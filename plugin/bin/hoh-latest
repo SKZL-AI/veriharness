@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# Applies a HoH command to the most recently touched run.
+#
+# `herdr plugin action invoke` passes no arguments through, so a menu entry
+# cannot take a run id. Rather than pretend an interface that does not exist,
+# this script picks the newest run -- in practice almost always the intended
+# one.
+set -euo pipefail
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+root="${HOH_RUNS:-$HOME/hoh/runs}"
+
+if [ ! -d "$root" ]; then
+  echo "No run directory at $root (set HOH_RUNS if it lives elsewhere)." >&2
+  exit 2
+fi
+
+# Real runs only: a directory holding a state.json. That leaves `_arenas` out.
+latest="$(
+  find "$root" -mindepth 2 -maxdepth 2 -name state.json -printf '%T@ %h\n' 2>/dev/null \
+    | sort -rn | head -1 | cut -d' ' -f2- | xargs -r basename
+)"
+if [ -z "$latest" ]; then
+  echo "No run found in $root." >&2
+  exit 2
+fi
+
+echo "Run: $latest"
+exec "$here/hoh" "$1" "$latest"

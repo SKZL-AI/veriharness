@@ -1,0 +1,17 @@
+[Unit]
+Description=Check regularly for HoH runs to resume
+Documentation=file://%h/hoh/docs/OPERATIONS.md
+
+[Timer]
+# Every 15 minutes. The deadline lives in the state (retry_after) -- the timer
+# only has to look often enough, not know the waiting time itself. More often
+# would be pointless: `resume-quota` does nothing while the deadline runs.
+OnBootSec=5min
+OnUnitActiveSec=15min
+# Catch up on missed runs, for instance after a reboot.
+Persistent=true
+AccuracySec=1min
+RandomizedDelaySec=60
+
+[Install]
+WantedBy=timers.target

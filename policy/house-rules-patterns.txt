@@ -1,0 +1,38 @@
+# House-rule patterns -- one POSIX ERE (grep -E) per line, # = comment.
+# SECOND STAGE alongside dangerous-patterns.txt. This file blocks NO
+# catastrophic commands; it enforces policy (~/.agents/rules/house-rules.md).
+# Effect depends on HOUSE_RULES_MODE: "ask" (Claude asks first) or "block" (exit 2).
+#
+# --- nvidia-smi: forbidden, because on 2026-08-03 it wedged the driver ---
+# Intent: EVERY invocation, not only samplers. Deliberately NOT a plain
+# substring, so that `grep nvidia-smi train.py` and prose or documentation do
+# not match by mistake.
+#
+# 1) [superseded, kept for provenance] nvidia-smi at a real command position
+#    (start of line, after ; & | or inside $( )).
+# 1) nvidia-smi at a real COMMAND POSITION -- including behind environment
+#    assignments and shell builtins. Extended 2026-09-07: an adversarial
+#    review demonstrated that "FOO=1 nvidia-smi", "eval nvidia-smi",
+#    "exec nvidia-smi" and "command nvidia-smi" defeated the old anchor.
+#    Deliberately not a substring: "grep -rn nvidia-smi src/" stays allowed.
+(^|[;&|]|\$\()[[:space:]]*([A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*[[:space:]]+)*((sudo|env|command|exec|eval|nohup|nice|stdbuf|time)[[:space:]]+)*(sudo[[:space:]]+)?([./][^[:space:]]*/)?nvidia-smi([[:space:]]|[;&|)]|$)
+# 1a addendum, 2026-09-08: the closing anchor knew only whitespace, `;` and
+#     end of line. An adversarial review at the HoH step-0 gate demonstrated
+#     that the **bare** command substitution slips through this: `$(tool)` did
+#     not match, `$( tool )` did -- even though the comment above names `$( )`
+#     as covered. Measured with a placeholder instead of the real name. The
+#     anchor now also knows `)`, `&` and `|`.
+# 1b) inside backticks -- the older command substitution. An adversarial
+#     review on 2026-09-07 demonstrated that `nvidia-smi` in backticks
+#     defeats the anchor from 1), which knows only $( ). Substitution is a
+#     command position.
+`[[:space:]]*([A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*[[:space:]]+)*((sudo|env|command|exec|eval|nohup|nice|stdbuf|time)[[:space:]]+)*([./][^[:space:]]*/)?nvidia-smi
+# 2) started through a wrapper that carries flags of its own
+(watch|timeout|xargs|strace|ltrace|flock)[[:space:]][^;&|]*nvidia-smi
+# 2b) through a shell smuggled in underneath
+(sh|bash|zsh|dash|ksh)[[:space:]]+-[A-Za-z]*c[[:space:]]+["']?[^"']*nvidia-smi
+# 2c) stashed in a variable first (n=nvidia-smi; $n)
+[A-Za-z_][A-Za-z0-9_]*=["']?nvidia-smi
+# 3) sampler forms named explicitly (in case 1 and 2 ever fail to match)
+nvidia-smi[[:space:]]+(dmon|pmon)
+nvidia-smi[[:space:]][^;&|]*(-l|--loop|--loop-ms)([[:space:]]|=|$)

@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+# Portable entry point for HoH -- from Herdr actions, cron and systemd.
+#
+# Two things are **resolved rather than set** here, both because the first
+# version failed on exactly them:
+#
+# 1. The source tree. It used to be an absolute `PYTHONPATH=<home>/hoh/src` in
+#    the plugin manifest. That worked on this machine and would have been
+#    broken on every other one.
+#
+# 2. The interpreter. `python3` on the PATH is not the same Python in every
+#    environment: an interactive shell takes the one from the profile,
+#    **systemd loads no profile** and takes the system's. The service therefore
+#    died with `ModuleNotFoundError: No module named 'pydantic'` even though
+#    the same command ran fine in a terminal. So the first interpreter that
+#    **really has** the dependency is used -- not the first one on the PATH.
+
+set -euo pipefail
+
+# --- 1. Installed package: the cleanest route --------------------------------
+if command -v hoh >/dev/null 2>&1; then
+  exec hoh "$@"
+fi
+
+# --- 2. Resolve the source tree ----------------------------------------------
+root="${HERDR_PLUGIN_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+source_tree="${HOH_SRC:-$root/../src}"
+
+if [ ! -d "$source_tree/hoh" ]; then
+  cat >&2 <<MESSAGE
+HoH is not reachable from here.
+  looked for a console command : hoh (not on the PATH)
+  looked for a source tree     : $source_tree
+Remedy:
+  pip install -e <hoh-repo>        # recommended, makes 'hoh' available globally
+  export HOH_SRC=<hoh-repo>/src
+MESSAGE
+  exit 127
+fi
+
+# --- 3. Find an interpreter that has the dependency --------------------------
+candidates=()
+[ -n "${HOH_PYTHON:-}" ] && candidates+=("$HOH_PYTHON")
+candidates+=("python3")
+# Environments an interactive shell would find through the profile but systemd
+# would not. The order is deliberate: an explicit setting beats everything.
+for p in "$HOME/miniconda3/bin/python3" "$HOME/anaconda3/bin/python3" \
+         "$HOME/.venv/bin/python3" "$root/../.venv/bin/python3" \
+         /usr/local/bin/python3 /usr/bin/python3; do
+  [ -x "$p" ] && candidates+=("$p")
+done
+
+for py in "${candidates[@]}"; do
+  command -v "$py" >/dev/null 2>&1 || continue
+  if PYTHONPATH="$source_tree" "$py" -c 'import pydantic' >/dev/null 2>&1; then
+    exec env PYTHONPATH="$source_tree${PYTHONPATH:+:$PYTHONPATH}" "$py" -m hoh.cli "$@"
+  fi
+done
+
+cat >&2 <<MESSAGE
+No Python interpreter with 'pydantic' found.
+  source tree : $source_tree
+  checked     : ${candidates[*]}
+
+This typically happens under systemd or cron: **no shell profile is loaded**
+there, so the PATH differs from the one in a terminal.
+Remedy:
+  export HOH_PYTHON=/path/to/python3     # state it explicitly
+  pip install -e <hoh-repo>              # or install HoH
+MESSAGE
+exit 127

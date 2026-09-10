@@ -1,0 +1,8 @@
+{
+  "run_id": "d2",
+  "iteration": 1,
+  "attempt": 1,
+  "rejected_on_check": "K7",
+  "rejected_at": "2026-09-08T07:55:45Z",
+  "note": "Copied verbatim from this repository's own dogfood evidence at runs/d2/. This iteration was later replanned and accepted as iteration 2 (see runs/d2/state.json history) -- the rejection shown here is the real first attempt, not a synthetic one."
+}

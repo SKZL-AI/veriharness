@@ -1,0 +1,62 @@
+[project]
+name = "hoh"
+version = "0.1.0"
+description = "VeriHarness — an evidence-bound Harness-of-Harness for verifiable long-horizon agent development. hoh is the package, module, and CLI that implement the Harness-of-Harness pattern; VeriHarness is the project built on it."
+requires-python = ">=3.11"
+# SPDX expression only. The captain decided MIT for this project (see
+# PROVENANCE.md); LICENSE carries the complete, unmodified text.
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Furkan Sakızlı" }]
+dependencies = ["pydantic>=2.0"]
+# Deliberately no "License ::" classifier: from setuptools 77 on it is mutually
+# exclusive with the SPDX `license` expression above.
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "Intended Audience :: Science/Research",
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Software Development :: Quality Assurance",
+  "Topic :: Software Development :: Testing",
+]
+
+# The long description is README.md itself -- there is no second copy. An
+# embedded copy here used to stand in for it, and it drifted: it kept opening
+# with the pre-rename title long after the project became VeriHarness. The
+# one fact that copy's comment stated explicitly -- that this field is what
+# produces Description-Content-Type in the distribution metadata -- still
+# holds; the file extension now sets it instead.
+readme = "README.md"
+
+[project.urls]
+# PLACEHOLDER -- VeriHarness is the decided project name, but no host or
+# account has been chosen for it yet, so no hosting location can be stated
+# here truthfully. RFC 2606 reserves example.invalid so this placeholder
+# cannot be mistaken for, or resolve to, a real project.
+Repository = "https://github.com/SKZL-AI/veriharness"
+
+[project.scripts]
+hoh = "hoh.cli:main"
+
+[build-system]
+# >= 77 for PEP 639: only from that version is the SPDX `license` string above
+# understood and emitted as License-Expression.
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+# The guard pattern files have to travel inside the wheel; without them an
+# installed copy raises PolicyUnavailable for every command.
+hoh = ["policy/*.txt"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

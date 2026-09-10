@@ -1,0 +1,17 @@
+{
+  "receipt_id": "d2-i1-a1-K7",
+  "run_id": "d2",
+  "iteration": 1,
+  "attempt": 1,
+  "check_id": "K7",
+  "candidate_binding": "63d90ce783ed3b544eeced9c53f434a3aaa44971:9fd8d68d0de0df00f588f9839df214770f2147b0:dirty",
+  "command": "python3 -m pytest -q",
+  "exit_code": 1,
+  "started_at": "2026-09-08T07:51:32Z",
+  "ended_at": "2026-09-08T07:52:01Z",
+  "stdout_digest": "9f16c4fe85420d1f",
+  "stdout_path": "logs/d2-i1-a1-K7.txt",
+  "runner_identity": "SAI-01/pid1526558/py3.13.5",
+  "runner_ok": true,
+  "truncated": false
+}

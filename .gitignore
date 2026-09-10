@@ -1,0 +1,26 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+runs/
+demo/
+history/*.bak
+!history/README.md
+
+# Versioned predecessors: they stay on disk but do not go into the public
+# repository. An adversarial review demonstrated on 2026-09-08 that three of
+# four history/*.bak files were tracked -- history/README.md claimed the
+# opposite -- and that plugin/herdr-plugin.toml.v2026-* carries an absolute
+# home path in an EXECUTABLE line. `git rm --cached` takes them out of the
+# delivery without removing them; the content stays in the history.
+*.bak
+plugin/*.v2026-*
+plugin/bin/hoh-latest-de
+policy/*.txt.v*
+
+# Build output. Measured 2026-09-08: 18 files under build/lib/ were tracked --
+# a stale copy of the source, including an older policy file. Adding the rule
+# does not untrack them (see history/README.md for the same lesson); the
+# exclusion from the public repository happens in D8 via the export's path
+# selection.
+build/

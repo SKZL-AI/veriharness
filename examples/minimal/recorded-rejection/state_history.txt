@@ -1,0 +1,10 @@
+Excerpt from runs/d2/state.json ("history" array), run d2, iteration 1.
+Copied verbatim -- nothing paraphrased, nothing added.
+
+2026-09-08T07:34:00Z stage NEW -> PLANNING: new iteration
+2026-09-08T07:44:01Z stage PLANNING -> DEVELOPING: Plan 83e28e53e9e0c5c3
+2026-09-08T07:51:03Z FREEZE plan=83e28e53e9e0c5c3 binding=63d90ce783ed3b544eeced9c53f434a3aaa44971:9fd8d68d0de0df00f588f9839df214770f2147b0:dirty
+2026-09-08T07:51:03Z stage DEVELOPING -> VERIFYING: candidate frozen
+2026-09-08T07:51:32Z non-discriminating criteria: K8 (was already green on the last accepted state and therefore does not demonstrate the increment), K9 (was already green on the last accepted state and therefore does not demonstrate the increment), K5 (was already green on the last accepted state and therefore does not demonstrate the increment)
+2026-09-08T07:55:45Z candidate rejected: not accepted: K7
+2026-09-08T07:55:45Z stage VERIFYING -> PLANNING: replanning after rejection

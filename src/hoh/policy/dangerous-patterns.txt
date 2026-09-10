@@ -1,0 +1,41 @@
+# Dangerous command denylist — one POSIX ERE (grep -E) per line.
+# Single source of truth for all agent command guards (Claude Code, Codex,
+# Kimi Code, Hermes, ...). Use [[:space:]], never \s.
+# Design rule: block only irreversible/catastrophic commands. Recoverable
+# local-destructive commands (rm -rf node_modules, git clean -fdx) stay allowed.
+
+# --- rm recursive/force on /, ~, $HOME, /* ---
+(^|[;&|][[:space:]]*)(sudo[[:space:]]+)?rm[[:space:]]+(-[a-zA-Z]*[rR][a-zA-Z]*[[:space:]]+)+(/|/\*|~|\$HOME|\$\{HOME\})([[:space:]]|/\*[[:space:]]*$|$)
+# --- sudo rm recursive anywhere (sudo rm -rf /any/path) ---
+(^|[;&|][[:space:]]*)sudo[[:space:]]+rm[[:space:]]+-[a-zA-Z]*[rR]
+# --- disk wipe / raw disk writes ---
+(^|[;&|][[:space:]]*)(sudo[[:space:]]+)?dd[[:space:]].*of=/dev/(sd|nvme|hd|vd|disk|mmcblk)
+(^|[;&|][[:space:]]*)(sudo[[:space:]]+)?mkfs(\.[a-z0-9]+)?[[:space:]]
+(^|[;&|][[:space:]]*)(sudo[[:space:]]+)?(wipefs|shred)[[:space:]].*/dev/
+>[[:space:]]*/dev/(sd|nvme|hd|vd|mmcblk)
+# --- fork bomb ---
+:\(\)[[:space:]]*\{[[:space:]]*:\|:&[[:space:]]*\};:
+# --- pipe remote script straight into a shell ---
+curl[[:space:]][^|]*\|[[:space:]]*(sudo[[:space:]]+)?(ba|z|da)?sh([[:space:]]|$)
+wget[[:space:]][^|]*\|[[:space:]]*(sudo[[:space:]]+)?(ba|z|da)?sh([[:space:]]|$)
+# --- git force push (allow --force-with-lease) ---
+git[[:space:]]+push[[:space:]].*--force([[:space:]]|$)
+git[[:space:]]+push[[:space:]].*-[a-zA-Z]*f([[:space:]]|$)
+# --- repo / data destruction via CLIs ---
+gh[[:space:]]+repo[[:space:]]+delete
+# --- overwrite shell init / authorized_keys from the net ---
+(curl|wget)[[:space:]].*(>[[:space:]]*~?/?\.(bashrc|zshrc|profile)|authorized_keys)
+# 2026-09-07: gap closed. The patterns above anchor the end with
+# ([[:space:]]|/\*[[:space:]]*$|$) -- a trailing slash slipped through:
+# "rm -rf ~/" and "rm -rf $HOME/" were NOT blocked.
+(^|[;&|][[:space:]]*)(sudo[[:space:]]+)?rm[[:space:]]+(-[a-zA-Z]*[rR][a-zA-Z]*[[:space:]]+)+(/|~|\$HOME|\$\{HOME\})/+([[:space:]]|$)
+# 2026-09-07: the house rule "no recursive deletion at fundamental paths"
+# anchored technically. Local cleanup (./build, node_modules) stays free.
+# System directories
+(^|[;&|][[:space:]]*)(sudo[[:space:]]+)?rm[[:space:]]+(-[a-zA-Z]*[rR][a-zA-Z]*[[:space:]]+)+/+(etc|usr|var|boot|bin|sbin|lib|lib64|opt|srv|root|home|mnt|proc|sys|dev|snap)(/[^[:space:]]*)?([[:space:]]|$)
+# Elternverzeichnis-Traversal
+(^|[;&|][[:space:]]*)(sudo[[:space:]]+)?rm[[:space:]]+(-[a-zA-Z]*[rR][a-zA-Z]*[[:space:]]+)+\.\.(/+\*?)?([[:space:]]|$)
+# Zugangsdaten und Agenten-Konfiguration
+(^|[;&|][[:space:]]*)(sudo[[:space:]]+)?rm[[:space:]]+(-[a-zA-Z]*[rR][a-zA-Z]*[[:space:]]+)+(~|\$HOME|\$\{HOME\})/\.(ssh|gnupg|config|claude|agents|codex|kimi-code|pi|aws|kube)([[:space:]]|/|$)
+# find -delete auf fundamentalen Pfaden
+find[[:space:]]+(/|~|\$HOME|\$\{HOME\})[[:space:]][^;&|]*-delete

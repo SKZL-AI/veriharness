@@ -1,0 +1,8 @@
+# Fallback without systemd -- same effect, every 15 minutes.
+# Install with:  crontab -e
+#
+# The absolute path is necessary because cron has a minimal environment.
+# `bin/hoh` resolves the rest itself (installed package, HOH_SRC or the
+# sibling directory) -- so the entry stays valid even if HoH is later
+# installed as a package.
+*/15 * * * * $HOME/hoh/plugin/bin/hoh resume-quota >> $HOME/hoh/runs/_resume-quota.log 2>&1

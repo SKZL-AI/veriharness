@@ -1,0 +1,26 @@
+[Unit]
+Description=HoH: resume runs that are waiting on quota
+Documentation=file://%h/hoh/docs/OPERATIONS.md
+# Without a network a resume has no purpose -- the role run needs the provider.
+After=network-online.target
+
+[Service]
+Type=oneshot
+# `hoh resume-quota` resumes blocked_kind=usage_limit only, and only once
+# retry_after has expired. Every other block has a cause a human clears -- the
+# timer walks past those, it does not walk over them.
+ExecStart=%h/hoh/plugin/bin/hoh resume-quota
+# It restores the state only; the run itself needs Herdr and is deliberately
+# NOT started from here. A role run outside a Herdr session would have no
+# demonstrable endpoint.
+Nice=10
+IOSchedulingClass=idle
+# The service touches nothing but the run directory.
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=%h/hoh/runs
+PrivateTmp=true
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,54 @@
+# Herdr plugin for HoH.
+#
+# Its purpose is **reachability**: the same commands, from any workspace. There
+# is no second implementation here -- every action calls `bin/hoh`, and that
+# calls the CLI.
+#
+# Three properties of the plugin interface, **measured** against Herdr 0.8.0
+# rather than assumed:
+#
+#   * The manifest's `[env]` section is not read. A variable declared there
+#     does not arrive inside the action (evidence: ModuleNotFoundError).
+#   * `herdr plugin action invoke` passes **no arguments** through. Every
+#     action is therefore argument-free; one with a required argument would be
+#     an interface that does not exist.
+#   * Herdr does pass `HERDR_PLUGIN_ROOT` and sets the working directory to
+#     the plugin root. That is exactly what `bin/hoh` builds on -- which is
+#     why there is **no absolute path left here**. The first version carried
+#     `PYTHONPATH=<home>/hoh/src` in the command; that worked on this machine
+#     and would have been broken on every other one.
+#
+# Everything that needs a particular run or an approval -- `run`, `start`,
+# `deliver`, `cancel` -- deliberately stays out. Steps like those belong on the
+# CLI with explicit arguments, not behind a menu entry.
+
+id = "hoh"
+name = "Harness-of-Harness"
+version = "0.2.0"
+description = "Planner -> developer -> independent QA -> evidence -> accept/reject -> replan."
+min_herdr_version = "0.8.0"
+platforms = ["linux", "macos"]
+
+[[actions]]
+id = "list"
+title = "List runs"
+description = "Every known run with its stage, condition and accepted candidate."
+command = ["./bin/hoh", "list"]
+
+[[actions]]
+id = "status"
+title = "State of the most recent run"
+description = "Stage, condition, budget and open items of the most recently touched run."
+command = ["./bin/hoh-latest", "status"]
+
+[[actions]]
+id = "report"
+title = "Report on the most recent run"
+description = "Markdown report: verdicts, receipts, evidence, open gaps."
+command = ["./bin/hoh-latest", "report"]
+
+[[actions]]
+id = "resume-quota"
+title = "Resume runs waiting on quota"
+description = "Checks every run and resumes those whose wait has expired. usage_limit only."
+command = ["./bin/hoh", "resume-quota"]

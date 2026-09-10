@@ -1,0 +1,18 @@
+cff-version: 1.2.0
+message: >-
+  If you use this software, please cite it. No canonical citation format
+  has been agreed for this project yet; the fields below are the facts
+  confirmed locally (from pyproject.toml and this run's git history), not
+  a fully worked-out citation record. hoh is the package, module, and CLI
+  that implement the Harness-of-Harness pattern; VeriHarness is the project
+  built on that pattern and the name this citation records.
+title: "VeriHarness: an evidence-bound Harness-of-Harness for verifiable long-horizon agent development"
+version: 0.1.0
+date-released: "2026-09-08"
+authors:
+  - given-names: "Furkan"
+    family-names: "Sakızlı"
+license: "MIT"
+# See LICENSE at the repository root: the captain decided MIT for this
+# project, and LICENSE carries the complete, unmodified text. See
+# PROVENANCE.md for the third-party facts this decision was checked against.

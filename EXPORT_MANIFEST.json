@@ -1,0 +1,1040 @@
+{
+  "schema": "hoh-export-manifest/1",
+  "entries": [
+    {
+      "path": ".gitignore",
+      "decision": "INCLUDE",
+      "rule": "repo-meta"
+    },
+    {
+      "path": "A02_BEFUNDE.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "A02_BERICHT.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "A03_NACHWEIS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "A11_KOEXISTENZ.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "CHANGELOG.md",
+      "decision": "INCLUDE",
+      "rule": "governance"
+    },
+    {
+      "path": "CITATION.cff",
+      "decision": "INCLUDE",
+      "rule": "governance"
+    },
+    {
+      "path": "CLAIMS.json",
+      "decision": "INCLUDE",
+      "rule": "public-docs"
+    },
+    {
+      "path": "CLAIMS.md",
+      "decision": "INCLUDE",
+      "rule": "public-docs"
+    },
+    {
+      "path": "CONTRIBUTING.md",
+      "decision": "INCLUDE",
+      "rule": "governance"
+    },
+    {
+      "path": "DELTA_HERDR_NATIVE.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "DOGFOOD_ENTSCHEIDUNGEN.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "DOGFOOD_HANDOFF.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "DOGFOOD_LEDGER.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "DOGFOOD_READINESS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "EXPORT_MANIFEST.json",
+      "decision": "INCLUDE",
+      "rule": "governance"
+    },
+    {
+      "path": "HOH_ACCEPTANCE_REPORT.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "HOH_INTEGRATION_MAP.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "HUMAN_REVIEW_CANDIDATE.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "LICENSE",
+      "decision": "INCLUDE",
+      "rule": "governance"
+    },
+    {
+      "path": "LICENSE.v1.20260908T084525Z",
+      "decision": "EXCLUDE",
+      "rule": "parked-predecessor"
+    },
+    {
+      "path": "PHASE2.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "PROVENANCE.md",
+      "decision": "INCLUDE",
+      "rule": "governance"
+    },
+    {
+      "path": "RC_GATE.md",
+      "decision": "INCLUDE",
+      "rule": "public-docs"
+    },
+    {
+      "path": "README.md",
+      "decision": "INCLUDE",
+      "rule": "public-docs"
+    },
+    {
+      "path": "RELEASE_NOTES.md",
+      "decision": "INCLUDE",
+      "rule": "public-docs"
+    },
+    {
+      "path": "RUNBOOK.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "SECURITY.md",
+      "decision": "INCLUDE",
+      "rule": "governance"
+    },
+    {
+      "path": "THIRD_PARTY_NOTICES.md",
+      "decision": "INCLUDE",
+      "rule": "governance"
+    },
+    {
+      "path": "build/",
+      "decision": "EXCLUDE",
+      "rule": "stale-build-output"
+    },
+    {
+      "path": "docs/ARCHITECTURE.md",
+      "decision": "INCLUDE",
+      "rule": "public-docs"
+    },
+    {
+      "path": "docs/EVIDENCE_MODEL.md",
+      "decision": "INCLUDE",
+      "rule": "public-docs"
+    },
+    {
+      "path": "docs/GOALBOOK.md",
+      "decision": "INCLUDE",
+      "rule": "public-docs"
+    },
+    {
+      "path": "docs/HERDR_HOH_IMPLEMENTATION_HANDOFF.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "docs/HERDR_INTEGRATION.md",
+      "decision": "INCLUDE",
+      "rule": "public-docs"
+    },
+    {
+      "path": "docs/K1_CACHE_PROFILE.md",
+      "decision": "EXCLUDE",
+      "rule": "foreign-subject"
+    },
+    {
+      "path": "docs/LIMITATIONS.md",
+      "decision": "INCLUDE",
+      "rule": "public-docs"
+    },
+    {
+      "path": "docs/OPERATIONS.md",
+      "decision": "INCLUDE",
+      "rule": "public-docs"
+    },
+    {
+      "path": "docs/QUELLENCHECK.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "docs/RECOVERY.md",
+      "decision": "INCLUDE",
+      "rule": "public-docs"
+    },
+    {
+      "path": "dogfood/ABSCHLUSSBERICHT.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/ABSCHLUSSBERICHT.md.v20260909T142857Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/ABSCHLUSSBERICHT.md.v20260909T154058Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/ABSCHLUSSBERICHT.md.v20260909T180906Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/ABSCHLUSSBERICHT.md.v20260909T192206Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/D7_REVIEW_AUFTRAG.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/EXPORT_DATEIMENGE.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/HUMAN_REVIEW_CANDIDATE.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/PARALLELENTSCHEIDUNGEN.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/READY_QUEUE.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/READY_QUEUE.json.v1.20260908T152646Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/READY_QUEUE.json.v2026-09-08T19:31:49Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/READY_QUEUE.json.v2026-09-09T14:24:01Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/READY_QUEUE.json.v2026-09-09T15:50:10Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/READY_QUEUE.json.v2026-09-09T15:52:20Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/READY_QUEUE.json.v2026-09-09T16:07:21Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/READY_QUEUE.json.v2026-09-09T16:54:10Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/READY_QUEUE.json.v2026-09-09T17:07:27Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/READY_QUEUE.json.v2026-09-09T17:33:41Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/READY_QUEUE.json.v2026-09-09T18:08:32Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/READY_QUEUE.json.v2026-09-09T18:46:50Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/READY_QUEUE.json.v2026-09-09T19:22:06Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/READY_QUEUE.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/READY_QUEUE.md.v1.20260908T152111Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/VORSCHLAG_UNION_GATE.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/d1-packaging.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/d1-packaging.md.v1.2026-09-07T15-40-00Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/d1-packaging.md.v2.2026-09-08T06-55-38Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/d2-hygiene.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/d2-hygiene.md.v1.20260908T082313Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/d2b-licenses.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/d2c-license-files.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/d2c2-license-files.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/d3-docs.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/d3b-selfcontained.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/d3c-limitations.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/d3d-limit-six.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/d3d-limit-six.md.v1.20260908T173959Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/d3d-limit-six.md.v2.20260908T175711Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/d3d-limit-six.md.v3.20260908T180223Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/d3f-limits-fifteen-sixteen.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/d3g-limit-eight-disproven.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/d3g-limit-eight-disproven.md.v2026-09-09T10:13:38Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/d4-claims.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/d4b-run-claims.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/d4c-content-anchors.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/d4d-claim-surfaces.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/d4e-public-surface.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/d4e-public-surface.md.v1.20260908T164524Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/d4e-public-surface.md.v2.20260908T172035Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/d4f-readable-claims.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/d4g-five-minutes.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/d4h-ledger-public.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/d4h-ledger-public.md.v2026-09-09T06:58:28Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/d4i-anchor-environment-gap.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/d4j-scope-check-is-not-a-test.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/d4k-two-regimes-one-assertion.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/d4l-empty-list-is-the-wrong-invariant.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/d5-paper.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/d5-paper.md.v1.20260908T164838Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/d5-paper.md.v2026-09-08T20:37:17Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/d5l-limits-from-the-file.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/d5l-limits-from-the-file.md.v2026-09-08T21:53:41Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/d5l-limits-from-the-file.md.v2026-09-08T22:51:36Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/d5p-two-prose-defects.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/d6-audit.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/d7a-overclaims.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/d7b-release-safety.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/d7k-consolidation.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/d7k-consolidation.md.v20260909T142252Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/d7r-review-repairs.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/d7r-review-repairs.md.v20260909T170426Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/d7w-a-claim-that-outruns-its-tree.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/d7x-export-bookkeeping.md.entwurf.v20260909T154533Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/d7x-manifest-is-the-record.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/d7y-references-that-do-not-ship.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/d7y-references-that-do-not-ship.md.v20260909T165355Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/d7z-a-hand-count-of-a-moving-tree.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/d8-release-candidate.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/d8-release-candidate.md.v1.20260908T152000Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/d8-release-candidate.md.v2026-09-08T20:46:08Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/d8-release-candidate.md.v2026-09-09T07:51:38Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/d8b-classify-the-release-documents.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/d8c-marked-fallback-is-not-a-defect.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/dug-union-gate.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/dug2-build-input.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/dug2-build-input.md.v1.20260908T165846Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/dugf-fixture-selfsufficient.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/dugf-fixture-selfsufficient.md.v1.20260908T180925Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/r1-export-manifest.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/r1-export-manifest.md.v1.20260908T164328Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/r1a-evidence-visibility.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/r1a-evidence-visibility.md.v1.20260908T155924Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/r1c-walk-prunes-evidence.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/r1d-manifest-stability.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/rname-project-identity.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/rname-project-identity.md.v2026-09-08T21:56:03Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/rname2-one-readme-not-two.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "examples/minimal/README.md",
+      "decision": "INCLUDE",
+      "rule": "example"
+    },
+    {
+      "path": "examples/minimal/recorded-rejection/SOURCE.json",
+      "decision": "INCLUDE",
+      "rule": "example"
+    },
+    {
+      "path": "examples/minimal/recorded-rejection/qa_result.json",
+      "decision": "INCLUDE",
+      "rule": "example"
+    },
+    {
+      "path": "examples/minimal/recorded-rejection/receipts/d2-i1-a1-K7-basis.json",
+      "decision": "INCLUDE",
+      "rule": "example"
+    },
+    {
+      "path": "examples/minimal/recorded-rejection/receipts/d2-i1-a1-K7.json",
+      "decision": "INCLUDE",
+      "rule": "example"
+    },
+    {
+      "path": "examples/minimal/recorded-rejection/state_history.txt",
+      "decision": "INCLUDE",
+      "rule": "example"
+    },
+    {
+      "path": "examples/minimal/spec.md",
+      "decision": "INCLUDE",
+      "rule": "example"
+    },
+    {
+      "path": "history/D7_REVIEW_AUFTRAG.md.v1.20260908T130539Z",
+      "decision": "EXCLUDE",
+      "rule": "parked-predecessor"
+    },
+    {
+      "path": "history/EXPORT_DATEIMENGE.md.v1.20260908T110641Z",
+      "decision": "EXCLUDE",
+      "rule": "parked-predecessor"
+    },
+    {
+      "path": "history/README.md",
+      "decision": "EXCLUDE",
+      "rule": "parked-predecessor"
+    },
+    {
+      "path": "history/dangerous-patterns.txt.de-partial.20260908T091903Z",
+      "decision": "EXCLUDE",
+      "rule": "parked-predecessor"
+    },
+    {
+      "path": "history/herdr-plugin.toml.de.20260908T091440Z",
+      "decision": "EXCLUDE",
+      "rule": "parked-predecessor"
+    },
+    {
+      "path": "history/hoh-latest.de.20260908T091440Z",
+      "decision": "EXCLUDE",
+      "rule": "parked-predecessor"
+    },
+    {
+      "path": "history/hoh.de.20260908T091440Z",
+      "decision": "EXCLUDE",
+      "rule": "parked-predecessor"
+    },
+    {
+      "path": "history/house-rules-patterns.txt.de.20260908T091217Z",
+      "decision": "EXCLUDE",
+      "rule": "parked-predecessor"
+    },
+    {
+      "path": "ops/README.md",
+      "decision": "INCLUDE",
+      "rule": "operational-integration"
+    },
+    {
+      "path": "ops/cron.example",
+      "decision": "INCLUDE",
+      "rule": "operational-integration"
+    },
+    {
+      "path": "ops/hoh-resume-quota.service",
+      "decision": "INCLUDE",
+      "rule": "operational-integration"
+    },
+    {
+      "path": "ops/hoh-resume-quota.timer",
+      "decision": "INCLUDE",
+      "rule": "operational-integration"
+    },
+    {
+      "path": "paper/AUDIT.md",
+      "decision": "INCLUDE",
+      "rule": "paper"
+    },
+    {
+      "path": "paper/FIGURES.md",
+      "decision": "INCLUDE",
+      "rule": "paper"
+    },
+    {
+      "path": "paper/NUMBERS.md",
+      "decision": "INCLUDE",
+      "rule": "paper"
+    },
+    {
+      "path": "paper/POSITION_PAPER.md",
+      "decision": "INCLUDE",
+      "rule": "paper"
+    },
+    {
+      "path": "paper/REVIEW_A.md",
+      "decision": "INCLUDE",
+      "rule": "paper"
+    },
+    {
+      "path": "paper/REVIEW_B.md",
+      "decision": "INCLUDE",
+      "rule": "paper"
+    },
+    {
+      "path": "paper/REVIEW_CONSOLIDATED.md",
+      "decision": "INCLUDE",
+      "rule": "paper"
+    },
+    {
+      "path": "plugin/bin/hoh",
+      "decision": "INCLUDE",
+      "rule": "operational-integration"
+    },
+    {
+      "path": "plugin/bin/hoh-latest",
+      "decision": "INCLUDE",
+      "rule": "operational-integration"
+    },
+    {
+      "path": "plugin/herdr-plugin.toml",
+      "decision": "INCLUDE",
+      "rule": "operational-integration"
+    },
+    {
+      "path": "policy/README.md",
+      "decision": "INCLUDE",
+      "rule": "operational-integration"
+    },
+    {
+      "path": "policy/dangerous-patterns.txt",
+      "decision": "INCLUDE",
+      "rule": "operational-integration"
+    },
+    {
+      "path": "policy/house-rules-patterns.txt",
+      "decision": "INCLUDE",
+      "rule": "operational-integration"
+    },
+    {
+      "path": "pyproject.toml",
+      "decision": "INCLUDE",
+      "rule": "package"
+    },
+    {
+      "path": "runs/",
+      "decision": "EXCLUDE",
+      "rule": "evidence-not-artifact"
+    },
+    {
+      "path": "src/hoh/__init__.py",
+      "decision": "INCLUDE",
+      "rule": "package"
+    },
+    {
+      "path": "src/hoh/cli.py",
+      "decision": "INCLUDE",
+      "rule": "package"
+    },
+    {
+      "path": "src/hoh/contracts.py",
+      "decision": "INCLUDE",
+      "rule": "package"
+    },
+    {
+      "path": "src/hoh/controller.py",
+      "decision": "INCLUDE",
+      "rule": "package"
+    },
+    {
+      "path": "src/hoh/delivery.py",
+      "decision": "INCLUDE",
+      "rule": "package"
+    },
+    {
+      "path": "src/hoh/dispatchers.py",
+      "decision": "INCLUDE",
+      "rule": "package"
+    },
+    {
+      "path": "src/hoh/evidence.py",
+      "decision": "INCLUDE",
+      "rule": "package"
+    },
+    {
+      "path": "src/hoh/goalbook.py",
+      "decision": "INCLUDE",
+      "rule": "package"
+    },
+    {
+      "path": "src/hoh/herdr.py",
+      "decision": "INCLUDE",
+      "rule": "package"
+    },
+    {
+      "path": "src/hoh/policy/dangerous-patterns.txt",
+      "decision": "INCLUDE",
+      "rule": "package"
+    },
+    {
+      "path": "src/hoh/policy/house-rules-patterns.txt",
+      "decision": "INCLUDE",
+      "rule": "package"
+    },
+    {
+      "path": "src/hoh/quota.py",
+      "decision": "INCLUDE",
+      "rule": "package"
+    },
+    {
+      "path": "src/hoh/roles.py",
+      "decision": "INCLUDE",
+      "rule": "package"
+    },
+    {
+      "path": "src/hoh/runner.py",
+      "decision": "INCLUDE",
+      "rule": "package"
+    },
+    {
+      "path": "src/hoh/stages.py",
+      "decision": "INCLUDE",
+      "rule": "package"
+    },
+    {
+      "path": "src/hoh/store.py",
+      "decision": "INCLUDE",
+      "rule": "package"
+    },
+    {
+      "path": "src/hoh/trust.py",
+      "decision": "INCLUDE",
+      "rule": "package"
+    },
+    {
+      "path": "src/hoh/workspace.py",
+      "decision": "INCLUDE",
+      "rule": "package"
+    },
+    {
+      "path": "tests/test_claims_anchors.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_contracts.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_controller.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_evidence.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_export_manifest.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_phase2.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_review_findings.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_runner.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_source_hygiene.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_stages.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_store.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_union_gate.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_workspace.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tools/audit_refs.py",
+      "decision": "INCLUDE",
+      "rule": "tooling"
+    },
+    {
+      "path": "tools/check_claims.py",
+      "decision": "INCLUDE",
+      "rule": "tooling"
+    },
+    {
+      "path": "tools/export_manifest.py",
+      "decision": "INCLUDE",
+      "rule": "tooling"
+    },
+    {
+      "path": "tools/union_gate.py",
+      "decision": "INCLUDE",
+      "rule": "tooling"
+    }
+  ]
+}
