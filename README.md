@@ -114,12 +114,12 @@ figures are stated here rather than linked:
 | Iterations that produced receipts | **100** (98 of them criterion receipts) |
 | Distinct specifications | **51** |
 | Merges into the mainline | **45** |
-| Recorded findings | **96** |
+| Recorded findings | **97** |
 | Human governance decisions | **7** |
 | Wall-clock | five calendar days; 3.5 days elapsed |
 
 The findings are the point of that table more than the run count is. A
-campaign that produces 96 recorded findings against its own harness is not a
+campaign that produces 97 recorded findings against its own harness is not a
 campaign that went smoothly. The findings themselves live in the development
 repository's working ledger, which does not ship; what ships is the subset
 that became a standing limit, written out in full in `docs/LIMITATIONS.md`
@@ -138,17 +138,34 @@ overstate the kernel and erase the work that happened above it.
 | The orchestrating agent session, outside run write-boundaries | Specifications, core fixes to `src/hoh/`, gate and release tooling, merges |
 | A human, as policy authority | Seven governance decisions, and every irreversible external action |
 
-Measured over the non-merge commits reachable from the mainline -- a merge
-commit is the *taking* of a run branch, not a direct write, so counting one as
-"written directly" would invert what it shows:
+Measured over the non-merge commits reachable from the mainline **of the
+development repository, at commit `30ff053`** -- a merge commit is the *taking*
+of a run branch, not a direct write, so counting one as "written directly"
+would invert what it shows. The published repository is an export with its own,
+much shorter history; these counts do not describe it and are not reproducible
+there.
 
 | Path | Commits | Arrived via a run branch | Written directly |
 |---|---|---|---|
 | `src/hoh/` | 49 | 1 | 48 |
-| `tests/` | 69 | 19 | 50 |
-| `docs/` | 14 | 9 | 5 |
-| `paper/` | 9 | 9 | **0** |
+| `tests/` | 70 | 19 | 51 |
+| `docs/` | 15 | 9 | 6 |
+| `paper/` | 10 | 9 | 1 |
 | `tools/` | 20 | 19 | 1 |
+
+Naming that commit is not pedantry, and the first published version of this
+table got three of its five rows wrong for want of it. The table counts commits
+to paths the table itself lives in, so **the commit that writes these numbers
+changes them**, and a count taken "now" is stale the moment it is written down.
+A measurement of a tree has to name the tree.
+
+The `paper/` row deserves its own sentence, because it changed while this
+release was being prepared. Nine of its ten commits came from runs: the
+position paper was written by the loop, not by hand. The tenth is the
+correction that produced this release -- sections 1.1 and 1.2, written directly
+by the orchestrating session, outside any run. Until that commit the column
+read zero, and saying so now rather than leaving the older, tidier number in
+place is the same discipline the rest of this section is about.
 
 The `tools/` row is the one worth pausing on: all three of this project's
 release-gate tools -- `check_claims.py`, `export_manifest.py` and

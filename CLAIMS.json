@@ -16,7 +16,7 @@
     {
       "id": "C-001",
       "text": "| Herdr must be running (`HERDR_ENV=1`) | HoH refuses to start otherwise -- deliberately, but it is a real prerequisite, not a formality. |",
-      "where": "README.md:168",
+      "where": "README.md:200",
       "status": "SUPPORTED",
       "evidence": [
         "file:src/hoh/herdr.py:52"
@@ -1354,16 +1354,16 @@
     },
     {
       "id": "C-130",
-      "text": "| Recorded findings | **96** |",
+      "text": "| Recorded findings | **97** |",
       "where": "README.md:117",
       "status": "SUPPORTED",
       "evidence": [
         "receiptcount:d8=26",
         "run:d8/1"
       ],
-      "anchor_digest": "cc5d2a5e58cef87d5b7e193dc847df659ce754fdafc304914180135efd4e50b3",
+      "anchor_digest": "c324dfeb624442d212464eb7564fde54fdef1e53c15b3c03ac621c262f1d922d",
       "local_only_resolution": "Resolved by the orchestrating agent session on 2026-09-10 in the development repository: 94 findings, by counting distinct finding numbers in the development ledger. Re-checkable with the operator tool kampagne-zahlen.py, which re-derives this figure from its source and compares it against this exact line (README.md:117), failing on any disagreement; its negative control nk-kampagne-zahlen.py falsifies each number in turn and requires the checker to go red on every one.",
-      "note": "Catalogued during the rc2 correction cycle. The figure is not left free-standing in prose: it is bound to its source by a checker that fails the release gate on drift, which is the defect class that made this cycle necessary. Figure updated from 94 to 95 on 2026-09-10, when finding O95 was recorded; the earlier wording was \"| Recorded findings | **94** |\". Finding count updated from 95 to 96 on 2026-09-10, when finding O96 was recorded; the earlier wording was \"| Recorded findings | **95** |\"."
+      "note": "Catalogued during the rc2 correction cycle. The figure is not left free-standing in prose: it is bound to its source by a checker that fails the release gate on drift, which is the defect class that made this cycle necessary. Figure updated from 94 to 95 on 2026-09-10, when finding O95 was recorded; the earlier wording was \"| Recorded findings | **94** |\". Finding count updated from 95 to 96 on 2026-09-10, when finding O96 was recorded; the earlier wording was \"| Recorded findings | **95** |\". Anchor re-derived on 2026-09-10 (similarity 0.97) after finding O97: the attribution figures are now measured at a named commit rather than at HEAD, because the commit that writes them changes them. The earlier wording was: \"| Recorded findings | **96** |\"."
     },
     {
       "id": "C-131",
@@ -1380,21 +1380,21 @@
     },
     {
       "id": "C-132",
-      "text": "campaign that produces 96 recorded findings against its own harness is not a",
+      "text": "campaign that produces 97 recorded findings against its own harness is not a",
       "where": "README.md:122",
       "status": "SUPPORTED",
       "evidence": [
         "receiptcount:d8=26",
         "run:d8/1"
       ],
-      "anchor_digest": "a7427f07554bc81affc9a013fdf53085806e8c0449d6ffcfa2f328881dd20aa9",
+      "anchor_digest": "2627be0615d0fe9ac70fc2692d3aaca77ea1fb008b86ca3dabe17b92e8f1594f",
       "local_only_resolution": "Resolved by the orchestrating agent session on 2026-09-10 in the development repository: 94 findings, by counting distinct finding numbers in the development ledger. Re-checkable with the operator tool kampagne-zahlen.py, which re-derives this figure from its source and compares it against this exact line (README.md:122), failing on any disagreement; its negative control nk-kampagne-zahlen.py falsifies each number in turn and requires the checker to go red on every one.",
-      "note": "Catalogued during the rc2 correction cycle. The figure is not left free-standing in prose: it is bound to its source by a checker that fails the release gate on drift, which is the defect class that made this cycle necessary. Anchor re-derived on 2026-09-10: the earlier wording was \"campaign that produces 94 recorded findings against its own harness is not\" and implied that finding numbers can be traced into docs/LIMITATIONS.md. They cannot -- that document names no finding numbers, because U2 forbids a shipped file from referencing an unshipped one. The figure itself is unchanged. Figure updated from 94 to 95 on 2026-09-10, when finding O95 was recorded; the earlier wording was \"campaign that produces 94 recorded findings against its own harness is not a\". Finding count updated from 95 to 96 on 2026-09-10, when finding O96 was recorded; the earlier wording was \"campaign that produces 95 recorded findings against its own harness is not a\"."
+      "note": "Catalogued during the rc2 correction cycle. The figure is not left free-standing in prose: it is bound to its source by a checker that fails the release gate on drift, which is the defect class that made this cycle necessary. Anchor re-derived on 2026-09-10: the earlier wording was \"campaign that produces 94 recorded findings against its own harness is not\" and implied that finding numbers can be traced into docs/LIMITATIONS.md. They cannot -- that document names no finding numbers, because U2 forbids a shipped file from referencing an unshipped one. The figure itself is unchanged. Figure updated from 94 to 95 on 2026-09-10, when finding O95 was recorded; the earlier wording was \"campaign that produces 94 recorded findings against its own harness is not a\". Finding count updated from 95 to 96 on 2026-09-10, when finding O96 was recorded; the earlier wording was \"campaign that produces 95 recorded findings against its own harness is not a\". Anchor re-derived on 2026-09-10 (similarity 0.99) after finding O97: the attribution figures are now measured at a named commit rather than at HEAD, because the commit that writes them changes them. The earlier wording was: \"campaign that produces 96 recorded findings against its own harness is not a\"."
     },
     {
       "id": "C-133",
       "text": "| `src/hoh/` | 49 | 1 | 48 |",
-      "where": "README.md:147",
+      "where": "README.md:150",
       "status": "SUPPORTED",
       "evidence": [
         "receiptcount:d8=26",
@@ -1406,42 +1406,42 @@
     },
     {
       "id": "C-134",
-      "text": "| `tests/` | 69 | 19 | 50 |",
-      "where": "README.md:148",
+      "text": "| `tests/` | 70 | 19 | 51 |",
+      "where": "README.md:151",
       "status": "SUPPORTED",
       "evidence": [
         "receiptcount:d8=26",
         "run:d8/1"
       ],
-      "anchor_digest": "8dfd0ecc78589f06be29de4080f6a6d873abfec5ce70f1d8f0a061a312c35654",
+      "anchor_digest": "3cb98e6960932c4c868476bbd05a7aade93ff8e37eb667d1a8bedf6caf7be0bb",
       "local_only_resolution": "Resolved by the orchestrating agent session on 2026-09-10 in the development repository: 19 of them arriving via run branches, 7 governance decisions, 73 commits touching tests, by counting DEC-R identifiers across the ledger and the limitations document; subtracting the mainline first-parent chain from those commits; listing mainline commits touching tests. Re-checkable with the operator tool kampagne-zahlen.py, which re-derives this figure from its source and compares it against this exact line (README.md:143), failing on any disagreement; its negative control nk-kampagne-zahlen.py falsifies each number in turn and requires the checker to go red on every one.",
-      "note": "Catalogued during the rc2 correction cycle. The figure is not left free-standing in prose: it is bound to its source by a checker that fails the release gate on drift, which is the defect class that made this cycle necessary. Anchor re-derived on 2026-09-10 (similarity 0.89); the earlier wording was: \"| `tests/` | 73 | 19 | 54 |\". What changed in the rc2 cycle: the specification count (48 basenames -> 51 distinct contents) and the attribution columns (now counted without merge commits). The statement itself was not withdrawn."
+      "note": "Catalogued during the rc2 correction cycle. The figure is not left free-standing in prose: it is bound to its source by a checker that fails the release gate on drift, which is the defect class that made this cycle necessary. Anchor re-derived on 2026-09-10 (similarity 0.89); the earlier wording was: \"| `tests/` | 73 | 19 | 54 |\". What changed in the rc2 cycle: the specification count (48 basenames -> 51 distinct contents) and the attribution columns (now counted without merge commits). The statement itself was not withdrawn. Anchor re-derived on 2026-09-10 (similarity 0.89) after finding O97: the attribution figures are now measured at a named commit rather than at HEAD, because the commit that writes them changes them. The earlier wording was: \"| `tests/` | 69 | 19 | 50 |\"."
     },
     {
       "id": "C-135",
-      "text": "| `docs/` | 14 | 9 | 5 |",
-      "where": "README.md:144",
+      "text": "| `docs/` | 15 | 9 | 6 |",
+      "where": "README.md:152",
       "status": "SUPPORTED",
       "evidence": [
         "receiptcount:d8=26",
         "run:d8/1"
       ],
-      "anchor_digest": "98f6ec67c9884758f31d8c2a41902b6bf929b70eb4e871af973aad049ed2a319",
+      "anchor_digest": "783695c7e5aee2a9d3c665b91ae28a43a58c97f44f79d0084b5fe4eaf717dadd",
       "local_only_resolution": "Resolved by the orchestrating agent session on 2026-09-10 in the development repository: a campaign figure, by deriving from the run records and the commit history. Re-checkable with the operator tool kampagne-zahlen.py, which re-derives this figure from its source and compares it against this exact line (README.md:144), failing on any disagreement; its negative control nk-kampagne-zahlen.py falsifies each number in turn and requires the checker to go red on every one.",
-      "note": "Catalogued during the rc2 correction cycle. The figure is not left free-standing in prose: it is bound to its source by a checker that fails the release gate on drift, which is the defect class that made this cycle necessary."
+      "note": "Catalogued during the rc2 correction cycle. The figure is not left free-standing in prose: it is bound to its source by a checker that fails the release gate on drift, which is the defect class that made this cycle necessary. Anchor re-derived on 2026-09-10 (similarity 0.92) after finding O97: the attribution figures are now measured at a named commit rather than at HEAD, because the commit that writes them changes them. The earlier wording was: \"| `docs/` | 14 | 9 | 5 |\"."
     },
     {
       "id": "C-136",
-      "text": "| `paper/` | 9 | 9 | **0** |",
-      "where": "README.md:150",
+      "text": "| `paper/` | 10 | 9 | 1 |",
+      "where": "README.md:153",
       "status": "SUPPORTED",
       "evidence": [
         "receiptcount:d8=26",
         "run:d8/1"
       ],
-      "anchor_digest": "bf4e97186d60de9c9bde32710f0dc9ad590e967ec384b7ed3df5436769a01f07",
+      "anchor_digest": "2d3443565ca5fce02bcdd73b160fc01d21c984eb0440005446665ce771b424f5",
       "local_only_resolution": "Resolved by the orchestrating agent session on 2026-09-10 in the development repository: a campaign figure, by deriving from the run records and the commit history. Re-checkable with the operator tool kampagne-zahlen.py, which re-derives this figure from its source and compares it against this exact line (README.md:145), failing on any disagreement; its negative control nk-kampagne-zahlen.py falsifies each number in turn and requires the checker to go red on every one.",
-      "note": "Catalogued during the rc2 correction cycle. The figure is not left free-standing in prose: it is bound to its source by a checker that fails the release gate on drift, which is the defect class that made this cycle necessary. Anchor re-derived on 2026-09-10 (similarity 0.83); the earlier wording was: \"| `paper/` | 10 | 9 | 1 |\". What changed in the rc2 cycle: the specification count (48 basenames -> 51 distinct contents) and the attribution columns (now counted without merge commits). The statement itself was not withdrawn."
+      "note": "Catalogued during the rc2 correction cycle. The figure is not left free-standing in prose: it is bound to its source by a checker that fails the release gate on drift, which is the defect class that made this cycle necessary. Anchor re-derived on 2026-09-10 (similarity 0.83); the earlier wording was: \"| `paper/` | 10 | 9 | 1 |\". What changed in the rc2 cycle: the specification count (48 basenames -> 51 distinct contents) and the attribution columns (now counted without merge commits). The statement itself was not withdrawn. Anchor re-derived on 2026-09-10 (similarity 0.83) after finding O97: the attribution figures are now measured at a named commit rather than at HEAD, because the commit that writes them changes them. The earlier wording was: \"| `paper/` | 9 | 9 | **0** |\"."
     },
     {
       "id": "C-137",
@@ -1458,16 +1458,16 @@
     },
     {
       "id": "C-138",
-      "text": "51 specifications, 45 merges and 96 recorded findings**, across five calendar",
+      "text": "51 specifications, 45 merges and 97 recorded findings**, across five calendar",
       "where": "docs/LIMITATIONS.md:28",
       "status": "SUPPORTED",
       "evidence": [
         "receiptcount:d8=26",
         "run:d8/1"
       ],
-      "anchor_digest": "0a21da6ccf23e4b901ddd88d018ce756f924dfe98f1781c07ae676b4910e1525",
+      "anchor_digest": "030603368de8705dc40c09fcc529da606fc6b96d04aecb9178796de27a164dda",
       "local_only_resolution": "Resolved by the orchestrating agent session on 2026-09-10 in the development repository: 45 merges, 48 specifications, 94 findings, by counting distinct finding numbers in the development ledger; counting distinct spec_path values across all state.json; counting merge commits on the mainline. Re-checkable with the operator tool kampagne-zahlen.py, which re-derives this figure from its source and compares it against this exact line (docs/LIMITATIONS.md:28), failing on any disagreement; its negative control nk-kampagne-zahlen.py falsifies each number in turn and requires the checker to go red on every one.",
-      "note": "Catalogued during the rc2 correction cycle. The figure is not left free-standing in prose: it is bound to its source by a checker that fails the release gate on drift, which is the defect class that made this cycle necessary. Figure updated from 94 to 95 on 2026-09-10, when finding O95 was recorded; the earlier wording was \"48 specifications, 45 merges and 94 recorded findings**, across five calendar\". Anchor re-derived on 2026-09-10 (similarity 0.97); the earlier wording was: \"48 specifications, 45 merges and 95 recorded findings**, across five calendar\". What changed in the rc2 cycle: the specification count (48 basenames -> 51 distinct contents) and the attribution columns (now counted without merge commits). The statement itself was not withdrawn. Finding count updated from 95 to 96 on 2026-09-10, when finding O96 was recorded; the earlier wording was \"51 specifications, 45 merges and 95 recorded findings**, across five calendar\"."
+      "note": "Catalogued during the rc2 correction cycle. The figure is not left free-standing in prose: it is bound to its source by a checker that fails the release gate on drift, which is the defect class that made this cycle necessary. Figure updated from 94 to 95 on 2026-09-10, when finding O95 was recorded; the earlier wording was \"48 specifications, 45 merges and 94 recorded findings**, across five calendar\". Anchor re-derived on 2026-09-10 (similarity 0.97); the earlier wording was: \"48 specifications, 45 merges and 95 recorded findings**, across five calendar\". What changed in the rc2 cycle: the specification count (48 basenames -> 51 distinct contents) and the attribution columns (now counted without merge commits). The statement itself was not withdrawn. Finding count updated from 95 to 96 on 2026-09-10, when finding O96 was recorded; the earlier wording was \"51 specifications, 45 merges and 95 recorded findings**, across five calendar\". Anchor re-derived on 2026-09-10 (similarity 0.99) after finding O97: the attribution figures are now measured at a named commit rather than at HEAD, because the commit that writes them changes them. The earlier wording was: \"51 specifications, 45 merges and 96 recorded findings**, across five calendar\"."
     },
     {
       "id": "C-139",
@@ -1484,16 +1484,16 @@
     },
     {
       "id": "C-140",
-      "text": "decisions against 65 runs, 51 specifications, 45 merges and 96 findings. The",
+      "text": "decisions against 65 runs, 51 specifications, 45 merges and 97 findings. The",
       "where": "docs/LIMITATIONS.md:47",
       "status": "SUPPORTED",
       "evidence": [
         "receiptcount:d8=26",
         "run:d8/1"
       ],
-      "anchor_digest": "f5668a50b7a8421650014e5afd545c79f3efd68e69abc46e0b2024e1e2bcf1af",
+      "anchor_digest": "c0481f7cfd753df3da8f56de155cda7d818cd542de0f36a674173f93fe49e976",
       "local_only_resolution": "Resolved by the orchestrating agent session on 2026-09-10 in the development repository: 45 merges, 48 specifications, 65 runs, 94 findings, by counting distinct finding numbers in the development ledger; counting distinct spec_path values across all state.json; counting merge commits on the mainline; counting runs/*/state.json. Re-checkable with the operator tool kampagne-zahlen.py, which re-derives this figure from its source and compares it against this exact line (docs/LIMITATIONS.md:47), failing on any disagreement; its negative control nk-kampagne-zahlen.py falsifies each number in turn and requires the checker to go red on every one.",
-      "note": "Catalogued during the rc2 correction cycle. The figure is not left free-standing in prose: it is bound to its source by a checker that fails the release gate on drift, which is the defect class that made this cycle necessary. Figure updated from 94 to 95 on 2026-09-10, when finding O95 was recorded; the earlier wording was \"decisions against 65 runs, 48 specifications, 45 merges and 94 findings. The\". Anchor re-derived on 2026-09-10 (similarity 0.97); the earlier wording was: \"decisions against 65 runs, 48 specifications, 45 merges and 95 findings. The\". What changed in the rc2 cycle: the specification count (48 basenames -> 51 distinct contents) and the attribution columns (now counted without merge commits). The statement itself was not withdrawn. Finding count updated from 95 to 96 on 2026-09-10, when finding O96 was recorded; the earlier wording was \"decisions against 65 runs, 51 specifications, 45 merges and 95 findings. The\"."
+      "note": "Catalogued during the rc2 correction cycle. The figure is not left free-standing in prose: it is bound to its source by a checker that fails the release gate on drift, which is the defect class that made this cycle necessary. Figure updated from 94 to 95 on 2026-09-10, when finding O95 was recorded; the earlier wording was \"decisions against 65 runs, 48 specifications, 45 merges and 94 findings. The\". Anchor re-derived on 2026-09-10 (similarity 0.97); the earlier wording was: \"decisions against 65 runs, 48 specifications, 45 merges and 95 findings. The\". What changed in the rc2 cycle: the specification count (48 basenames -> 51 distinct contents) and the attribution columns (now counted without merge commits). The statement itself was not withdrawn. Finding count updated from 95 to 96 on 2026-09-10, when finding O96 was recorded; the earlier wording was \"decisions against 65 runs, 51 specifications, 45 merges and 95 findings. The\". Anchor re-derived on 2026-09-10 (similarity 0.99) after finding O97: the attribution figures are now measured at a named commit rather than at HEAD, because the commit that writes them changes them. The earlier wording was: \"decisions against 65 runs, 51 specifications, 45 merges and 96 findings. The\"."
     },
     {
       "id": "C-141",
@@ -1523,34 +1523,34 @@
     },
     {
       "id": "C-143",
-      "text": "| `README.md`, `RELEASE_NOTES.md` | The dogfood evidence \"covers documentation and governance work, never a change to `src/` or `tests/`\" | False on both halves. 19 of 69 commits under `tests/` arrived via run branches, and one run added two files under `src/hoh/policy/`. |",
-      "where": "RELEASE_NOTES.md:19",
+      "text": "| `README.md`, `RELEASE_NOTES.md` | The dogfood evidence \"covers documentation and governance work, never a change to `src/` or `tests/`\" | False on both halves. 19 of 70 commits under `tests/` arrived via run branches, and one run added two files under `src/hoh/policy/`. |",
+      "where": "RELEASE_NOTES.md:75",
       "status": "SUPPORTED",
       "evidence": [
         "receiptcount:d8=26",
         "run:d8/1"
       ],
-      "anchor_digest": "fe9a3eaf20b890708c1b6afb23fda752e56a836cfb8d8c884c00acd6235332c3",
+      "anchor_digest": "12509cc2c1e3c3df8b6c68a72989f3e4c34ebb6d5b445649e2fd7939017c0c80",
       "local_only_resolution": "Resolved by the orchestrating agent session on 2026-09-10 in the development repository: 19 of them arriving via run branches, 7 governance decisions, 73 commits touching tests, by counting DEC-R identifiers across the ledger and the limitations document; subtracting the mainline first-parent chain from those commits; listing mainline commits touching tests. Re-checkable with the operator tool kampagne-zahlen.py, which re-derives this figure from its source and compares it against this exact line (RELEASE_NOTES.md:19), failing on any disagreement; its negative control nk-kampagne-zahlen.py falsifies each number in turn and requires the checker to go red on every one.",
-      "note": "Catalogued during the rc2 correction cycle. The figure is not left free-standing in prose: it is bound to its source by a checker that fails the release gate on drift, which is the defect class that made this cycle necessary. Anchor re-derived on 2026-09-10 (similarity 0.99); the earlier wording was: \"| `README.md`, `RELEASE_NOTES.md` | The dogfood evidence \"covers documentation and governance work, never a change to `src/` or `tests/`\" | False on both halves. 19 of 73 commits under `tests/` arrived via run branches, and one run added two files under `src/hoh/policy/`. |\". What changed in the rc2 cycle: the specification count (48 basenames -> 51 distinct contents) and the attribution columns (now counted without merge commits). The statement itself was not withdrawn."
+      "note": "Catalogued during the rc2 correction cycle. The figure is not left free-standing in prose: it is bound to its source by a checker that fails the release gate on drift, which is the defect class that made this cycle necessary. Anchor re-derived on 2026-09-10 (similarity 0.99); the earlier wording was: \"| `README.md`, `RELEASE_NOTES.md` | The dogfood evidence \"covers documentation and governance work, never a change to `src/` or `tests/`\" | False on both halves. 19 of 73 commits under `tests/` arrived via run branches, and one run added two files under `src/hoh/policy/`. |\". What changed in the rc2 cycle: the specification count (48 basenames -> 51 distinct contents) and the attribution columns (now counted without merge commits). The statement itself was not withdrawn. Anchor re-derived on 2026-09-10 (similarity 0.99) after finding O97: the attribution figures are now measured at a named commit rather than at HEAD, because the commit that writes them changes them. The earlier wording was: \"| `README.md`, `RELEASE_NOTES.md` | The dogfood evidence \"covers documentation and governance work, never a change to `src/` or `tests/`\" | False on both halves. 19 of 69 commits under `tests/` arrived via run branches, and one run added two files under `src/hoh/policy/`. |\"."
     },
     {
       "id": "C-144",
-      "text": "the non-merge commits reachable from the mainline: `tests/` has 69 commits, 19 of them",
-      "where": "RELEASE_NOTES.md:154",
+      "text": "the non-merge commits reachable from the mainline: `tests/` has 70 commits, 19 of them",
+      "where": "RELEASE_NOTES.md:210",
       "status": "SUPPORTED",
       "evidence": [
         "receiptcount:d8=26",
         "run:d8/1"
       ],
-      "anchor_digest": "9519515b7a00a3cb28b9149932aa5bb2d8c5d5b3716359fd77e7561b2416ecd8",
+      "anchor_digest": "9e7ef8b77cced59e926bc27ad3f5c39dac785b369d536c3fa0c6efa7bc8d5d21",
       "local_only_resolution": "Resolved by the orchestrating agent session on 2026-09-10 in the development repository: 19 of them arriving via run branches, 7 governance decisions, 73 commits touching tests, by counting DEC-R identifiers across the ledger and the limitations document; subtracting the mainline first-parent chain from those commits; listing mainline commits touching tests. Re-checkable with the operator tool kampagne-zahlen.py, which re-derives this figure from its source and compares it against this exact line (RELEASE_NOTES.md:151), failing on any disagreement; its negative control nk-kampagne-zahlen.py falsifies each number in turn and requires the checker to go red on every one.",
-      "note": "Catalogued during the rc2 correction cycle. The figure is not left free-standing in prose: it is bound to its source by a checker that fails the release gate on drift, which is the defect class that made this cycle necessary. Anchor re-derived on 2026-09-10 (similarity 0.91); the earlier wording was: \"the commits reachable from the mainline: `tests/` has 73 commits, 19 of them\". What changed in the rc2 cycle: the specification count (48 basenames -> 51 distinct contents) and the attribution columns (now counted without merge commits). The statement itself was not withdrawn."
+      "note": "Catalogued during the rc2 correction cycle. The figure is not left free-standing in prose: it is bound to its source by a checker that fails the release gate on drift, which is the defect class that made this cycle necessary. Anchor re-derived on 2026-09-10 (similarity 0.91); the earlier wording was: \"the commits reachable from the mainline: `tests/` has 73 commits, 19 of them\". What changed in the rc2 cycle: the specification count (48 basenames -> 51 distinct contents) and the attribution columns (now counted without merge commits). The statement itself was not withdrawn. Anchor re-derived on 2026-09-10 (similarity 0.98) after finding O97: the attribution figures are now measured at a named commit rather than at HEAD, because the commit that writes them changes them. The earlier wording was: \"the non-merge commits reachable from the mainline: `tests/` has 69 commits, 19 of them\"."
     },
     {
       "id": "C-145",
       "text": "| `tools/` | 20 | 19 | 1 |",
-      "where": "README.md:151",
+      "where": "README.md:154",
       "status": "SUPPORTED",
       "evidence": [
         "receiptcount:d8=26",
@@ -1559,6 +1559,19 @@
       "anchor_digest": "5d43560015d9b6b3cd7845a8ddb78178c58b6702a1fd8d469816f508452110fc",
       "local_only_resolution": "Resolved by the orchestrating agent session on 2026-09-10 in the development repository: 22 commits touching tools, 19 of them arriving via run branches, by listing mainline commits touching tools and subtracting the first-parent chain. Re-checkable against README.md:149 with the operator tool kampagne-zahlen.py.",
       "note": "Catalogued during the rc2 correction cycle. Anchor re-derived on 2026-09-10 (similarity 0.92); the earlier wording was: \"| `tools/` | 22 | 19 | 3 |\". What changed in the rc2 cycle: the specification count (48 basenames -> 51 distinct contents) and the attribution columns (now counted without merge commits). The statement itself was not withdrawn."
+    },
+    {
+      "id": "C-146",
+      "text": "rc2 reported `paper/` as 9/9/**0** -- nothing written to the position paper",
+      "where": "RELEASE_NOTES.md:33",
+      "status": "SUPPORTED",
+      "evidence": [
+        "receiptcount:d8=26",
+        "run:d8/1"
+      ],
+      "anchor_digest": "e89ebe855d0a95d78f6848cbf7dfb1435ff15bca192e7d4cabaa2499037de016",
+      "local_only_resolution": "Resolved by the orchestrating agent session on 2026-09-10 in the development repository by re-deriving the attribution counts at the named commit 30ff053 rather than at HEAD. Re-checkable with the operator tool kampagne-zahlen.py, which prints the commit it measured at and fails on any disagreement.",
+      "note": "Catalogued during the rc3 correction cycle (finding O97)."
     }
   ],
   "not_claims": [
@@ -5452,77 +5465,77 @@
     {
       "id": "N-556",
       "text": "# Release notes -- v0.1.0-rc1",
-      "where": "RELEASE_NOTES.md:63",
+      "where": "RELEASE_NOTES.md:119",
       "reason": "document title/heading naming the release version tag `v0.1.0-rc1`; not a measurement.",
       "anchor_digest": "2a3bc850e79ff39514576242d8b561dac98bbb917215f6407b83c788516b6f2d"
     },
     {
       "id": "N-557",
       "text": "| Herdr running, with `HERDR_ENV=1` | HoH refuses to start otherwise, on purpose -- a real prerequisite, not a formality. |",
-      "where": "RELEASE_NOTES.md:86",
+      "where": "RELEASE_NOTES.md:142",
       "reason": "restates the Herdr/`HERDR_ENV=1` prerequisite already recorded as claim `C-001` (`README.md:64`, evidence `file:src/hoh/herdr.py:52`); a downstream restatement of an existing claim, not a new one.",
       "anchor_digest": "5e3ca9356bf8a5e040a194468e431c50bed73692ae0c99db7d6a2ab152d4f251"
     },
     {
       "id": "N-558",
       "text": "## What changed on the way to `0.1.0-rc1`",
-      "where": "RELEASE_NOTES.md:90",
+      "where": "RELEASE_NOTES.md:146",
       "reason": "section heading restating the release version tag from this document's own title; not a measurement.",
       "anchor_digest": "86669b7710f339c86fba060e17cd94637508d1678851eddf4f9654eaf8b41fbc"
     },
     {
       "id": "N-559",
       "text": "- This run (`hoh-d8`) added three release-candidate documents -- this file,",
-      "where": "RELEASE_NOTES.md:92",
+      "where": "RELEASE_NOTES.md:148",
       "reason": "names this run's own run id (`hoh-d8`), describing which run produced these documents; a run-id self-reference, not a measurement.",
       "anchor_digest": "90d8de08e6d4676233748692c31e1dbbc775b711b118ecab7294a8c0cdf3abff"
     },
     {
       "id": "N-560",
       "text": "audit (`paper/AUDIT.md`) each passed their own QA gate: `D5` accepted the",
-      "where": "RELEASE_NOTES.md:98",
+      "where": "RELEASE_NOTES.md:154",
       "reason": "restates D5's and D6's acceptance figures continued at lines 34-35, already recorded at `dogfood/ABSCHLUSSBERICHT.md:222` and `:406` (Section B's run-trace table) and restated identically at `RC_GATE.md`'s 'Position Paper QA grün' row; a downstream restatement, not a new independent measurement.",
       "anchor_digest": "c510225d78c2b626fb95344f5ae6a9a91bd7be4248f74e15ed7be38c83ef6a35"
     },
     {
       "id": "N-561",
       "text": "paper at its second iteration, `14` of `14` criteria; `D6` accepted the",
-      "where": "RELEASE_NOTES.md:99",
+      "where": "RELEASE_NOTES.md:155",
       "reason": "restates D5's acceptance figure (`14` of `14` criteria), already recorded at `dogfood/ABSCHLUSSBERICHT.md:222` (Section B's run-trace table) and restated identically at `RC_GATE.md`'s 'Position Paper QA grün' row; a downstream restatement, not a new independent measurement.",
       "anchor_digest": "fbe740d54cc7abdec75485582272ab80b9604f4f1bef93bc4a9b5082cf613a90"
     },
     {
       "id": "N-562",
       "text": "audit at its second iteration, `10` of `10` criteria.",
-      "where": "RELEASE_NOTES.md:100",
+      "where": "RELEASE_NOTES.md:156",
       "reason": "restates D6's acceptance figure (`10` of `10` criteria), already recorded at `dogfood/ABSCHLUSSBERICHT.md:406` (Section B's run-trace table) and restated identically at `RC_GATE.md`'s 'Position Paper QA grün' row; a downstream restatement, not a new independent measurement.",
       "anchor_digest": "32fc0a17ad14cd69d4a441c06b1d6e228ac5ea1af9cc5a82c253ab0c7c2950b5"
     },
     {
       "id": "N-563",
       "text": "four classified BLOCKER are now closed: `A-01` and `A-02` were corrected by",
-      "where": "RELEASE_NOTES.md:105",
+      "where": "RELEASE_NOTES.md:161",
       "reason": "restates the BLOCKER-finding closures (`A-01`, `A-02`), already recorded in `paper/REVIEW_CONSOLIDATED.md`'s Findings table and restated in this ledger's own `RC_GATE.md` disposition-table entries (lines 77-78); a downstream restatement, not a new independent measurement.",
       "anchor_digest": "78806148a2a2fa79a3f15d338f4ec280d3ac27b5a76d57c0fddc83bf1d00798c"
     },
     {
       "id": "N-564",
       "text": "loop run `d7r`, `B-04` by loop run `d7w`, and `B-01` by loop run `d7x` --",
-      "where": "RELEASE_NOTES.md:106",
+      "where": "RELEASE_NOTES.md:162",
       "reason": "restates the BLOCKER-finding closures (`B-04`, `B-01`), already recorded in `paper/REVIEW_CONSOLIDATED.md`'s Findings table and restated in this ledger's own `RC_GATE.md` disposition-table entries (lines 79-80); a downstream restatement, not a new independent measurement.",
       "anchor_digest": "eaeb5839504cad68237c536db27bcbb503686cf1cf22d6cc43abe2cd1fcf0f98"
     },
     {
       "id": "N-565",
       "text": "guard, not a silent gap (see `docs/LIMITATIONS.md`, limit 4).",
-      "where": "RELEASE_NOTES.md:110",
+      "where": "RELEASE_NOTES.md:166",
       "reason": "cross-reference to `docs/LIMITATIONS.md` limit 4 (an existing declared claim surface in this ledger), naming where the underlying disclaimer already lives, and to the full defect accounting at `dogfood/ABSCHLUSSBERICHT.md:906` (Section D); not a fresh measurement.",
       "anchor_digest": "2f61c712b49d2a4423e66d4be063660ec87bcaa23c382c7654c5c4be0340e2d9"
     },
     {
       "id": "N-566",
       "text": "logic was never written by a run. See `docs/LIMITATIONS.md` limit 8, and",
-      "where": "RELEASE_NOTES.md:160",
+      "where": "RELEASE_NOTES.md:216",
       "reason": "cross-reference to `docs/LIMITATIONS.md` limit 8 (an existing declared claim surface in this ledger); not a fresh measurement.",
       "anchor_digest": "58cfb2528d1908bc11e16942bf9042b456ad102f428a89c4e7730ddbe44d2e74",
       "note": "Anchor moved from RELEASE_NOTES.md:84 to RELEASE_NOTES.md:157 on 2026-09-10; the earlier wording was: \"`docs/LIMITATIONS.md` limit 8 for the current wording and why the wider\". The line was revised in the rc2 correction cycle; the statement itself was not withdrawn."
@@ -5530,7 +5543,7 @@
     {
       "id": "N-567",
       "text": "`v0.1.0-rc1` was tagged and pushed on a human decision that this run neither",
-      "where": "RELEASE_NOTES.md:190",
+      "where": "RELEASE_NOTES.md:246",
       "reason": "restates the release version tag `v0.1.0-rc1` from this document's own title while describing what the operator published after run D8 closed; not a measurement. Re-anchored on 2026-09-10: the sentence this entry previously pointed at said the candidate \"is not a public release\", which was true when D8 wrote it and false once the operator published. The entry follows the version mention to its successor sentence rather than being dropped.",
       "anchor_digest": "5b022517c8eb18195dfb396fd468e9684ac2d7749ef55d87f2c0e3325f809071",
       "note": "Anchor moved from RELEASE_NOTES.md:114 to RELEASE_NOTES.md:187 on 2026-09-10; the earlier wording was: \"was complete: `v0.1.0-rc1` is now the public research-preview release\". The line was revised in the rc2 correction cycle; the statement itself was not withdrawn."
@@ -5545,7 +5558,7 @@
     {
       "id": "N-569",
       "text": "**Run `D8`, which produced this document, published nothing.** It created no",
-      "where": "RELEASE_NOTES.md:184",
+      "where": "RELEASE_NOTES.md:240",
       "reason": "names run `D8` as a run identifier while stating the scope boundary that run observed; the digit is part of the run id, not a measurement.",
       "anchor_digest": "6b10ed1dbd95649e10629d9d672901a4ec1eb8c73e54b18f14dccb5f9c46c6dd"
     },
@@ -5672,126 +5685,126 @@
     {
       "id": "N-587",
       "text": "# Release notes -- v0.1.0-rc2",
-      "where": "RELEASE_NOTES.md:1",
+      "where": "RELEASE_NOTES.md:57",
       "anchor_digest": "64246c2996b70964c25c7eb04d1d341652cdcef2a9c55a24a845a3716ac30f4c",
       "reason": "describes the architecture or the rc2 correction itself, not a numeric measurement claim"
     },
     {
       "id": "N-588",
       "text": "`v0.1.0-rc2` supersedes `v0.1.0-rc1`. It is a **documentation and positioning",
-      "where": "RELEASE_NOTES.md:3",
+      "where": "RELEASE_NOTES.md:59",
       "anchor_digest": "d7084f62730c8249c99942751f2bc0075a50277c36c29e693f42ad97147ff240",
       "reason": "describes the architecture or the rc2 correction itself, not a numeric measurement claim"
     },
     {
       "id": "N-589",
       "text": "two tags. `v0.1.0-rc1` stays published, tagged and unmoved -- it is the",
-      "where": "RELEASE_NOTES.md:5",
+      "where": "RELEASE_NOTES.md:61",
       "anchor_digest": "df1daeeb66efc986d269a55533929754d863565b81b3c6600a34232857820110",
       "reason": "describes the architecture or the rc2 correction itself, not a numeric measurement claim"
     },
     {
       "id": "N-590",
       "text": "## What rc2 corrects, and why there was anything to correct",
-      "where": "RELEASE_NOTES.md:10",
+      "where": "RELEASE_NOTES.md:66",
       "anchor_digest": "8f01a1a5de23e4bc6ee9ebc1cfd25a31d93250d7974e525b2dc83a0c32224f9b",
       "reason": "describes the architecture or the rc2 correction itself, not a numeric measurement claim"
     },
     {
       "id": "N-591",
       "text": "Four claims in the rc1 documents were wrong or misleading. All four were",
-      "where": "RELEASE_NOTES.md:12",
+      "where": "RELEASE_NOTES.md:68",
       "anchor_digest": "0337b9b714db5c421dc399e60d87758f153ad1e8471e89f8cca3cf849fbb7941",
       "reason": "describes the architecture or the rc2 correction itself, not a numeric measurement claim"
     },
     {
       "id": "N-592",
       "text": "| Where | What rc1 said | Why it was wrong |",
-      "where": "RELEASE_NOTES.md:16",
+      "where": "RELEASE_NOTES.md:72",
       "anchor_digest": "4ec3a0f58e6d68b380d9c3d01169893730ccd6c553e78f0bd8ebdf0a07051269",
       "reason": "describes the architecture or the rc2 correction itself, not a numeric measurement claim"
     },
     {
       "id": "N-593",
       "text": "| `docs/LIMITATIONS.md` limit 1 | Described the campaign as *attended*, with \"an operator\" writing each specification | Misattributed the system's own top layer as external supervision. The specifications, merges and repairs came from an agent session, not a person typing. |",
-      "where": "RELEASE_NOTES.md:20",
+      "where": "RELEASE_NOTES.md:76",
       "anchor_digest": "f2e37dfb28c57bfd7988547c8ec2a257699442cebdc3e7d1e2522307beb8cea9",
       "reason": "describes the architecture or the rc2 correction itself, not a numeric measurement claim"
     },
     {
       "id": "N-594",
       "text": "| `docs/LIMITATIONS.md` limit 8 | \"No run has ever added or edited a line inside `src/`\" | Overstated. Run `d1` added `src/hoh/policy/dangerous-patterns.txt` and `src/hoh/policy/house-rules-patterns.txt`, merged as accepted candidate `d1-i2`. Recorded as finding `O94`. |",
-      "where": "RELEASE_NOTES.md:21",
+      "where": "RELEASE_NOTES.md:77",
       "anchor_digest": "bc6f95661b6586189bf06244f1f389c4d5e92e21f0da1e4949e0a99f60341947",
       "reason": "describes the architecture or the rc2 correction itself, not a numeric measurement claim"
     },
     {
       "id": "N-595",
       "text": "rc2 additionally adds what rc1 omitted entirely: a `What has actually been",
-      "where": "RELEASE_NOTES.md:28",
+      "where": "RELEASE_NOTES.md:84",
       "anchor_digest": "4f7c4d226d4ab2e73692d69b9d1e7f36a454037070488ca619bd4614a15d8877",
       "reason": "describes the architecture or the rc2 correction itself, not a numeric measurement claim"
     },
     {
       "id": "N-596",
       "text": "rc1 stated the composition limit in a form that had already stopped being",
-      "where": "RELEASE_NOTES.md:41",
+      "where": "RELEASE_NOTES.md:97",
       "anchor_digest": "13ef8dfc2c931d7a7a76b428b022d0ec63fc1edb7b80da1aceb481659cefb182",
       "reason": "describes the architecture or the rc2 correction itself, not a numeric measurement claim"
     },
     {
       "id": "N-597",
       "text": "corrected two-level statement, now in `docs/LIMITATIONS.md` §9 and the paper's",
-      "where": "RELEASE_NOTES.md:43",
+      "where": "RELEASE_NOTES.md:99",
       "anchor_digest": "fea458928ae41a1fe8e3797c25351e08c104d663b9350669fcb1d9d1dee6f36a",
       "reason": "describes the architecture or the rc2 correction itself, not a numeric measurement claim"
     },
     {
       "id": "N-598",
       "text": "- **System level:** above that loop sit the union invariants `U1`-`U5`,",
-      "where": "RELEASE_NOTES.md:49",
+      "where": "RELEASE_NOTES.md:105",
       "anchor_digest": "eb223ccc917a506b139dd317094d968372e1f385c41415fa9310b53ba225a15e",
       "reason": "describes the architecture or the rc2 correction itself, not a numeric measurement claim"
     },
     {
       "id": "N-599",
       "text": "This is not a claim that composition is solved. `U1`-`U5` are a named,",
-      "where": "RELEASE_NOTES.md:54",
+      "where": "RELEASE_NOTES.md:110",
       "anchor_digest": "9edb37fdbfc9f65e038717a4e2ed3704c71d56ad5294cee6404d60fb73678ffe",
       "reason": "describes the architecture or the rc2 correction itself, not a numeric measurement claim"
     },
     {
       "id": "N-600",
       "text": "`d8b` and `d8c`.",
-      "where": "RELEASE_NOTES.md:59",
+      "where": "RELEASE_NOTES.md:115",
       "anchor_digest": "ec99bd063076cb846cfa40cd0f51554714dda81a45dfd916d6b2db6ae84c86f0",
       "reason": "describes the architecture or the rc2 correction itself, not a numeric measurement claim"
     },
     {
       "id": "N-601",
       "text": "`[corrected in rc2]`. This is the record of what was claimed at rc1.*",
-      "where": "RELEASE_NOTES.md:66",
+      "where": "RELEASE_NOTES.md:122",
       "anchor_digest": "e7788f38d1129c431e031366ec6f706ed091e1d9ffece74a49a21d070ee6a756",
       "reason": "describes the architecture or the rc2 correction itself, not a numeric measurement claim"
     },
     {
       "id": "N-602",
       "text": "  **[corrected in rc2.** rc1 wrote \"by the operator\" here, which reads as a",
-      "where": "RELEASE_NOTES.md:119",
+      "where": "RELEASE_NOTES.md:175",
       "anchor_digest": "62c8cd7b11fd515013b6b0b40bd85db82bc6097db7859bb3703063a38e89fbac",
       "reason": "marks the rc2 correction of an rc1 wording (\"by the operator\"); names an authority, not a measurement. Re-anchored on 2026-09-10: the entry first covered the same correction written as an inline clause inside the rc1 bullet, which merged two sentences and pulled an excluded internal document into this ledger's rendered reference closure. The correction now stands as its own sentence after the preserved rc1 text."
     },
     {
       "id": "N-603",
       "text": "**[corrected in rc2]** That claim is too wide on both halves. Measured over",
-      "where": "RELEASE_NOTES.md:153",
+      "where": "RELEASE_NOTES.md:209",
       "anchor_digest": "9043480017ed3e10a52793c42330b4acf1d18b47a70556ed826274678d280c5b",
       "reason": "describes the architecture or the rc2 correction itself, not a numeric measurement claim"
     },
     {
       "id": "N-604",
       "text": "arriving via run branches across three run-authored files; `src/hoh/` has 49",
-      "where": "RELEASE_NOTES.md:155",
+      "where": "RELEASE_NOTES.md:211",
       "anchor_digest": "23af90fa60c292c88d0adeb32190624d25738e36dfa3f0c503d737d44d72e808",
       "reason": "describes the architecture or the rc2 correction itself, not a numeric measurement claim",
       "note": "Anchor re-derived on 2026-09-10 (similarity 0.97); the earlier wording was: \"arriving via run branches across three run-authored files; `src/hoh/` has 50\". What changed in the rc2 cycle: the specification count (48 basenames -> 51 distinct contents) and the attribution columns (now counted without merge commits). The statement itself was not withdrawn."
@@ -5799,21 +5812,21 @@
     {
       "id": "N-605",
       "text": "commits, one of which arrived via a run branch -- run `d1` adding",
-      "where": "RELEASE_NOTES.md:156",
+      "where": "RELEASE_NOTES.md:212",
       "anchor_digest": "4cd17d3f531c80f50d9c1dd67cadaf80fec6c9733104cc7706be36c75875cadd",
       "reason": "describes the architecture or the rc2 correction itself, not a numeric measurement claim"
     },
     {
       "id": "N-606",
       "text": "finding `O94` for how the overstatement was found.",
-      "where": "RELEASE_NOTES.md:161",
+      "where": "RELEASE_NOTES.md:217",
       "anchor_digest": "6bb8aa2be5e86837830bbbc6565521a465442b263019b1c253f18cf86f20e41f",
       "reason": "describes the architecture or the rc2 correction itself, not a numeric measurement claim"
     },
     {
       "id": "N-607",
       "text": "and taken by a person. `v0.1.0-rc2` follows the same split. Those two sentences are deliberately kept apart, because",
-      "where": "RELEASE_NOTES.md:193",
+      "where": "RELEASE_NOTES.md:249",
       "anchor_digest": "e2ff15360bb00021898204a096a8cf1c7c466eb2017283eb4c0817a4ecdb948a",
       "reason": "describes the architecture or the rc2 correction itself, not a numeric measurement claim"
     },
@@ -5827,10 +5840,73 @@
     {
       "id": "N-609",
       "text": "declared as an exception and carries a test; the remainder of the 48 direct",
-      "where": "README.md:168",
+      "where": "README.md:185",
       "anchor_digest": "c5a0c8ab8bbc21b1c549a929c8bbf170ca7d9018d4460cdc5d598b6299fdcf78",
       "reason": "describes which authority produced the release-gate tooling, not a numeric measurement",
       "note": "Anchor re-derived on 2026-09-10 (similarity 0.99); the earlier wording was: \"declared as an exception and carries a test; the remainder of the 49 direct\". What changed in the rc2 cycle: the specification count (48 basenames -> 51 distinct contents) and the attribution columns (now counted without merge commits). The statement itself was not withdrawn."
+    },
+    {
+      "id": "N-610",
+      "text": "development repository, at commit `30ff053`** -- a merge commit is the *taking*",
+      "where": "README.md:142",
+      "anchor_digest": "426a9ba31b0ea14e9f8a93dd591ec42dd66a47e541412414250bc28ccde42fe7",
+      "reason": "names the commit the attribution figures are measured at, and discloses that the table counts commits to paths it lives in; a statement about the measurement, not a measurement"
+    },
+    {
+      "id": "N-611",
+      "text": "table got three of its five rows wrong for want of it. The table counts commits",
+      "where": "README.md:157",
+      "anchor_digest": "f7eea802e4d9f2999289bfa6e62ab33f516675cd1c4ea2779310ef86793080bd",
+      "reason": "names the commit the attribution figures are measured at, and discloses that the table counts commits to paths it lives in; a statement about the measurement, not a measurement"
+    },
+    {
+      "id": "N-612",
+      "text": "to paths the table itself lives in, so **the commit that writes these numbers",
+      "where": "README.md:158",
+      "anchor_digest": "514986d2694253b151920ca6464eb1f3bc2fea10ddea45960fa05dde86763d46",
+      "reason": "names the commit the attribution figures are measured at, and discloses that the table counts commits to paths it lives in; a statement about the measurement, not a measurement"
+    },
+    {
+      "id": "N-613",
+      "text": "# Release notes -- v0.1.0-rc3",
+      "where": "RELEASE_NOTES.md:1",
+      "anchor_digest": "f25b0401f1492e4f985a0ddb220a08c5267764283e9825c9ed828afb9fc60c91",
+      "reason": "describes the rc3 correction and how it was found, not a numeric measurement"
+    },
+    {
+      "id": "N-614",
+      "text": "`v0.1.0-rc3` supersedes `v0.1.0-rc2`, published the same day. Both earlier tags",
+      "where": "RELEASE_NOTES.md:3",
+      "anchor_digest": "a6a416d6a372eb68e8f1183c73d53c914815655744ac1aad3fea8423d33143d8",
+      "reason": "describes the rc3 correction and how it was found, not a numeric measurement"
+    },
+    {
+      "id": "N-615",
+      "text": "rc3 exists because verifying rc2 *after* publishing it found a defect that",
+      "where": "RELEASE_NOTES.md:6",
+      "anchor_digest": "6dcb070ab8f6e4c6a8bff37e29e1aecda8bcf44c368b3043b4e840777d612fba",
+      "reason": "describes the rc3 correction and how it was found, not a numeric measurement"
+    },
+    {
+      "id": "N-616",
+      "text": "## What rc3 corrects",
+      "where": "RELEASE_NOTES.md:10",
+      "anchor_digest": "bce67fdd2af5cb8023220954eea18b63610ef32c5522ab40e703bb66ead08a16",
+      "reason": "describes the rc3 correction and how it was found, not a numeric measurement"
+    },
+    {
+      "id": "N-617",
+      "text": "rc3 therefore:",
+      "where": "RELEASE_NOTES.md:24",
+      "anchor_digest": "ba3a1a1be69ef591f147983f2b600f80e575b89631c2901a09d200e2a5c8a58a",
+      "reason": "describes the rc3 correction and how it was found, not a numeric measurement"
+    },
+    {
+      "id": "N-618",
+      "text": "by the orchestrating session to produce rc2 itself. The column now reads 1, and",
+      "where": "RELEASE_NOTES.md:35",
+      "anchor_digest": "eecbe15972907a66b841d33512fe8079fc3767062877708f0a175a097be58a3a",
+      "reason": "describes the rc3 correction and how it was found, not a numeric measurement"
     }
   ],
   "claim_surfaces": [

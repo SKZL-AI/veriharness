@@ -25,7 +25,7 @@ system's own top layer as if it were external supervision.
 
 Measured on the campaign that produced this release: **65 runs carrying 1,988
 receipts (880 of them control runs), 100 iterations that produced receipts,
-51 specifications, 45 merges and 96 recorded findings**, across five calendar
+51 specifications, 45 merges and 97 recorded findings**, across five calendar
 days and 3.5 days of elapsed wall-clock -- and the position paper, the claims
 ledger, the release documents and the export machinery among the artifacts
 produced.
@@ -44,7 +44,7 @@ in this campaign was escalated **by rule, not by necessity**. A human decided
 seven things -- `DEC-R1`, `DEC-R1a`, `DEC-R2`, `DEC-R3`, `DEC-R4`, `DEC-R5`,
 `DEC-R6`: the project's public name, which files the export carries, how one
 class of reference is dispositioned, and whether to publish. Seven governance
-decisions against 65 runs, 51 specifications, 45 merges and 96 findings. The
+decisions against 65 runs, 51 specifications, 45 merges and 97 findings. The
 same orchestration configured with those policies delegated in advance would
 have resolved them itself. That is a statement about the design, not a
 measurement: this deployment did not run that way, so it is listed here as

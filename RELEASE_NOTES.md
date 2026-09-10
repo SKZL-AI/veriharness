@@ -1,3 +1,59 @@
+# Release notes -- v0.1.0-rc3
+
+`v0.1.0-rc3` supersedes `v0.1.0-rc2`, published the same day. Both earlier tags
+stay published and unmoved. No behaviour of `hoh` changed in either step.
+
+rc3 exists because verifying rc2 *after* publishing it found a defect that
+every gate before publication had missed, and the way it was missed is the
+interesting part.
+
+## What rc3 corrects
+
+The attribution table in `README.md` counts commits to `src/hoh/`, `tests/`,
+`docs/`, `paper/` and `tools/`. That table lives in `README.md`, and it is
+written in the same commit that touches those very paths -- so **the commit
+that writes the numbers changes the numbers.** Measured at `HEAD`, three of the
+table's five rows were off by one the moment they were committed.
+
+A second, independent defect sat next to it: the table said "measured over the
+non-merge commits reachable from the mainline" without saying *which* mainline.
+Read against this published repository, whose mainline is two commits long,
+every one of those figures is wrong. They only ever described the development
+repository.
+
+rc3 therefore:
+
+- names the repository and the exact commit the figures are measured at, and
+  states plainly that they are not reproducible in this export;
+- corrects the three rows: `tests/` 70/19/51, `docs/` 15/9/6, `paper/` 10/9/1;
+- measures the attribution at that named commit rather than at `HEAD`, so the
+  figure stops moving.
+
+**One claim flipped, and it is worth naming rather than quietly restating.**
+rc2 reported `paper/` as 9/9/**0** -- nothing written to the position paper
+outside a run. That was true until sections 1.1 and 1.2 were written directly
+by the orchestrating session to produce rc2 itself. The column now reads 1, and
+the README names which commit it is.
+
+## How it was found, and why that matters more than the fix
+
+Every gate was green. The ten-step closure chain: green. The export
+verification: green. The post-publish audit: green. The tag was pushed and the
+release published.
+
+The defect surfaced only when the number checker was pointed at a **fresh clone
+of the published repository** instead of the tree it was written in. Every gate
+ran inside the same tree the figure was derived from, so every gate agreed with
+it. That is not a gap in any individual check -- it is a property of checking a
+measurement against the thing it measured.
+
+This is the same shape as two limits this project already documents:
+`subject_head` is not `attestation_commit`, and `RC_CLOSED` is not
+`POST_PUBLISH_CONSISTENT`. The new instance adds self-reference: here, writing
+the measurement down changes it. A measurement of a tree has to name the tree.
+
+---
+
 # Release notes -- v0.1.0-rc2
 
 `v0.1.0-rc2` supersedes `v0.1.0-rc1`. It is a **documentation and positioning
@@ -16,7 +72,7 @@ a gate, which is itself worth stating plainly.
 | Where | What rc1 said | Why it was wrong |
 |---|---|---|
 | `README.md` | "There is no automatism, and there should not be" | True of the kernel, false as a description of the product. HoH does not self-start, but this project's own campaign drove it automatically from an orchestrating agent session across five days. The heading read as "this thing cannot be automated". |
-| `README.md`, `RELEASE_NOTES.md` | The dogfood evidence "covers documentation and governance work, never a change to `src/` or `tests/`" | False on both halves. 19 of 69 commits under `tests/` arrived via run branches, and one run added two files under `src/hoh/policy/`. |
+| `README.md`, `RELEASE_NOTES.md` | The dogfood evidence "covers documentation and governance work, never a change to `src/` or `tests/`" | False on both halves. 19 of 70 commits under `tests/` arrived via run branches, and one run added two files under `src/hoh/policy/`. |
 | `docs/LIMITATIONS.md` limit 1 | Described the campaign as *attended*, with "an operator" writing each specification | Misattributed the system's own top layer as external supervision. The specifications, merges and repairs came from an agent session, not a person typing. |
 | `docs/LIMITATIONS.md` limit 8 | "No run has ever added or edited a line inside `src/`" | Overstated. Run `d1` added `src/hoh/policy/dangerous-patterns.txt` and `src/hoh/policy/house-rules-patterns.txt`, merged as accepted candidate `d1-i2`. Recorded as finding `O94`. |
 
@@ -151,7 +207,7 @@ here rather than left implicit.
 ~~The evidence behind this release candidate covers documentation, packaging,
 and governance work -- not a single change to HoH's own production code.~~
 **[corrected in rc2]** That claim is too wide on both halves. Measured over
-the non-merge commits reachable from the mainline: `tests/` has 69 commits, 19 of them
+the non-merge commits reachable from the mainline: `tests/` has 70 commits, 19 of them
 arriving via run branches across three run-authored files; `src/hoh/` has 49
 commits, one of which arrived via a run branch -- run `d1` adding
 `src/hoh/policy/dangerous-patterns.txt` and `src/hoh/policy/house-rules-patterns.txt` so an installed wheel
