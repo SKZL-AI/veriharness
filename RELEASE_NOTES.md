@@ -1,4 +1,69 @@
+# Release notes -- v0.1.0-rc2
+
+`v0.1.0-rc2` supersedes `v0.1.0-rc1`. It is a **documentation and positioning
+correction**, not new functionality: no behaviour of `hoh` changed between the
+two tags. `v0.1.0-rc1` stays published, tagged and unmoved -- it is the
+historical artifact of what this project said about itself on 2026-09-10
+before the corrections below, and deleting or retagging it would destroy
+exactly the kind of record this project claims to keep.
+
+## What rc2 corrects, and why there was anything to correct
+
+Four claims in the rc1 documents were wrong or misleading. All four were
+found after publication, three of them by a reader's objection rather than by
+a gate, which is itself worth stating plainly.
+
+| Where | What rc1 said | Why it was wrong |
+|---|---|---|
+| `README.md` | "There is no automatism, and there should not be" | True of the kernel, false as a description of the product. HoH does not self-start, but this project's own campaign drove it automatically from an orchestrating agent session across five days. The heading read as "this thing cannot be automated". |
+| `README.md`, `RELEASE_NOTES.md` | The dogfood evidence "covers documentation and governance work, never a change to `src/` or `tests/`" | False on both halves. 19 of 69 commits under `tests/` arrived via run branches, and one run added two files under `src/hoh/policy/`. |
+| `docs/LIMITATIONS.md` limit 1 | Described the campaign as *attended*, with "an operator" writing each specification | Misattributed the system's own top layer as external supervision. The specifications, merges and repairs came from an agent session, not a person typing. |
+| `docs/LIMITATIONS.md` limit 8 | "No run has ever added or edited a line inside `src/`" | Overstated. Run `d1` added `src/hoh/policy/dangerous-patterns.txt` and `src/hoh/policy/house-rules-patterns.txt`, merged as accepted candidate `d1-i2`. Recorded as finding `O94`. |
+
+None of these were code defects, and none of them changed what the software
+does. They were claims about the project's own evidence -- which is the class
+of statement this project holds itself to most strictly, so getting them
+wrong in the first public release is worth naming rather than quietly fixing.
+
+rc2 additionally adds what rc1 omitted entirely: a `What has actually been
+exercised` section in `README.md` reporting the campaign in measured numbers,
+an attribution table naming which authority wrote which paths, the four-layer
+architecture in `docs/ARCHITECTURE.md`, and §1.1/§1.2 of the position paper on
+global composition closure and the operating model the evidence came from.
+
+Every number added is bound: `kampagne-zahlen.py` re-derives all of them from
+the run records and the commit history and fails the release gate on any
+disagreement, with a negative control that falsifies each number in turn and
+requires the checker to catch it.
+
+## The merge problem, restated
+
+rc1 stated the composition limit in a form that had already stopped being
+complete: *"nothing in the loop checks the union of two runs' changes"*. The
+corrected two-level statement, now in `docs/LIMITATIONS.md` §9 and the paper's
+§1.1:
+
+- **Per run:** `Accept(A)` and `Accept(B)` still do not imply `Accept(A ∪ B)`.
+  The acceptance loop is not closed under composition, and no amount of global
+  gating closes it.
+- **System level:** above that loop sit the union invariants `U1`-`U5`,
+  semantic dependency measurement between parallel candidates, and a post-DAG
+  closure pass that turns any global failure into a new repair run and re-runs
+  closure until it reaches a fixpoint -- `DAG_TERMINAL != RC_CLOSED`.
+
+This is not a claim that composition is solved. `U1`-`U5` are a named,
+extensible list of failure shapes that have actually occurred; an unknown
+cross-run interaction would pass all of them. What the global layer changes is
+whether such an inconsistency reaches a release -- during this very release it
+caught two, after the run graph was already terminal, which became repair runs
+`d8b` and `d8c`.
+
+---
+
 # Release notes -- v0.1.0-rc1
+
+*Preserved below exactly as published, apart from the four corrections marked
+`[corrected in rc2]`. This is the record of what was claimed at rc1.*
 
 ## What this is, plainly, before anything else
 
@@ -44,11 +109,17 @@ otherwise would undercut an evidence-first project's own point:
   operator: they are a disclosed, disclaimed property of the check-command
   guard, not a silent gap (see `docs/LIMITATIONS.md`, limit 4).
 - Eleven core HoH defects and five guard gaps found during this campaign's
-  own dogfooding were fixed by the operator, under a narrow, declared
-  exception to the rule that the loop may not touch `src/hoh/` or `tests/`;
-  the full accounting, defect by defect, is `dogfood/ABSCHLUSSBERICHT.md`
+  own dogfooding were fixed **at the orchestrator level** -- by the
+  orchestrating agent session working outside a run, not by a person typing
+  and not by an HoH developer role -- under a narrow, declared exception to
+  the rule that the loop may not touch `src/hoh/` or `tests/`; the full
+  accounting, defect by defect, is `dogfood/ABSCHLUSSBERICHT.md`
   point D. Outside that declared exception, the loop never touched HoH's own
   production code to produce this project's evidence about itself.
+  **[corrected in rc2.** rc1 wrote "by the operator" here, which reads as a
+  person typing; the fixes were made by the orchestrating agent session
+  working above the run boundary. The sentence about production code is
+  corrected separately below.**]**
 
 ## The double review, stated precisely
 
@@ -77,12 +148,17 @@ here rather than left implicit.
 
 ## What this dogfood evidence does and does not cover
 
-The evidence behind this release candidate covers documentation, packaging,
-and governance work -- not a single change to HoH's own production code.
-That is the sharper and more useful claim, and it is narrower than earlier
-drafts of this project's own limitations document used to state; see
-`docs/LIMITATIONS.md` limit 8 for the current wording and why the wider
-claim stopped being true.
+~~The evidence behind this release candidate covers documentation, packaging,
+and governance work -- not a single change to HoH's own production code.~~
+**[corrected in rc2]** That claim is too wide on both halves. Measured over
+the non-merge commits reachable from the mainline: `tests/` has 69 commits, 19 of them
+arriving via run branches across three run-authored files; `src/hoh/` has 49
+commits, one of which arrived via a run branch -- run `d1` adding
+`src/hoh/policy/dangerous-patterns.txt` and `src/hoh/policy/house-rules-patterns.txt` so an installed wheel
+could execute an acceptance check at all. What survives, and is worth saying:
+**no run has ever added or edited a line of Python under `src/`.** HoH's own
+logic was never written by a run. See `docs/LIMITATIONS.md` limit 8, and
+finding `O94` for how the overstatement was found.
 
 ## What is not claimed
 
@@ -103,10 +179,19 @@ self-repair, self-healing, or anything "fixing itself": every fix credited
 above names the loop or the operator, by run id or by role, because that is
 the distinction this project is built to keep honest.
 
-## What this release candidate is not
+## What this run did, and what the operator did after it
 
-It is not a public release. Creating the `v0.1.0-rc1` tag, pushing it
-anywhere, or running `hoh deliver --approve` are captain decisions this
-document does not make and this run was not permitted to take.
+**Run `D8`, which produced this document, published nothing.** It created no
+tag, made no push, added no remote and never called `hoh deliver` -- those
+were outside its declared scope, and `RC_GATE.md`'s "What this run did not do"
+records that boundary as it stood when the gate was measured.
+
+**Publication happened afterwards**, once the release closure was complete:
+`v0.1.0-rc1` was tagged and pushed on a human decision that this run neither
+made nor was permitted to make. The orchestrating agent session prepared and
+verified the export; the decision to publish it was reserved from delegation
+and taken by a person. `v0.1.0-rc2` follows the same split. Those two sentences are deliberately kept apart, because
+one is a statement about a run and the other about a person, and collapsing
+them is the exact class of claim this project exists to keep separate.
 `RC_GATE.md` reports the gate condition by condition, including the rows
 only the operator can fill in.

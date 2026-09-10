@@ -1890,8 +1890,41 @@ def test_render_markdown_real_ledger_no_claim_begins_mid_sentence(tmp_path):
         if text.startswith("--") or text.startswith(")") or text.startswith("|"):
             return True
         if text.startswith("**"):
+            # Nach ** entscheidet, ob Leerraum folgt. Ein schliessendes **
+            # steht am Ende eines Fettbereichs und wird von Leerraum gefolgt;
+            # ein oeffnendes wird von dem gefolgt, was fett wird.
+            #
+            # Die Vorfassung fragte stattdessen, ob innerhalb der naechsten 80
+            # Zeichen ein zweites ** steht, und hielt damit jede Fettung, deren
+            # Einleitung laenger als 80 Zeichen ist, faelschlich fuer eine
+            # Fortsetzung -- eingetreten am 2026-09-10 an C-142, dessen
+            # Listenpunkt mit einer 102 Zeichen langen fetten Ueberschrift
+            # beginnt. Der Rohtext war korrekt rekonstruiert, die Pruefung
+            # falsch.
+            #
+            # Die erste Reparatur ersetzte das Zeichenfenster durch eine
+            # Positivliste von acht Zeichen und handelte sich damit dieselbe
+            # Fehlerklasse andersherum ein: `**„Zitat"**`, `***fett-kursiv***`,
+            # `**~~weg~~**`, `**$HOME**` und ein Emoji wurden zu Fortsetzungen
+            # erklaert. Ein adversariales Review fand zehn solche Stellen im
+            # Repository -- darunter `„`, das deutsche oeffnende
+            # Anfuehrungszeichen, das in der Liste schlicht fehlte. Eine
+            # Positivliste faengt, was jemand aufgeschrieben hat.
+            #
+            # GRENZE, ausdruecklich: ein Fragment, das mit `**` beginnt, traegt
+            # das Zeichen LINKS vom Delimiter nicht mehr -- genau das, was die
+            # Frage entscheiden wuerde. `**bold**s of the counter ...` ist
+            # deshalb hier nicht von einem Satzanfang zu unterscheiden und
+            # wird durchgelassen. Das ist bewusst in Kauf genommen: die Klasse
+            # ist im heutigen Renderer nicht erreichbar, weil die Satzgrenze
+            # fast immer hinter Leerraum liegt. Wer sie schliessen will, muss
+            # die Quellzeile ueber den Anker nachschlagen statt aus dem
+            # Fragment zu raten.
+            # Ein leeres ** am Textende bleibt eine Fortsetzung.
             rest = text[2:]
-            return "**" not in rest[:80]
+            if not rest:
+                return True
+            return rest[0].isspace()
         m = re.match(r"^([A-Za-z][A-Za-z0-9./'_-]*)", text)
         if not m:
             return False
@@ -1907,8 +1940,58 @@ def test_render_markdown_real_ledger_no_claim_begins_mid_sentence(tmp_path):
             if starts_mid_sentence(t) and cc.RECONSTRUCTION_FALLBACK_MARKER not in t
         ]
 
-    assert len(texts) == 122
+    # ABGELEITET, nicht getippt. Diese Zeile stand als `== 122` und ist beim
+    # naechsten katalogisierten Claim gefallen -- die fuenfte stehende Zahl, die
+    # dieses Repository entfernt. d8cs Kriterium 6 hatte beide Wege erlaubt und
+    # genau diese Gefahr benannt; hier ist sie eingetreten.
+    assert len(texts) == len(cc.load_ledger()["claims"]), (
+        f"rendered claim rows ({len(texts)}) must match the ledger's claim count "
+        f"({len(cc.load_ledger()['claims'])})"
+    )
     assert _unmarked_mid_sentence(texts) == []
+
+    # Beide Richtungen der **-Unterscheidung, damit die Reparatur von 2026-09-10
+    # nicht stillschweigend zurueckfaellt: ein oeffnendes ** mit langer
+    # Einleitung darf NICHT als Fortsetzung gelten, ein schliessendes ** schon.
+    _oeffnend = (
+        "**Multi-day orchestrated operation is demonstrated; long-duration "
+        "operation without intervention is not.** The campaign behind this "
+        "paper ran 65 runs."
+    )
+    assert len(_oeffnend.split("**")[1]) > 80, (
+        "die Einleitung muss laenger als das alte 80-Zeichen-Fenster sein, "
+        "sonst prueft dieser Fall die Reparatur gar nicht"
+    )
+    assert not starts_mid_sentence(_oeffnend), (
+        "ein oeffnendes ** mit Einleitung ueber 80 Zeichen wurde wieder als "
+        "Fortsetzung gewertet -- die Regression von C-142 ist zurueck"
+    )
+    # Nur Leerraum nach ** heisst Fortsetzung. Jeder Fall hier war unter der
+    # verworfenen Positivliste ein Falsch-Positiv; ein adversariales Review
+    # fand am 2026-09-10 zehn solche Stellen im Repository selbst, `„` voran.
+    for _anfang in (
+        "**\u201eZitat\u201c am Satzanfang** und der Rest des Satzes.",
+        "***fett-kursiv*** beginnt hier einen Satz.",
+        "**~~ueberholt~~ ersetzt** durch die neue Fassung.",
+        "**$HOME wird vom Guard abgelehnt**, mit Absicht.",
+        "**\U0001F680 Startliste** deckt die letzten drei Schritte ab.",
+        "**\u00c4nderungen am Exportpfad** muessen neu abgeleitet werden.",
+        "**65 Laeufe** trugen 1.988 Belege.",
+        "**\\_wortwoertlich\\_ gesetzt** von einem der Pruefer.",
+    ):
+        assert not starts_mid_sentence(_anfang), (
+            f"{_anfang[:40]!r} beginnt einen Satz, wurde aber als Fortsetzung "
+            "gewertet -- die verworfene Positivliste ist zurueck"
+        )
+    for _fortsetzung in (
+        "** and the remainder of a sentence that began on an earlier line.",
+        "**\tnach einem Tabulator geht derselbe Satz weiter.",
+        "**\nund nach einem Zeilenumbruch ebenso.",
+        "**",
+    ):
+        assert starts_mid_sentence(_fortsetzung), (
+            f"{_fortsetzung[:30]!r} ist eine Fortsetzung und muss gemeldet werden"
+        )
 
     def _render_with_root(ledger: dict, root: Path) -> str:
         original_repo_root = cc.REPO_ROOT

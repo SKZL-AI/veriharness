@@ -62,7 +62,9 @@ what lifts it from an anecdote to a property. Keep two levels apart by name:
 preservation suite re-runs, and at least one criterion is proven to have been
 red on the predecessor), and **post-merge / union correctness** (the same
 statements hold for the *combined* state after several runs are
-consolidated). Nothing in the acceptance loop checks the second kind.
+consolidated). Nothing in the acceptance loop checks the second kind — a
+statement about the loop that remains true, and that §1.1 shows is no longer
+the whole picture at the level of the system.
 
 **Instance one, found by a human.** Runs `d1` and `d2` each passed their own
 independently verified acceptance criteria. Per-run, receipt-bound evidence
@@ -100,6 +102,100 @@ state is verified" is making a claim this project's own evidence does not
 support (C-017). A failure mode that only a careful human catches is a
 different risk from one a check catches automatically after the fact, and
 this project has now measured one instance of each.
+
+### 1.1 What the project did about it, and what that changed
+
+The two instances above are the historical discovery, and they are left
+standing in that form because the sequence matters more than the conclusion.
+What followed is the part a reader evaluating VeriHarness today needs, because
+the sentence "nothing in the acceptance loop checks the second kind" is still
+true of the *acceptance loop* and no longer describes the *system*.
+
+The sequence was:
+
+1. **Failure observation.** Two merges of individually correct runs left the
+   combined state inconsistent (C-017, C-052..C-054).
+2. **Hypothesis.** Per-run evidence does not compose. Acceptance is a property
+   of a candidate against its base; consolidation is a different state, and no
+   check in the loop ranges over it.
+3. **Union gate.** Five invariants (`U1`-`U5`) evaluated over the merged tree
+   rather than any single run's base -- licence agreement, no shipped file
+   referencing an unshipped one, built artifact matching repository claims,
+   every evidence reference resolving, and suite plus linter green on the
+   combined state. Two of the five are the two failures above, added because
+   they happened.
+4. **Semantic dependency layer.** Before two runs are allowed to proceed in
+   parallel, their declared scopes are measured against each other rather than
+   assumed independent. Serialisation is imposed where a dependency is
+   measured, not as a blanket policy.
+5. **Post-DAG closure.** After the last planned run merges, the global gates
+   run over the whole state. A failure there does not halt the release and
+   does not get patched by hand: it produces a new repair run, which goes
+   through the ordinary loop and must itself be accepted.
+6. **A fixpoint rule instead of a completion rule.** Release is gated on
+
+   ```
+   DAG_TERMINAL  !=  RC_CLOSED
+   ```
+
+   A terminal DAG means every planned run merged. `RC_CLOSED` additionally
+   requires every global gate green *and* that the pass which checked them
+   created no new repair node. Closure is a fixpoint, not the end of a plan.
+
+**The prospective instance.** That distinction did work during this release
+rather than describing work. The DAG went terminal after run `D8`. The global
+gates then found two real defects in the merged state -- a composition failure
+and an export failure -- neither of which any individual run had been wrong
+about. They became repair runs `d8b` and `d8c`; only after both were accepted
+and closure re-ran clean did the candidate qualify. Unlike instance one, no
+human noticed. Unlike instance two, the finding arrived *before* publication
+rather than minutes after a merge. That is the third position in the sequence
+this paper has been tracking: a human found the first, a tool found the second
+after the fact, and a gate found the third before it could ship.
+
+The general statement, which is what this section is actually for:
+
+> **Per-run evidence binding is necessary but insufficient for composition.
+> VeriHarness therefore adds global composition closure above the per-run
+> acceptance loop.**
+
+**What this does not become.** `U1`-`U5` and the semantic invariants are an
+explicit, extensible set of *known* properties, each added because a specific
+failure taught it. They do not prove that an unknown cross-run interaction
+would be detected. The acceptance loop is still not closed under composition,
+and no quantity of global gating closes it; what the global layer changes is
+whether the resulting inconsistency reaches a release. `docs/LIMITATIONS.md`
+§9 states that limit in the form a reader should hold this project to.
+
+### 1.2 The operating model this evidence came from
+
+One clarification belongs here rather than in an appendix, because every
+number in this paper depends on it. The campaign that produced this evidence
+did not run as a person invoking `hoh run` repeatedly. It ran as a composed
+stack:
+
+- a **human policy authority**, who set the limits and took the decisions
+  reserved from delegation -- seven of them across the campaign, including
+  whether to publish at all;
+- an **agentic main orchestrator**: a long-running agent session that wrote
+  and revised specifications, started runs, read verdicts and receipts,
+  decided merges, executed the global gates, turned gate failures into repair
+  runs, and repeated until closure;
+- the **HoH verification kernel**, which ran each individual run's
+  plan/develop/QA/evidence/accept loop;
+- the **Herdr runtime**, providing the sessions and worktrees.
+
+The orchestrator is a deployment layer, not a component of `src/hoh/`; it
+drives the kernel through the same CLI any operator would use, and the kernel
+cannot tell the difference. Naming it precisely matters in both directions.
+Describing the campaign as hand-driven would understate what ran
+automatically. Describing it as **autonomous self-repair** would be worse, and
+this paper does not: the kernel did not decide which runs existed, and the
+repairs to HoH's own source were made above the run boundary, not by a run.
+The accurate term is **policy-delegated agentic orchestration with
+evidence-bound repair loops** -- decisions delegated in advance by a human,
+executed by an agent, with every individual change still required to earn
+receipts through the ordinary loop.
 
 ## 2. The verification channel is the attack surface
 
@@ -453,11 +549,12 @@ At least these hold today, several of them measured rather than merely
 disclaimed:
 
 This list corresponds to `docs/LIMITATIONS.md` and is complete against it: as
-of 2026-09-09, that file held sixteen numbered limits, and this section
+of 2026-09-10, that file held sixteen numbered limits, and this section
 carries a statement for every one of them -- fourteen of the sixteen as the
 items below, and the remaining two (limits 9 and 12) in the body of this
-paper itself, at length, where they are already treated (limit 9 in §1's
-per-run-versus-merged-state discussion, limit 12 in §0's and §3's
+paper itself, at length, where they are already treated (limit 9 in §1 and
+§1.1, on per-run versus merged state and the closure layer above it, limit 12
+in §0's and §3's
 `discriminates`-terminology definitions). The list's positions below do not
 track `docs/LIMITATIONS.md`'s own limit numbers position-for-position: limit
 6's content below spans list positions 6 and 7, offsetting every position
@@ -466,11 +563,24 @@ reader who counts a different number of headings in `docs/LIMITATIONS.md`
 than are named here knows this list has fallen behind, not that a gap was
 deliberate.
 
-1. **No proof of multi-month unattended operation.** The longest continuous
-   evidence this project has of itself is a handful of iterations inside one
-   dogfood campaign. `Budgets.max_wallclock_seconds` and `max_iterations`
-   exist and are enforced, but an enforced ceiling is not the same claim as
-   demonstrated multi-month reliability under it.
+1. **Multi-day orchestrated operation is demonstrated; long-duration
+   operation without intervention is not.** The campaign behind this paper ran
+   **65 runs, 1,988 receipts (880 of them control runs) and 100 iterations
+   that produced receipts, across five calendar days and 3.5 days of elapsed
+   wall-clock**, producing this paper, the claims ledger and the release
+   machinery among its artifacts. It was driven by an **orchestrating agent
+   session** rather than by a person writing specifications: a human decided
+   **seven** governance questions (`DEC-R1` … `DEC-R6` and the decision to
+   publish), and those were escalated by rule rather than by necessity — the
+   same orchestration with those policies delegated in advance would have
+   resolved them itself, which is a property of the design and not a measured
+   result. What is therefore open is duration, not the automation:
+   `Budgets.max_wallclock_seconds` and `max_iterations` are enforced, but an
+   enforced ceiling is not a demonstration of multi-month reliability, and
+   nothing here shows how this campaign's own failure modes — budget
+   exhaustion, an expired role credential, a lost tool directory after a power
+   cut, a composition failure between two correct runs — behave when nobody is
+   reachable for a week, or how an orchestrator survives its own restart.
 2. **No matched-budget comparison, and no baseline at all.** There is no
    matched-budget comparison against a plain agent working the same
    specification without VeriHarness's plan/develop/verify loop around it,

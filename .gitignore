@@ -24,3 +24,4 @@ policy/*.txt.v*
 # exclusion from the public repository happens in D8 via the export's path
 # selection.
 build/
+.ruff_cache/

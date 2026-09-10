@@ -6,19 +6,64 @@ real, current limit of HoH, not a hedge. Where a limit lives in one specific
 module, this says so, so a reader can go look rather than take the claim on
 faith.
 
-## 1. No proof of long unattended operation
+## 1. Multi-day orchestrated operation is demonstrated; long-duration operation without intervention is not
 
-The longest continuous evidence this project has of itself is a handful of
-iterations inside one run (see the dogfood runs under `runs/`, and the
-recorded example in `examples/minimal/recorded-rejection/`, which comes from
-one such run). There is no multi-month unattended-operation record: nobody
-has pointed HoH at a long-lived project, walked away, and come back weeks
-later to a run that kept planning, developing and verifying correctly the
-whole time. `Budgets.max_wallclock_seconds` and `max_iterations` exist and
-are enforced (`RunState.budget_exhausted` in `src/hoh/contracts.py`), but an
-enforced ceiling is not the same claim as demonstrated multi-month reliability
-under it. Anyone evaluating HoH for long-horizon use should treat that gap as
-open, not as covered by the budget mechanism.
+This entry has now been wrong twice, in opposite directions, and both
+corrections stay visible, because how a project describes its own evidence is
+itself evidence.
+
+**The first version undersold what exists.** It read "a handful of iterations
+inside one run".
+
+**The second version misdescribed who produced it.** It said an operator
+"wrote each specification, merged each accepted candidate, decided each open
+question", and called those days *attended*. That is not the architecture:
+the specifications, merges, repairs and findings came from an **orchestrating
+agent session** -- Herdr runs it, it drives HoH, HoH runs the roles. Calling
+that layer "an operator" reads as a person typing, and it describes the
+system's own top layer as if it were external supervision.
+
+Measured on the campaign that produced this release: **65 runs carrying 1,988
+receipts (880 of them control runs), 100 iterations that produced receipts,
+51 specifications, 45 merges and 96 recorded findings**, across five calendar
+days and 3.5 days of elapsed wall-clock -- and the position paper, the claims
+ledger, the release documents and the export machinery among the artifacts
+produced.
+
+Three statements have to be kept apart here, because collapsing them is what
+made both earlier versions wrong.
+
+**Empirically demonstrated.** A multi-day, agent-orchestrated campaign that
+continued on its own between policy, safety and release gates: writing
+specifications, starting runs, reading verdicts, merging, running the global
+gates, generating repair runs from gate failures, and re-closing until the
+whole set reached a fixpoint.
+
+**Architecturally available, not exercised here.** Most of what was escalated
+in this campaign was escalated **by rule, not by necessity**. A human decided
+seven things -- `DEC-R1`, `DEC-R1a`, `DEC-R2`, `DEC-R3`, `DEC-R4`, `DEC-R5`,
+`DEC-R6`: the project's public name, which files the export carries, how one
+class of reference is dispositioned, and whether to publish. Seven governance
+decisions against 65 runs, 51 specifications, 45 merges and 96 findings. The
+same orchestration configured with those policies delegated in advance would
+have resolved them itself. That is a statement about the design, not a
+measurement: this deployment did not run that way, so it is listed here as
+untested rather than as a result.
+
+**Not demonstrated, and the real gap.** Weeks or months of operation with no
+human intervention at all. Five days is not months. Nothing here shows how the
+failure modes this campaign actually hit -- budget exhaustion, a role harness
+whose credential had expired, a lost tool directory after a power cut, a
+composition failure between two individually correct runs -- behave when nobody
+is reachable for a week. A human *was* reachable throughout and answered those
+seven times. Nothing here shows an orchestrator surviving its own restart, or a
+provider outage, without one.
+
+`Budgets.max_wallclock_seconds` and `max_iterations` exist and are enforced
+(`RunState.budget_exhausted` in `src/hoh/contracts.py`), but an enforced ceiling
+is not the same claim as demonstrated multi-month reliability under it. Anyone
+evaluating HoH for long-horizon use should treat that gap as open, and should
+not read "five days orchestrated" as evidence for the month that follows.
 
 ## 2. No baseline, no matched-budget comparison
 
@@ -135,8 +180,23 @@ still reports green is a real risk this project has not closed.
 
 ## 8. This project's own dogfood evidence and what it actually shows about `src/` and `tests/`
 
-Measured directly against this repository's own commit history: no run has
-ever added or edited a line inside `src/`. Inside `tests/`, the picture is
+Measured directly against this repository's own commit history: **no run has
+ever added or edited a line of Python inside `src/`.** That wording is
+narrower than this entry carried until 2026-09-10, and the narrowing is a
+correction, not a hedge. The earlier form was "no run has ever added or
+edited a line inside `src/`", and it is false: run `d1` added
+`src/hoh/policy/dangerous-patterns.txt` and
+`src/hoh/policy/house-rules-patterns.txt` -- packaged copies of the guard
+pattern lists, so that an installed wheel could run an acceptance check at
+all -- and that commit reached the mainline through the ordinary merge of the
+accepted candidate `d1-i2`. It is one commit against 49 non-merge commits
+touching `src/hoh/`; the other 48 were written outside any run. It contains no `.py` file, which
+is why the corrected claim still says something worth saying. But "a run
+wrote nothing under `src/`" was not true, and a reader checking it against
+the commit history would have caught this document in an overstatement about
+its own discipline.
+
+Inside `tests/`, the picture is
 narrower still -- the loop created exactly three files there, and all three
 are the test files of the three release tools the loop itself wrote:
 `test_claims_anchors.py`, `test_export_manifest.py`, and
@@ -172,7 +232,7 @@ history:
 git log --format='%s' -- tests/ src/ | grep '^HoH '
 ```
 
-## 9. Local run correctness does not imply correctness after a merge
+## 9. Composition is guarded globally, not proven complete
 
 This is the sharpest limit in this document, because it says the project's
 own verification discipline is insufficient for the thing it is most likely
@@ -183,12 +243,72 @@ own declared scope, left the combined state inconsistent after being merged
 project's own licence. Once it left 5 coverage anchors pointing at content
 that had moved, across 2 merges total. **Neither run was wrong** on its own
 terms: each was checked against its own base, its own scope, and its own
-evidence, and each check passed honestly. Nothing in the loop checks the
-union of two runs' changes against each other, only each run against the
-base it started from. Per-run evidence binding is therefore necessary and
-not sufficient for correctness of a merged, multi-run history; a reader who
-treats "every run in this history was individually verified" as "the current
-merged state is verified" is making a claim this project does not support.
+evidence, and each check passed honestly. Per-run evidence binding is therefore
+necessary and not sufficient: a reader who treats "every run in this history
+was individually verified" as "the current merged state is verified" is making
+a claim per-run checking does not support.
+
+**Since this entry was first written, that gap has been partly closed, and
+saying so is part of stating it honestly.** An earlier version ended "nothing
+in the loop checks the union of two runs' changes against each other". That is
+no longer true. `tools/union_gate.py` runs five invariants over the *combined*
+state rather than over any single run's base, and two of them are exactly the
+two failures named above:
+
+```
+U1  every licence statement in the repository agrees          <- the first failure
+U2  no shipped file references a file that is not shipped
+U3  what the built artifact ships matches what the repo claims
+U4  every evidence reference in the claims ledger still resolves <- the second
+U5  suite and linter are green on the combined state
+```
+
+A third instance was caught by this discipline during the release closure and
+is worth naming because it is the mechanism working rather than a story about
+it: one run introduced the invariant "every exported path is classified", a
+later run added two exported documents, **neither run was wrong on its own
+terms**, and the whole-state check refused the combined state until a repair
+run classified them.
+
+**The invariants are one of two layers, and the second one is what actually
+caught the last two failures.** `U1`-`U5` check the merged tree. Above them
+sits a closure layer that checks the *process*: semantic dependency measurement
+between runs that are candidates to proceed in parallel, the claims/export/
+global-state invariants, and a post-DAG pass that runs after every planned run
+has been merged. When any of those fail, the failure does not stop the release
+-- it generates a new repair run, which goes through the ordinary loop and must
+itself be accepted, after which closure is attempted again. Release is gated on
+a *fixpoint*, not on the plan being finished:
+
+```
+DAG_TERMINAL  !=  RC_CLOSED
+```
+
+A terminal DAG means every planned run has been merged. `RC_CLOSED` additionally
+requires every global gate green *and* no new repair node created by the pass
+that checked them. The distinction was not theoretical during this release. The
+DAG went terminal after run `D8`; the global gates then found two real
+composition and export defects in the merged state, which became repair runs
+`d8b` and `d8c`; only after those were accepted and closure re-ran clean did
+the candidate qualify. Both defects were prospective -- found before publication
+by the layer above the acceptance loop, not by a reader afterwards.
+
+The general form:
+
+> **Per-run evidence binding is necessary but insufficient for composition.
+> VeriHarness therefore adds global composition closure above the per-run
+> acceptance loop.**
+
+**What remains open is the part that cannot be closed by adding invariants.**
+`U1`-`U5` are a *named list*, extended each time a composition failure taught
+this project a new one. A cross-run inconsistency of a kind no invariant names
+would still pass every gate here. So the honest form of this limit is no longer
+"the union is unchecked" but: **the union is checked, at two levels, against a
+growing list of known failure shapes -- and that list is evidence of what has
+been learned, not a proof that the next composition is sound.** The per-run
+acceptance loop is still not closed under composition, and no amount of global
+gating changes that; what the global layer changes is whether the resulting
+inconsistency reaches a release.
 
 ## 10. A criterion cannot express a property of the difference to the predecessor state
 

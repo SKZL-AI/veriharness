@@ -1,13 +1,56 @@
-# Architecture: where Herdr ends and HoH begins
+# Architecture: four layers, and where each boundary is enforced
 
 HoH is not a replacement for a terminal multiplexer, and it is not a
 harness. It sits on top of one, deciding things a multiplexer has no opinion
-about. This document draws the line between the two as concretely as
-possible: not "Herdr does infrastructure and HoH does logic" as a slogan, but
-which module enforces which half, and where you would look to check that the
-line is real rather than aspirational.
+about. This document draws the lines as concretely as possible: not "Herdr
+does infrastructure and HoH does logic" as a slogan, but which module enforces
+which half, and where you would look to check that a line is real rather than
+aspirational.
 
-## The cut, in one table
+There are four layers, not two. This document used to describe only the
+middle two, which was accurate about the code and incomplete about the
+system: the layer that decides *which runs happen at all* was missing from
+it, and that is the layer this project's own development ran on.
+
+## The four layers
+
+```
+  Human policy authority
+        |   policy limits, non-delegated decisions, irreversible external actions
+  Agentic main orchestrator
+        |   specifications, run scheduling, merges, global gates, repair, closure
+  VeriHarness / HoH verification kernel
+        |   one run: plan -> develop -> independent QA -> evidence -> accept/reject
+  Herdr runtime
+        |   sessions, panes, worktrees, restore
+  Planner / developer / QA sessions, in their worktrees
+```
+
+| Layer | May decide | May not | Lives in |
+|---|---|---|---|
+| Human policy authority | What the orchestrator is allowed to decide; anything reserved from it; irreversible external actions | -- | Outside the repository, by configuration and instruction |
+| Agentic main orchestrator | What to specify, when to run, what to merge, when a release is closed, what repair work a gate failure implies | Cannot bypass a run's verdict, cannot construct a `Receipt`, cannot mark a rejected candidate accepted | A deployment layer, **not** `src/hoh/`; drives HoH through the CLI and Herdr |
+| HoH verification kernel | Plan binding, acceptance, preservation, replanning, cross-run objectives | Cannot open a pane, cannot decide which runs exist | `src/hoh/` |
+| Herdr runtime | Sessions, panes, worktrees, liveness facts | Has no opinion on acceptance | Herdr itself |
+
+The orchestrator deserves the emphasis because it is the layer most easily
+mistaken for something it is not. **It is not a hidden component of `src/hoh/`,
+and it is not a scheduler shipped with this repository.** It is an agent
+session that holds a long-horizon objective and drives HoH through exactly the
+interfaces documented here -- the same `hoh start` / `hoh run` a person would
+type. Nothing in `src/hoh/` knows whether its caller is a person or an
+orchestrator, and that is deliberate: the kernel's guarantees must not depend
+on who invoked it.
+
+The consequence runs the other way too, and it is the honest half. Because the
+orchestrator sits *above* the kernel, **none of the kernel's guarantees apply
+to it.** Its decisions are not receipt-bound. When it merges two runs, no
+acceptance check attests that merge. That gap is precisely why the global
+closure layer described in `docs/LIMITATIONS.md` §9 exists: the invariants
+`U1`-`U5` and the post-DAG closure pass are what check the orchestrator's own
+composition decisions, because the per-run loop structurally cannot.
+
+## The cut between Herdr and HoH, in one table
 
 | Concern | Owner | Enforced in |
 |---|---|---|

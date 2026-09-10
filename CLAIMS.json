@@ -16,7 +16,7 @@
     {
       "id": "C-001",
       "text": "| Herdr must be running (`HERDR_ENV=1`) | HoH refuses to start otherwise -- deliberately, but it is a real prerequisite, not a formality. |",
-      "where": "README.md:64",
+      "where": "README.md:168",
       "status": "SUPPORTED",
       "evidence": [
         "file:src/hoh/herdr.py:52"
@@ -26,7 +26,7 @@
     {
       "id": "C-002",
       "text": "`require_herdr()` enforces this at the boundary -- if `HERDR_ENV` is not `1`",
-      "where": "docs/ARCHITECTURE.md:32",
+      "where": "docs/ARCHITECTURE.md:75",
       "status": "SUPPORTED",
       "evidence": [
         "file:src/hoh/herdr.py:52"
@@ -144,7 +144,7 @@
     {
       "id": "C-013",
       "text": "There is no matched-budget comparison against a plain agent working the same specification without HoH's plan/develop/verify loop around it, and no baseline run of any kind exists in this repository's evidence.",
-      "where": "docs/LIMITATIONS.md:25",
+      "where": "docs/LIMITATIONS.md:70",
       "status": "UNSUPPORTED",
       "evidence": [
         "file:docs/LIMITATIONS.md:25"
@@ -166,7 +166,7 @@
     {
       "id": "C-015",
       "text": "This project's own dogfood evidence never touched `src/` or `tests/`.",
-      "where": "docs/LIMITATIONS.md:123",
+      "where": "docs/LIMITATIONS.md:211",
       "status": "INVALIDATED",
       "evidence": [
         "file:docs/LIMITATIONS.md:125",
@@ -179,7 +179,7 @@
     {
       "id": "C-016",
       "text": "the guard around acceptance-check commands is a tripwire against accidents, not a security boundary against a deliberately hostile plan",
-      "where": "docs/LIMITATIONS.md:47",
+      "where": "docs/LIMITATIONS.md:92",
       "status": "UNSUPPORTED",
       "evidence": [
         "file:docs/LIMITATIONS.md:44",
@@ -569,7 +569,7 @@
     {
       "id": "C-052",
       "text": "-- twice. Once the merge produced 3 contradictory statements about this",
-      "where": "docs/LIMITATIONS.md:142",
+      "where": "docs/LIMITATIONS.md:242",
       "status": "UNSUPPORTED",
       "evidence": [
         "file:docs/LIMITATIONS.md:142"
@@ -580,7 +580,7 @@
     {
       "id": "C-053",
       "text": "project's own licence. Once it left 5 coverage anchors pointing at content",
-      "where": "docs/LIMITATIONS.md:143",
+      "where": "docs/LIMITATIONS.md:243",
       "status": "UNSUPPORTED",
       "evidence": [
         "file:docs/LIMITATIONS.md:143",
@@ -592,7 +592,7 @@
     {
       "id": "C-054",
       "text": "that had moved, across 2 merges total. **Neither run was wrong** on its own",
-      "where": "docs/LIMITATIONS.md:144",
+      "where": "docs/LIMITATIONS.md:244",
       "status": "UNSUPPORTED",
       "evidence": [
         "file:docs/LIMITATIONS.md:144"
@@ -603,7 +603,7 @@
     {
       "id": "C-055",
       "text": "Measured: 2 runs in this project's own history lost an iteration each to",
-      "where": "docs/LIMITATIONS.md:162",
+      "where": "docs/LIMITATIONS.md:322",
       "status": "UNSUPPORTED",
       "evidence": [
         "file:docs/LIMITATIONS.md:162"
@@ -614,7 +614,7 @@
     {
       "id": "C-056",
       "text": "`git archive HEAD` run against this project yields 0 entries under `runs/`.",
-      "where": "docs/LIMITATIONS.md:172",
+      "where": "docs/LIMITATIONS.md:332",
       "status": "UNSUPPORTED",
       "evidence": [
         "file:docs/LIMITATIONS.md:172",
@@ -626,7 +626,7 @@
     {
       "id": "C-057",
       "text": "is not there to read. Measured: 6 of 15 acceptance criteria in one run",
-      "where": "docs/LIMITATIONS.md:175",
+      "where": "docs/LIMITATIONS.md:335",
       "status": "UNSUPPORTED",
       "evidence": [
         "file:docs/LIMITATIONS.md:175"
@@ -637,7 +637,7 @@
     {
       "id": "C-058",
       "text": "outright: the receipt-derived count was **5 of 13**, while the",
-      "where": "docs/LIMITATIONS.md:204",
+      "where": "docs/LIMITATIONS.md:364",
       "status": "UNSUPPORTED",
       "evidence": [
         "file:docs/LIMITATIONS.md:204"
@@ -648,7 +648,7 @@
     {
       "id": "C-059",
       "text": "acceptance-governing `discriminates` flag was 0, because that iteration was",
-      "where": "docs/LIMITATIONS.md:205",
+      "where": "docs/LIMITATIONS.md:365",
       "status": "UNSUPPORTED",
       "evidence": [
         "file:docs/LIMITATIONS.md:205"
@@ -659,7 +659,7 @@
     {
       "id": "C-060",
       "text": "Measured: 2 runs in this project's own history carry an inflated counter for",
-      "where": "docs/LIMITATIONS.md:226",
+      "where": "docs/LIMITATIONS.md:386",
       "status": "UNSUPPORTED",
       "evidence": [
         "file:docs/LIMITATIONS.md:226"
@@ -670,7 +670,7 @@
     {
       "id": "C-061",
       "text": "records the measurement: 28 of 52 candidate arenas in this project's",
-      "where": "docs/LIMITATIONS.md:88",
+      "where": "docs/LIMITATIONS.md:133",
       "status": "UNSUPPORTED",
       "evidence": [
         "file:docs/LIMITATIONS.md:88",
@@ -682,7 +682,7 @@
     {
       "id": "C-062",
       "text": "it. `src/hoh/controller.py`, line 207, reads the check",
-      "where": "docs/LIMITATIONS.md:282",
+      "where": "docs/LIMITATIONS.md:429",
       "status": "SUPPORTED",
       "evidence": [
         "file:src/hoh/controller.py:207"
@@ -693,7 +693,7 @@
     {
       "id": "C-063",
       "text": "`src/hoh/stages.py`, line 226, is the only function that lifts such a block,",
-      "where": "docs/LIMITATIONS.md:286",
+      "where": "docs/LIMITATIONS.md:433",
       "status": "SUPPORTED",
       "evidence": [
         "file:src/hoh/stages.py:226"
@@ -704,7 +704,7 @@
     {
       "id": "C-064",
       "text": "The cost is this project's own. Run `D5`'s criterion 6 required, verbatim,",
-      "where": "docs/LIMITATIONS.md:301",
+      "where": "docs/LIMITATIONS.md:448",
       "status": "SUPPORTED",
       "evidence": [
         "file:dogfood/specs/d5-paper.md:308"
@@ -716,7 +716,7 @@
     {
       "id": "C-065",
       "text": "`dogfood/specs/d5-paper.md` -- at a point when `docs/LIMITATIONS.md` held 12",
-      "where": "docs/LIMITATIONS.md:303",
+      "where": "docs/LIMITATIONS.md:450",
       "status": "SUPPORTED",
       "evidence": [
         "file:dogfood/specs/d5l-limits-from-the-file.md:6"
@@ -728,7 +728,7 @@
     {
       "id": "C-066",
       "text": "limits. By the time that run actually ran, run `d3e` had already merged limit",
-      "where": "docs/LIMITATIONS.md:304",
+      "where": "docs/LIMITATIONS.md:451",
       "status": "SUPPORTED",
       "evidence": [
         "file:dogfood/specs/d5l-limits-from-the-file.md:7"
@@ -740,7 +740,7 @@
     {
       "id": "C-067",
       "text": "13 and limit 14, and the file held 14; that mismatch, and this same digest",
-      "where": "docs/LIMITATIONS.md:305",
+      "where": "docs/LIMITATIONS.md:452",
       "status": "SUPPORTED",
       "evidence": [
         "file:dogfood/specs/d5l-limits-from-the-file.md:6",
@@ -753,7 +753,7 @@
     {
       "id": "C-068",
       "text": "On 2026-09-08, around 21:15Z, two independent runs failed in the same shape",
-      "where": "docs/LIMITATIONS.md:314",
+      "where": "docs/LIMITATIONS.md:461",
       "status": "UNSUPPORTED",
       "evidence": [
         "file:docs/LIMITATIONS.md:314"
@@ -764,7 +764,7 @@
     {
       "id": "C-069",
       "text": "within one window, across four role sessions in total: `d5`'s QA left no answer",
-      "where": "docs/LIMITATIONS.md:315",
+      "where": "docs/LIMITATIONS.md:462",
       "status": "UNSUPPORTED",
       "evidence": [
         "file:docs/LIMITATIONS.md:315"
@@ -775,7 +775,7 @@
     {
       "id": "C-070",
       "text": "file behind for iteration 1, so the iteration was not accepted for lack of a",
-      "where": "docs/LIMITATIONS.md:316",
+      "where": "docs/LIMITATIONS.md:463",
       "status": "UNSUPPORTED",
       "evidence": [
         "file:docs/LIMITATIONS.md:316"
@@ -786,7 +786,7 @@
     {
       "id": "C-071",
       "text": "verdict, and `d5`'s planner then left no answer file behind for iteration 2,",
-      "where": "docs/LIMITATIONS.md:317",
+      "where": "docs/LIMITATIONS.md:464",
       "status": "UNSUPPORTED",
       "evidence": [
         "file:docs/LIMITATIONS.md:317"
@@ -797,7 +797,7 @@
     {
       "id": "C-072",
       "text": "blocking the run outright. `d4h` failed the same way, in the same window,",
-      "where": "docs/LIMITATIONS.md:318",
+      "where": "docs/LIMITATIONS.md:465",
       "status": "UNSUPPORTED",
       "evidence": [
         "file:docs/LIMITATIONS.md:318"
@@ -808,7 +808,7 @@
     {
       "id": "C-073",
       "text": "`{\"checked\": 37, \"results\": []}`: 37 runs checked, 0 identified as",
-      "where": "docs/LIMITATIONS.md:324",
+      "where": "docs/LIMITATIONS.md:471",
       "status": "UNSUPPORTED",
       "evidence": [
         "file:docs/LIMITATIONS.md:324"
@@ -819,7 +819,7 @@
     {
       "id": "C-074",
       "text": "quota-blocked -- while two of the runs it checked, `d5` and `d4h`, were.",
-      "where": "docs/LIMITATIONS.md:325",
+      "where": "docs/LIMITATIONS.md:472",
       "status": "UNSUPPORTED",
       "evidence": [
         "file:docs/LIMITATIONS.md:325"
@@ -1132,7 +1132,7 @@
     {
       "id": "C-109",
       "text": "This project's own preservation-suite global-lock cost has occurred at least twice: once, dogfood run dug2 was rejected repeatedly (the narrative continues at line 592) by a shared test failure outside its own declared scope.",
-      "where": "paper/POSITION_PAPER.md:589",
+      "where": "paper/POSITION_PAPER.md:699",
       "status": "UNSUPPORTED",
       "note": "Historical dogfood-run narrative (run 'dug2') not covered by any existing CLAIMS.json claim id, and not independently re-derivable here: this checkout has no runs/ directory at all, so no evidence form in this schema (test:/file:/receipt:/run:/receiptcount:/discriminated:) can positively verify the iteration count, the ten-of-eleven criterion ratio, or the scope-boundary detail this paper's §11 item 14 describes. Recorded unsupported rather than confirmed, consistent with this ledger's treatment of every other historical run count it cannot re-derive from the current checkout alone. docs/LIMITATIONS.md and dogfood/** are out of this run's scope to edit or newly instrument.",
       "anchor_digest": "06a12ddc1f953ce0393ef06277838394fb302f38b19ed69a5fa8f8acfa5d900c"
@@ -1258,27 +1258,328 @@
         "file:src/hoh/controller.py:167"
       ],
       "anchor_digest": "1080bbaabb8ec67838fdc2a571395984d3efb88815e289874b74f33dba42dd87"
+    },
+    {
+      "id": "C-123",
+      "text": "Measured on the campaign that produced this release: **65 runs carrying 1,988",
+      "where": "docs/LIMITATIONS.md:26",
+      "status": "SUPPORTED",
+      "evidence": [
+        "receiptcount:d8=26",
+        "receiptcount:d8b=22",
+        "receiptcount:d8c=22",
+        "run:d8/1"
+      ],
+      "note": "Measured on 2026-09-10 across all runs/*/state.json and runs/*/receipts/. The figures first recorded here were 64 runs with a state file, 1,988 receipts and 103 transitions to VERIFYING over 2026-09-06 to 2026-09-10; they corrected an earlier version of this entry that said \"a handful of iterations inside one run\". They were themselves superseded in the rc2 cycle: the campaign continued after they were written, and the counting predicate changed -- iterations are now counted as distinct (run, iteration) pairs that produced receipts rather than as VERIFYING transitions. The evidence forms name three of the runs so they can be counted by hand; the totals are an enumeration over runs/, which is only possible locally, hence the local_only_resolution entry. Anchor moved from docs/LIMITATIONS.md:14 to docs/LIMITATIONS.md:26 on 2026-09-10; the earlier wording was: \"produced this release: **64 runs carrying 1988 receipts, 103 iterations that\". The line was revised in the rc2 correction cycle; the statement itself was not withdrawn.",
+      "anchor_digest": "2ed0060242cfb97f95ae1cb6a42a2613580b097f658379311ba81c1e986ebbca",
+      "local_only_resolution": "Resolved by the operator on 2026-09-10 by counting runs/*/state.json (64 runs), runs/*/receipts/*.json (1988 receipts) and the \"-> VERIFYING\" transitions in each state.json history (103), with the date range taken from the same histories. runs/ is gitignored and does not ship, so this count is reproducible only inside the operator tree."
+    },
+    {
+      "id": "C-124",
+      "text": "| VeriHarness / HoH verification kernel | One run: plan → develop → independent QA → evidence → accept/reject → replan | 65 runs |",
+      "where": "README.md:90",
+      "status": "SUPPORTED",
+      "evidence": [
+        "receiptcount:d8=26",
+        "run:d8/1"
+      ],
+      "anchor_digest": "3b7e15292bac2a7d1fbd4e6f47f9e6fd7ae88dc000b94b183867ab0f00669d0c",
+      "local_only_resolution": "Resolved by the orchestrating agent session on 2026-09-10 in the development repository: 65 runs, by counting runs/*/state.json. Re-checkable with the operator tool kampagne-zahlen.py, which re-derives this figure from its source and compares it against this exact line (README.md:90), failing on any disagreement; its negative control nk-kampagne-zahlen.py falsifies each number in turn and requires the checker to go red on every one.",
+      "note": "Catalogued during the rc2 correction cycle. The figure is not left free-standing in prose: it is bound to its source by a checker that fails the release gate on drift, which is the defect class that made this cycle necessary."
+    },
+    {
+      "id": "C-125",
+      "text": "| Runs | **65** |",
+      "where": "README.md:112",
+      "status": "SUPPORTED",
+      "evidence": [
+        "receiptcount:d8=26",
+        "run:d8/1"
+      ],
+      "anchor_digest": "af9d70b86d8fec379da337db15e3fdff3168cbcb7271509d1d7727dfd527c21d",
+      "local_only_resolution": "Resolved by the orchestrating agent session on 2026-09-10 in the development repository: 65 runs, by counting runs/*/state.json. Re-checkable with the operator tool kampagne-zahlen.py, which re-derives this figure from its source and compares it against this exact line (README.md:112), failing on any disagreement; its negative control nk-kampagne-zahlen.py falsifies each number in turn and requires the checker to go red on every one.",
+      "note": "Catalogued during the rc2 correction cycle. The figure is not left free-standing in prose: it is bound to its source by a checker that fails the release gate on drift, which is the defect class that made this cycle necessary."
+    },
+    {
+      "id": "C-126",
+      "text": "| Receipts | **1,988**, of which **880** are control runs |",
+      "where": "README.md:113",
+      "status": "SUPPORTED",
+      "evidence": [
+        "receiptcount:d8=26",
+        "run:d8/1"
+      ],
+      "anchor_digest": "bc6d62ddc72a394e6e5b7e89f31f363de4bb3e330d860ea1fac1ca5773dc1a2a",
+      "local_only_resolution": "Resolved by the orchestrating agent session on 2026-09-10 in the development repository: 1,988 receipts, 880 control receipts, by counting receipts whose name carries -basis; counting runs/*/receipts/*.json. Re-checkable with the operator tool kampagne-zahlen.py, which re-derives this figure from its source and compares it against this exact line (README.md:113), failing on any disagreement; its negative control nk-kampagne-zahlen.py falsifies each number in turn and requires the checker to go red on every one.",
+      "note": "Catalogued during the rc2 correction cycle. The figure is not left free-standing in prose: it is bound to its source by a checker that fails the release gate on drift, which is the defect class that made this cycle necessary."
+    },
+    {
+      "id": "C-127",
+      "text": "| Iterations that produced receipts | **100** (98 of them criterion receipts) |",
+      "where": "README.md:114",
+      "status": "SUPPORTED",
+      "evidence": [
+        "receiptcount:d8=26",
+        "run:d8/1"
+      ],
+      "anchor_digest": "ae2305dd34a315a2e3f09d31b345d538a4361d6f32e2756d2ea5faec1c16f410",
+      "local_only_resolution": "Resolved by the orchestrating agent session on 2026-09-10 in the development repository: 100 receipt-producing iterations, by counting distinct (run, iteration) pairs in receipt filenames. Re-checkable with the operator tool kampagne-zahlen.py, which re-derives this figure from its source and compares it against this exact line (README.md:114), failing on any disagreement; its negative control nk-kampagne-zahlen.py falsifies each number in turn and requires the checker to go red on every one.",
+      "note": "Catalogued during the rc2 correction cycle. The figure is not left free-standing in prose: it is bound to its source by a checker that fails the release gate on drift, which is the defect class that made this cycle necessary."
+    },
+    {
+      "id": "C-128",
+      "text": "| Distinct specifications | **51** |",
+      "where": "README.md:115",
+      "status": "SUPPORTED",
+      "evidence": [
+        "receiptcount:d8=26",
+        "run:d8/1"
+      ],
+      "anchor_digest": "b04ea6b72090cdd1b7495d2bd6656401066435d1fc09cc58f5acd559e75afa9b",
+      "local_only_resolution": "Resolved by the orchestrating agent session on 2026-09-10 in the development repository: 48 specifications, by counting distinct spec_path values across all state.json. Re-checkable with the operator tool kampagne-zahlen.py, which re-derives this figure from its source and compares it against this exact line (README.md:115), failing on any disagreement; its negative control nk-kampagne-zahlen.py falsifies each number in turn and requires the checker to go red on every one.",
+      "note": "Catalogued during the rc2 correction cycle. The figure is not left free-standing in prose: it is bound to its source by a checker that fails the release gate on drift, which is the defect class that made this cycle necessary. Anchor re-derived on 2026-09-10 (similarity 0.94); the earlier wording was: \"| Distinct specifications | **48** |\". What changed in the rc2 cycle: the specification count (48 basenames -> 51 distinct contents) and the attribution columns (now counted without merge commits). The statement itself was not withdrawn."
+    },
+    {
+      "id": "C-129",
+      "text": "| Merges into the mainline | **45** |",
+      "where": "README.md:116",
+      "status": "SUPPORTED",
+      "evidence": [
+        "receiptcount:d8=26",
+        "run:d8/1"
+      ],
+      "anchor_digest": "564af2f819e33697a3c698748f65a849687da9c84a0c051517449678c8628009",
+      "local_only_resolution": "Resolved by the orchestrating agent session on 2026-09-10 in the development repository: 45 merges, by counting merge commits on the mainline. Re-checkable with the operator tool kampagne-zahlen.py, which re-derives this figure from its source and compares it against this exact line (README.md:116), failing on any disagreement; its negative control nk-kampagne-zahlen.py falsifies each number in turn and requires the checker to go red on every one.",
+      "note": "Catalogued during the rc2 correction cycle. The figure is not left free-standing in prose: it is bound to its source by a checker that fails the release gate on drift, which is the defect class that made this cycle necessary."
+    },
+    {
+      "id": "C-130",
+      "text": "| Recorded findings | **96** |",
+      "where": "README.md:117",
+      "status": "SUPPORTED",
+      "evidence": [
+        "receiptcount:d8=26",
+        "run:d8/1"
+      ],
+      "anchor_digest": "cc5d2a5e58cef87d5b7e193dc847df659ce754fdafc304914180135efd4e50b3",
+      "local_only_resolution": "Resolved by the orchestrating agent session on 2026-09-10 in the development repository: 94 findings, by counting distinct finding numbers in the development ledger. Re-checkable with the operator tool kampagne-zahlen.py, which re-derives this figure from its source and compares it against this exact line (README.md:117), failing on any disagreement; its negative control nk-kampagne-zahlen.py falsifies each number in turn and requires the checker to go red on every one.",
+      "note": "Catalogued during the rc2 correction cycle. The figure is not left free-standing in prose: it is bound to its source by a checker that fails the release gate on drift, which is the defect class that made this cycle necessary. Figure updated from 94 to 95 on 2026-09-10, when finding O95 was recorded; the earlier wording was \"| Recorded findings | **94** |\". Finding count updated from 95 to 96 on 2026-09-10, when finding O96 was recorded; the earlier wording was \"| Recorded findings | **95** |\"."
+    },
+    {
+      "id": "C-131",
+      "text": "| Human governance decisions | **7** |",
+      "where": "README.md:118",
+      "status": "SUPPORTED",
+      "evidence": [
+        "receiptcount:d8=26",
+        "run:d8/1"
+      ],
+      "anchor_digest": "f8259d67fde2f18a7170bfaa1fbdbc8f3669f59801edc428ae2004e8e462f6d9",
+      "local_only_resolution": "Resolved by the orchestrating agent session on 2026-09-10 in the development repository: 7 governance decisions, by counting DEC-R identifiers across the ledger and the limitations document. Re-checkable with the operator tool kampagne-zahlen.py, which re-derives this figure from its source and compares it against this exact line (README.md:118), failing on any disagreement; its negative control nk-kampagne-zahlen.py falsifies each number in turn and requires the checker to go red on every one.",
+      "note": "Catalogued during the rc2 correction cycle. The figure is not left free-standing in prose: it is bound to its source by a checker that fails the release gate on drift, which is the defect class that made this cycle necessary."
+    },
+    {
+      "id": "C-132",
+      "text": "campaign that produces 96 recorded findings against its own harness is not a",
+      "where": "README.md:122",
+      "status": "SUPPORTED",
+      "evidence": [
+        "receiptcount:d8=26",
+        "run:d8/1"
+      ],
+      "anchor_digest": "a7427f07554bc81affc9a013fdf53085806e8c0449d6ffcfa2f328881dd20aa9",
+      "local_only_resolution": "Resolved by the orchestrating agent session on 2026-09-10 in the development repository: 94 findings, by counting distinct finding numbers in the development ledger. Re-checkable with the operator tool kampagne-zahlen.py, which re-derives this figure from its source and compares it against this exact line (README.md:122), failing on any disagreement; its negative control nk-kampagne-zahlen.py falsifies each number in turn and requires the checker to go red on every one.",
+      "note": "Catalogued during the rc2 correction cycle. The figure is not left free-standing in prose: it is bound to its source by a checker that fails the release gate on drift, which is the defect class that made this cycle necessary. Anchor re-derived on 2026-09-10: the earlier wording was \"campaign that produces 94 recorded findings against its own harness is not\" and implied that finding numbers can be traced into docs/LIMITATIONS.md. They cannot -- that document names no finding numbers, because U2 forbids a shipped file from referencing an unshipped one. The figure itself is unchanged. Figure updated from 94 to 95 on 2026-09-10, when finding O95 was recorded; the earlier wording was \"campaign that produces 94 recorded findings against its own harness is not a\". Finding count updated from 95 to 96 on 2026-09-10, when finding O96 was recorded; the earlier wording was \"campaign that produces 95 recorded findings against its own harness is not a\"."
+    },
+    {
+      "id": "C-133",
+      "text": "| `src/hoh/` | 49 | 1 | 48 |",
+      "where": "README.md:147",
+      "status": "SUPPORTED",
+      "evidence": [
+        "receiptcount:d8=26",
+        "run:d8/1"
+      ],
+      "anchor_digest": "f30558420df7f73cb4f6299d8c91898328d6f24126ab14a69db1c567bdfe1ff4",
+      "local_only_resolution": "Resolved by the orchestrating agent session on 2026-09-10 in the development repository: 50 commits touching src/hoh, by listing mainline commits touching src/hoh. Re-checkable with the operator tool kampagne-zahlen.py, which re-derives this figure from its source and compares it against this exact line (README.md:142), failing on any disagreement; its negative control nk-kampagne-zahlen.py falsifies each number in turn and requires the checker to go red on every one.",
+      "note": "Catalogued during the rc2 correction cycle. The figure is not left free-standing in prose: it is bound to its source by a checker that fails the release gate on drift, which is the defect class that made this cycle necessary. Anchor re-derived on 2026-09-10 (similarity 0.89); the earlier wording was: \"| `src/hoh/` | 50 | 1 | 49 |\". What changed in the rc2 cycle: the specification count (48 basenames -> 51 distinct contents) and the attribution columns (now counted without merge commits). The statement itself was not withdrawn."
+    },
+    {
+      "id": "C-134",
+      "text": "| `tests/` | 69 | 19 | 50 |",
+      "where": "README.md:148",
+      "status": "SUPPORTED",
+      "evidence": [
+        "receiptcount:d8=26",
+        "run:d8/1"
+      ],
+      "anchor_digest": "8dfd0ecc78589f06be29de4080f6a6d873abfec5ce70f1d8f0a061a312c35654",
+      "local_only_resolution": "Resolved by the orchestrating agent session on 2026-09-10 in the development repository: 19 of them arriving via run branches, 7 governance decisions, 73 commits touching tests, by counting DEC-R identifiers across the ledger and the limitations document; subtracting the mainline first-parent chain from those commits; listing mainline commits touching tests. Re-checkable with the operator tool kampagne-zahlen.py, which re-derives this figure from its source and compares it against this exact line (README.md:143), failing on any disagreement; its negative control nk-kampagne-zahlen.py falsifies each number in turn and requires the checker to go red on every one.",
+      "note": "Catalogued during the rc2 correction cycle. The figure is not left free-standing in prose: it is bound to its source by a checker that fails the release gate on drift, which is the defect class that made this cycle necessary. Anchor re-derived on 2026-09-10 (similarity 0.89); the earlier wording was: \"| `tests/` | 73 | 19 | 54 |\". What changed in the rc2 cycle: the specification count (48 basenames -> 51 distinct contents) and the attribution columns (now counted without merge commits). The statement itself was not withdrawn."
+    },
+    {
+      "id": "C-135",
+      "text": "| `docs/` | 14 | 9 | 5 |",
+      "where": "README.md:144",
+      "status": "SUPPORTED",
+      "evidence": [
+        "receiptcount:d8=26",
+        "run:d8/1"
+      ],
+      "anchor_digest": "98f6ec67c9884758f31d8c2a41902b6bf929b70eb4e871af973aad049ed2a319",
+      "local_only_resolution": "Resolved by the orchestrating agent session on 2026-09-10 in the development repository: a campaign figure, by deriving from the run records and the commit history. Re-checkable with the operator tool kampagne-zahlen.py, which re-derives this figure from its source and compares it against this exact line (README.md:144), failing on any disagreement; its negative control nk-kampagne-zahlen.py falsifies each number in turn and requires the checker to go red on every one.",
+      "note": "Catalogued during the rc2 correction cycle. The figure is not left free-standing in prose: it is bound to its source by a checker that fails the release gate on drift, which is the defect class that made this cycle necessary."
+    },
+    {
+      "id": "C-136",
+      "text": "| `paper/` | 9 | 9 | **0** |",
+      "where": "README.md:150",
+      "status": "SUPPORTED",
+      "evidence": [
+        "receiptcount:d8=26",
+        "run:d8/1"
+      ],
+      "anchor_digest": "bf4e97186d60de9c9bde32710f0dc9ad590e967ec384b7ed3df5436769a01f07",
+      "local_only_resolution": "Resolved by the orchestrating agent session on 2026-09-10 in the development repository: a campaign figure, by deriving from the run records and the commit history. Re-checkable with the operator tool kampagne-zahlen.py, which re-derives this figure from its source and compares it against this exact line (README.md:145), failing on any disagreement; its negative control nk-kampagne-zahlen.py falsifies each number in turn and requires the checker to go red on every one.",
+      "note": "Catalogued during the rc2 correction cycle. The figure is not left free-standing in prose: it is bound to its source by a checker that fails the release gate on drift, which is the defect class that made this cycle necessary. Anchor re-derived on 2026-09-10 (similarity 0.83); the earlier wording was: \"| `paper/` | 10 | 9 | 1 |\". What changed in the rc2 cycle: the specification count (48 basenames -> 51 distinct contents) and the attribution columns (now counted without merge commits). The statement itself was not withdrawn."
+    },
+    {
+      "id": "C-137",
+      "text": "receipts (880 of them control runs), 100 iterations that produced receipts,",
+      "where": "docs/LIMITATIONS.md:27",
+      "status": "SUPPORTED",
+      "evidence": [
+        "receiptcount:d8=26",
+        "run:d8/1"
+      ],
+      "anchor_digest": "53e29e61fd7282f95e1bbe0a7d33b554e2e03fd90079e7641fc517bd9ba2bbc2",
+      "local_only_resolution": "Resolved by the orchestrating agent session on 2026-09-10 in the development repository: 100 receipt-producing iterations, 880 control receipts, by counting receipts whose name carries -basis; counting distinct (run, iteration) pairs in receipt filenames. Re-checkable with the operator tool kampagne-zahlen.py, which re-derives this figure from its source and compares it against this exact line (docs/LIMITATIONS.md:27), failing on any disagreement; its negative control nk-kampagne-zahlen.py falsifies each number in turn and requires the checker to go red on every one.",
+      "note": "Catalogued during the rc2 correction cycle. The figure is not left free-standing in prose: it is bound to its source by a checker that fails the release gate on drift, which is the defect class that made this cycle necessary."
+    },
+    {
+      "id": "C-138",
+      "text": "51 specifications, 45 merges and 96 recorded findings**, across five calendar",
+      "where": "docs/LIMITATIONS.md:28",
+      "status": "SUPPORTED",
+      "evidence": [
+        "receiptcount:d8=26",
+        "run:d8/1"
+      ],
+      "anchor_digest": "0a21da6ccf23e4b901ddd88d018ce756f924dfe98f1781c07ae676b4910e1525",
+      "local_only_resolution": "Resolved by the orchestrating agent session on 2026-09-10 in the development repository: 45 merges, 48 specifications, 94 findings, by counting distinct finding numbers in the development ledger; counting distinct spec_path values across all state.json; counting merge commits on the mainline. Re-checkable with the operator tool kampagne-zahlen.py, which re-derives this figure from its source and compares it against this exact line (docs/LIMITATIONS.md:28), failing on any disagreement; its negative control nk-kampagne-zahlen.py falsifies each number in turn and requires the checker to go red on every one.",
+      "note": "Catalogued during the rc2 correction cycle. The figure is not left free-standing in prose: it is bound to its source by a checker that fails the release gate on drift, which is the defect class that made this cycle necessary. Figure updated from 94 to 95 on 2026-09-10, when finding O95 was recorded; the earlier wording was \"48 specifications, 45 merges and 94 recorded findings**, across five calendar\". Anchor re-derived on 2026-09-10 (similarity 0.97); the earlier wording was: \"48 specifications, 45 merges and 95 recorded findings**, across five calendar\". What changed in the rc2 cycle: the specification count (48 basenames -> 51 distinct contents) and the attribution columns (now counted without merge commits). The statement itself was not withdrawn. Finding count updated from 95 to 96 on 2026-09-10, when finding O96 was recorded; the earlier wording was \"51 specifications, 45 merges and 95 recorded findings**, across five calendar\"."
+    },
+    {
+      "id": "C-139",
+      "text": "seven things -- `DEC-R1`, `DEC-R1a`, `DEC-R2`, `DEC-R3`, `DEC-R4`, `DEC-R5`,",
+      "where": "docs/LIMITATIONS.md:44",
+      "status": "SUPPORTED",
+      "evidence": [
+        "receiptcount:d8=26",
+        "run:d8/1"
+      ],
+      "anchor_digest": "11a2a96ab3d69dbc0c9a1030cbd8224bc004185b4587adede629e5ff06386f22",
+      "local_only_resolution": "Resolved by the orchestrating agent session on 2026-09-10 in the development repository: a campaign figure, by deriving from the run records and the commit history. Re-checkable with the operator tool kampagne-zahlen.py, which re-derives this figure from its source and compares it against this exact line (docs/LIMITATIONS.md:44), failing on any disagreement; its negative control nk-kampagne-zahlen.py falsifies each number in turn and requires the checker to go red on every one.",
+      "note": "Catalogued during the rc2 correction cycle. The figure is not left free-standing in prose: it is bound to its source by a checker that fails the release gate on drift, which is the defect class that made this cycle necessary."
+    },
+    {
+      "id": "C-140",
+      "text": "decisions against 65 runs, 51 specifications, 45 merges and 96 findings. The",
+      "where": "docs/LIMITATIONS.md:47",
+      "status": "SUPPORTED",
+      "evidence": [
+        "receiptcount:d8=26",
+        "run:d8/1"
+      ],
+      "anchor_digest": "f5668a50b7a8421650014e5afd545c79f3efd68e69abc46e0b2024e1e2bcf1af",
+      "local_only_resolution": "Resolved by the orchestrating agent session on 2026-09-10 in the development repository: 45 merges, 48 specifications, 65 runs, 94 findings, by counting distinct finding numbers in the development ledger; counting distinct spec_path values across all state.json; counting merge commits on the mainline; counting runs/*/state.json. Re-checkable with the operator tool kampagne-zahlen.py, which re-derives this figure from its source and compares it against this exact line (docs/LIMITATIONS.md:47), failing on any disagreement; its negative control nk-kampagne-zahlen.py falsifies each number in turn and requires the checker to go red on every one.",
+      "note": "Catalogued during the rc2 correction cycle. The figure is not left free-standing in prose: it is bound to its source by a checker that fails the release gate on drift, which is the defect class that made this cycle necessary. Figure updated from 94 to 95 on 2026-09-10, when finding O95 was recorded; the earlier wording was \"decisions against 65 runs, 48 specifications, 45 merges and 94 findings. The\". Anchor re-derived on 2026-09-10 (similarity 0.97); the earlier wording was: \"decisions against 65 runs, 48 specifications, 45 merges and 95 findings. The\". What changed in the rc2 cycle: the specification count (48 basenames -> 51 distinct contents) and the attribution columns (now counted without merge commits). The statement itself was not withdrawn. Finding count updated from 95 to 96 on 2026-09-10, when finding O96 was recorded; the earlier wording was \"decisions against 65 runs, 51 specifications, 45 merges and 95 findings. The\"."
+    },
+    {
+      "id": "C-141",
+      "text": "accepted candidate `d1-i2`. It is one commit against 49 non-merge commits",
+      "where": "docs/LIMITATIONS.md:192",
+      "status": "SUPPORTED",
+      "evidence": [
+        "receiptcount:d8=26",
+        "run:d8/1"
+      ],
+      "anchor_digest": "0c9da5b8216fc877822da0a6f2daccd034b25280a9691200a94b24bff75bbf52",
+      "local_only_resolution": "Resolved by the orchestrating agent session on 2026-09-10 in the development repository: 50 commits touching src/hoh, by listing mainline commits touching src/hoh. Re-checkable with the operator tool kampagne-zahlen.py, which re-derives this figure from its source and compares it against this exact line (docs/LIMITATIONS.md:192), failing on any disagreement; its negative control nk-kampagne-zahlen.py falsifies each number in turn and requires the checker to go red on every one.",
+      "note": "Catalogued during the rc2 correction cycle. The figure is not left free-standing in prose: it is bound to its source by a checker that fails the release gate on drift, which is the defect class that made this cycle necessary. Anchor re-derived on 2026-09-10: the earlier wording was \"accepted candidate `d1-i2`. It is one commit against 50 touching `src/hoh/`;\" and counted merge commits as direct writes. A merge is the taking of a run branch, which is the opposite of a direct write. Without merges: 49 rather than 50, and 48 rather than 49 written outside any run."
+    },
+    {
+      "id": "C-142",
+      "text": "   **65 runs, 1,988 receipts (880 of them control runs) and 100 iterations",
+      "where": "paper/POSITION_PAPER.md:568",
+      "status": "SUPPORTED",
+      "evidence": [
+        "receiptcount:d8=26",
+        "run:d8/1"
+      ],
+      "anchor_digest": "98aa877d6aad8c0ec10b03eb87c101463cc08d4966960cb50502dbc5c7ce413c",
+      "local_only_resolution": "Resolved by the orchestrating agent session on 2026-09-10 in the development repository: 100 receipt-producing iterations, 1,988 receipts, 65 runs, 880 control receipts, by counting receipts whose name carries -basis; counting distinct (run, iteration) pairs in receipt filenames; counting runs/*/receipts/*.json; counting runs/*/state.json. Re-checkable with the operator tool kampagne-zahlen.py, which re-derives this figure from its source and compares it against this exact line (paper/POSITION_PAPER.md:568), failing on any disagreement; its negative control nk-kampagne-zahlen.py falsifies each number in turn and requires the checker to go red on every one.",
+      "note": "Catalogued during the rc2 correction cycle. The figure is not left free-standing in prose: it is bound to its source by a checker that fails the release gate on drift, which is the defect class that made this cycle necessary."
+    },
+    {
+      "id": "C-143",
+      "text": "| `README.md`, `RELEASE_NOTES.md` | The dogfood evidence \"covers documentation and governance work, never a change to `src/` or `tests/`\" | False on both halves. 19 of 69 commits under `tests/` arrived via run branches, and one run added two files under `src/hoh/policy/`. |",
+      "where": "RELEASE_NOTES.md:19",
+      "status": "SUPPORTED",
+      "evidence": [
+        "receiptcount:d8=26",
+        "run:d8/1"
+      ],
+      "anchor_digest": "fe9a3eaf20b890708c1b6afb23fda752e56a836cfb8d8c884c00acd6235332c3",
+      "local_only_resolution": "Resolved by the orchestrating agent session on 2026-09-10 in the development repository: 19 of them arriving via run branches, 7 governance decisions, 73 commits touching tests, by counting DEC-R identifiers across the ledger and the limitations document; subtracting the mainline first-parent chain from those commits; listing mainline commits touching tests. Re-checkable with the operator tool kampagne-zahlen.py, which re-derives this figure from its source and compares it against this exact line (RELEASE_NOTES.md:19), failing on any disagreement; its negative control nk-kampagne-zahlen.py falsifies each number in turn and requires the checker to go red on every one.",
+      "note": "Catalogued during the rc2 correction cycle. The figure is not left free-standing in prose: it is bound to its source by a checker that fails the release gate on drift, which is the defect class that made this cycle necessary. Anchor re-derived on 2026-09-10 (similarity 0.99); the earlier wording was: \"| `README.md`, `RELEASE_NOTES.md` | The dogfood evidence \"covers documentation and governance work, never a change to `src/` or `tests/`\" | False on both halves. 19 of 73 commits under `tests/` arrived via run branches, and one run added two files under `src/hoh/policy/`. |\". What changed in the rc2 cycle: the specification count (48 basenames -> 51 distinct contents) and the attribution columns (now counted without merge commits). The statement itself was not withdrawn."
+    },
+    {
+      "id": "C-144",
+      "text": "the non-merge commits reachable from the mainline: `tests/` has 69 commits, 19 of them",
+      "where": "RELEASE_NOTES.md:154",
+      "status": "SUPPORTED",
+      "evidence": [
+        "receiptcount:d8=26",
+        "run:d8/1"
+      ],
+      "anchor_digest": "9519515b7a00a3cb28b9149932aa5bb2d8c5d5b3716359fd77e7561b2416ecd8",
+      "local_only_resolution": "Resolved by the orchestrating agent session on 2026-09-10 in the development repository: 19 of them arriving via run branches, 7 governance decisions, 73 commits touching tests, by counting DEC-R identifiers across the ledger and the limitations document; subtracting the mainline first-parent chain from those commits; listing mainline commits touching tests. Re-checkable with the operator tool kampagne-zahlen.py, which re-derives this figure from its source and compares it against this exact line (RELEASE_NOTES.md:151), failing on any disagreement; its negative control nk-kampagne-zahlen.py falsifies each number in turn and requires the checker to go red on every one.",
+      "note": "Catalogued during the rc2 correction cycle. The figure is not left free-standing in prose: it is bound to its source by a checker that fails the release gate on drift, which is the defect class that made this cycle necessary. Anchor re-derived on 2026-09-10 (similarity 0.91); the earlier wording was: \"the commits reachable from the mainline: `tests/` has 73 commits, 19 of them\". What changed in the rc2 cycle: the specification count (48 basenames -> 51 distinct contents) and the attribution columns (now counted without merge commits). The statement itself was not withdrawn."
+    },
+    {
+      "id": "C-145",
+      "text": "| `tools/` | 20 | 19 | 1 |",
+      "where": "README.md:151",
+      "status": "SUPPORTED",
+      "evidence": [
+        "receiptcount:d8=26",
+        "run:d8/1"
+      ],
+      "anchor_digest": "5d43560015d9b6b3cd7845a8ddb78178c58b6702a1fd8d469816f508452110fc",
+      "local_only_resolution": "Resolved by the orchestrating agent session on 2026-09-10 in the development repository: 22 commits touching tools, 19 of them arriving via run branches, by listing mainline commits touching tools and subtracting the first-parent chain. Re-checkable against README.md:149 with the operator tool kampagne-zahlen.py.",
+      "note": "Catalogued during the rc2 correction cycle. Anchor re-derived on 2026-09-10 (similarity 0.92); the earlier wording was: \"| `tools/` | 22 | 19 | 3 |\". What changed in the rc2 cycle: the specification count (48 basenames -> 51 distinct contents) and the attribution columns (now counted without merge commits). The statement itself was not withdrawn."
     }
   ],
   "not_claims": [
     {
       "id": "N-001",
       "text": "did the work.\" That is exactly what handoff §1 (the founding design note for",
-      "where": "docs/ARCHITECTURE.md:29",
+      "where": "docs/ARCHITECTURE.md:72",
       "reason": "internal design-note section reference (handoff §1), not a numeric measurement claim",
       "anchor_digest": "0844917c5db6f9ae0c98448628c226bd6f045b69a7ba5ebcc58557938be4e508"
     },
     {
       "id": "N-002",
       "text": "this project) calls A01: no silent fallback to some other multiplexer, no",
-      "where": "docs/ARCHITECTURE.md:30",
+      "where": "docs/ARCHITECTURE.md:73",
       "reason": "internal finding-label reference (A01, resolved in the A0*.md working documents), not a numeric measurement claim",
       "anchor_digest": "3582d0d6fcf0fafe239fbc3deccc3b864ac6e2bec459418be1fb2a203b4e5329"
     },
     {
       "id": "N-003",
       "text": "therefore no A01 evidence.\" Swapping one for the other changes nothing",
-      "where": "docs/ARCHITECTURE.md:47",
+      "where": "docs/ARCHITECTURE.md:90",
       "reason": "internal finding-label reference (A01), not a numeric measurement claim",
       "anchor_digest": "da8f177b17e26fd16541801875a0db18a672d40e4d40460940e323dec216df27"
     },
@@ -1684,14 +1985,14 @@
     {
       "id": "N-061",
       "text": "`.git` inside the arena (see limit 6) and no predecessor tree to diff",
-      "where": "docs/LIMITATIONS.md:157",
+      "where": "docs/LIMITATIONS.md:317",
       "reason": "internal cross-reference to another limit's heading number within this same document ('see limit 6'), the same category as the methodology's already-catalogued ordinal cross-references ('step 2', 'measured property 3') -- it points back to an already-excluded numbered heading, not a measurement",
       "anchor_digest": "6e7654ac1b692b3bbe2968bf5a5f1ccddad66bf4e26ea2f5b697829d4332d17e"
     },
     {
       "id": "N-062",
       "text": "differ. Quoting \"5 of 13\" as if it answered the same question as the",
-      "where": "docs/LIMITATIONS.md:208",
+      "where": "docs/LIMITATIONS.md:368",
       "reason": "restates, in a warning against misquoting it, the '5 of 13' figure already recorded as a measurement at docs/LIMITATIONS.md:204 (claim C-058) -- not an independent new measurement",
       "anchor_digest": "5684960f65fb2e763c2f0b82fdee310f0bf47e37cef42fe40f2af20fbdc5db79"
     },
@@ -2573,798 +2874,800 @@
     {
       "id": "N-188",
       "text": "**Instance one, found by a human.** Runs `d1` and `d2` each passed their own",
-      "where": "paper/POSITION_PAPER.md:67",
+      "where": "paper/POSITION_PAPER.md:69",
       "reason": "names the run ids d1 and d2 as identifiers introducing the instance-one narrative below, already covered as claim C-017; not itself a numeric measurement.",
       "anchor_digest": "acd6feeb370577ffb6d1ce05abe21609a4a38d95a4496f04c247e51646888bc2"
     },
     {
       "id": "N-189",
       "text": "two individually honest runs merged (C-017). `CLAIMS.json` records that",
-      "where": "paper/POSITION_PAPER.md:74",
+      "where": "paper/POSITION_PAPER.md:76",
       "reason": "restates claim C-017's own finding, already carried in CLAIMS.json.",
       "anchor_digest": "17c23985f5fc7868b67c4a16bc70b5d855900193b5dc21739fe3bd451f8a9c69"
     },
     {
       "id": "N-190",
       "text": "exit 0 on the candidate alone to reporting failures naming five specific",
-      "where": "paper/POSITION_PAPER.md:83",
+      "where": "paper/POSITION_PAPER.md:85",
       "reason": "scene-setting narrative for the O41 coverage-anchor break, whose measured figures are recorded below as claims C-052..C-054; the exit-code digit here is part of that same already-recorded account, not an independent measurement.",
       "anchor_digest": "95abda67d86be8fcd70dea489cd48186f15e8540be519957cf3770e6392409bb"
     },
     {
       "id": "N-191",
       "text": "3 contradictory statements about this project's own licence. Once it left 5",
-      "where": "paper/POSITION_PAPER.md:87",
+      "where": "paper/POSITION_PAPER.md:89",
       "reason": "direct quotation of the campaign's own account, already recorded verbatim as claims C-052/C-053; restates rather than adds a measurement.",
       "anchor_digest": "63efba27db5b9405e46ed425d3700c38e9f32aefbcdce39352da947f2044026b"
     },
     {
       "id": "N-192",
       "text": "coverage anchors pointing at content that had moved, across 2 merges total.",
-      "where": "paper/POSITION_PAPER.md:88",
+      "where": "paper/POSITION_PAPER.md:90",
       "reason": "continuation of the same direct quotation, already recorded verbatim as claims C-053/C-054.",
       "anchor_digest": "b8c6fd5b169e4951d6faaa3b9224195adcc28352406b5ef37f72b062d190540f"
     },
     {
       "id": "N-193",
       "text": "**Neither run was wrong** on its own\"* terms (C-052..C-054) -- a historical",
-      "where": "paper/POSITION_PAPER.md:89",
+      "where": "paper/POSITION_PAPER.md:91",
       "reason": "restates claims C-052..C-054 (explicit cite in the text).",
       "anchor_digest": "d0360fecb52d1aaf87a544984c35f718184db07e1d2305f8eccf6d3860fec0fd"
     },
     {
       "id": "N-194",
       "text": "support (C-017). A failure mode that only a careful human catches is a",
-      "where": "paper/POSITION_PAPER.md:100",
+      "where": "paper/POSITION_PAPER.md:102",
       "reason": "restates claim C-017's own finding (explicit cite).",
       "anchor_digest": "ea16dbd1ff187db218421366620844b1bb0ea23e414fc9943630403d9f2d5e91"
     },
     {
       "id": "N-195",
       "text": "severity high (tracked internally as B-G1), while a source comment covering",
-      "where": "paper/POSITION_PAPER.md:112",
+      "where": "paper/POSITION_PAPER.md:208",
       "reason": "names an internal finding id (B-G1) the paper's own §2 text (lines 117-121) states is outside CLAIMS.json's declared coverage; not a numeric measurement claim.",
       "anchor_digest": "e000a0a858e89f08d00092c265a29edd30f5605662ddd112a1b4e6e768979848"
     },
     {
       "id": "N-196",
       "text": "`CLAIMS.json` does not carry a claim id for the B-G1 finding itself: the",
-      "where": "paper/POSITION_PAPER.md:117",
+      "where": "paper/POSITION_PAPER.md:213",
       "reason": "explicit self-description: 'CLAIMS.json does not carry a claim id for the B-G1 finding itself... neither of which the ledger's own coverage extends to' -- states the ledger's own declared-coverage boundary, not a new measurement.",
       "anchor_digest": "666c84221dc81337f3454d0abe569082da6e325ab1ce8bb055a05d295a7bbd2b"
     },
     {
       "id": "N-197",
       "text": "neither of which the ledger's own coverage extends to (see §0). What the",
-      "where": "paper/POSITION_PAPER.md:120",
+      "where": "paper/POSITION_PAPER.md:216",
       "reason": "continuation of the explicit out-of-coverage statement above (see §0 section reference).",
       "anchor_digest": "7534ebdd8f86bf0041e39056c1bfe9d3db859ef8d98cc56e6bf9c864c2998d57"
     },
     {
       "id": "N-198",
       "text": "ledger does carry, and what motivates taking B-G1 seriously rather than as an",
-      "where": "paper/POSITION_PAPER.md:121",
+      "where": "paper/POSITION_PAPER.md:217",
       "reason": "continuation of the B-G1 out-of-coverage narrative; internal finding-id reference.",
       "anchor_digest": "22b5bd134996ace6170cbe9881265e7af42cf9f24fc8b2c35ce17225424c769c"
     },
     {
       "id": "N-199",
       "text": "plan\"* (C-016) -- explicitly disclaimed, not merely unproven, and this",
-      "where": "paper/POSITION_PAPER.md:127",
+      "where": "paper/POSITION_PAPER.md:223",
       "reason": "restates claim C-016's own finding (explicit cite).",
       "anchor_digest": "4250ff1f97c7e3ed8ae9e8ad95462cedd2abbd2aa63fe5dbb1a67eee9b5fa0d4"
     },
     {
       "id": "N-200",
       "text": "principle. B-G1 is a demonstration of exactly the class of failure that",
-      "where": "paper/POSITION_PAPER.md:130",
+      "where": "paper/POSITION_PAPER.md:226",
       "reason": "internal finding-id reference (B-G1), continuation of the out-of-coverage narrative.",
       "anchor_digest": "3318a49cf2cb3f05fb06d0bc3379c4c03b925dfdcd5074d36ebeb13b942ae8b5"
     },
     {
       "id": "N-201",
       "text": "**`a02`, invalidated, appears here only as the counter-example it is.** Its",
-      "where": "paper/POSITION_PAPER.md:141",
+      "where": "paper/POSITION_PAPER.md:237",
       "reason": "names the run id a02, introducing the paragraph about claims C-011/C-012 below; not itself a new measurement.",
       "anchor_digest": "a8db5c9121cda6192a58f28ff37996824350bfd8ef2e96833b5430b6079d2003"
     },
     {
       "id": "N-202",
       "text": "(C-011). A dependent summary elsewhere in the project's own acceptance",
-      "where": "paper/POSITION_PAPER.md:147",
+      "where": "paper/POSITION_PAPER.md:243",
       "reason": "restates claim C-011's own finding (explicit cite).",
       "anchor_digest": "7e4ea521b9be3e9490e45d3eb51b63b8009c47dec4dec61f7ad9bfa1d2948955"
     },
     {
       "id": "N-203",
       "text": "fixed (C-012). Both citations above are invalidated, and the correction --",
-      "where": "paper/POSITION_PAPER.md:150",
+      "where": "paper/POSITION_PAPER.md:246",
       "reason": "restates claim C-012's own finding (explicit cite).",
       "anchor_digest": "ee466d5faf7b8d74cc2050f201c14235c689b9aceec9f69fe5215d701288d7e3"
     },
     {
       "id": "N-204",
       "text": "**`a03` and every dogfood run after it make the controller run the base",
-      "where": "paper/POSITION_PAPER.md:155",
+      "where": "paper/POSITION_PAPER.md:251",
       "reason": "names the run id a03, introducing the paragraph about claims C-047 onward below; not itself a new measurement.",
       "anchor_digest": "02fc6d5a3c359ce231faaedfc31d2ef951d22cb6524aab5d508904eddd307ca2"
     },
     {
       "id": "N-205",
       "text": "flag is earned from a real second execution, not defaulted. `a03` -- the",
-      "where": "paper/POSITION_PAPER.md:157",
+      "where": "paper/POSITION_PAPER.md:253",
       "reason": "names the run id a03 (continuation); not itself a new measurement.",
       "anchor_digest": "ec96eb16a2446c87c84682a6400205955dbf28b14976d16483e3e34a971a3f91"
     },
     {
       "id": "N-206",
       "text": "corrected replacement for `a02`'s invalidated evidence -- recorded 21 receipt",
-      "where": "paper/POSITION_PAPER.md:158",
+      "where": "paper/POSITION_PAPER.md:254",
       "reason": "wrapped continuation of the receipt-count sentence citing claim C-047 (the '21 receipt files' figure), cite lands on the next line.",
       "anchor_digest": "8d18f68f68a90ebfb5c70d00a4931351762b4d98642d147e901fa7b54dc746df"
     },
     {
       "id": "N-207",
       "text": "files across two iterations (C-047). Its first iteration: 3 of 5 checks with",
-      "where": "paper/POSITION_PAPER.md:159",
+      "where": "paper/POSITION_PAPER.md:255",
       "reason": "restates claim C-047 (explicit cite) and previews claim C-048's '3 of 5' figure, cited fully two lines below.",
       "anchor_digest": "d220f098e83c0ae534f470a4e86d423b4149c40297531adf3b16135161a3ee55"
     },
     {
       "id": "N-208",
       "text": "codes, and the candidate was accepted (C-048, C-049). Its second iteration:",
-      "where": "paper/POSITION_PAPER.md:161",
+      "where": "paper/POSITION_PAPER.md:257",
       "reason": "restates claims C-048 and C-049 (explicit cite).",
       "anchor_digest": "35d237cebcf6df3417b4949f105dd177c7f3797e348c8b2b48dd3078ee1680e9"
     },
     {
       "id": "N-209",
       "text": "2 of 3 such checks differed, the candidate was accepted again, and the run",
-      "where": "paper/POSITION_PAPER.md:162",
+      "where": "paper/POSITION_PAPER.md:258",
       "reason": "restates claim C-050's own figure ('2 of 3'), cited explicitly three lines below.",
       "anchor_digest": "6c0cc2b65e547fa673b1c9a59cec450d565595e26d06acf98f78ec55cda7eb27"
     },
     {
       "id": "N-210",
       "text": "\"two consecutive increments\" claim now rests on, in place of `a02`'s",
-      "where": "paper/POSITION_PAPER.md:164",
+      "where": "paper/POSITION_PAPER.md:260",
       "reason": "names the run id a02 again, referring back to the already-invalidated claims C-011/C-012; not a new measurement.",
       "anchor_digest": "0d779c14b17a4ce74b2898819b9cccd361d29d7ca202cec4b820a07f11e63c86"
     },
     {
       "id": "N-211",
       "text": "invalidated version (C-050, C-051).",
-      "where": "paper/POSITION_PAPER.md:165",
+      "where": "paper/POSITION_PAPER.md:261",
       "reason": "restates claims C-050 and C-051 (explicit cite).",
       "anchor_digest": "7b26c18433a5f5c2f1dc677cf2336d6ec98c4ea4b6f20ade044cf0b1565ffdee"
     },
     {
       "id": "N-212",
       "text": "`a03`. Every one of the seven runs below recorded both a `-basis` and a",
-      "where": "paper/POSITION_PAPER.md:168",
+      "where": "paper/POSITION_PAPER.md:264",
       "reason": "names the run id a03, introducing the summary-table paragraph below; not a new measurement.",
       "anchor_digest": "14e8af1a0b55958da08fc37d1e55872e2d9db7d7dac4d0a2a1ba8af87f495891"
     },
     {
       "id": "N-213",
       "text": "candidate receipt for its accepted (or, for `d2c`, its sole) iteration, so",
-      "where": "paper/POSITION_PAPER.md:169",
+      "where": "paper/POSITION_PAPER.md:265",
       "reason": "names the run id d2c (parenthetical); not a new measurement.",
       "anchor_digest": "0c492e23927ba90af3e7c616e52d1952dce2a0960b37eafed493093f771a9a36"
     },
     {
       "id": "N-214",
       "text": "| `d1` | 48 (C-018) | 5 of 11, iteration 2 (C-021) | accepted, iteration 2 (C-022) |",
-      "where": "paper/POSITION_PAPER.md:174",
+      "where": "paper/POSITION_PAPER.md:270",
       "reason": "table row restating claims C-018/C-021/C-022's own figures side by side; not an independent measurement.",
       "anchor_digest": "dd74932406b8778ef1206d575401eed8cf977a650ac5586c2293a0ec74e1ae71"
     },
     {
       "id": "N-215",
       "text": "| `d2` | 36 (C-023) | 6 of 9, iteration 2 (C-026) | accepted, iteration 2 (C-027) |",
-      "where": "paper/POSITION_PAPER.md:175",
+      "where": "paper/POSITION_PAPER.md:271",
       "reason": "table row restating claims C-023/C-026/C-027's own figures.",
       "anchor_digest": "0f3c547e4de36d165f341708153e5a193af9c80a8ce658721f7d9f4d12ddb3f1"
     },
     {
       "id": "N-216",
       "text": "| `d2b` | 52 (C-028) | 7 of 13, iteration 2 (C-031) | accepted, iteration 2 (C-032) |",
-      "where": "paper/POSITION_PAPER.md:176",
+      "where": "paper/POSITION_PAPER.md:272",
       "reason": "table row restating claims C-028/C-031/C-032's own figures.",
       "anchor_digest": "c07522a8721b7f178b88a075ee0e8b929fd56fba2ee0ee0b00f873e024e7a9e5"
     },
     {
       "id": "N-217",
       "text": "| `d2c` | 18 (C-033) | 3 of 9, iteration 1 (C-034) | not accepted -- the one dogfood run of the seven that was not (C-036) |",
-      "where": "paper/POSITION_PAPER.md:177",
+      "where": "paper/POSITION_PAPER.md:273",
       "reason": "table row restating claims C-033/C-034/C-036's own figures.",
       "anchor_digest": "c71102bfe2e3521ad24f65422335895dd4a30d9cef42de2d3f3ce18251ec6701"
     },
     {
       "id": "N-218",
       "text": "| `d3` | 37 (C-037) | 8 of 11, iteration 1 (C-038) | accepted on the first attempt (C-039) |",
-      "where": "paper/POSITION_PAPER.md:178",
+      "where": "paper/POSITION_PAPER.md:274",
       "reason": "table row restating claims C-037/C-038/C-039's own figures.",
       "anchor_digest": "15744a5397be5f9ef6bfdbc230f0b40014278a7e4db8065d00344fd97375ac97"
     },
     {
       "id": "N-219",
       "text": "| `d4` | 32 (C-042) | 9 of 10, iteration 1 (C-043) | accepted on the first attempt (C-044) |",
-      "where": "paper/POSITION_PAPER.md:179",
+      "where": "paper/POSITION_PAPER.md:275",
       "reason": "table row restating claims C-042/C-043/C-044's own figures.",
       "anchor_digest": "ed29bfc8642fdd0ca47c35861317cd4ab9db0e7fe9e1e2c0854c9929d1a853bb"
     },
     {
       "id": "N-220",
       "text": "| `a03` | 21 (C-047) | 3 of 5, iteration 1 (C-048) | accepted, both iterations (C-049, C-051) |",
-      "where": "paper/POSITION_PAPER.md:180",
+      "where": "paper/POSITION_PAPER.md:276",
       "reason": "table row restating claims C-047/C-048/C-049/C-051's own figures.",
       "anchor_digest": "8ceb4c8ba956d2c1f3b7141ac68697f9a1ee13a8e2a865809cfcf6f8ba1f31ee"
     },
     {
       "id": "N-221",
       "text": "`d1`'s own first iteration is the clean illustration of why the two",
-      "where": "paper/POSITION_PAPER.md:182",
+      "where": "paper/POSITION_PAPER.md:278",
       "reason": "names the run id d1 and its iteration, introducing the terminology-precision paragraph below; not a new measurement.",
       "anchor_digest": "dd49a8e679dd36e3a2538116fc2ad2289bcc79d0d9bcfb8c96520289ca3afa6b"
     },
     {
       "id": "N-222",
       "text": "quantities named in §0 must never be quoted interchangeably: its",
-      "where": "paper/POSITION_PAPER.md:183",
+      "where": "paper/POSITION_PAPER.md:279",
       "reason": "section reference (§0), continuation.",
       "anchor_digest": "70ef4cdd566be038d9518f90b9f512682529445a464c687ad1c755b6e5f6db83"
     },
     {
       "id": "N-223",
       "text": "receipt-derived discriminating count was 5 of 13 (C-019), while its",
-      "where": "paper/POSITION_PAPER.md:184",
+      "where": "paper/POSITION_PAPER.md:280",
       "reason": "restates claim C-019's own figure ('5 of 13', explicit cite).",
       "anchor_digest": "dc36cc8a5c9437a441eb478d5f735629996ad73b6f60253fd372e57a6639b7ef"
     },
     {
       "id": "N-224",
       "text": "acceptance-governing `discriminates` flag was 0 (C-059) -- a historical count",
-      "where": "paper/POSITION_PAPER.md:185",
+      "where": "paper/POSITION_PAPER.md:281",
       "reason": "restates claim C-059's own figure ('0', explicit cite).",
       "anchor_digest": "9c549cc3cb04df108c58dac514b6a8fe083d50513f0119fd1b6a14c0a42df706"
     },
     {
       "id": "N-225",
       "text": "rejection (C-020). \"5 of 13 criteria discriminated\" is a true sentence about",
-      "where": "paper/POSITION_PAPER.md:190",
+      "where": "paper/POSITION_PAPER.md:286",
       "reason": "restates claim C-020's own finding (explicit cite) and reuses the '5 of 13' figure already covered by claim C-019.",
       "anchor_digest": "89bb45e461f033a39fc8a2395b46c9788d359c301dbb1a707a3351a7de72c25b"
     },
     {
       "id": "N-226",
       "text": "that iteration and a misleading one if read as \"5 of 13 criteria governed",
-      "where": "paper/POSITION_PAPER.md:191",
+      "where": "paper/POSITION_PAPER.md:287",
       "reason": "continuation restating the same '5 of 13' figure already covered by claim C-019.",
       "anchor_digest": "8f9b185a4b6858286da2a6452c5538278b1fbcf8dacffa28ad4c07f7f6242b00"
     },
     {
       "id": "N-227",
       "text": "Run `d2`'s specification instructed the loop not to invent a license fact:",
-      "where": "paper/POSITION_PAPER.md:196",
+      "where": "paper/POSITION_PAPER.md:292",
       "reason": "names the run id d2, introducing the 'document that refuses to invent' narrative; not a new measurement.",
       "anchor_digest": "9bd28fc100494afb32c1853b6c8e9302ba419d6ee25126de5477f5d8e80b5f50"
     },
     {
       "id": "N-228",
       "text": "§0) -- but the surrounding license-consistency problem it responds to is the",
-      "where": "paper/POSITION_PAPER.md:209",
+      "where": "paper/POSITION_PAPER.md:305",
       "reason": "section reference (§0), continuation of the out-of-coverage framing for this narrative (DOGFOOD_LEDGER.md, outside declared coverage).",
       "anchor_digest": "aa922b8f6725097bb29920e7ef5c78a554cb068f7eae0699d81acc58aa3e2bc0"
     },
     {
       "id": "N-229",
       "text": "same one instance one of §1 measures, a sufficiency claim the ledger itself",
-      "where": "paper/POSITION_PAPER.md:210",
+      "where": "paper/POSITION_PAPER.md:306",
       "reason": "section reference (§1) and restates the same finding as claim C-017, cited explicitly on the next line.",
       "anchor_digest": "41535cf04f47c31beb83febd4518da8a5d1fb351d118412248465eca74ed3b8c"
     },
     {
       "id": "N-230",
       "text": "marks unsupported rather than confirmed (C-017).",
-      "where": "paper/POSITION_PAPER.md:211",
+      "where": "paper/POSITION_PAPER.md:307",
       "reason": "restates claim C-017's own finding (explicit cite).",
       "anchor_digest": "89f1758a959d2e86340d356ad751e4daa0a6c3ade6e578f2c5373a472647acd5"
     },
     {
       "id": "N-231",
       "text": "A specification for run `d1` embedded a sha256 digest of a guard pattern file",
-      "where": "paper/POSITION_PAPER.md:220",
+      "where": "paper/POSITION_PAPER.md:316",
       "reason": "names the run id d1 and the hash-algorithm name 'sha256' (not a measured quantity); introduces a narrative the paper's own §5 (line 236) says is outside CLAIMS.json's declared coverage (recorded in DOGFOOD_LEDGER.md instead).",
       "anchor_digest": "052c8c48fafd55d3775d026f70dbb25ca4d023fc563ce144bd190d9ab92af280"
     },
     {
       "id": "N-232",
       "text": "§4, `CLAIMS.json`'s coverage does not extend to `DOGFOOD_LEDGER.md`, where",
-      "where": "paper/POSITION_PAPER.md:236",
+      "where": "paper/POSITION_PAPER.md:332",
       "reason": "explicit self-description: 'CLAIMS.json's coverage does not extend to DOGFOOD_LEDGER.md, where this account is recorded' -- states the ledger's own declared-coverage boundary (also a §4 section reference), not a new measurement.",
       "anchor_digest": "beaa9a1a11532518fc8d10225743db0a5d46fb3ea28fde5ce6cc00af37ccf4f7"
     },
     {
       "id": "N-233",
       "text": "not just a theoretical gap: measured, 2 runs in this project's own history",
-      "where": "paper/POSITION_PAPER.md:249",
+      "where": "paper/POSITION_PAPER.md:345",
       "reason": "restates claim C-055's own figure ('2 runs'), cited explicitly seven lines below.",
       "anchor_digest": "16d2f235e63ba5f002c2068795f19fa21738bcb9e503ee205c2a38eb674ebe5f"
     },
     {
       "id": "N-234",
       "text": "checkout alone (C-055). That class of assertion has to live outside the",
-      "where": "paper/POSITION_PAPER.md:256",
+      "where": "paper/POSITION_PAPER.md:352",
       "reason": "restates claim C-055's own finding (explicit cite).",
       "anchor_digest": "24662f21ecfb30501e0a0e5c1e153b1da7b18312fd693f57b2081aab4bfcf422"
     },
     {
       "id": "N-235",
       "text": "yields 0 entries under `runs/`, a claim `CLAIMS.json` records as unsupported",
-      "where": "paper/POSITION_PAPER.md:264",
+      "where": "paper/POSITION_PAPER.md:360",
       "reason": "restates claim C-056's own finding ('0 entries under runs/'), cited explicitly two lines below.",
       "anchor_digest": "0af11e8aeeceb32283a36f52ea5d7420d302673f27267c63dd30707f2084efa6"
     },
     {
       "id": "N-236",
       "text": "its output (C-056). Six of fifteen acceptance criteria in one run failed for",
-      "where": "paper/POSITION_PAPER.md:266",
+      "where": "paper/POSITION_PAPER.md:362",
       "reason": "restates claim C-056 (explicit cite) and previews claim C-057's 'six of fifteen' figure, cited fully four lines below.",
       "anchor_digest": "8aabb72ebc43dc3a49050a6b82e67994d7927fbc32b75ba2906b6fe6eaed4268"
     },
     {
       "id": "N-237",
       "text": "re-verify, so the ledger marks it unsupported rather than confirmed (C-057).",
-      "where": "paper/POSITION_PAPER.md:270",
+      "where": "paper/POSITION_PAPER.md:366",
       "reason": "restates claim C-057's own finding (explicit cite).",
       "anchor_digest": "9a386e8a389cdb814867cf8b2ae7f776728a7d1c2c725a9c312e95492240addd"
     },
     {
       "id": "N-238",
       "text": "reachable *from* the candidate -- §2's B-G1 is exactly the failure that",
-      "where": "paper/POSITION_PAPER.md:274",
+      "where": "paper/POSITION_PAPER.md:370",
       "reason": "internal finding-id (B-G1) and section reference (§2); restates the out-of-coverage B-G1 narrative already established at lines 112-130.",
       "anchor_digest": "68b69539bb7e2debc2d5718cfdde358343ea5a34c115b2536610e4dd09dc908a"
     },
     {
       "id": "N-239",
       "text": "nested arena. The measurement behind the fix: 28 of 52 candidate arenas in",
-      "where": "paper/POSITION_PAPER.md:289",
+      "where": "paper/POSITION_PAPER.md:385",
       "reason": "restates claim C-061's own figure ('28 of 52'), cited explicitly five lines below.",
       "anchor_digest": "936a1fc3531294760b1be836417972460416a5008a087e01d9c3c23dd7f0f22e"
     },
     {
       "id": "N-240",
       "text": "re-derive a historical population it does not still hold (C-061). This is",
-      "where": "paper/POSITION_PAPER.md:294",
+      "where": "paper/POSITION_PAPER.md:390",
       "reason": "restates claim C-061's own finding (explicit cite).",
       "anchor_digest": "30f02839faca7f5bef0cd4bf8d2a60ec9154d41d32cc5f3df6ef68135463b420"
     },
     {
       "id": "N-241",
       "text": "the same defect the project's own bug ledger tracks as K11, fixed by the",
-      "where": "paper/POSITION_PAPER.md:295",
+      "where": "paper/POSITION_PAPER.md:391",
       "reason": "internal finding-id reference (K11), naming an internal bug-ledger identifier, not a numeric measurement.",
       "anchor_digest": "12a634fe8efe894d4b57287a80654434dde20f9d41c37d5079052bd8b5230ad2"
     },
     {
       "id": "N-242",
       "text": "Run `d2c2`'s second iteration passed all ten of ten criteria, and was",
-      "where": "paper/POSITION_PAPER.md:301",
+      "where": "paper/POSITION_PAPER.md:397",
       "reason": "names the run id d2c2, introducing a narrative the paper's own text (line 305) says CLAIMS.json carries no claim id for (recorded in dogfood/ABSCHLUSSBERICHT.md's run table instead, outside declared coverage).",
       "anchor_digest": "be1accdf620d8b0c6d4c25dc14aaf8f7b30cc5d08b518fb488c4fd17c4d5a6f5"
     },
     {
       "id": "N-243",
       "text": "state. `CLAIMS.json` does not carry a claim id for `d2c2`: it is recorded in",
-      "where": "paper/POSITION_PAPER.md:305",
+      "where": "paper/POSITION_PAPER.md:401",
       "reason": "explicit self-description: 'CLAIMS.json does not carry a claim id for d2c2... it is recorded in dogfood/ABSCHLUSSBERICHT.md's run table, not in README.md or docs/**' -- states the ledger's own declared-coverage boundary.",
       "anchor_digest": "6206e970797ce1467e430dcba01352618e14a27f0f07050a4125ff784434763b"
     },
     {
       "id": "N-244",
       "text": "document rather than as ledger-verified (see §0).",
-      "where": "paper/POSITION_PAPER.md:309",
+      "where": "paper/POSITION_PAPER.md:405",
       "reason": "section reference (§0), continuation of the out-of-coverage framing for the d2c2 narrative.",
       "anchor_digest": "d464dbdb3cabaef260c77a09958c64a1a7621ce3a3c8f8ea106a67081c852e56"
     },
     {
       "id": "N-245",
       "text": "`d1`'s second iteration carried a criterion the plan had listed as new work,",
-      "where": "paper/POSITION_PAPER.md:313",
+      "where": "paper/POSITION_PAPER.md:409",
       "reason": "names the run id d1 and its iteration, introducing a K11-criterion narrative the paper's own text (line 317) says CLAIMS.json carries no claim id for.",
       "anchor_digest": "069495a4cb562d5bd3e7b5c6cf155db99d7b91a2c8d752ea55c72407f3903d47"
     },
     {
       "id": "N-246",
       "text": "`K11`, which the controller itself flagged as not discriminating, in its own",
-      "where": "paper/POSITION_PAPER.md:314",
+      "where": "paper/POSITION_PAPER.md:410",
       "reason": "internal finding-id reference (K11), continuation.",
       "anchor_digest": "45cee8e9da3abc15c8bfb4876fd0509b650efd81a805db71a764e9970698bb55"
     },
     {
       "id": "N-247",
       "text": "to the measurement. `CLAIMS.json` does not carry a claim id for this `K11`",
-      "where": "paper/POSITION_PAPER.md:317",
+      "where": "paper/POSITION_PAPER.md:413",
       "reason": "explicit self-description: 'CLAIMS.json does not carry a claim id for this K11 detail... recorded in dogfood/ABSCHLUSSBERICHT.md' -- states the ledger's own declared-coverage boundary.",
       "anchor_digest": "6835e2a33236a7aa0a03659f52287ff221a5b2d3b0198bfe34d2a82d6cf97b33"
     },
     {
       "id": "N-248",
       "text": "than as ledger-verified (see §0). `d2c2`'s rejection is the same rule",
-      "where": "paper/POSITION_PAPER.md:320",
+      "where": "paper/POSITION_PAPER.md:416",
       "reason": "section reference (§0) and run id (d2c2), continuation of the out-of-coverage framing.",
       "anchor_digest": "36514eddaaa05216c29e2b893de5b02dd013bf5c4151537dac75558d567b01f5"
     },
     {
       "id": "N-249",
       "text": "failure mode behind §3's invalidated `a02` evidence -- a stamped",
-      "where": "paper/POSITION_PAPER.md:324",
+      "where": "paper/POSITION_PAPER.md:420",
       "reason": "section reference (§3) and run id (a02), continuation -- refers back to the already-invalidated claims C-011/C-012.",
       "anchor_digest": "10da855a978faa28ff8cab5eb6539a1e319e8ef686bc9938443898f293a69bf6"
     },
     {
       "id": "N-250",
       "text": "declared coverage): run `d4c` replaced a defective differential criterion --",
-      "where": "paper/POSITION_PAPER.md:333",
+      "where": "paper/POSITION_PAPER.md:429",
       "reason": "names the run id d4c, continuing the explicit out-of-coverage statement begun two lines above ('CLAIMS.json does not carry claim ids for any of the three... recorded in DOGFOOD_LEDGER.md, outside the ledger's declared coverage').",
       "anchor_digest": "111805da94cde8fff514a30334369760d5c8bc4f08335f193780c0d717344b5c"
     },
     {
       "id": "N-251",
       "text": "behind instance two of §1 -- with a comparison against a per-claim content",
-      "where": "paper/POSITION_PAPER.md:335",
+      "where": "paper/POSITION_PAPER.md:431",
       "reason": "section reference (§1), continuation of the out-of-coverage narrative.",
       "anchor_digest": "b720e9b019e42dd4abee4dae2fdd950d31a7f60f71764d41276078e390c329dd"
     },
     {
       "id": "N-252",
       "text": "verifiable by reading the ledger's own schema. Run `d4b` turned a criterion",
-      "where": "paper/POSITION_PAPER.md:338",
+      "where": "paper/POSITION_PAPER.md:434",
       "reason": "names the run id d4b, continuation of the same out-of-coverage §8 narrative.",
       "anchor_digest": "8fad5171cfa260f07031574ba1baa5d3954bb3c463a411eb806aebd6963e85ae"
     },
     {
       "id": "N-253",
       "text": "`ENVIRONMENT_GAP_MARKER` constant. Run `d3b` added two precisions its",
-      "where": "paper/POSITION_PAPER.md:345",
+      "where": "paper/POSITION_PAPER.md:441",
       "reason": "names the run id d3b, continuation of the same out-of-coverage §8 narrative.",
       "anchor_digest": "7fe3b83493e47a7cdf18e99f7134bda6c2f503a12d67edf48528c87e02efc957"
     },
     {
       "id": "N-254",
       "text": "deliverables, per the §3 table above (`d2c` being the one not accepted); the",
-      "where": "paper/POSITION_PAPER.md:379",
+      "where": "paper/POSITION_PAPER.md:475",
       "reason": "section reference (§3) and restates the d2c-not-accepted fact already recorded as claim C-036.",
       "anchor_digest": "18883d2ecb79a97ac4556d0d382426884e1a0373d570b2a5b34f1a0cda6b70b5"
     },
     {
       "id": "N-255",
       "text": "`LICENSE` file of §4 that refused to invent a fact;",
-      "where": "paper/POSITION_PAPER.md:380",
+      "where": "paper/POSITION_PAPER.md:476",
       "reason": "section reference (§4).",
       "anchor_digest": "620eb61dd644c08707a8b435b81f4ba54e1b0620e96d7d05323a6fa02b6ef868"
     },
     {
       "id": "N-256",
       "text": "the planner of §5 that read the project's own git history and rejected a",
-      "where": "paper/POSITION_PAPER.md:381",
+      "where": "paper/POSITION_PAPER.md:477",
       "reason": "section reference (§5).",
       "anchor_digest": "734ed84269cce0dbf6ca72bf2aa09467efacbfb7b5ae2c64e795215c299308a5"
     },
     {
       "id": "N-257",
       "text": "improvements of §8; and a QA role that, in a separate run, traced a",
-      "where": "paper/POSITION_PAPER.md:383",
+      "where": "paper/POSITION_PAPER.md:479",
       "reason": "section reference (§8).",
       "anchor_digest": "7243a32ba63592393da88c433a4fdadbf75482efee92299047f20c45e3dbe901"
     },
     {
       "id": "N-258",
       "text": "check script itself (O40) rather than guessing, and marked its verdict",
-      "where": "paper/POSITION_PAPER.md:385",
+      "where": "paper/POSITION_PAPER.md:481",
       "reason": "internal finding-id reference (O40), names a finding rather than measuring one.",
       "anchor_digest": "0ee6ab3bfb369e7c4ca268afa7700c414733231cce3f5f8c334f7850e5d04d8a"
     },
     {
       "id": "N-259",
       "text": "`INCONCLUSIVE` with the sentence \"this is a bug in the K10 check script, not",
-      "where": "paper/POSITION_PAPER.md:386",
+      "where": "paper/POSITION_PAPER.md:482",
       "reason": "internal finding-id reference (K10), names a check identifier rather than measuring one.",
       "anchor_digest": "cdf103b817fcce29f1d2a262608515cb3b326415f62cc4712d78ac5bcff3e15b"
     },
     {
       "id": "N-260",
       "text": "role dispatch: eleven core defects (K1 through K11, one of them K11 of §6,",
-      "where": "paper/POSITION_PAPER.md:391",
+      "where": "paper/POSITION_PAPER.md:487",
       "reason": "internal finding-id references (K1 through K11) and section reference (§6); names identifiers rather than measuring.",
       "anchor_digest": "1cac0943c6a8ad077dd31b72f2e362a967c27b4b99f0d44076885286e64d2f7c"
     },
     {
       "id": "N-261",
       "text": "fixed with two tests), five guard gaps including B-G1 of §2, six named",
-      "where": "paper/POSITION_PAPER.md:392",
+      "where": "paper/POSITION_PAPER.md:488",
       "reason": "internal finding-id reference (B-G1) and section reference (§2); names identifiers rather than measuring.",
       "anchor_digest": "7c74ec09512f84596b9dd961bee13b274c8a0e5246f1f1c56b126ec1a05274c0"
     },
     {
       "id": "N-262",
       "text": "pressure changed what the loop wrote where it did not know\" is true, per §4,",
-      "where": "paper/POSITION_PAPER.md:410",
+      "where": "paper/POSITION_PAPER.md:506",
       "reason": "section reference (§4).",
       "anchor_digest": "3aa229413f6b60cd765f12d9faa1ae638b89ac0607ab45fd1d50117d8c9b8762"
     },
     {
       "id": "N-263",
       "text": "2026 Hyoung Yan,\" read directly from the repository's own `LICENSE` file.",
-      "where": "paper/POSITION_PAPER.md:417",
+      "where": "paper/POSITION_PAPER.md:513",
       "reason": "cites an upstream source already resolved by index (Q2) in docs/QUELLENCHECK.md, per this same paper's own §10 text two lines below; restates an already-resolved external citation, not an independent measurement.",
       "anchor_digest": "0e919aaba1d883ea48be23c7c3129dce83b6085a8a334c38186e2c799e32cfc7"
     },
     {
       "id": "N-264",
       "text": "(`docs/QUELLENCHECK.md`, source Q2); this project therefore claims no",
-      "where": "paper/POSITION_PAPER.md:425",
+      "where": "paper/POSITION_PAPER.md:521",
       "reason": "explicit citation index (Q2), resolved in docs/QUELLENCHECK.md; internal handoff prose citing an upstream source by index, not a numeric measurement claim.",
       "anchor_digest": "c160eaaa79f0c3e5c38ad297730a4dcf1dc09e664d9e6fa83f4541ac6944c39e"
     },
     {
       "id": "N-265",
       "text": "items below, and the remaining two (limits 9 and 12) in the body of this",
-      "where": "paper/POSITION_PAPER.md:458",
+      "where": "paper/POSITION_PAPER.md:554",
       "reason": "ordinal cross-reference to docs/LIMITATIONS.md's own limit numbers (9 and 12), already-excluded structural numbering per this ledger's methodology.",
       "anchor_digest": "a6780665e36471069c87e72b5ebac123f992dda0e5878d8ed8cb10f9c7d8fb8c"
     },
     {
       "id": "N-266",
-      "text": "paper itself, at length, where they are already treated (limit 9 in §1's",
-      "where": "paper/POSITION_PAPER.md:459",
+      "text": "paper itself, at length, where they are already treated (limit 9 in §1 and",
+      "where": "paper/POSITION_PAPER.md:555",
       "reason": "section references (§1) and ordinal cross-reference (limit 9), continuation.",
-      "anchor_digest": "1eccf278b13ef1283d897bd5145e53bbe0fb05a4a01d322f69dd16dbc0b605ec"
+      "anchor_digest": "044a1e0a0dc758b518282f4aed74ef7fbe009c59324ac3c97c847fe98eaea7ba",
+      "note": "Anchor moved from paper/POSITION_PAPER.md:459 to paper/POSITION_PAPER.md:555 on 2026-09-10; the earlier wording was: \"paper itself, at length, where they are already treated (limit 9 in §1's\". The line was revised in the rc2 correction cycle; the statement itself was not withdrawn."
     },
     {
       "id": "N-267",
-      "text": "per-run-versus-merged-state discussion, limit 12 in §0's and §3's",
-      "where": "paper/POSITION_PAPER.md:460",
+      "text": "§1.1, on per-run versus merged state and the closure layer above it, limit 12",
+      "where": "paper/POSITION_PAPER.md:556",
       "reason": "section references (§0, §3) and ordinal cross-reference (limit 12), continuation.",
-      "anchor_digest": "fade7c3b7ae6649cd13c41674dbc2b73ff55ff48e4d9a74d2adb45b5d78da04f"
+      "anchor_digest": "02b6b3cb51ef5bf274075b50a73646a8396ae282adf983d82bbb6c2efb6bf6d2",
+      "note": "Anchor moved from paper/POSITION_PAPER.md:460 to paper/POSITION_PAPER.md:556 on 2026-09-10; the earlier wording was: \"per-run-versus-merged-state discussion, limit 12 in §0's and §3's\". The line was revised in the rc2 correction cycle; the statement itself was not withdrawn."
     },
     {
       "id": "N-268",
       "text": "6's content below spans list positions 6 and 7, offsetting every position",
-      "where": "paper/POSITION_PAPER.md:463",
+      "where": "paper/POSITION_PAPER.md:560",
       "reason": "self-referential structural description of this same list's own numbering offset (limit 6 spanning list positions 6 and 7); ordinal cross-reference, not a numeric measurement.",
       "anchor_digest": "38f2dfa8a6960509316affe4ed887eca9a9e2eb26ba56b534f29514f085e95cb"
     },
     {
       "id": "N-269",
       "text": "after it, so list position 9, for instance, is not that file's limit 9. A",
-      "where": "paper/POSITION_PAPER.md:464",
+      "where": "paper/POSITION_PAPER.md:561",
       "reason": "ordinal cross-reference continuation (list position 9 vs. limit 9).",
       "anchor_digest": "3f5ce80e68625d891656468a4dcc9390be830be6e7f1ce25d30b0ebaeca61155"
     },
     {
       "id": "N-270",
       "text": "the absence of something (C-013). It is therefore not demonstrated that",
-      "where": "paper/POSITION_PAPER.md:480",
+      "where": "paper/POSITION_PAPER.md:590",
       "reason": "restates claim C-013's own finding (explicit cite).",
       "anchor_digest": "b7ce4efd581c82205803dd84473169039995ffa17d44b9e002810e22bac5afcd"
     },
     {
       "id": "N-271",
       "text": "§2's C-016 -- a claim about the absence of a hostile-plan defense that",
-      "where": "paper/POSITION_PAPER.md:487",
+      "where": "paper/POSITION_PAPER.md:597",
       "reason": "section reference (§2) and restates claim C-016's own finding (explicit cite).",
       "anchor_digest": "4741c6aff0fb6abd1b979e8b55d5d506d402b6c2c7685b83f1f0fae384b6e5c9"
     },
     {
       "id": "N-272",
       "text": "that same arena rather than a directory outside it (§6). A second,",
-      "where": "paper/POSITION_PAPER.md:502",
+      "where": "paper/POSITION_PAPER.md:612",
       "reason": "section reference (§6).",
       "anchor_digest": "1bb6ed8ea6451b4c80498606a721389fa71ecbe03502e85e108fc11ac2f21e95"
     },
     {
       "id": "N-273",
       "text": "instead of the arena's own (§6).",
-      "where": "paper/POSITION_PAPER.md:508",
+      "where": "paper/POSITION_PAPER.md:618",
       "reason": "section reference (§6).",
       "anchor_digest": "f59e0572288ac771a0ed5e09c1d2c695e81124ce6dcea52a150ceb7bdde607e9"
     },
     {
       "id": "N-274",
       "text": "binding** -- 28 of 52 candidate arenas in this project's own history",
-      "where": "paper/POSITION_PAPER.md:510",
+      "where": "paper/POSITION_PAPER.md:620",
       "reason": "restates claim C-061's own figure ('28 of 52'), cited explicitly four lines below.",
       "anchor_digest": "b250af47ed9b233296c688112faf16c6e7d5033344b369f1e1f9a916f3bd75b6"
     },
     {
       "id": "N-275",
       "text": "re-derived from this checkout alone (C-061, §6).",
-      "where": "paper/POSITION_PAPER.md:514",
+      "where": "paper/POSITION_PAPER.md:624",
       "reason": "restates claim C-061 (explicit cite) and section reference (§6).",
       "anchor_digest": "49b75eecccb5cef35056861b3cd51e5dba71bb61e368583af9900df3392c7525"
     },
     {
       "id": "N-276",
       "text": "production.** The claim is not demonstrated end-to-end (C-014): only a",
-      "where": "paper/POSITION_PAPER.md:523",
+      "where": "paper/POSITION_PAPER.md:633",
       "reason": "restates claim C-014's own finding (explicit cite).",
       "anchor_digest": "e8cae5158bbc1516f5b07cf4cff1a319874109c3bb9f127f404bc958c1464bfc"
     },
     {
       "id": "N-277",
       "text": "ever touched those directories (C-015). VeriHarness's evidence about its",
-      "where": "paper/POSITION_PAPER.md:533",
+      "where": "paper/POSITION_PAPER.md:643",
       "reason": "restates claim C-015's own finding (explicit cite).",
       "anchor_digest": "7d1f90ce0d24b0af3469c29f352b256bf11b2053f43325c0ebc7dcf364da0518"
     },
     {
       "id": "N-278",
       "text": "`test_claims_anchors.py` (9 of 9 commits), `test_export_manifest.py` (4 of",
-      "where": "paper/POSITION_PAPER.md:540",
+      "where": "paper/POSITION_PAPER.md:650",
       "reason": "restates figures already recorded in claim C-015's own note ('test_claims_anchors.py (9 of 9 commits)', 'test_export_manifest.py (4 of 4)').",
       "anchor_digest": "f3fd0af2671a9bdfb86e80375d286d6aeef0f2e110e96325bac9510184c38857"
     },
     {
       "id": "N-279",
       "text": "4), and `test_union_gate.py` (3 of 3), every one of those commits coming",
-      "where": "paper/POSITION_PAPER.md:541",
+      "where": "paper/POSITION_PAPER.md:651",
       "reason": "continuation restating claim C-015's own note figures ('test_union_gate.py (3 of 3)').",
       "anchor_digest": "dba7ba69f6dbdc09aee190055b7a638e82b0a74611e3f8c7d73aaddbd2f7cf92"
     },
     {
       "id": "N-280",
       "text": "from a run, sourced from `CLAIMS.json`'s own corrected C-015 note. Several",
-      "where": "paper/POSITION_PAPER.md:542",
+      "where": "paper/POSITION_PAPER.md:652",
       "reason": "explicit self-description: 'sourced from CLAIMS.json's own corrected C-015 note' -- restates claim C-015.",
       "anchor_digest": "3c2b49baa33755d0b10b96a8bb57bd843b1eaafa5ae6dd3f43fc9406ee6b6c37"
     },
     {
       "id": "N-281",
       "text": "own C-015 entry was moved from status `unsupported` to status",
-      "where": "paper/POSITION_PAPER.md:546",
+      "where": "paper/POSITION_PAPER.md:656",
       "reason": "restates claim C-015's own status-history, continuation ('moved from status unsupported to status invalidated').",
       "anchor_digest": "9c6beab7f7d1bec15cae5de708be5f865ffa44c107ba998418409e25f23bfe12"
     },
     {
       "id": "N-282",
       "text": "`invalidated` by node `d3g` on 2026-09-09, on exactly this evidence. What",
-      "where": "paper/POSITION_PAPER.md:547",
+      "where": "paper/POSITION_PAPER.md:657",
       "reason": "names the run/node id d3g (the date 2026-09-09 is stripped as a full ISO date); continuation restating claim C-015's own provenance.",
       "anchor_digest": "f76ebb80f479ab5d225970db72f2323b357a7b0cac63827b917a491b73dd7f49"
     },
     {
       "id": "N-283",
       "text": "alone (C-055, §6).",
-      "where": "paper/POSITION_PAPER.md:560",
+      "where": "paper/POSITION_PAPER.md:670",
       "reason": "restates claim C-055 (explicit cite) and section reference (§6).",
       "anchor_digest": "8648a437c5b830360eed441f3996887e6067a85442e8d8d90084619ea2adf0d8"
     },
     {
       "id": "N-284",
       "text": "rather than confirmed (C-056, C-057, §6). This is deliberate on one side",
-      "where": "paper/POSITION_PAPER.md:566",
+      "where": "paper/POSITION_PAPER.md:676",
       "reason": "restates claims C-056 and C-057 (explicit cite) and section reference (§6).",
       "anchor_digest": "fb9e203fee5a3a8f3932909f1ff4f32e93ab4b6f3e377e897a060142c382160b"
     },
     {
       "id": "N-285",
       "text": "(a candidate must never reach the evidence that judges it, per §2's",
-      "where": "paper/POSITION_PAPER.md:567",
+      "where": "paper/POSITION_PAPER.md:677",
       "reason": "section reference (§2), continuation.",
       "anchor_digest": "6e1f2a6ae99b21185a2ddd17b5497fedd9393457add00e8fcfc285e6d6b3eb37"
     },
     {
       "id": "N-286",
       "text": "B-G1) and open on the other (a claims ledger citing receipts cannot",
-      "where": "paper/POSITION_PAPER.md:568",
+      "where": "paper/POSITION_PAPER.md:678",
       "reason": "internal finding-id reference (B-G1), continuation.",
       "anchor_digest": "70535cb9b4e4e414d4dad8f5e64bfd21593775c9ec54d6326af00a7c8f5aebe9"
     },
     {
       "id": "N-287",
       "text": "jointly produced entirely outside `dug2`'s own declared scope -- which its",
-      "where": "paper/POSITION_PAPER.md:592",
+      "where": "paper/POSITION_PAPER.md:702",
       "reason": "continuation of the same 'dug2' sentence begun at line 589 (recorded as a new claim there); the scope-boundary detail here is part of that already-covered narrative.",
       "anchor_digest": "030f71673538e6b3197fc4d9c6c2db5d459b159e6085c0cbadba0ee568232775"
     },
     {
       "id": "N-288",
       "text": "This run's own history is the cost made concrete: run `D5`'s criterion 6",
-      "where": "paper/POSITION_PAPER.md:620",
+      "where": "paper/POSITION_PAPER.md:730",
       "reason": "restates claim C-064's own finding (D5's criterion 6, verbatim 'all twelve limitations').",
       "anchor_digest": "097df3235f553c8203f24ae783f136f915780b1feb60e58869605cb5f9616df6"
     },
     {
       "id": "N-289",
       "text": "false by the time `D5` actually ran, because run `d3e` had by then already",
-      "where": "paper/POSITION_PAPER.md:622",
+      "where": "paper/POSITION_PAPER.md:732",
       "reason": "restates claim C-066's own finding (d3e merged limit 13 and limit 14 before D5 ran).",
       "anchor_digest": "88e7de4c52a587b8c56ea5989d92b6287685fccd7ea1c4e96947618f26298bf1"
     },
     {
       "id": "N-290",
       "text": "merged limit 13 and limit 14 into `docs/LIMITATIONS.md`; the running",
-      "where": "paper/POSITION_PAPER.md:623",
+      "where": "paper/POSITION_PAPER.md:733",
       "reason": "continuation restating claim C-066's own finding.",
       "anchor_digest": "a503dbc2e31174f6547e7e134f7cb806ea504bb3778d3d711a5ce26afb5a8c0d"
     },
     {
       "id": "N-291",
       "text": "its contract.** On 2026-09-08, two independent runs, `d5` and `d4h`,",
-      "where": "paper/POSITION_PAPER.md:628",
+      "where": "paper/POSITION_PAPER.md:738",
       "reason": "restates claim C-068's own finding ('On 2026-09-08... two independent runs', explicit cite range C-068..C-072 two lines below).",
       "anchor_digest": "d214b993aa1da3146d9a30fc6538e043c3f47f67ce347937e205bb19e8114532"
     },
     {
       "id": "N-292",
       "text": "as unsupported rather than confirmed (C-068..C-072). The command built",
-      "where": "paper/POSITION_PAPER.md:633",
+      "where": "paper/POSITION_PAPER.md:743",
       "reason": "restates claims C-068 through C-072 (explicit cite).",
       "anchor_digest": "eb931f3277df4d7e4802e443d9f0321a6c2a6de950254ac6aca76951115d8f2f"
     },
     {
       "id": "N-293",
       "text": "this project's full history, reported `{\"checked\": 37, \"results\": []}` --",
-      "where": "paper/POSITION_PAPER.md:635",
+      "where": "paper/POSITION_PAPER.md:745",
       "reason": "restates claim C-073's own figure ('{\"checked\": 37, \"results\": []}'), cited explicitly two lines below.",
       "anchor_digest": "91ea520caed6ebb907574e8af8fc480e8b8cb41772ed5779aea5df39d9bb195f"
     },
     {
       "id": "N-294",
       "text": "37 runs checked, 0 identified as quota-blocked -- even though two of the",
-      "where": "paper/POSITION_PAPER.md:636",
+      "where": "paper/POSITION_PAPER.md:746",
       "reason": "continuation restating claim C-073's own figure ('37 runs checked, 0 identified').",
       "anchor_digest": "d3d42a493ce16adfc6e90380fa1fc0b95f6c39c463b8b94288f09743ef619b8e"
     },
     {
       "id": "N-295",
       "text": "runs it checked, `d5` and `d4h`, were (C-073, C-074). \"Left no answer file",
-      "where": "paper/POSITION_PAPER.md:637",
+      "where": "paper/POSITION_PAPER.md:747",
       "reason": "restates claims C-073 and C-074 (explicit cite).",
       "anchor_digest": "a7038e25858a8e82e99069e04c6a4d940a345cf4686f5a203f56faa536b438c3"
     },
     {
       "id": "N-296",
       "text": "solves evidence composition across merged runs (§1's structural gap stays",
-      "where": "paper/POSITION_PAPER.md:652",
+      "where": "paper/POSITION_PAPER.md:762",
       "reason": "section reference (§1), part of the closing 'what this paper does not claim' summary.",
       "anchor_digest": "d5264810ef94a4afe3f29b91e88df9bdc4477417b670fd8feeacda8fc03a3667"
     },
     {
       "id": "N-297",
       "text": "autonomous self-repair (§8). What it does claim, within the boundary the",
-      "where": "paper/POSITION_PAPER.md:654",
+      "where": "paper/POSITION_PAPER.md:764",
       "reason": "section reference (§8), continuation.",
       "anchor_digest": "6cda257d0a5b9d81233676dacc94b5a09a25f6f94e32d71ab7ea8f467c10baa8"
     },
     {
       "id": "N-298",
       "text": "naming rule of §0 sets: that per-run evidence binding is a real, demonstrated",
-      "where": "paper/POSITION_PAPER.md:655",
+      "where": "paper/POSITION_PAPER.md:765",
       "reason": "section reference (§0), continuation.",
       "anchor_digest": "231f9b5f1049c4930c3536d28d279e9759381081597b6c1507f96794c989ded7"
     },
     {
       "id": "N-299",
       "text": "close (§1); that the verification channel is worth defending as an attack",
-      "where": "paper/POSITION_PAPER.md:657",
+      "where": "paper/POSITION_PAPER.md:767",
       "reason": "section reference (§1), continuation.",
       "anchor_digest": "5ae47ab6802b8d70d43b742e04837fd73cb16d233b049131dd9283d34c18627b"
     },
     {
       "id": "N-300",
       "text": "surface because it has already been attacked successfully once (§2); that an",
-      "where": "paper/POSITION_PAPER.md:658",
+      "where": "paper/POSITION_PAPER.md:768",
       "reason": "section reference (§2), continuation.",
       "anchor_digest": "0bc7163293509b5fd8dd71b3055630399e7807f83b14647a27aeee26c08447ea"
     },
     {
       "id": "N-301",
       "text": "project's own receipts, and the project has both kinds on record (§3); and",
-      "where": "paper/POSITION_PAPER.md:660",
+      "where": "paper/POSITION_PAPER.md:770",
       "reason": "section reference (§3), continuation.",
       "anchor_digest": "e136e2e599d85eb9a76895b222c26ac7a34ec94d6129e0359e6746e69603d5e0"
     },
@@ -5149,86 +5452,385 @@
     {
       "id": "N-556",
       "text": "# Release notes -- v0.1.0-rc1",
-      "where": "RELEASE_NOTES.md:1",
+      "where": "RELEASE_NOTES.md:63",
       "reason": "document title/heading naming the release version tag `v0.1.0-rc1`; not a measurement.",
       "anchor_digest": "2a3bc850e79ff39514576242d8b561dac98bbb917215f6407b83c788516b6f2d"
     },
     {
       "id": "N-557",
       "text": "| Herdr running, with `HERDR_ENV=1` | HoH refuses to start otherwise, on purpose -- a real prerequisite, not a formality. |",
-      "where": "RELEASE_NOTES.md:21",
+      "where": "RELEASE_NOTES.md:86",
       "reason": "restates the Herdr/`HERDR_ENV=1` prerequisite already recorded as claim `C-001` (`README.md:64`, evidence `file:src/hoh/herdr.py:52`); a downstream restatement of an existing claim, not a new one.",
       "anchor_digest": "5e3ca9356bf8a5e040a194468e431c50bed73692ae0c99db7d6a2ab152d4f251"
     },
     {
       "id": "N-558",
       "text": "## What changed on the way to `0.1.0-rc1`",
-      "where": "RELEASE_NOTES.md:25",
+      "where": "RELEASE_NOTES.md:90",
       "reason": "section heading restating the release version tag from this document's own title; not a measurement.",
       "anchor_digest": "86669b7710f339c86fba060e17cd94637508d1678851eddf4f9654eaf8b41fbc"
     },
     {
       "id": "N-559",
       "text": "- This run (`hoh-d8`) added three release-candidate documents -- this file,",
-      "where": "RELEASE_NOTES.md:27",
+      "where": "RELEASE_NOTES.md:92",
       "reason": "names this run's own run id (`hoh-d8`), describing which run produced these documents; a run-id self-reference, not a measurement.",
       "anchor_digest": "90d8de08e6d4676233748692c31e1dbbc775b711b118ecab7294a8c0cdf3abff"
     },
     {
       "id": "N-560",
       "text": "audit (`paper/AUDIT.md`) each passed their own QA gate: `D5` accepted the",
-      "where": "RELEASE_NOTES.md:33",
+      "where": "RELEASE_NOTES.md:98",
       "reason": "restates D5's and D6's acceptance figures continued at lines 34-35, already recorded at `dogfood/ABSCHLUSSBERICHT.md:222` and `:406` (Section B's run-trace table) and restated identically at `RC_GATE.md`'s 'Position Paper QA grün' row; a downstream restatement, not a new independent measurement.",
       "anchor_digest": "c510225d78c2b626fb95344f5ae6a9a91bd7be4248f74e15ed7be38c83ef6a35"
     },
     {
       "id": "N-561",
       "text": "paper at its second iteration, `14` of `14` criteria; `D6` accepted the",
-      "where": "RELEASE_NOTES.md:34",
+      "where": "RELEASE_NOTES.md:99",
       "reason": "restates D5's acceptance figure (`14` of `14` criteria), already recorded at `dogfood/ABSCHLUSSBERICHT.md:222` (Section B's run-trace table) and restated identically at `RC_GATE.md`'s 'Position Paper QA grün' row; a downstream restatement, not a new independent measurement.",
       "anchor_digest": "fbe740d54cc7abdec75485582272ab80b9604f4f1bef93bc4a9b5082cf613a90"
     },
     {
       "id": "N-562",
       "text": "audit at its second iteration, `10` of `10` criteria.",
-      "where": "RELEASE_NOTES.md:35",
+      "where": "RELEASE_NOTES.md:100",
       "reason": "restates D6's acceptance figure (`10` of `10` criteria), already recorded at `dogfood/ABSCHLUSSBERICHT.md:406` (Section B's run-trace table) and restated identically at `RC_GATE.md`'s 'Position Paper QA grün' row; a downstream restatement, not a new independent measurement.",
       "anchor_digest": "32fc0a17ad14cd69d4a441c06b1d6e228ac5ea1af9cc5a82c253ab0c7c2950b5"
     },
     {
       "id": "N-563",
       "text": "four classified BLOCKER are now closed: `A-01` and `A-02` were corrected by",
-      "where": "RELEASE_NOTES.md:40",
+      "where": "RELEASE_NOTES.md:105",
       "reason": "restates the BLOCKER-finding closures (`A-01`, `A-02`), already recorded in `paper/REVIEW_CONSOLIDATED.md`'s Findings table and restated in this ledger's own `RC_GATE.md` disposition-table entries (lines 77-78); a downstream restatement, not a new independent measurement.",
       "anchor_digest": "78806148a2a2fa79a3f15d338f4ec280d3ac27b5a76d57c0fddc83bf1d00798c"
     },
     {
       "id": "N-564",
       "text": "loop run `d7r`, `B-04` by loop run `d7w`, and `B-01` by loop run `d7x` --",
-      "where": "RELEASE_NOTES.md:41",
+      "where": "RELEASE_NOTES.md:106",
       "reason": "restates the BLOCKER-finding closures (`B-04`, `B-01`), already recorded in `paper/REVIEW_CONSOLIDATED.md`'s Findings table and restated in this ledger's own `RC_GATE.md` disposition-table entries (lines 79-80); a downstream restatement, not a new independent measurement.",
       "anchor_digest": "eaeb5839504cad68237c536db27bcbb503686cf1cf22d6cc43abe2cd1fcf0f98"
     },
     {
       "id": "N-565",
       "text": "guard, not a silent gap (see `docs/LIMITATIONS.md`, limit 4).",
-      "where": "RELEASE_NOTES.md:45",
+      "where": "RELEASE_NOTES.md:110",
       "reason": "cross-reference to `docs/LIMITATIONS.md` limit 4 (an existing declared claim surface in this ledger), naming where the underlying disclaimer already lives, and to the full defect accounting at `dogfood/ABSCHLUSSBERICHT.md:906` (Section D); not a fresh measurement.",
       "anchor_digest": "2f61c712b49d2a4423e66d4be063660ec87bcaa23c382c7654c5c4be0340e2d9"
     },
     {
       "id": "N-566",
-      "text": "`docs/LIMITATIONS.md` limit 8 for the current wording and why the wider",
-      "where": "RELEASE_NOTES.md:84",
+      "text": "logic was never written by a run. See `docs/LIMITATIONS.md` limit 8, and",
+      "where": "RELEASE_NOTES.md:160",
       "reason": "cross-reference to `docs/LIMITATIONS.md` limit 8 (an existing declared claim surface in this ledger); not a fresh measurement.",
-      "anchor_digest": "df70b120065a708adc3768b5045b2e6e2b11095548b2ca1fea4368dcdd69a41a"
+      "anchor_digest": "58cfb2528d1908bc11e16942bf9042b456ad102f428a89c4e7730ddbe44d2e74",
+      "note": "Anchor moved from RELEASE_NOTES.md:84 to RELEASE_NOTES.md:157 on 2026-09-10; the earlier wording was: \"`docs/LIMITATIONS.md` limit 8 for the current wording and why the wider\". The line was revised in the rc2 correction cycle; the statement itself was not withdrawn."
     },
     {
       "id": "N-567",
-      "text": "It is not a public release. Creating the `v0.1.0-rc1` tag, pushing it",
-      "where": "RELEASE_NOTES.md:108",
-      "reason": "restates the release version tag `v0.1.0-rc1` from this document's own title while describing what this release candidate is not; not a measurement.",
-      "anchor_digest": "88b5e72ad2f5fdeb37a74dedfb0a3c76122bcfe7ac7ff8e7ff8a223b0c3d8282"
+      "text": "`v0.1.0-rc1` was tagged and pushed on a human decision that this run neither",
+      "where": "RELEASE_NOTES.md:190",
+      "reason": "restates the release version tag `v0.1.0-rc1` from this document's own title while describing what the operator published after run D8 closed; not a measurement. Re-anchored on 2026-09-10: the sentence this entry previously pointed at said the candidate \"is not a public release\", which was true when D8 wrote it and false once the operator published. The entry follows the version mention to its successor sentence rather than being dropped.",
+      "anchor_digest": "5b022517c8eb18195dfb396fd468e9684ac2d7749ef55d87f2c0e3325f809071",
+      "note": "Anchor moved from RELEASE_NOTES.md:114 to RELEASE_NOTES.md:187 on 2026-09-10; the earlier wording was: \"was complete: `v0.1.0-rc1` is now the public research-preview release\". The line was revised in the rc2 correction cycle; the statement itself was not withdrawn."
+    },
+    {
+      "id": "N-568",
+      "text": "`U1`-`U5` are a *named list*, extended each time a composition failure taught",
+      "where": "docs/LIMITATIONS.md:303",
+      "reason": "names the union invariants U1..U5 as identifiers of the gate, not as a measurement; the digits are part of their names.",
+      "anchor_digest": "75ba83e5ea1e8098e2be74ada55a2c519ff687a5df3cd30c3900bbd338fd9109"
+    },
+    {
+      "id": "N-569",
+      "text": "**Run `D8`, which produced this document, published nothing.** It created no",
+      "where": "RELEASE_NOTES.md:184",
+      "reason": "names run `D8` as a run identifier while stating the scope boundary that run observed; the digit is part of the run id, not a measurement.",
+      "anchor_digest": "6b10ed1dbd95649e10629d9d672901a4ec1eb8c73e54b18f14dccb5f9c46c6dd"
+    },
+    {
+      "id": "N-570",
+      "text": "| Human policy authority | Policy limits, non-delegated decisions, irreversible external actions | 7 governance decisions; the public release |",
+      "where": "README.md:88",
+      "anchor_digest": "760a594c8b17c5428bf53b84881d39390409c4dd64bb6cbc4b0d8f8a72ef4c25",
+      "reason": "describes the architecture or the rc2 correction itself, not a numeric measurement claim"
+    },
+    {
+      "id": "N-571",
+      "text": "closure layer described in `docs/LIMITATIONS.md` §9 exists: the invariants",
+      "where": "docs/ARCHITECTURE.md:49",
+      "anchor_digest": "4225af27ba0311b221064b3f28d7191028c96a35ddea4c6d75b25300be676e0f",
+      "reason": "describes the architecture or the rc2 correction itself, not a numeric measurement claim"
+    },
+    {
+      "id": "N-572",
+      "text": "`U1`-`U5` and the post-DAG closure pass are what check the orchestrator's own",
+      "where": "docs/ARCHITECTURE.md:50",
+      "anchor_digest": "2c66728a63cd88acd0869bcbb9e374bdb5f997eeef739ea470524f562b76e511",
+      "reason": "describes the architecture or the rc2 correction itself, not a numeric measurement claim"
+    },
+    {
+      "id": "N-573",
+      "text": "`DEC-R6`: the project's public name, which files the export carries, how one",
+      "where": "docs/LIMITATIONS.md:45",
+      "anchor_digest": "ce17211a4ce94fd45c25f01c132a7995a54a0098b5ef9e59c1056c9235ef4d7d",
+      "reason": "describes the architecture or the rc2 correction itself, not a numeric measurement claim"
+    },
+    {
+      "id": "N-574",
+      "text": "edited a line inside `src/`\", and it is false: run `d1` added",
+      "where": "docs/LIMITATIONS.md:187",
+      "anchor_digest": "2865c3a3383638f41da798b6b4b51cc3cca15e0664c28534b2bb3425904e7bfc",
+      "reason": "describes the architecture or the rc2 correction itself, not a numeric measurement claim"
+    },
+    {
+      "id": "N-575",
+      "text": "touching `src/hoh/`; the other 48 were written outside any run. It contains no `.py` file, which",
+      "where": "docs/LIMITATIONS.md:193",
+      "anchor_digest": "56ba8cf018c26703c7a5c30d96ff13884c647e602ebd259110a065cb018e8071",
+      "reason": "describes the architecture or the rc2 correction itself, not a numeric measurement claim",
+      "note": "Anchor re-derived on 2026-09-10 (similarity 0.87); the earlier wording was: \"the other 49 were written outside any run. It contains no `.py` file, which\". What changed in the rc2 cycle: the specification count (48 basenames -> 51 distinct contents) and the attribution columns (now counted without merge commits). The statement itself was not withdrawn."
+    },
+    {
+      "id": "N-576",
+      "text": "caught the last two failures.** `U1`-`U5` check the merged tree. Above them",
+      "where": "docs/LIMITATIONS.md:274",
+      "anchor_digest": "36be11acae5921e7cdacaaf2733b59d80da25b9a45961804dbecd5dce1da449e",
+      "reason": "describes the architecture or the rc2 correction itself, not a numeric measurement claim"
+    },
+    {
+      "id": "N-577",
+      "text": "DAG went terminal after run `D8`; the global gates then found two real",
+      "where": "docs/LIMITATIONS.md:290",
+      "anchor_digest": "cac2fab3852930671015f329d5dbec8585960753998c37a7cddb93859a661722",
+      "reason": "describes the architecture or the rc2 correction itself, not a numeric measurement claim"
+    },
+    {
+      "id": "N-578",
+      "text": "`d8b` and `d8c`; only after those were accepted and closure re-ran clean did",
+      "where": "docs/LIMITATIONS.md:292",
+      "anchor_digest": "db4bc9cdc25a3ac7fac4a36e2ff1ffd92f865240e005760011380b88664779a8",
+      "reason": "describes the architecture or the rc2 correction itself, not a numeric measurement claim"
+    },
+    {
+      "id": "N-579",
+      "text": "   combined state inconsistent (C-017, C-052..C-054).",
+      "where": "paper/POSITION_PAPER.md:117",
+      "anchor_digest": "51da039d22d947f942b4733cc71284ae56a5b591c61f082b1164fcc8fe0d8c8d",
+      "reason": "describes the architecture or the rc2 correction itself, not a numeric measurement claim"
+    },
+    {
+      "id": "N-580",
+      "text": "3. **Union gate.** Five invariants (`U1`-`U5`) evaluated over the merged tree",
+      "where": "paper/POSITION_PAPER.md:121",
+      "anchor_digest": "ae4a311a4ca5c0430ae4913b44797bead7f7bcc30d1bdcbf84b6cb8ade85c7f1",
+      "reason": "describes the architecture or the rc2 correction itself, not a numeric measurement claim"
+    },
+    {
+      "id": "N-581",
+      "text": "rather than describing work. The DAG went terminal after run `D8`. The global",
+      "where": "paper/POSITION_PAPER.md:146",
+      "anchor_digest": "4bba088292cefd8d8067986c64297cf52f6a91a21b5fc53fb01ef8c438e6975a",
+      "reason": "describes the architecture or the rc2 correction itself, not a numeric measurement claim"
+    },
+    {
+      "id": "N-582",
+      "text": "about. They became repair runs `d8b` and `d8c`; only after both were accepted",
+      "where": "paper/POSITION_PAPER.md:149",
+      "anchor_digest": "bf817dcc1d9e1bf8ab1ec06ddfc5364562dc0911a142c3b4a50d46216b30b0bc",
+      "reason": "describes the architecture or the rc2 correction itself, not a numeric measurement claim"
+    },
+    {
+      "id": "N-583",
+      "text": "**What this does not become.** `U1`-`U5` and the semantic invariants are an",
+      "where": "paper/POSITION_PAPER.md:162",
+      "anchor_digest": "8f57bd2cf6b68e6321a43f6fd62c3191a42d5c61a3ba12cea17c97fc9a9e5150",
+      "reason": "describes the architecture or the rc2 correction itself, not a numeric measurement claim"
+    },
+    {
+      "id": "N-584",
+      "text": "§9 states that limit in the form a reader should hold this project to.",
+      "where": "paper/POSITION_PAPER.md:168",
+      "anchor_digest": "033508c63c7f6fb382e733fb01741a5b016ac9e6a517f4035cc9b7717320f1cc",
+      "reason": "describes the architecture or the rc2 correction itself, not a numeric measurement claim"
+    },
+    {
+      "id": "N-585",
+      "text": "in §0's and §3's",
+      "where": "paper/POSITION_PAPER.md:557",
+      "anchor_digest": "8f8f5adde8560283fb2aeaed66f6cee324459f4202c635a385d824619a2186c2",
+      "reason": "describes the architecture or the rc2 correction itself, not a numeric measurement claim"
+    },
+    {
+      "id": "N-586",
+      "text": "   **seven** governance questions (`DEC-R1` … `DEC-R6` and the decision to",
+      "where": "paper/POSITION_PAPER.md:573",
+      "anchor_digest": "c3ab95c0159c603f16d398435822883d2ac45c3a69aece9cc39cbaeebed80c2d",
+      "reason": "describes the architecture or the rc2 correction itself, not a numeric measurement claim"
+    },
+    {
+      "id": "N-587",
+      "text": "# Release notes -- v0.1.0-rc2",
+      "where": "RELEASE_NOTES.md:1",
+      "anchor_digest": "64246c2996b70964c25c7eb04d1d341652cdcef2a9c55a24a845a3716ac30f4c",
+      "reason": "describes the architecture or the rc2 correction itself, not a numeric measurement claim"
+    },
+    {
+      "id": "N-588",
+      "text": "`v0.1.0-rc2` supersedes `v0.1.0-rc1`. It is a **documentation and positioning",
+      "where": "RELEASE_NOTES.md:3",
+      "anchor_digest": "d7084f62730c8249c99942751f2bc0075a50277c36c29e693f42ad97147ff240",
+      "reason": "describes the architecture or the rc2 correction itself, not a numeric measurement claim"
+    },
+    {
+      "id": "N-589",
+      "text": "two tags. `v0.1.0-rc1` stays published, tagged and unmoved -- it is the",
+      "where": "RELEASE_NOTES.md:5",
+      "anchor_digest": "df1daeeb66efc986d269a55533929754d863565b81b3c6600a34232857820110",
+      "reason": "describes the architecture or the rc2 correction itself, not a numeric measurement claim"
+    },
+    {
+      "id": "N-590",
+      "text": "## What rc2 corrects, and why there was anything to correct",
+      "where": "RELEASE_NOTES.md:10",
+      "anchor_digest": "8f01a1a5de23e4bc6ee9ebc1cfd25a31d93250d7974e525b2dc83a0c32224f9b",
+      "reason": "describes the architecture or the rc2 correction itself, not a numeric measurement claim"
+    },
+    {
+      "id": "N-591",
+      "text": "Four claims in the rc1 documents were wrong or misleading. All four were",
+      "where": "RELEASE_NOTES.md:12",
+      "anchor_digest": "0337b9b714db5c421dc399e60d87758f153ad1e8471e89f8cca3cf849fbb7941",
+      "reason": "describes the architecture or the rc2 correction itself, not a numeric measurement claim"
+    },
+    {
+      "id": "N-592",
+      "text": "| Where | What rc1 said | Why it was wrong |",
+      "where": "RELEASE_NOTES.md:16",
+      "anchor_digest": "4ec3a0f58e6d68b380d9c3d01169893730ccd6c553e78f0bd8ebdf0a07051269",
+      "reason": "describes the architecture or the rc2 correction itself, not a numeric measurement claim"
+    },
+    {
+      "id": "N-593",
+      "text": "| `docs/LIMITATIONS.md` limit 1 | Described the campaign as *attended*, with \"an operator\" writing each specification | Misattributed the system's own top layer as external supervision. The specifications, merges and repairs came from an agent session, not a person typing. |",
+      "where": "RELEASE_NOTES.md:20",
+      "anchor_digest": "f2e37dfb28c57bfd7988547c8ec2a257699442cebdc3e7d1e2522307beb8cea9",
+      "reason": "describes the architecture or the rc2 correction itself, not a numeric measurement claim"
+    },
+    {
+      "id": "N-594",
+      "text": "| `docs/LIMITATIONS.md` limit 8 | \"No run has ever added or edited a line inside `src/`\" | Overstated. Run `d1` added `src/hoh/policy/dangerous-patterns.txt` and `src/hoh/policy/house-rules-patterns.txt`, merged as accepted candidate `d1-i2`. Recorded as finding `O94`. |",
+      "where": "RELEASE_NOTES.md:21",
+      "anchor_digest": "bc6f95661b6586189bf06244f1f389c4d5e92e21f0da1e4949e0a99f60341947",
+      "reason": "describes the architecture or the rc2 correction itself, not a numeric measurement claim"
+    },
+    {
+      "id": "N-595",
+      "text": "rc2 additionally adds what rc1 omitted entirely: a `What has actually been",
+      "where": "RELEASE_NOTES.md:28",
+      "anchor_digest": "4f7c4d226d4ab2e73692d69b9d1e7f36a454037070488ca619bd4614a15d8877",
+      "reason": "describes the architecture or the rc2 correction itself, not a numeric measurement claim"
+    },
+    {
+      "id": "N-596",
+      "text": "rc1 stated the composition limit in a form that had already stopped being",
+      "where": "RELEASE_NOTES.md:41",
+      "anchor_digest": "13ef8dfc2c931d7a7a76b428b022d0ec63fc1edb7b80da1aceb481659cefb182",
+      "reason": "describes the architecture or the rc2 correction itself, not a numeric measurement claim"
+    },
+    {
+      "id": "N-597",
+      "text": "corrected two-level statement, now in `docs/LIMITATIONS.md` §9 and the paper's",
+      "where": "RELEASE_NOTES.md:43",
+      "anchor_digest": "fea458928ae41a1fe8e3797c25351e08c104d663b9350669fcb1d9d1dee6f36a",
+      "reason": "describes the architecture or the rc2 correction itself, not a numeric measurement claim"
+    },
+    {
+      "id": "N-598",
+      "text": "- **System level:** above that loop sit the union invariants `U1`-`U5`,",
+      "where": "RELEASE_NOTES.md:49",
+      "anchor_digest": "eb223ccc917a506b139dd317094d968372e1f385c41415fa9310b53ba225a15e",
+      "reason": "describes the architecture or the rc2 correction itself, not a numeric measurement claim"
+    },
+    {
+      "id": "N-599",
+      "text": "This is not a claim that composition is solved. `U1`-`U5` are a named,",
+      "where": "RELEASE_NOTES.md:54",
+      "anchor_digest": "9edb37fdbfc9f65e038717a4e2ed3704c71d56ad5294cee6404d60fb73678ffe",
+      "reason": "describes the architecture or the rc2 correction itself, not a numeric measurement claim"
+    },
+    {
+      "id": "N-600",
+      "text": "`d8b` and `d8c`.",
+      "where": "RELEASE_NOTES.md:59",
+      "anchor_digest": "ec99bd063076cb846cfa40cd0f51554714dda81a45dfd916d6b2db6ae84c86f0",
+      "reason": "describes the architecture or the rc2 correction itself, not a numeric measurement claim"
+    },
+    {
+      "id": "N-601",
+      "text": "`[corrected in rc2]`. This is the record of what was claimed at rc1.*",
+      "where": "RELEASE_NOTES.md:66",
+      "anchor_digest": "e7788f38d1129c431e031366ec6f706ed091e1d9ffece74a49a21d070ee6a756",
+      "reason": "describes the architecture or the rc2 correction itself, not a numeric measurement claim"
+    },
+    {
+      "id": "N-602",
+      "text": "  **[corrected in rc2.** rc1 wrote \"by the operator\" here, which reads as a",
+      "where": "RELEASE_NOTES.md:119",
+      "anchor_digest": "62c8cd7b11fd515013b6b0b40bd85db82bc6097db7859bb3703063a38e89fbac",
+      "reason": "marks the rc2 correction of an rc1 wording (\"by the operator\"); names an authority, not a measurement. Re-anchored on 2026-09-10: the entry first covered the same correction written as an inline clause inside the rc1 bullet, which merged two sentences and pulled an excluded internal document into this ledger's rendered reference closure. The correction now stands as its own sentence after the preserved rc1 text."
+    },
+    {
+      "id": "N-603",
+      "text": "**[corrected in rc2]** That claim is too wide on both halves. Measured over",
+      "where": "RELEASE_NOTES.md:153",
+      "anchor_digest": "9043480017ed3e10a52793c42330b4acf1d18b47a70556ed826274678d280c5b",
+      "reason": "describes the architecture or the rc2 correction itself, not a numeric measurement claim"
+    },
+    {
+      "id": "N-604",
+      "text": "arriving via run branches across three run-authored files; `src/hoh/` has 49",
+      "where": "RELEASE_NOTES.md:155",
+      "anchor_digest": "23af90fa60c292c88d0adeb32190624d25738e36dfa3f0c503d737d44d72e808",
+      "reason": "describes the architecture or the rc2 correction itself, not a numeric measurement claim",
+      "note": "Anchor re-derived on 2026-09-10 (similarity 0.97); the earlier wording was: \"arriving via run branches across three run-authored files; `src/hoh/` has 50\". What changed in the rc2 cycle: the specification count (48 basenames -> 51 distinct contents) and the attribution columns (now counted without merge commits). The statement itself was not withdrawn."
+    },
+    {
+      "id": "N-605",
+      "text": "commits, one of which arrived via a run branch -- run `d1` adding",
+      "where": "RELEASE_NOTES.md:156",
+      "anchor_digest": "4cd17d3f531c80f50d9c1dd67cadaf80fec6c9733104cc7706be36c75875cadd",
+      "reason": "describes the architecture or the rc2 correction itself, not a numeric measurement claim"
+    },
+    {
+      "id": "N-606",
+      "text": "finding `O94` for how the overstatement was found.",
+      "where": "RELEASE_NOTES.md:161",
+      "anchor_digest": "6bb8aa2be5e86837830bbbc6565521a465442b263019b1c253f18cf86f20e41f",
+      "reason": "describes the architecture or the rc2 correction itself, not a numeric measurement claim"
+    },
+    {
+      "id": "N-607",
+      "text": "and taken by a person. `v0.1.0-rc2` follows the same split. Those two sentences are deliberately kept apart, because",
+      "where": "RELEASE_NOTES.md:193",
+      "anchor_digest": "e2ff15360bb00021898204a096a8cf1c7c466eb2017283eb4c0817a4ecdb948a",
+      "reason": "describes the architecture or the rc2 correction itself, not a numeric measurement claim"
+    },
+    {
+      "id": "N-608",
+      "text": "rather than summarised. Limits 8 and 9 there are both findings from this",
+      "where": "README.md:126",
+      "anchor_digest": "57b15068fca0efaaed99810fc38c4c5efbb2147fabab1bb283383aaf336059b0",
+      "reason": "names which two limits in docs/LIMITATIONS.md originate as unclosed findings of this campaign; a pointer into a shipped document, not a measurement"
+    },
+    {
+      "id": "N-609",
+      "text": "declared as an exception and carries a test; the remainder of the 48 direct",
+      "where": "README.md:168",
+      "anchor_digest": "c5a0c8ab8bbc21b1c549a929c8bbf170ca7d9018d4460cdc5d598b6299fdcf78",
+      "reason": "describes which authority produced the release-gate tooling, not a numeric measurement",
+      "note": "Anchor re-derived on 2026-09-10 (similarity 0.99); the earlier wording was: \"declared as an exception and carries a test; the remainder of the 49 direct\". What changed in the rc2 cycle: the specification count (48 basenames -> 51 distinct contents) and the attribution columns (now counted without merge commits). The statement itself was not withdrawn."
     }
   ],
   "claim_surfaces": [
