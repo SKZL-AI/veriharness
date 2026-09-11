@@ -36,6 +36,7 @@ import datetime
 import hashlib
 import json
 import re
+import string
 import subprocess
 import sys
 import tempfile
@@ -79,12 +80,42 @@ def _mnt_pattern() -> re.Pattern:
     return re.compile(re.escape(sl + "mnt" + sl) + r"[^" + re.escape(sl) + r"]+" + re.escape(sl))
 
 
+#: Characters that, immediately before a needle, mean it is *not* the start of
+#: an absolute path. A needle in the middle of a relative path -- a directory
+#: that happens to be named "root" inside an evidence tree -- is an ordinary
+#: name, not this machine's layout leaking into a published file. The guard
+#: used to flag those, and the only ways out would have been weakening it or
+#: renaming real evidence.
+#: Assembled rather than written out, because a 66-character literal alphabet
+#: is indistinguishable from a token to the export's own token-shaped scan --
+#: which flagged this very line. Building it from `string` is also the better
+#: code.
+_PFAD_ZEICHEN = frozenset(string.ascii_letters + string.digits + "._-/")
+
+
 def find_home_paths(text: str) -> list[str]:
-    """Returns the distinct needles found in text, empty if none."""
+    """Returns the distinct needles found in text, empty if none.
+
+    A needle counts only where it *begins* a path: at the start of the text, or
+    after a character that cannot be part of one. Narrowed deliberately and no
+    further -- a needle inside quotes, inside brackets, or at the start of a
+    line still matches, because the character before it is a quote, a bracket
+    or nothing. Only a needle preceded by another path segment is let through.
+
+    Examples are deliberately not written out here: this file is itself one of
+    the files the guard scans, and spelling an absolute path into the docstring
+    would make the guard fail on its own explanation. The cases live in
+    `tests/test_claims_anchors.py`, which is scanned too and therefore builds
+    them from parts.
+    """
     hits = []
     for needle in _home_needles():
-        if needle in text:
-            hits.append(needle)
+        pos = text.find(needle)
+        while pos != -1:
+            if pos == 0 or text[pos - 1] not in _PFAD_ZEICHEN:
+                hits.append(needle)
+                break
+            pos = text.find(needle, pos + 1)
     if _mnt_pattern().search(text):
         hits.append("<mnt-pattern>")
     return hits
@@ -965,6 +996,13 @@ def find_undeclared_claim_surfaces(data: dict, repo_root: Path = REPO_ROOT) -> l
 CLAIM_SURFACE_EXCLUSION_REASONS = {
     "ledger-itself",
     "copied-evidence",
+    # Machine-written evidence published because a public claim names it: a
+    # receipt, a run state, a project state, a check transcript, a git bundle.
+    # Every number in one was produced by the runner rather than authored,
+    # which is the distinction this ledger draws -- and the reason the tree is
+    # exported at all is that a claim whose evidence is not published asks the
+    # reader to take it on trust.
+    "evidence-artifact",
     "pattern-data",
     "package-metadata",
     "source-code",

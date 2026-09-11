@@ -162,6 +162,16 @@
       "rule": "public-docs"
     },
     {
+      "path": "docs/BENCHMARK_PROTOCOL.md",
+      "decision": "INCLUDE",
+      "rule": "public-docs"
+    },
+    {
+      "path": "docs/EVIDENCE_INDEX.md",
+      "decision": "INCLUDE",
+      "rule": "public-docs"
+    },
+    {
       "path": "docs/EVIDENCE_MODEL.md",
       "decision": "INCLUDE",
       "rule": "public-docs"
@@ -207,6 +217,11 @@
       "rule": "public-docs"
     },
     {
+      "path": "docs/ROUTING.md",
+      "decision": "INCLUDE",
+      "rule": "public-docs"
+    },
+    {
       "path": "dogfood/ABSCHLUSSBERICHT.md",
       "decision": "EXCLUDE",
       "rule": "internal-working-document"
@@ -230,6 +245,11 @@
       "path": "dogfood/ABSCHLUSSBERICHT.md.v20260909T192206Z",
       "decision": "EXCLUDE",
       "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/ATTRIBUTION.json",
+      "decision": "INCLUDE",
+      "rule": "published-evidence"
     },
     {
       "path": "dogfood/D7_REVIEW_AUFTRAG.md",
@@ -328,6 +348,111 @@
     },
     {
       "path": "dogfood/VORSCHLAG_UNION_GATE.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/benchmark/INSTRUMENT_CONTROL.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/benchmark/reference/duration.py",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/benchmark/reference/ledger.py",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/benchmark/reference/retry.py",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/benchmark/reference/roman.py",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/benchmark/reference/text.py",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/benchmark/tasks/ledger_apply/SPEC.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/benchmark/tasks/ledger_apply/base/ledger.py",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/benchmark/tasks/ledger_apply/hidden_test.py",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/benchmark/tasks/parse_duration/SPEC.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/benchmark/tasks/parse_duration/base/duration.py",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/benchmark/tasks/parse_duration/hidden_test.py",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/benchmark/tasks/retry_backoff/SPEC.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/benchmark/tasks/retry_backoff/base/retry.py",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/benchmark/tasks/retry_backoff/hidden_test.py",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/benchmark/tasks/slug_pair/SPEC.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/benchmark/tasks/slug_pair/base/text.py",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/benchmark/tasks/slug_pair/hidden_test.py",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/benchmark/tasks/to_roman/SPEC.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/benchmark/tasks/to_roman/base/roman.py",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/benchmark/tasks/to_roman/hidden_test.py",
       "decision": "EXCLUDE",
       "rule": "internal-working-document"
     },
@@ -697,6 +822,931 @@
       "rule": "internal-working-document"
     },
     {
+      "path": "dogfood/specs/telemetry-wiring.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211254Z/checks.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211254Z/control/.hoh-out-control-i1-a1-CONTROL.log",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211254Z/control/arena/hello.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211254Z/logs/strictroman4-i1-a1-K1-basis.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211254Z/logs/strictroman4-i1-a1-K1.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211254Z/logs/strictroman4-i1-a1-K2-basis.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211254Z/logs/strictroman4-i1-a1-K2.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211254Z/logs/strictroman4-i2-a1-K1.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211254Z/logs/strictroman4-i2-a1-K2.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211254Z/logs/strictroman4-i3-a1-K1.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211254Z/logs/strictroman4-i3-a1-K2.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211254Z/logs/strictroman4-i3-a1-K3-basis.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211254Z/logs/strictroman4-i3-a1-K3.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211254Z/receipts/strictroman4-i1-a1-K1-basis.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211254Z/receipts/strictroman4-i1-a1-K1.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211254Z/receipts/strictroman4-i1-a1-K2-basis.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211254Z/receipts/strictroman4-i1-a1-K2.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211254Z/receipts/strictroman4-i2-a1-K1.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211254Z/receipts/strictroman4-i2-a1-K2.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211254Z/receipts/strictroman4-i3-a1-K1.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211254Z/receipts/strictroman4-i3-a1-K2.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211254Z/receipts/strictroman4-i3-a1-K3-basis.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211254Z/receipts/strictroman4-i3-a1-K3.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211254Z/state.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211310Z/checks.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211310Z/control/.hoh-out-control-i1-a1-CONTROL.log",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211310Z/control/arena/hello.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211310Z/logs/strictroman4-i1-a1-K1-basis.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211310Z/logs/strictroman4-i1-a1-K1.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211310Z/logs/strictroman4-i1-a1-K2-basis.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211310Z/logs/strictroman4-i1-a1-K2.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211310Z/logs/strictroman4-i2-a1-K1.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211310Z/logs/strictroman4-i2-a1-K2.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211310Z/logs/strictroman4-i3-a1-K1.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211310Z/logs/strictroman4-i3-a1-K2.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211310Z/logs/strictroman4-i3-a1-K3-basis.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211310Z/logs/strictroman4-i3-a1-K3.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211310Z/receipts/strictroman4-i1-a1-K1-basis.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211310Z/receipts/strictroman4-i1-a1-K1.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211310Z/receipts/strictroman4-i1-a1-K2-basis.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211310Z/receipts/strictroman4-i1-a1-K2.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211310Z/receipts/strictroman4-i2-a1-K1.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211310Z/receipts/strictroman4-i2-a1-K2.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211310Z/receipts/strictroman4-i3-a1-K1.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211310Z/receipts/strictroman4-i3-a1-K2.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211310Z/receipts/strictroman4-i3-a1-K3-basis.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211310Z/receipts/strictroman4-i3-a1-K3.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211310Z/state.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211331Z/SUMMARY.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211331Z/checks.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211331Z/control/.hoh-out-control-i1-a1-CONTROL.log",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211331Z/control/arena/hello.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211331Z/control/control-receipt.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211331Z/control/control-transcript.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211331Z/logs/strictroman4-i1-a1-K1-basis.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211331Z/logs/strictroman4-i1-a1-K1.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211331Z/logs/strictroman4-i1-a1-K2-basis.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211331Z/logs/strictroman4-i1-a1-K2.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211331Z/logs/strictroman4-i2-a1-K1.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211331Z/logs/strictroman4-i2-a1-K2.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211331Z/logs/strictroman4-i3-a1-K1.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211331Z/logs/strictroman4-i3-a1-K2.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211331Z/logs/strictroman4-i3-a1-K3-basis.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211331Z/logs/strictroman4-i3-a1-K3.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211331Z/receipts/strictroman4-i1-a1-K1-basis.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211331Z/receipts/strictroman4-i1-a1-K1.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211331Z/receipts/strictroman4-i1-a1-K2-basis.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211331Z/receipts/strictroman4-i1-a1-K2.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211331Z/receipts/strictroman4-i2-a1-K1.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211331Z/receipts/strictroman4-i2-a1-K2.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211331Z/receipts/strictroman4-i3-a1-K1.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211331Z/receipts/strictroman4-i3-a1-K2.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211331Z/receipts/strictroman4-i3-a1-K3-basis.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211331Z/receipts/strictroman4-i3-a1-K3.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e.v20260911T211331Z/state.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e/SUMMARY.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e/checks.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e/control/.hoh-out-control-i1-a1-CONTROL.log",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e/control/arena/hello.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e/control/control-receipt.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e/control/control-transcript.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e/logs/strictroman4-i1-a1-K1-basis.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e/logs/strictroman4-i1-a1-K1.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e/logs/strictroman4-i1-a1-K2-basis.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e/logs/strictroman4-i1-a1-K2.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e/logs/strictroman4-i2-a1-K1.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e/logs/strictroman4-i2-a1-K2.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e/logs/strictroman4-i3-a1-K1.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e/logs/strictroman4-i3-a1-K2.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e/logs/strictroman4-i3-a1-K3-basis.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e/logs/strictroman4-i3-a1-K3.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e/receipts/strictroman4-i1-a1-K1-basis.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e/receipts/strictroman4-i1-a1-K1.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e/receipts/strictroman4-i1-a1-K2-basis.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e/receipts/strictroman4-i1-a1-K2.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e/receipts/strictroman4-i2-a1-K1.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e/receipts/strictroman4-i2-a1-K2.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e/receipts/strictroman4-i3-a1-K1.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e/receipts/strictroman4-i3-a1-K2.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e/receipts/strictroman4-i3-a1-K3-basis.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e/receipts/strictroman4-i3-a1-K3.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/strict-e2e/state.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/fixture-git-log.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/fixture.bundle",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/harness-steps.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/projects/unattended/.lock",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/projects/unattended/project.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/projects/unattended/project.json.v1.20260911T144454Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/projects/unattended/project.json.v10.20260911T145350Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/projects/unattended/project.json.v2.20260911T144817Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/projects/unattended/project.json.v3.20260911T144818Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/projects/unattended/project.json.v4.20260911T144818Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/projects/unattended/project.json.v5.20260911T144818Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/projects/unattended/project.json.v6.20260911T144818Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/projects/unattended/project.json.v7.20260911T144818Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/projects/unattended/project.json.v8.20260911T145350Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/projects/unattended/project.json.v9.20260911T145350Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/repair-1-1/.lock",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/repair-1-1/answers/i1-a0-planner.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/repair-1-1/answers/i1-a1-qa.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/repair-1-1/checks.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/repair-1-1/evidence.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/repair-1-1/logs/repair-1-1-i1-a1-K1-basis.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/repair-1-1/logs/repair-1-1-i1-a1-K1.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/repair-1-1/logs/repair-1-1-i1-a1-K2-basis.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/repair-1-1/logs/repair-1-1-i1-a1-K2.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/repair-1-1/receipts/repair-1-1-i1-a1-K1-basis.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/repair-1-1/receipts/repair-1-1-i1-a1-K1.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/repair-1-1/receipts/repair-1-1-i1-a1-K2-basis.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/repair-1-1/receipts/repair-1-1-i1-a1-K2.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/repair-1-1/results/plan-i1-a1.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/repair-1-1/results/qa-i1-a1.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/repair-1-1/state.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/repair-1-1/state.json.v2026-09-11T14-48-18Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/repair-1-1/state.json.v2026-09-11T14-48-18Z-001",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/repair-1-1/state.json.v2026-09-11T14-48-18Z-002",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/repair-1-1/state.json.v2026-09-11T14-50-41Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/repair-1-1/state.json.v2026-09-11T14-50-41Z-001",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/repair-1-1/state.json.v2026-09-11T14-50-41Z-002",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/repair-1-1/state.json.v2026-09-11T14-51-40Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/repair-1-1/state.json.v2026-09-11T14-51-40Z-001",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/repair-1-1/state.json.v2026-09-11T14-51-40Z-002",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/repair-1-1/state.json.v2026-09-11T14-51-41Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/repair-1-1/state.json.v2026-09-11T14-53-48Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/repair-1-1/state.json.v2026-09-11T14-53-48Z-001",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/repair-1-1/state.json.v2026-09-11T14-53-48Z-002",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/slugify/.lock",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/slugify/answers/i1-a0-planner.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/slugify/answers/i1-a1-qa.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/slugify/checks.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/slugify/evidence.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/slugify/logs/slugify-i1-a1-K1-basis.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/slugify/logs/slugify-i1-a1-K1.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/slugify/logs/slugify-i1-a1-K2-basis.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/slugify/logs/slugify-i1-a1-K2.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/slugify/logs/slugify-i1-a1-K3-basis.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/slugify/logs/slugify-i1-a1-K3.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/slugify/logs/slugify-i1-a1-K4-basis.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/slugify/logs/slugify-i1-a1-K4.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/slugify/receipts/slugify-i1-a1-K1-basis.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/slugify/receipts/slugify-i1-a1-K1.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/slugify/receipts/slugify-i1-a1-K2-basis.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/slugify/receipts/slugify-i1-a1-K2.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/slugify/receipts/slugify-i1-a1-K3-basis.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/slugify/receipts/slugify-i1-a1-K3.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/slugify/receipts/slugify-i1-a1-K4-basis.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/slugify/receipts/slugify-i1-a1-K4.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/slugify/results/plan-i1-a1.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/slugify/results/qa-i1-a1.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/slugify/state.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/slugify/state.json.v2026-09-11T14-44-55Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/slugify/state.json.v2026-09-11T14-44-55Z-001",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/slugify/state.json.v2026-09-11T14-44-55Z-002",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/slugify/state.json.v2026-09-11T14-46-09Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/slugify/state.json.v2026-09-11T14-46-09Z-001",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/slugify/state.json.v2026-09-11T14-46-10Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/slugify/state.json.v2026-09-11T14-46-48Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/slugify/state.json.v2026-09-11T14-46-48Z-001",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/slugify/state.json.v2026-09-11T14-46-48Z-002",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/slugify/state.json.v2026-09-11T14-46-49Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/slugify/state.json.v2026-09-11T14-48-16Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/slugify/state.json.v2026-09-11T14-48-16Z-001",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/root/slugify/state.json.v2026-09-11T14-48-16Z-002",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/unattended-e2e/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
       "path": "examples/minimal/README.md",
       "decision": "INCLUDE",
       "rule": "example"
@@ -872,7 +1922,17 @@
       "rule": "package"
     },
     {
+      "path": "src/hoh/amendment.py",
+      "decision": "INCLUDE",
+      "rule": "package"
+    },
+    {
       "path": "src/hoh/approval.py",
+      "decision": "INCLUDE",
+      "rule": "package"
+    },
+    {
+      "path": "src/hoh/assurance.py",
       "decision": "INCLUDE",
       "rule": "package"
     },
@@ -977,6 +2037,16 @@
       "rule": "package"
     },
     {
+      "path": "src/hoh/taxonomy.py",
+      "decision": "INCLUDE",
+      "rule": "package"
+    },
+    {
+      "path": "src/hoh/telemetry.py",
+      "decision": "INCLUDE",
+      "rule": "package"
+    },
+    {
       "path": "src/hoh/trust.py",
       "decision": "INCLUDE",
       "rule": "package"
@@ -987,7 +2057,17 @@
       "rule": "package"
     },
     {
+      "path": "tests/test_amendment.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
       "path": "tests/test_approval.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_assurance.py",
       "decision": "INCLUDE",
       "rule": "tests"
     },
@@ -1017,7 +2097,17 @@
       "rule": "tests"
     },
     {
+      "path": "tests/test_isolation_record.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
       "path": "tests/test_launcher_verdicts.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_meta_evidence.py",
       "decision": "INCLUDE",
       "rule": "tests"
     },
@@ -1033,6 +2123,11 @@
     },
     {
       "path": "tests/test_project_resume.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_refusal_evidence.py",
       "decision": "INCLUDE",
       "rule": "tests"
     },
@@ -1067,6 +2162,11 @@
       "rule": "tests"
     },
     {
+      "path": "tests/test_taxonomy_telemetry.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
       "path": "tests/test_union_gate.py",
       "decision": "INCLUDE",
       "rule": "tests"
@@ -1077,7 +2177,17 @@
       "rule": "tests"
     },
     {
+      "path": "tools/attribution.py",
+      "decision": "INCLUDE",
+      "rule": "tooling"
+    },
+    {
       "path": "tools/audit_refs.py",
+      "decision": "INCLUDE",
+      "rule": "tooling"
+    },
+    {
+      "path": "tools/benchmark.py",
       "decision": "INCLUDE",
       "rule": "tooling"
     },
@@ -1092,7 +2202,22 @@
       "rule": "tooling"
     },
     {
+      "path": "tools/collect_strict_evidence.py",
+      "decision": "INCLUDE",
+      "rule": "tooling"
+    },
+    {
+      "path": "tools/evidence_index.py",
+      "decision": "INCLUDE",
+      "rule": "tooling"
+    },
+    {
       "path": "tools/export_manifest.py",
+      "decision": "INCLUDE",
+      "rule": "tooling"
+    },
+    {
+      "path": "tools/meta_evidence.py",
       "decision": "INCLUDE",
       "rule": "tooling"
     },

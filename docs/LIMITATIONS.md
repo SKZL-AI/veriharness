@@ -25,7 +25,7 @@ system's own top layer as if it were external supervision.
 
 Measured on the campaign that produced this release: **65 runs carrying 1,988
 receipts (880 of them control runs), 100 iterations that produced receipts,
-51 specifications, 45 merges and 104 recorded findings**, across five calendar
+51 specifications, 45 merges and 116 recorded findings**, across five calendar
 days and 3.5 days of elapsed wall-clock -- and the position paper, the claims
 ledger, the release documents and the export machinery among the artifacts
 produced.
@@ -44,7 +44,7 @@ in this campaign was escalated **by rule, not by necessity**. A human decided
 seven things -- `DEC-R1`, `DEC-R1a`, `DEC-R2`, `DEC-R3`, `DEC-R4`, `DEC-R5`,
 `DEC-R6`: the project's public name, which files the export carries, how one
 class of reference is dispositioned, and whether to publish. Seven governance
-decisions against 65 runs, 51 specifications, 45 merges and 104 findings. The
+decisions against 65 runs, 51 specifications, 45 merges and 116 findings. The
 same orchestration configured with those policies delegated in advance would
 have resolved them itself. That is a statement about the design, not a
 measurement: this deployment did not run that way, so it is listed here as
@@ -69,11 +69,31 @@ record rather than re-dispatching, merged exactly once, and reached a fixpoint.
 Five distinct process ids, and the run's own write sequence unchanged across
 the resume, so nothing was re-run.
 
-What that does *not* establish is the rest of the paragraph. Surviving a
-restart is not the same as surviving a week without anyone reachable, and the
-demonstration above took minutes, not days. A provider outage across a long
-idle period, an orchestrator restarted repeatedly, and the accumulation of
-small ambiguities over weeks all remain untested.
+**A second measurement, made on 2026-09-11, goes further and is worth stating
+exactly.** A run reached its fixpoint with **no human action at all** after it
+was started: a real dispatch, a candidate accepted, four deliberate process
+kills at the boundaries where a resume can lose or repeat work, a global gate
+deliberately red on the merged state, a repair node created and specified
+automatically, a real repair dispatch, and a second closure that reached
+`RC_CLOSED`. Six processes, four kills, zero interventions -- and checked
+against the repository rather than the harness's own log: five commits, every
+candidate landed exactly once.
+
+What that still does **not** establish is the rest of this paragraph, and the
+gap is one of scale rather than kind. The run took minutes, not days. It had
+one planned node, one repair, and a five-file fixture. A provider outage across
+a long idle period, an orchestrator restarted many times, and the accumulation
+of small ambiguities over weeks all remain untested. The approval authority
+that let it proceed unattended was configured in advance; a deployment without
+one still blocks at a trust prompt, deliberately.
+
+And one thing is worth saying because the first attempt at that run failed:
+the deadlock it hit was found by the fault injection, not by reasoning. Killing
+the process between marking a node as running and dispatching it left a run
+that existed and had never begun, which the controller called unclassifiable
+and halted on -- every round, indefinitely. That is the shape of failure this
+kind of test exists to find, and it is a reason to treat "it worked once
+unattended" as a beginning rather than a result.
 
 `Budgets.max_wallclock_seconds` and `max_iterations` exist and are enforced
 (`RunState.budget_exhausted` in `src/hoh/contracts.py`), but an enforced ceiling
@@ -452,6 +472,47 @@ the flag to be true about, regardless of how many receipt pairs happened to
 differ. Quoting "5 of 13" as if it answered the same question as the
 controller's flag would misstate what that iteration's evidence actually
 supports.
+
+## 12a. A criterion whose own file the candidate added discriminates trivially
+
+The acceptance-governing condition in limitation 12 -- red on the predecessor,
+green on the candidate -- has a hole that this project's own STRICT acceptance
+run walked straight into.
+
+The accepted candidate had exactly one discriminating criterion:
+
+    python3 -m unittest discover -s tests -p 'test_roman.py'
+
+Exit 0 on the candidate. On the baseline, exit 5:
+
+    Ran 0 tests in 0.000s
+
+    NO TESTS RAN
+
+The baseline is red **because the test file is not there** -- it is part of the
+candidate. Every newly written test file discriminates in that sense, so the
+criterion demonstrates that the developer created a file, not that behaviour
+changed. In that particular run the increment was real; the evidence offered
+for it was not.
+
+`hoh.runner.artefactual_reason()` detects the signatures with which a test
+runner says it executed nothing (exit 5, `NO TESTS RAN`, `FileNotFoundError`,
+`collected 0 items`) and the controller records them on the run state, so the
+weakness is visible in the evidence and to any gate that reads it.
+
+**Nothing is subtracted.** What counts as a demonstrated increment is a
+semantic property of acceptance, and changing it belongs in a specification
+rather than in a defect fix -- a run whose only new criterion is a new test
+file would stop being acceptable, which may well be right and is not a change
+to make silently. So this stays open, tracked, and priority **high**: it
+weakens the single mechanism this project offers against a candidate that
+passes without changing anything.
+
+What works today, and what a spec author should do until it is closed: write
+the failing test *before* the run, in the baseline. Then the baseline fails
+with the behaviour's absence -- `NotImplementedError`, a wrong value, an
+assertion -- and the criterion demonstrates what it claims to. This project's
+third STRICT acceptance run is built that way.
 
 ## 13. An iteration budget is charged when an iteration begins, and a state written by an older version keeps what that version charged
 

@@ -20,7 +20,10 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from . import sandbox as sandbox_mod
 
 from . import roles, stages
 from .contracts import (
@@ -46,7 +49,9 @@ from .runner import (
     ArenaEscape,
     HouseRuleViolation,
     PolicyUnavailable,
+    artefactual_reason,
     run_check,
+    runner_identity,
     verify_log,
     verify_receipt,
 )
@@ -135,11 +140,21 @@ class Controller:
         *,
         spec_path: Path | str,
         scratch_dir: Path | None = None,
+        isolation: "sandbox_mod.Isolation | None" = None,
     ) -> None:
         self.store = store
         self.dispatcher = dispatcher
         self.spec_path = Path(spec_path).expanduser()
         self.scratch_dir = scratch_dir
+        # How acceptance checks are executed. `None` means the historical
+        # path, and it stays the default: adding a sandbox must not silently
+        # change what existing runs do.
+        #
+        # It is set once, for the whole run, and applies to the candidate
+        # check *and* the baseline check. Letting the two differ would be a
+        # quiet way to compare two states measured under different rules,
+        # which is the failure mode the baseline check exists to prevent.
+        self.isolation = isolation
 
     # -- Creating and loading ------------------------------------------------ #
 
@@ -648,6 +663,7 @@ class Controller:
         probe = baseline.model_copy(update={"repo_path": str(arena)})
         discriminating: set[str] = set()
         blind: dict[str, str] = {}
+        artefactual: dict[str, str] = {}
         for check in fresh:
             try:
                 # The same deadline as in the candidate run. With 120 s
@@ -658,12 +674,22 @@ class Controller:
                     check, probe, run_id=state.run_id, iteration=state.iteration,
                     attempt=state.attempt, cwd=arena, timeout=DEFAULT_CHECK_TIMEOUT,
                     receipt_suffix="basis",
+                    isolation=self.isolation,
                 )
             except (HouseRuleViolation, ArenaEscape, PolicyUnavailable) as exc:
                 # Not measured means not demonstrated: the criterion ends up
                 # in neither of the two sets and therefore carries no
                 # discriminates.
                 blind[check.check_id] = f"base check not executed: {exc}"
+                # And it leaves a receipt saying so. A refused *candidate*
+                # check produced one (exit 126); a refused baseline check
+                # produced nothing at all, so an iteration where the guard
+                # rejected everything looked, from the receipts alone, like an
+                # iteration where no baseline was ever attempted. A reviewer
+                # found exactly that gap in a real run: three candidate
+                # receipts, zero baseline receipts, and no way to tell
+                # "refused" from "never tried".
+                self._refusal_receipt(state, check, probe, exc)
                 continue
 
             # The evidence of the base check gets written. Previously it was
@@ -689,12 +715,75 @@ class Controller:
                 )
             elif result is Outcome.FAIL:
                 discriminating.add(check.check_id)
+                grund = artefactual_reason(receipt.exit_code, log)
+                if grund:
+                    # The criterion is red on the predecessor and green on the
+                    # candidate, so it satisfies the letter of "demonstrates an
+                    # increment" -- but the predecessor is red because the
+                    # criterion's own new file is not there yet, not because
+                    # the behaviour is missing. Every new test file
+                    # discriminates in that sense, which makes the measure
+                    # cheap to satisfy and nearly uninformative.
+                    #
+                    # Recorded rather than subtracted: changing what counts as
+                    # an increment is a semantic change to acceptance, and it
+                    # belongs in a specification rather than in a bug fix. So
+                    # the weakness is visible in the evidence and to the gate
+                    # that reads it, and `docs/LIMITATIONS.md` carries it as a
+                    # named, tracked limitation.
+                    artefactual[check.check_id] = grund
             else:
                 blind[check.check_id] = (
                     f"base check not evaluable ({result.value}, "
                     f"exit {receipt.exit_code}) -- not measured means not demonstrated"
                 )
+        if artefactual:
+            state.note(
+                "artefactual discrimination: "
+                + "; ".join(f"{k}: {v}" for k, v in sorted(artefactual.items()))
+            )
         return discriminating, blind
+
+    def _refusal_receipt(
+        self, state: RunState, check: AcceptanceCheck, candidate: Candidate, exc: Exception
+    ) -> None:
+        """Writes the evidence that a baseline check was refused before running.
+
+        Exit 126 -- found, but not executable -- and `runner_ok=False`, which
+        is what the candidate side already produced for the same refusal. The
+        point is symmetry: absence of a receipt has to mean absence of an
+        attempt, or the receipts cannot be counted.
+        """
+        receipt_id = (
+            f"{state.run_id}-i{state.iteration}-a{state.attempt}-"
+            f"{check.check_id}-basis"
+        )
+        jetzt = utcnow()
+        text = (
+            f"$ {check.command}\n# refused before execution: {exc}\n"
+            f"--- output ---\n\n"
+        )
+        try:
+            receipt = Receipt(
+                receipt_id=receipt_id,
+                run_id=state.run_id,
+                iteration=state.iteration,
+                attempt=state.attempt,
+                check_id=check.check_id,
+                candidate_binding=candidate.binding(),
+                command=check.command,
+                exit_code=126,
+                started_at=jetzt,
+                ended_at=jetzt,
+                stdout_digest=digest(text),
+                stdout_path=f"logs/{receipt_id}.txt",
+                runner_identity=runner_identity(),
+                runner_ok=False,
+            )
+            self.store.write_receipt(receipt_id, receipt)
+            self.store.write_log(receipt_id, text)
+        except Exception as schreibfehler:       # pragma: no cover - disk shapes
+            state.note(f"refusal receipt for {check.check_id} not writable: {schreibfehler}")
 
     def _checks_for(self, plan: DevelopmentPlan, state: RunState) -> list[AcceptanceCheck]:
         """Plan checks plus the persisted preservation suite.
@@ -876,6 +965,7 @@ class Controller:
                 iteration=state.iteration,
                 attempt=state.attempt,
                 cwd=candidate.repo_path,  # is the arena (probe), never the live tree
+                isolation=self.isolation,
             )
         except PolicyUnavailable:
             # Without a policy nothing is executed -- and that is a visible

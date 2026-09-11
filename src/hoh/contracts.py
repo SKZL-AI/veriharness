@@ -216,6 +216,120 @@ class DevelopmentPlan(Strict):
 # --------------------------------------------------------------------------- #
 
 
+#: `IsolationRecord.effective` when isolation was requested, could not be
+#: provided, and the command was therefore never started. Distinct from both
+#: "none" and the requested value, because both of those read as a completed
+#: execution and no execution took place.
+ISOLATION_REFUSED = "refused"
+
+#: `IsolationRecord.effective` when the command ran but left no proof that it
+#: ran isolated. From outside, "bubblewrap failed during setup" and "the
+#: command started and wrote no marker" look identical -- bubblewrap 0.9 exits
+#: 1 for its own setup failures and for a check that exits 1 -- so this value
+#: covers both and claims neither. It is never a pass: `honoured()` is False
+#: and the runner records an infrastructure error.
+ISOLATION_UNVERIFIED = "unverified"
+
+
+class IsolationRecord(Strict):
+    """How a check was executed, as measured rather than as configured.
+
+    Written by the runner, like everything else on a `Receipt`. The reason it
+    exists as structured fields instead of a sentence in `note`: the claim
+    "this check ran sandboxed" was, until this record, only checkable by
+    reading the configuration that *asked* for a sandbox. That is precisely
+    the inference this project refuses everywhere else -- a configuration
+    states an intention, and an intention is not a measurement.
+
+    `effective` is what actually happened, and it has three shapes, not two:
+    the isolation that was applied, `"none"` when the command ran without any,
+    and `REFUSED` when isolation was requested, could not be provided, and the
+    command therefore **never ran at all**. That third value exists because the
+    other two both read as a completed execution. A refused run reporting
+    `"none"` looks like a successful unsandboxed check; reporting `"strict"`
+    looks like a successful sandboxed one. Neither happened.
+
+    `fallback_to_none` stays a separate boolean for the remaining case: a
+    backend that ran the command and returned less isolation than was asked
+    for. A reader looking for exactly one thing finds exactly one thing.
+    """
+
+    #: What the caller asked for, by name.
+    requested: str
+    #: What was actually applied -- or `REFUSED`, when nothing was.
+    effective: str
+    #: The backend that provided it: "bubblewrap", "none", or "" when none was
+    #: reached at all.
+    backend: str = ""
+    #: What the backend's own availability probe said. Empty means usable;
+    #: otherwise the reason, in the backend's words.
+    backend_probe: str = ""
+    #: Whether isolation was requested and the run happened without it. False
+    #: is the only value a sandboxed acceptance may carry.
+    fallback_to_none: bool = False
+    #: "denied" / "allowed" -- the network namespace policy actually applied.
+    network_policy: str = ""
+    #: "read-only" / "read-write" -- how the candidate tree was mounted.
+    candidate_mount_mode: str = ""
+    #: The resource ceilings applied, rendered: "as=<bytes>,nofile=<n>,timeout=<s>".
+    #: "none" where nothing was limited, which is a statement, not an omission.
+    #: These are the ceilings **after** clamping against the limits the runner
+    #: itself inherited, not the ones that were asked for -- a receipt
+    #: promising 600 CPU-seconds to a check killed by SIGXCPU at 60 is worse
+    #: than no receipt.
+    resource_limit_policy: str = ""
+    #: Whether the isolation was confirmed from **inside** the sandbox -- the
+    #: launched command recorded its own namespace ids and the candidate's
+    #: writability before the check ran, and they were compared with the
+    #: runner's. False means every other field here rests on the backend's
+    #: self-report, which is the weaker claim and should read as one.
+    verified_from_inside: bool = False
+    #: The two sides of that comparison, kept so a third party can redo it.
+    #:
+    #: `verified_from_inside` is this runner's *verdict* on the numbers below.
+    #: A reader who does not want to take the verdict on trust needs the
+    #: numbers, and a reviewer said so plainly: without them the field is one
+    #: more boolean whose derivation lives only in code that has already been
+    #: wrong about exactly this. Empty on the unsandboxed path, where there is
+    #: no claim to check.
+    observed_namespaces: dict[str, str] = Field(default_factory=dict)
+    runner_namespaces: dict[str, str] = Field(default_factory=dict)
+    #: What the runner found wrong with the measurement, or empty.
+    #:
+    #: This field is the answer to a specific hole a reviewer walked through.
+    #: `honoured()` used to be assembled from three fields, and there were
+    #: branches where all three looked right while the runner had already
+    #: refused the run: a short or junk proof left the mount mode "unknown",
+    #: which produced a complaint and `runner_ok=False` -- and `effective`
+    #: still equalled `requested`, `fallback_to_none` was still False, and
+    #: `verified_from_inside` was still True. So the predicate said yes about
+    #: a run the runner had said no about.
+    #:
+    #: Deriving the verdict from one field the runner writes when it objects
+    #: removes the class, rather than adding a fourth condition to the three
+    #: that were already not enough.
+    complaint: str = ""
+
+    def honoured(self) -> bool:
+        """Did the run get the isolation it asked for?
+
+        False for a refusal, which is the point: `runner_ok=False` already
+        says the check produced no verdict, and this says why in one word.
+        """
+        if self.complaint:
+            return False
+        if self.effective == ISOLATION_REFUSED:
+            return False
+        if self.effective != self.requested or self.fallback_to_none:
+            return False
+        # Isolation that was requested has to have been *shown*, not reported.
+        # The one case where nothing needs showing is a request for none:
+        # there is no claim to verify.
+        if self.requested != "none" and not self.verified_from_inside:
+            return False
+        return True
+
+
 class Receipt(Strict):
     """An execution record produced by the runner.
 
@@ -244,6 +358,14 @@ class Receipt(Strict):
     )
     truncated: bool = Field(
         default=False, description="True = output was cut off at the size limit"
+    )
+    isolation: IsolationRecord | None = Field(
+        default=None,
+        description=(
+            "How the check was executed. Optional because receipts written "
+            "before this record existed do not have it -- and a missing "
+            "record means unknown, never 'it was isolated'."
+        ),
     )
 
     def infrastructure_error(self) -> bool:
@@ -400,6 +522,17 @@ class RunState(Strict):
     spec_digest: str
     policy_digest: str
     profile_digest: str
+    #: The isolation this run's acceptance checks execute under, remembered
+    #: across invocations.
+    #:
+    #: It lives on the state rather than in the command line because
+    #: `hoh run <id>` *continues* an existing run. Without it, `hoh run X
+    #: --isolation strict --iterations 1` followed by a plain `hoh run X` --
+    #: after a pause, an approval, or simply a second invocation -- ran the
+    #: remaining iterations unsandboxed, and the receipts said so quietly
+    #: while the run as a whole still looked like a sandboxed one. A property
+    #: of a run belongs to the run.
+    isolation: str = "none"
 
     base_candidate: Candidate | None = None
     working_candidate: Candidate | None = None

@@ -582,3 +582,18 @@ def test_bereits_angenommener_kandidat_wird_nicht_neu_dispatcht(tmp_path):
     assert start.merged == ["a"], "exactly one merge"
     assert any(s.kind == "ALREADY_ACCEPTED" for s in ergebnis.steps), \
         [s.kind for s in ergebnis.steps]
+
+
+def test_nie_begonnener_knoten_wird_wieder_zu_arbeit(tmp_path):
+    """A RUNNING node whose run never started goes back to READY and is then
+    dispatched -- rather than halting the loop on every round."""
+    ergebnis, start, store = fahre(
+        tmp_path, [TaskNode(id="a", lifecycle=Lifecycle.RUNNING)],
+        evaluations={"a": RunVerdict.NOT_STARTED},
+        verdicts={"a": RunVerdict.ACCEPTED}, gates=[GateOutcome.GREEN],
+    )
+    assert ergebnis.halt is HaltClass.CLOSED, ergebnis.reason
+    assert start.launched == ["a"], "it must actually be dispatched, exactly once"
+    assert any(s.kind == "RESET_TO_READY" for s in ergebnis.steps), \
+        [s.kind for s in ergebnis.steps]
+    assert store.read_state().node("a").lifecycle is Lifecycle.MERGED

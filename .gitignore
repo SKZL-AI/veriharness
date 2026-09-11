@@ -25,3 +25,23 @@ policy/*.txt.v*
 # selection.
 build/
 .ruff_cache/
+
+# Stray run artifacts from ad-hoc probes executed with the repository root as
+# cwd: `run_check` writes `.hoh-out-*.log` and `.hoh-scratch-*` beside its
+# arena, so a probe that forgets to work in a temp directory leaves a tree
+# here. Twenty such files were committed on 2026-09-11 and found by the
+# export, which refuses an unclassified path -- the gate working exactly as
+# intended. The files were parked outside the repository, not deleted.
+c4-*/
+
+# Repair specifications the launcher writes into a repository when a repair
+# node has none of its own (`launcher._repair_spec`). They belong to the run
+# that produced them, not to this repository -- one appeared at the root here
+# during a self-dogfood campaign and the export refused it as unclassified.
+.hoh-repair-*.md
+
+# Caches written into the repository because something ran with HOME set to
+# the repository root. The project's own gates do that deliberately -- a check
+# must not read the operator's home -- and pip and pytest then put their
+# caches where HOME points. The cache is not part of the delivery.
+.cache/

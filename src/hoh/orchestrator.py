@@ -113,6 +113,13 @@ class RunVerdict(StrEnum):
     PROVIDER_UNAVAILABLE = "PROVIDER_UNAVAILABLE"
     #: Dispatched but its outcome is not yet determinable.
     UNDETERMINED = "UNDETERMINED"
+    #: The run exists and has not begun: no iteration, no candidate, no
+    #: receipts. Distinct from UNDETERMINED because it is not unknown at all --
+    #: it is the most knowable state a run can be in, and the right response is
+    #: to dispatch it. Reporting it as unclassifiable deadlocked an otherwise
+    #: unattended run: the controller re-read the same NEW state on every round
+    #: and halted on it every time.
+    NOT_STARTED = "NOT_STARTED"
     #: Stopped waiting for a human approval -- a trust dialog, a confirmation.
     #: Distinct from UNDETERMINED because it is not unclassifiable at all: it
     #: is known, actionable, and needs exactly one thing, which is a person.
@@ -385,6 +392,15 @@ class ProjectController:
         for n in laufend:
             ausgang = self.launcher.evaluate(n)
             schritte.append(Step(0, "EVALUATED", n.id, f"{ausgang.verdict}: {ausgang.detail}"))
+            if ausgang.verdict is RunVerdict.NOT_STARTED:
+                # Marked RUNNING, but the run never began -- a process died
+                # between persisting the lifecycle and dispatching. Nothing was
+                # spent and nothing can be repeated, so it simply becomes work
+                # again.
+                n.lifecycle = Lifecycle.READY
+                state = self._persist(state)
+                schritte.append(Step(0, "RESET_TO_READY", n.id, ausgang.detail))
+                continue
             if ausgang.verdict is RunVerdict.UNDETERMINED:
                 grund = (
                     f"node {n.id} is recorded as RUNNING and its run state does not say "
@@ -515,6 +531,11 @@ class ProjectController:
             grund = f"node {node_id}: {ausgang.detail or 'provider unavailable'}"
             schritte.append(Step(runde, HaltClass.BLOCKED_PROVIDER, node_id, grund))
             return Result(HaltClass.BLOCKED_PROVIDER, grund)
+
+        if ausgang.verdict is RunVerdict.NOT_STARTED:
+            knoten.lifecycle = Lifecycle.READY
+            schritte.append(Step(runde, "RESET_TO_READY", node_id, ausgang.detail))
+            return self._persist(state)
 
         if ausgang.verdict is RunVerdict.NEEDS_APPROVAL:
             knoten.lifecycle = Lifecycle.BLOCKED

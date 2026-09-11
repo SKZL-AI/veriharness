@@ -535,6 +535,80 @@ def cmd_unblock(args) -> int:
     return 0
 
 
+def _inconclusive_checks(store, state, iteration: int) -> list[tuple[str, str]]:
+    """The criteria of one iteration whose receipts say they never ran.
+
+    Read from the receipts, not from the loop's own summary: the summary knows
+    "not accepted", and only the receipt knows whether that was a product
+    defect or an infrastructure refusal.
+    """
+    raus: list[tuple[str, str]] = []
+    verzeichnis = store.dir / "receipts"
+    if not verzeichnis.is_dir():
+        return raus
+    for f in sorted(verzeichnis.glob(f"{state.run_id}-i{iteration}-*.json")):
+        if f.stem.endswith("-basis"):
+            continue
+        try:
+            d = json.loads(f.read_text())
+        except (OSError, ValueError):
+            continue
+        if d.get("runner_ok", True) and d.get("exit_code") not in (124, 126, 127):
+            continue
+        grund = {
+            124: "timeout", 126: "refused or not executable", 127: "not found",
+        }.get(d.get("exit_code"), "infrastructure error")
+        raus.append((d.get("check_id", f.stem), grund))
+    return raus
+
+
+def _isolation_for_run(state, angefordert: str | None):
+    """The isolation for this invocation, reconciled with the run's own.
+
+    Three cases, and only one of them is a judgement call:
+
+    * no flag -- the run keeps what it was started with;
+    * the same value -- nothing to decide;
+    * a different value -- allowed upwards, refused downwards. Lowering it
+      mid-run would mean the accepted candidate was verified partly under a
+      sandbox and partly not, and the run record would carry a single word for
+      two different regimes.
+    """
+    gespeichert = getattr(state, "isolation", "none") or "none"
+    if angefordert is None or angefordert == gespeichert:
+        return _isolation(gespeichert)
+    neu = _isolation(angefordert)
+    rang = {"none": 0, "strict": 1}
+    if rang.get(angefordert, 0) < rang.get(gespeichert, 0):
+        raise ValueError(
+            f"this run was started under --isolation {gespeichert} and asking "
+            f"for {angefordert} now would verify part of it under a sandbox "
+            "and part of it without one. Start a new run if that is what you "
+            "want; a run's isolation is a property of the run."
+        )
+    state.isolation = angefordert
+    return neu
+
+
+def _isolation(name: str):
+    """The requested isolation, or None for the historical path.
+
+    Returns None rather than `Isolation.NONE` for "none" so that the runner
+    takes exactly the code path it took before this flag existed. The two are
+    equivalent in effect; keeping them literally the same path means the
+    default cannot drift because someone changed what NONE does.
+    """
+    if name in ("", "none"):
+        return None
+    from .sandbox import Isolation
+
+    try:
+        return Isolation(name)
+    except ValueError:
+        erlaubt = ", ".join(i.value for i in Isolation)
+        raise ValueError(f"unknown isolation {name!r}; expected one of: {erlaubt}") from None
+
+
 def _per_role(pairs: list[str]) -> dict[Role, str]:
     """Parses `role=value` pairs into a per-role mapping.
 
@@ -635,7 +709,53 @@ def cmd_run(args) -> int:
             file=sys.stderr,
         )
 
-    controller = Controller(store, dispatcher, spec_path=state.spec_path)
+    try:
+        isolation = _isolation_for_run(state, args.isolation)
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+    if isolation is not None:
+        # Resolve the backend *before* any role is dispatched. Discovering at
+        # the first acceptance check that the machine cannot provide the
+        # isolation asked for means an entire planner and developer round has
+        # already been spent on a run that can only end INCONCLUSIVE.
+        from .sandbox import SandboxUnavailable, select
+
+        try:
+            backend = select(isolation)
+        except SandboxUnavailable as exc:
+            print(
+                f"--isolation {args.isolation} was requested and cannot be "
+                f"provided here: {exc}\n"
+                "Nothing has been dispatched. Ask for --isolation none "
+                "explicitly if you accept running unsandboxed.",
+                file=sys.stderr,
+            )
+            return 2
+        _print({
+            "isolation": isolation.value,
+            "backend": backend.name,
+            "note": "every acceptance check in this run, candidate and "
+                    "baseline alike, executes under this isolation",
+        })
+
+    # Persisted here, before a single role is dispatched. The guard that used
+    # to stand here compared `state.isolation` against the value
+    # `_isolation_for_run` had *just assigned to it*, so it was never true and
+    # the write never happened. In the happy path the value reached disk by
+    # accident, on the controller's first checkpoint; anything that stopped
+    # before that -- an unreadable spec, a stop request, `--iterations 0` --
+    # left the run recorded as unsandboxed, and the next `hoh run` continued it
+    # that way without a word.
+    gewuenscht = isolation.value if isolation is not None else "none"
+    if state.isolation != gewuenscht:
+        state.isolation = gewuenscht
+        with store.lock():
+            store.write_state(state)
+
+    controller = Controller(
+        store, dispatcher, spec_path=state.spec_path, isolation=isolation
+    )
 
     ran = 0
     waiting_for_approval = False
@@ -679,6 +799,19 @@ def cmd_run(args) -> int:
         waiting_for_approval = waiting_for_approval or out.waiting_for_approval
         label = "accepted" if out.accepted else "not accepted"
         print(f"Iteration {out.iteration}: {label} -- {out.reason}")
+        unklar = _inconclusive_checks(store, state, out.iteration)
+        if unklar and not out.accepted:
+            # "Not accepted" is true and useless when the reason is that
+            # nothing ran. An iteration whose criteria were refused by the
+            # guard, timed out, or could not be isolated has measured nothing
+            # about the product -- and a transcript that renders that as a
+            # product rejection is the laundering this project exists to stop.
+            # A reviewer read exactly that off a real run's log.
+            print(
+                f"  {len(unklar)} of these did not run at all "
+                f"(INCONCLUSIVE, not a verdict): "
+                + ", ".join(f"{cid} [{grund}]" for cid, grund in unklar)
+            )
 
         if state.condition is not Condition.ACTIVE:
             print(f"Run is now {state.condition.value}: {state.stop_reason or ''}")
@@ -1062,6 +1195,14 @@ def build_parser() -> argparse.ArgumentParser:
                         "setup for the independent review")
     r.add_argument("--no-herdr", action="store_true",
                    help="run without Herdr -- no acceptance value for A01/A02/A12")
+    r.add_argument(
+        "--isolation", default=None, choices=("none", "strict"),
+        help="how acceptance checks are executed. 'none' is the historical "
+             "path: a reduced environment and setrlimit, which is a tripwire "
+             "and not a boundary. 'strict' runs every check inside a "
+             "filesystem- and network-isolated sandbox and refuses to start "
+             "the run at all if the machine cannot provide one.",
+    )
     r.add_argument(
         "--role-model", action="append", default=[], metavar="ROLE=MODEL",
         help="model per role, repeatable: planner=sonnet, qa=opus. "

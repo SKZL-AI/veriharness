@@ -933,7 +933,14 @@ def test_check_mismatch_message_is_bounded(tmp_path, capsys):
 # --------------------------------------------------------------------------- #
 
 
-def test_rule_set_has_fifteen_names_with_paper_added():
+def test_rule_set_has_sixteen_names_with_published_evidence_added():
+    """The rule set is pinned so that a new classification is a decision.
+
+    `published-evidence` is the sixteenth. It exists because three subtrees
+    under `dogfood/` -- which is internal by default and should stay that way
+    -- are the evidence public documents name, and a claim whose evidence is
+    not in the export is a claim the reader is asked to take on trust.
+    """
     prior_fourteen = {
         "package",
         "public-docs",
@@ -952,11 +959,15 @@ def test_rule_set_has_fifteen_names_with_paper_added():
     }
     current = set(em.RULES)
 
-    assert len(em.RULES) == 15
-    assert "paper" in current
+    spaeter = {"paper", "published-evidence"}
+
+    assert len(em.RULES) == 16
+    assert spaeter <= current
 
     assert prior_fourteen <= current, f"missing prior rule(s): {prior_fourteen - current}"
-    assert current <= prior_fourteen | {"paper"}, f"unexpected extra rule(s): {current - (prior_fourteen | {'paper'})}"
+    assert current <= prior_fourteen | spaeter, (
+        f"unexpected extra rule(s): {current - (prior_fourteen | spaeter)}"
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -1112,3 +1123,73 @@ def test_gitignore_unsupported_pattern_fails_closed(tmp_path, capsys):
 
     with pytest.raises(em.UnsupportedGitignorePattern):
         em.derive(tmp_path)
+
+
+# --------------------------------------------------------------------------- #
+# The leak scans, narrowed once and not further
+# --------------------------------------------------------------------------- #
+
+
+def test_a_home_needle_inside_a_relative_path_is_not_a_leak():
+    """`EXPORT_MANIFEST.json` lists evidence paths containing a directory named
+    `root`, and the unnarrowed check reported the manifest itself as a leak.
+    A directory that happens to be named `root` is an ordinary name."""
+    assert not em.contains_home_path("dogfood/unattended-e2e/root/projects/x")
+    assert not em.contains_home_path("path/to/etc/thing")
+    assert not em.contains_home_path("my-home/notes")
+
+
+def test_an_absolute_home_path_is_still_a_leak():
+    """The control. Narrowing a leak scan is only defensible if the thing it
+    was built for still trips it."""
+    sl = chr(47)
+    assert em.contains_home_path(sl + "home" + sl + "someone" + sl + "x")
+    assert em.contains_home_path('"' + sl + "root" + sl + 'x"')
+    assert em.contains_home_path("(" + sl + "etc" + sl + "passwd)")
+    assert em.contains_home_path(chr(126) + sl + "project")
+
+
+def test_loopback_is_not_a_private_address_finding():
+    """This machine's house rules require local-only logging on loopback, and
+    a test that opens a listener there to prove a sandbox cannot reach it is
+    doing what the rules ask. Loopback reveals no topology: everyone has one."""
+    punkt = chr(46)
+    loopback = punkt.join(("127", "0", "0", "1"))
+    assert not em._PRIVATE_IPV4_RE.search(loopback)
+    assert not em._PRIVATE_IPV4_RE.search(f"connect to {loopback}:8080")
+
+
+def test_the_other_private_ranges_are_still_findings():
+    """Built from parts on purpose: this file is itself scanned, and writing
+    the addresses out would make the scan find them here. The same reason the
+    home-path needles are assembled rather than spelled."""
+    punkt = chr(46)
+    for teile in (("192", "168", "1", "5"), ("10", "0", "0", "1"),
+                  ("172", "16", "3", "9")):
+        addr = punkt.join(teile)
+        assert em._PRIVATE_IPV4_RE.search(addr), addr
+
+
+def test_a_trailing_wildcard_directory_pattern_is_supported():
+    """`c4-*/` was rejected, and the repository needed it: twenty files of
+    stray probe output had been committed, and the export caught them. A gate
+    that refuses a correct pattern pushes people towards removing the gate."""
+    rule = em._compile_gitignore_rule("c4-*/")
+    assert rule is not None and rule.dir_only
+    assert rule.regex.match("c4-0vysztqn")
+    assert not rule.regex.match("c5-0vysztqn")
+
+
+def test_a_wildcard_in_the_middle_is_supported():
+    rule = em._compile_gitignore_rule("state.json.v*")
+    assert rule.regex.match("state.json.v2026-09-11T14-48-18Z")
+    assert not rule.regex.match("state.json")
+
+
+def test_the_unsupported_forms_are_still_refused():
+    """The control for the widening above: everything else stays refused, and
+    an unsupported pattern stops the derivation rather than quietly letting
+    ignored content into the manifest."""
+    for muster in ("a**b", "a?b", "a[0-9]b", "/anchored", "a*b*c"):
+        with pytest.raises(em.UnsupportedGitignorePattern):
+            em._compile_gitignore_rule(muster)

@@ -494,8 +494,18 @@ class RunStore:
             # Counting it as one would halve the effective `keep_arenas`; and
             # it must travel with its arena, because a scratch directory whose
             # arena has been filed away is orphaned evidence of nothing.
+            # `.hoh-scratch-<receipt_id>` is the sandboxed path's equivalent,
+            # and `prune` did not know the name: `Path(".hoh-scratch-r-i1-a1-K1")`
+            # has no suffix, so three of them reduced a `keep_arenas=3` to
+            # zero and filed every real arena into `attic/`. Nothing was lost,
+            # but "keep the last three arenas" was not what happened.
             arena_runs = sorted(
-                (d for d in arena.iterdir() if d.is_dir() and d.suffix != ".scratch"),
+                (
+                    d for d in arena.iterdir()
+                    if d.is_dir()
+                    and d.suffix != ".scratch"
+                    and not d.name.startswith(".hoh-scratch-")
+                ),
                 key=lambda d: d.stat().st_mtime,
             )
             if len(arena_runs) > keep_arenas:
@@ -506,8 +516,12 @@ class RunStore:
                     if not new_path.exists():
                         d.rename(new_path)
                         moved["arenas"].append(d.name)
-                        scratch = d.with_name(d.name + ".scratch")
-                        if scratch.is_dir():
+                        for scratch in (
+                            d.with_name(d.name + ".scratch"),
+                            *arena.glob(f".hoh-scratch-*{d.name}*"),
+                        ):
+                            if not scratch.is_dir():
+                                continue
                             scratch_target = target / scratch.name
                             if not scratch_target.exists():
                                 scratch.rename(scratch_target)

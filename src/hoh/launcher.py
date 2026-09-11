@@ -78,6 +78,7 @@ class HohRunLauncher(RunLauncher):
         timeout: int = 7200,
         dry_run: bool = False,
         approvals: "ApprovalProvider | None" = None,
+        isolation: str = "none",
     ) -> None:
         self.root = Path(root).expanduser().resolve()
         self.repo_path = Path(repo_path).expanduser().resolve()
@@ -89,6 +90,12 @@ class HohRunLauncher(RunLauncher):
         self.planner, self.developer, self.qa = planner, developer, qa
         self.timeout = timeout
         self.dry_run = dry_run
+        # How the acceptance checks of every run this launcher starts are
+        # executed. Passed on the command line and then persisted on the run,
+        # so a resumed run keeps it -- a project whose nodes were verified
+        # under different isolation regimes would carry one word for two
+        # different claims.
+        self.isolation = isolation
         # Granting a worktree trust is an authority a deployment may hold, and
         # HoH deliberately does not: trusting on request would let anything
         # that can name a path obtain an agent's access to it. Absent by
@@ -356,6 +363,7 @@ class HohRunLauncher(RunLauncher):
             "python3", "-m", "hoh.cli", "--root", str(self.root), "run", run_id,
             "--iterations", str(self.iterations),
             "--planner", self.planner, "--developer", self.developer, "--qa", self.qa,
+            "--isolation", self.isolation,
         ])
 
         try:
@@ -422,6 +430,16 @@ class HohRunLauncher(RunLauncher):
                 )
             return RunOutcome(RunVerdict.ACCEPTED,
                               f"accepted {nachher.candidate_id}", candidate=nachher.commit)
+
+        # A run that exists and has not begun. The most knowable state there
+        # is, and reporting it as unclassifiable deadlocked an unattended run:
+        # a process died between marking the node RUNNING and dispatching it,
+        # and every later round re-read the same NEW state and halted on it.
+        if state.stage is Stage.NEW and not state.iteration and nachher is None:
+            return RunOutcome(
+                RunVerdict.NOT_STARTED,
+                "the run exists and has not begun: no iteration, no candidate",
+            )
 
         if state.stage in (Stage.PLANNING, Stage.DEVELOPING, Stage.VERIFYING):
             if state.budget_exhausted():

@@ -1,0 +1,82 @@
+{
+  "what": "Who executed each unit of work after O105, and on what evidence. The categories are a judgement; the coverage is checked by tools/attribution.py, which refuses a history with a commit that belongs to no entry.",
+  "anchor": "13628f3224983bf9924cf728a82174abd4310cb9",
+  "anchor_is": "O105 -- the commit that recorded the first unattended fixpoint. Everything after it is this phase.",
+  "honest_reading": "Most of this phase was written by the main session, not by the product. That is the number, and the entries say for each unit why it was or was not a candidate for the product path. Bootstrap and security-boundary work is a defensible reason; 'it was quicker' is not one, and does not appear below.",
+  "entries": [
+    {
+      "id": "meta-evidence-and-isolation",
+      "category": "MAIN_ORCHESTRATOR_DIRECT",
+      "is_development_node": true,
+      "commits": [
+        "ded88f5d37acc6fbfcb3d9ceffabbcb5b0a8d7ab"
+      ],
+      "why_not_the_product": "The isolation record is the evidence the product's own acceptance rests on, and assurance.py is the rule layer that decides what counts as measured. A product that certifies its own measuring instrument through the instrument is a circle. Independent meta-audit is one of the three cases where direct work is the right answer."
+    },
+    {
+      "id": "approval-scope-hardening",
+      "category": "MAIN_ORCHESTRATOR_DIRECT",
+      "is_development_node": true,
+      "commits": [
+        "cee1585f005ae83182f2d06b358b5289017ccf8a"
+      ],
+      "why_not_the_product": "A security boundary: PrefixScopedProvider can hand an agent write access to a directory. Having an agent write the check that governs what agents may be trusted with is the one delegation this project should not make."
+    },
+    {
+      "id": "evidence-integrity-after-review",
+      "category": "MAIN_ORCHESTRATOR_DIRECT",
+      "is_development_node": true,
+      "commits": [
+        "5d54479e1dbf4949f7a1c9a67b14ee3c17e73abf"
+      ],
+      "why_not_the_product": "Responses to an adversarial review of the product's own evidence path, including the finding that its first STRICT campaign proved nothing. Auditing the audit belongs outside the thing being audited."
+    },
+    {
+      "id": "proof-pipe",
+      "category": "MAIN_ORCHESTRATOR_DIRECT",
+      "is_development_node": true,
+      "commits": [
+        "c501fb6b2fcc78afe96236b728c180e623cab5d6"
+      ],
+      "why_not_the_product": "Same boundary: the mechanism that proves the sandbox isolated. A reviewer had just shown the previous version was forgeable by the checked command itself."
+    },
+    {
+      "id": "taxonomy-telemetry-amendment",
+      "category": "MAIN_ORCHESTRATOR_DIRECT",
+      "is_development_node": true,
+      "commits": [
+        "d2bd7aa21d0299121888e504b3482600d2d663be",
+        "940422995e1cb1a79b657505c085853b4967a45c"
+      ],
+      "why_not_the_product": "Bootstrap. These three modules are the contracts the product path would record against; they had to exist before a node could be specified in terms of them. The *wiring* of telemetry into the controller was then handed to the product -- see telemetry-wiring."
+    },
+    {
+      "id": "strict-evidence-and-routing",
+      "category": "MAIN_ORCHESTRATOR_DIRECT",
+      "is_development_node": false,
+      "commits": [
+        "808a4b879072b8e41de70961f09c83060ae0da0d"
+      ],
+      "why_not_the_product": "Not a development node: it installs the evidence four product runs produced, and disposes of routing. Collecting and reporting what the product did is the orchestrator's job by definition."
+    },
+    {
+      "id": "benchmark-infrastructure",
+      "category": "MAIN_ORCHESTRATOR_DIRECT",
+      "is_development_node": false,
+      "commits": [
+        "77fd07ffa6e0578c1579b3273cf58df854c675e5"
+      ],
+      "why_not_the_product": "Not a development node: it is the measuring apparatus for comparing the product against a baseline, including the hidden suites the product must never see. An arm that could read its own measurement is not an arm."
+    },
+    {
+      "id": "attribution-ledger",
+      "category": "MAIN_ORCHESTRATOR_DIRECT",
+      "is_development_node": false,
+      "range": {
+        "from": "77fd07ffa6e0578c1579b3273cf58df854c675e5",
+        "to": "HEAD"
+      },
+      "why_not_the_product": "Not a development node: it is the measurement of who did the development. Named as a range rather than as a list because the commit that writes this entry cannot know its own sha -- the same self-reference O97 hit with the attribution table, solved the same way, by naming a boundary instead of a value."
+    }
+  ]
+}

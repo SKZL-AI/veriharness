@@ -383,3 +383,31 @@ def test_unbekannter_mergefehler_haelt_weiterhin_ambiguous_an(tmp_path):
     ergebnis = ProjectController(s, Raetselhaft(), Gruen()).run()
     assert ergebnis.halt is HaltClass.AMBIGUOUS
     assert "did not say why" in ergebnis.reason
+
+
+def test_ein_nie_begonnener_lauf_ist_nicht_unklar(starter, tmp_path):
+    """The deadlock the first unattended run hit.
+
+    A process died between marking a node RUNNING and dispatching it. The run
+    existed at stage NEW with no iteration and no candidate, `evaluate` called
+    that UNDETERMINED, and the controller halted on it -- then re-read the same
+    state and halted again, every round, forever.
+
+    NEW with nothing behind it is the most knowable state a run can be in.
+    Nothing was spent, so nothing can be repeated: it is simply work again.
+    """
+    st = zustand(tmp_path, stage=Stage.NEW, last_accepted_candidate=None)
+    ergebnis = starter._verdict(st, None, Leer())
+    assert ergebnis.verdict is RunVerdict.NOT_STARTED
+    assert "has not begun" in ergebnis.detail
+
+
+def test_ein_begonnener_lauf_ist_nicht_ungestartet(starter, tmp_path):
+    """The distinction has to hold in the other direction, or the fix would
+    re-dispatch runs that are already going."""
+    laeuft = zustand(tmp_path, stage=Stage.DEVELOPING, iteration=1)
+    assert starter._verdict(laeuft, None, Leer()).verdict is not RunVerdict.NOT_STARTED
+
+    fertig = zustand(tmp_path, stage=Stage.CHECKPOINTED,
+                     last_accepted_candidate=kandidat("r-i1"))
+    assert starter._verdict(fertig, None, Leer()).verdict is RunVerdict.ACCEPTED

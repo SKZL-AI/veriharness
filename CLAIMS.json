@@ -1354,16 +1354,16 @@
     },
     {
       "id": "C-130",
-      "text": "| Recorded findings | **104** |",
+      "text": "| Recorded findings | **116** |",
       "where": "README.md:117",
       "status": "SUPPORTED",
       "evidence": [
         "receiptcount:d8=26",
         "run:d8/1"
       ],
-      "anchor_digest": "5e979f2f4c78517128d31c6ae00cd822227674f629522c894004f3467a2c58d0",
+      "anchor_digest": "d3e5c4ae0efd163aca1b38aed320e061a88bc7b9cf2cfd47ee3c807eb1d43d31",
       "local_only_resolution": "Resolved by the orchestrating agent session on 2026-09-10 in the development repository: 94 findings, by counting distinct finding numbers in the development ledger. Re-checkable with the operator tool kampagne-zahlen.py, which re-derives this figure from its source and compares it against this exact line (README.md:117), failing on any disagreement; its negative control nk-kampagne-zahlen.py falsifies each number in turn and requires the checker to go red on every one.",
-      "note": "Catalogued during the rc2 correction cycle. The figure is not left free-standing in prose: it is bound to its source by a checker that fails the release gate on drift, which is the defect class that made this cycle necessary. Figure updated from 94 to 95 on 2026-09-10, when finding O95 was recorded; the earlier wording was \"| Recorded findings | **94** |\". Finding count updated from 95 to 96 on 2026-09-10, when finding O96 was recorded; the earlier wording was \"| Recorded findings | **95** |\". Anchor re-derived on 2026-09-10 (similarity 0.97) after finding O97: the attribution figures are now measured at a named commit rather than at HEAD, because the commit that writes them changes them. The earlier wording was: \"| Recorded findings | **96** |\". Finding count updated to 98 on 2026-09-10 (O98 recorded); the earlier wording was \"| Recorded findings | **97** |\". Finding count updated to 99 on 2026-09-11 (O99 recorded); the earlier wording was \"| Recorded findings | **98** |\". Finding count updated to 100 on 2026-09-11 (O100 recorded); the earlier wording was \"| Recorded findings | **99** |\". Finding count updated to 101 on 2026-09-11 (O101 recorded); the earlier wording was \"| Recorded findings | **100** |\". Anchor re-derived on 2026-09-11 (similarity 0.97) when the finding count advanced and limit 6 was corrected; the earlier wording was \"| Recorded findings | **101** |\"."
+      "note": "Catalogued during the rc2 correction cycle. The figure is not left free-standing in prose: it is bound to its source by a checker that fails the release gate on drift, which is the defect class that made this cycle necessary. Figure updated from 94 to 95 on 2026-09-10, when finding O95 was recorded; the earlier wording was \"| Recorded findings | **94** |\". Finding count updated from 95 to 96 on 2026-09-10, when finding O96 was recorded; the earlier wording was \"| Recorded findings | **95** |\". Anchor re-derived on 2026-09-10 (similarity 0.97) after finding O97: the attribution figures are now measured at a named commit rather than at HEAD, because the commit that writes them changes them. The earlier wording was: \"| Recorded findings | **96** |\". Finding count updated to 98 on 2026-09-10 (O98 recorded); the earlier wording was \"| Recorded findings | **97** |\". Finding count updated to 99 on 2026-09-11 (O99 recorded); the earlier wording was \"| Recorded findings | **98** |\". Finding count updated to 100 on 2026-09-11 (O100 recorded); the earlier wording was \"| Recorded findings | **99** |\". Finding count updated to 101 on 2026-09-11 (O101 recorded); the earlier wording was \"| Recorded findings | **100** |\". Anchor re-derived on 2026-09-11 (similarity 0.97) when the finding count advanced and limit 6 was corrected; the earlier wording was \"| Recorded findings | **101** |\". Finding count updated from 105 to 111 on 2026-09-11, when findings O106-O111 were recorded (the meta-evidence rule layer and five defects an adversarial double review found in the isolation evidence path); the earlier wording was: \"| Recorded findings | **105** |\". Finding count updated from 111 to 113 on 2026-09-11, when O112 (a red baseline is not automatically a demonstrated increment) and O113 (the first STRICT run's isolation claim was unevidenced) were recorded; the earlier wording was: \"| Recorded findings | **111** |\". Finding count updated from 113 to 116 on 2026-09-12, when O114 (the isolation proof lay in the writable area of the thing being checked), O115 (STRICT_REAL_AGENT_E2E, at the fourth attempt) and O116 (the planner was never told how its own criteria are executed) were recorded; the earlier wording was: \"| Recorded findings | **113** |\"."
     },
     {
       "id": "C-131",
@@ -1380,16 +1380,16 @@
     },
     {
       "id": "C-132",
-      "text": "campaign that produces 104 recorded findings against its own harness is not a",
+      "text": "campaign that produces 116 recorded findings against its own harness is not a",
       "where": "README.md:122",
       "status": "SUPPORTED",
       "evidence": [
         "receiptcount:d8=26",
         "run:d8/1"
       ],
-      "anchor_digest": "dd0077139b9d99861e6c666a5c038ad621399c9de99fd6c89b8afa415bd92b1a",
+      "anchor_digest": "a646d7c2cef5064d4bb2f2046405b164e654de887ddda73b92e7db326cf58588",
       "local_only_resolution": "Resolved by the orchestrating agent session on 2026-09-10 in the development repository: 94 findings, by counting distinct finding numbers in the development ledger. Re-checkable with the operator tool kampagne-zahlen.py, which re-derives this figure from its source and compares it against this exact line (README.md:122), failing on any disagreement; its negative control nk-kampagne-zahlen.py falsifies each number in turn and requires the checker to go red on every one.",
-      "note": "Catalogued during the rc2 correction cycle. The figure is not left free-standing in prose: it is bound to its source by a checker that fails the release gate on drift, which is the defect class that made this cycle necessary. Anchor re-derived on 2026-09-10: the earlier wording was \"campaign that produces 94 recorded findings against its own harness is not\" and implied that finding numbers can be traced into docs/LIMITATIONS.md. They cannot -- that document names no finding numbers, because U2 forbids a shipped file from referencing an unshipped one. The figure itself is unchanged. Figure updated from 94 to 95 on 2026-09-10, when finding O95 was recorded; the earlier wording was \"campaign that produces 94 recorded findings against its own harness is not a\". Finding count updated from 95 to 96 on 2026-09-10, when finding O96 was recorded; the earlier wording was \"campaign that produces 95 recorded findings against its own harness is not a\". Anchor re-derived on 2026-09-10 (similarity 0.99) after finding O97: the attribution figures are now measured at a named commit rather than at HEAD, because the commit that writes them changes them. The earlier wording was: \"campaign that produces 96 recorded findings against its own harness is not a\". Finding count updated to 98 on 2026-09-10 (O98 recorded); the earlier wording was \"campaign that produces 97 recorded findings against its own harness is not a\". Finding count updated to 99 on 2026-09-11 (O99 recorded); the earlier wording was \"campaign that produces 98 recorded findings against its own harness is not a\". Finding count updated to 100 on 2026-09-11 (O100 recorded); the earlier wording was \"campaign that produces 99 recorded findings against its own harness is not a\". Finding count updated to 101 on 2026-09-11 (O101 recorded); the earlier wording was \"campaign that produces 100 recorded findings against its own harness is not a\". Anchor re-derived on 2026-09-11 (similarity 0.99) when the finding count advanced and limit 6 was corrected; the earlier wording was \"campaign that produces 101 recorded findings against its own harness is not a\"."
+      "note": "Catalogued during the rc2 correction cycle. The figure is not left free-standing in prose: it is bound to its source by a checker that fails the release gate on drift, which is the defect class that made this cycle necessary. Anchor re-derived on 2026-09-10: the earlier wording was \"campaign that produces 94 recorded findings against its own harness is not\" and implied that finding numbers can be traced into docs/LIMITATIONS.md. They cannot -- that document names no finding numbers, because U2 forbids a shipped file from referencing an unshipped one. The figure itself is unchanged. Figure updated from 94 to 95 on 2026-09-10, when finding O95 was recorded; the earlier wording was \"campaign that produces 94 recorded findings against its own harness is not a\". Finding count updated from 95 to 96 on 2026-09-10, when finding O96 was recorded; the earlier wording was \"campaign that produces 95 recorded findings against its own harness is not a\". Anchor re-derived on 2026-09-10 (similarity 0.99) after finding O97: the attribution figures are now measured at a named commit rather than at HEAD, because the commit that writes them changes them. The earlier wording was: \"campaign that produces 96 recorded findings against its own harness is not a\". Finding count updated to 98 on 2026-09-10 (O98 recorded); the earlier wording was \"campaign that produces 97 recorded findings against its own harness is not a\". Finding count updated to 99 on 2026-09-11 (O99 recorded); the earlier wording was \"campaign that produces 98 recorded findings against its own harness is not a\". Finding count updated to 100 on 2026-09-11 (O100 recorded); the earlier wording was \"campaign that produces 99 recorded findings against its own harness is not a\". Finding count updated to 101 on 2026-09-11 (O101 recorded); the earlier wording was \"campaign that produces 100 recorded findings against its own harness is not a\". Anchor re-derived on 2026-09-11 (similarity 0.99) when the finding count advanced and limit 6 was corrected; the earlier wording was \"campaign that produces 101 recorded findings against its own harness is not a\". Finding count updated from 105 to 111 on 2026-09-11, when findings O106-O111 were recorded (the meta-evidence rule layer and five defects an adversarial double review found in the isolation evidence path); the earlier wording was: \"campaign that produces 105 recorded findings against its own harness is not a\". Finding count updated from 111 to 113 on 2026-09-11, when O112 (a red baseline is not automatically a demonstrated increment) and O113 (the first STRICT run's isolation claim was unevidenced) were recorded; the earlier wording was: \"campaign that produces 111 recorded findings against its own harness is not a\". Finding count updated from 113 to 116 on 2026-09-12, when O114 (the isolation proof lay in the writable area of the thing being checked), O115 (STRICT_REAL_AGENT_E2E, at the fourth attempt) and O116 (the planner was never told how its own criteria are executed) were recorded; the earlier wording was: \"campaign that produces 113 recorded findings against its own harness is not a\"."
     },
     {
       "id": "C-133",
@@ -1458,16 +1458,16 @@
     },
     {
       "id": "C-138",
-      "text": "51 specifications, 45 merges and 104 recorded findings**, across five calendar",
+      "text": "51 specifications, 45 merges and 116 recorded findings**, across five calendar",
       "where": "docs/LIMITATIONS.md:28",
       "status": "SUPPORTED",
       "evidence": [
         "receiptcount:d8=26",
         "run:d8/1"
       ],
-      "anchor_digest": "8978d57eec7b6b52133cf345ef0617fa7e33afb8eb8e1c009f71b8c6e5eaf2ca",
+      "anchor_digest": "26d56f6e85cb714954f14fe39a204cd1cc778298a528da31d6628a2d903135ac",
       "local_only_resolution": "Resolved by the orchestrating agent session on 2026-09-10 in the development repository: 45 merges, 48 specifications, 94 findings, by counting distinct finding numbers in the development ledger; counting distinct spec_path values across all state.json; counting merge commits on the mainline. Re-checkable with the operator tool kampagne-zahlen.py, which re-derives this figure from its source and compares it against this exact line (docs/LIMITATIONS.md:28), failing on any disagreement; its negative control nk-kampagne-zahlen.py falsifies each number in turn and requires the checker to go red on every one.",
-      "note": "Catalogued during the rc2 correction cycle. The figure is not left free-standing in prose: it is bound to its source by a checker that fails the release gate on drift, which is the defect class that made this cycle necessary. Figure updated from 94 to 95 on 2026-09-10, when finding O95 was recorded; the earlier wording was \"48 specifications, 45 merges and 94 recorded findings**, across five calendar\". Anchor re-derived on 2026-09-10 (similarity 0.97); the earlier wording was: \"48 specifications, 45 merges and 95 recorded findings**, across five calendar\". What changed in the rc2 cycle: the specification count (48 basenames -> 51 distinct contents) and the attribution columns (now counted without merge commits). The statement itself was not withdrawn. Finding count updated from 95 to 96 on 2026-09-10, when finding O96 was recorded; the earlier wording was \"51 specifications, 45 merges and 95 recorded findings**, across five calendar\". Anchor re-derived on 2026-09-10 (similarity 0.99) after finding O97: the attribution figures are now measured at a named commit rather than at HEAD, because the commit that writes them changes them. The earlier wording was: \"51 specifications, 45 merges and 96 recorded findings**, across five calendar\". Finding count updated to 98 on 2026-09-10 (O98 recorded); the earlier wording was \"51 specifications, 45 merges and 97 recorded findings**, across five calendar\". Finding count updated to 99 on 2026-09-11 (O99 recorded); the earlier wording was \"51 specifications, 45 merges and 98 recorded findings**, across five calendar\". Finding count updated to 100 on 2026-09-11 (O100 recorded); the earlier wording was \"51 specifications, 45 merges and 99 recorded findings**, across five calendar\". Finding count updated to 101 on 2026-09-11 (O101 recorded); the earlier wording was \"51 specifications, 45 merges and 100 recorded findings**, across five calendar\". Anchor re-derived on 2026-09-11 (similarity 0.99) when the finding count advanced and limit 6 was corrected; the earlier wording was \"51 specifications, 45 merges and 101 recorded findings**, across five calendar\"."
+      "note": "Catalogued during the rc2 correction cycle. The figure is not left free-standing in prose: it is bound to its source by a checker that fails the release gate on drift, which is the defect class that made this cycle necessary. Figure updated from 94 to 95 on 2026-09-10, when finding O95 was recorded; the earlier wording was \"48 specifications, 45 merges and 94 recorded findings**, across five calendar\". Anchor re-derived on 2026-09-10 (similarity 0.97); the earlier wording was: \"48 specifications, 45 merges and 95 recorded findings**, across five calendar\". What changed in the rc2 cycle: the specification count (48 basenames -> 51 distinct contents) and the attribution columns (now counted without merge commits). The statement itself was not withdrawn. Finding count updated from 95 to 96 on 2026-09-10, when finding O96 was recorded; the earlier wording was \"51 specifications, 45 merges and 95 recorded findings**, across five calendar\". Anchor re-derived on 2026-09-10 (similarity 0.99) after finding O97: the attribution figures are now measured at a named commit rather than at HEAD, because the commit that writes them changes them. The earlier wording was: \"51 specifications, 45 merges and 96 recorded findings**, across five calendar\". Finding count updated to 98 on 2026-09-10 (O98 recorded); the earlier wording was \"51 specifications, 45 merges and 97 recorded findings**, across five calendar\". Finding count updated to 99 on 2026-09-11 (O99 recorded); the earlier wording was \"51 specifications, 45 merges and 98 recorded findings**, across five calendar\". Finding count updated to 100 on 2026-09-11 (O100 recorded); the earlier wording was \"51 specifications, 45 merges and 99 recorded findings**, across five calendar\". Finding count updated to 101 on 2026-09-11 (O101 recorded); the earlier wording was \"51 specifications, 45 merges and 100 recorded findings**, across five calendar\". Anchor re-derived on 2026-09-11 (similarity 0.99) when the finding count advanced and limit 6 was corrected; the earlier wording was \"51 specifications, 45 merges and 101 recorded findings**, across five calendar\". Finding count updated from 105 to 111 on 2026-09-11, when findings O106-O111 were recorded (the meta-evidence rule layer and five defects an adversarial double review found in the isolation evidence path); the earlier wording was: \"51 specifications, 45 merges and 105 recorded findings**, across five calendar\". Finding count updated from 111 to 113 on 2026-09-11, when O112 (a red baseline is not automatically a demonstrated increment) and O113 (the first STRICT run's isolation claim was unevidenced) were recorded; the earlier wording was: \"51 specifications, 45 merges and 111 recorded findings**, across five calendar\". Finding count updated from 113 to 116 on 2026-09-12, when O114 (the isolation proof lay in the writable area of the thing being checked), O115 (STRICT_REAL_AGENT_E2E, at the fourth attempt) and O116 (the planner was never told how its own criteria are executed) were recorded; the earlier wording was: \"51 specifications, 45 merges and 113 recorded findings**, across five calendar\"."
     },
     {
       "id": "C-139",
@@ -1484,16 +1484,16 @@
     },
     {
       "id": "C-140",
-      "text": "decisions against 65 runs, 51 specifications, 45 merges and 104 findings. The",
+      "text": "decisions against 65 runs, 51 specifications, 45 merges and 116 findings. The",
       "where": "docs/LIMITATIONS.md:47",
       "status": "SUPPORTED",
       "evidence": [
         "receiptcount:d8=26",
         "run:d8/1"
       ],
-      "anchor_digest": "e88a18eac95b3742d77971ec3b9b343057970e7d7ce863add1ef7e0c5b1ac022",
+      "anchor_digest": "7cffca2b57f6c0b60589a74da18fbb2aaeea527298733d98a49d5a0d554d9abb",
       "local_only_resolution": "Resolved by the orchestrating agent session on 2026-09-10 in the development repository: 45 merges, 48 specifications, 65 runs, 94 findings, by counting distinct finding numbers in the development ledger; counting distinct spec_path values across all state.json; counting merge commits on the mainline; counting runs/*/state.json. Re-checkable with the operator tool kampagne-zahlen.py, which re-derives this figure from its source and compares it against this exact line (docs/LIMITATIONS.md:47), failing on any disagreement; its negative control nk-kampagne-zahlen.py falsifies each number in turn and requires the checker to go red on every one.",
-      "note": "Catalogued during the rc2 correction cycle. The figure is not left free-standing in prose: it is bound to its source by a checker that fails the release gate on drift, which is the defect class that made this cycle necessary. Figure updated from 94 to 95 on 2026-09-10, when finding O95 was recorded; the earlier wording was \"decisions against 65 runs, 48 specifications, 45 merges and 94 findings. The\". Anchor re-derived on 2026-09-10 (similarity 0.97); the earlier wording was: \"decisions against 65 runs, 48 specifications, 45 merges and 95 findings. The\". What changed in the rc2 cycle: the specification count (48 basenames -> 51 distinct contents) and the attribution columns (now counted without merge commits). The statement itself was not withdrawn. Finding count updated from 95 to 96 on 2026-09-10, when finding O96 was recorded; the earlier wording was \"decisions against 65 runs, 51 specifications, 45 merges and 95 findings. The\". Anchor re-derived on 2026-09-10 (similarity 0.99) after finding O97: the attribution figures are now measured at a named commit rather than at HEAD, because the commit that writes them changes them. The earlier wording was: \"decisions against 65 runs, 51 specifications, 45 merges and 96 findings. The\". Finding count updated to 98 on 2026-09-10 (O98 recorded); the earlier wording was \"decisions against 65 runs, 51 specifications, 45 merges and 97 findings. The\". Finding count updated to 99 on 2026-09-11 (O99 recorded); the earlier wording was \"decisions against 65 runs, 51 specifications, 45 merges and 98 findings. The\". Finding count updated to 100 on 2026-09-11 (O100 recorded); the earlier wording was \"decisions against 65 runs, 51 specifications, 45 merges and 99 findings. The\". Finding count updated to 101 on 2026-09-11 (O101 recorded); the earlier wording was \"decisions against 65 runs, 51 specifications, 45 merges and 100 findings. The\". Anchor re-derived on 2026-09-11 (similarity 0.99) when the finding count advanced and limit 6 was corrected; the earlier wording was \"decisions against 65 runs, 51 specifications, 45 merges and 101 findings. The\"."
+      "note": "Catalogued during the rc2 correction cycle. The figure is not left free-standing in prose: it is bound to its source by a checker that fails the release gate on drift, which is the defect class that made this cycle necessary. Figure updated from 94 to 95 on 2026-09-10, when finding O95 was recorded; the earlier wording was \"decisions against 65 runs, 48 specifications, 45 merges and 94 findings. The\". Anchor re-derived on 2026-09-10 (similarity 0.97); the earlier wording was: \"decisions against 65 runs, 48 specifications, 45 merges and 95 findings. The\". What changed in the rc2 cycle: the specification count (48 basenames -> 51 distinct contents) and the attribution columns (now counted without merge commits). The statement itself was not withdrawn. Finding count updated from 95 to 96 on 2026-09-10, when finding O96 was recorded; the earlier wording was \"decisions against 65 runs, 51 specifications, 45 merges and 95 findings. The\". Anchor re-derived on 2026-09-10 (similarity 0.99) after finding O97: the attribution figures are now measured at a named commit rather than at HEAD, because the commit that writes them changes them. The earlier wording was: \"decisions against 65 runs, 51 specifications, 45 merges and 96 findings. The\". Finding count updated to 98 on 2026-09-10 (O98 recorded); the earlier wording was \"decisions against 65 runs, 51 specifications, 45 merges and 97 findings. The\". Finding count updated to 99 on 2026-09-11 (O99 recorded); the earlier wording was \"decisions against 65 runs, 51 specifications, 45 merges and 98 findings. The\". Finding count updated to 100 on 2026-09-11 (O100 recorded); the earlier wording was \"decisions against 65 runs, 51 specifications, 45 merges and 99 findings. The\". Finding count updated to 101 on 2026-09-11 (O101 recorded); the earlier wording was \"decisions against 65 runs, 51 specifications, 45 merges and 100 findings. The\". Anchor re-derived on 2026-09-11 (similarity 0.99) when the finding count advanced and limit 6 was corrected; the earlier wording was \"decisions against 65 runs, 51 specifications, 45 merges and 101 findings. The\". Finding count updated from 105 to 111 on 2026-09-11, when findings O106-O111 were recorded (the meta-evidence rule layer and five defects an adversarial double review found in the isolation evidence path); the earlier wording was: \"decisions against 65 runs, 51 specifications, 45 merges and 105 findings. The\". Finding count updated from 111 to 113 on 2026-09-11, when O112 (a red baseline is not automatically a demonstrated increment) and O113 (the first STRICT run's isolation claim was unevidenced) were recorded; the earlier wording was: \"decisions against 65 runs, 51 specifications, 45 merges and 111 findings. The\". Finding count updated from 113 to 116 on 2026-09-12, when O114 (the isolation proof lay in the writable area of the thing being checked), O115 (STRICT_REAL_AGENT_E2E, at the fourth attempt) and O116 (the planner was never told how its own criteria are executed) were recorded; the earlier wording was: \"decisions against 65 runs, 51 specifications, 45 merges and 113 findings. The\"."
     },
     {
       "id": "C-141",
@@ -1640,6 +1640,237 @@
       ],
       "anchor_digest": "59018efa79825e22232783b6a5afc8d4c8904d24894a66d06db7c215884d0be9",
       "note": "Measured on 2026-09-11 through run_check itself, in three regimes: the ceiling in place, the check removing it, and the check removing it inside the sandbox. The test asserts all three, including that the ancestor repository is still reachable in the middle case -- if that stops holding, the gap has moved and the test says so."
+    },
+    {
+      "id": "C-154",
+      "text": "in 36 files of these two trees and refused them, which is the behaviour",
+      "where": "docs/EVIDENCE_INDEX.md:12",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:tools/evidence_index.py:102"
+      ],
+      "note": "Generated by tools/evidence_index.py from the evidence tree it describes. LOCAL_ONLY on purpose: the tree is not in the public export, because its receipts carry absolute machine paths and redacting them would break the digests they carry. Anyone holding the tree can re-derive this line; a mismatch is a gate failure.",
+      "anchor_digest": "c9f5e5a2def2a8d2a8a2030205dc2a7096d3b42855abe37c141d4f06a3238158"
+    },
+    {
+      "id": "C-155",
+      "text": "number below with `python3 tools/evidence_index.py`, and a mismatch",
+      "where": "docs/EVIDENCE_INDEX.md:24",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:tools/evidence_index.py:102"
+      ],
+      "note": "Generated by tools/evidence_index.py from the evidence tree it describes. LOCAL_ONLY on purpose: the tree is not in the public export, because its receipts carry absolute machine paths and redacting them would break the digests they carry. Anyone holding the tree can re-derive this line; a mismatch is a gate failure.",
+      "anchor_digest": "e85d0080345131c4161b0b3a35e719ca8ec7cf64da9926efefb9fbd83eb481fd"
+    },
+    {
+      "id": "C-156",
+      "text": "* tree digest: `838017219d7599a9` over 27 file(s), 36776 bytes",
+      "where": "docs/EVIDENCE_INDEX.md:29",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:tools/evidence_index.py:102"
+      ],
+      "note": "Generated by tools/evidence_index.py from the evidence tree it describes. LOCAL_ONLY on purpose: the tree is not in the public export, because its receipts carry absolute machine paths and redacting them would break the digests they carry. Anyone holding the tree can re-derive this line; a mismatch is a gate failure.",
+      "anchor_digest": "aa6c894c440440e51f0ae69ae2921381c5d954e82bcbc0607205a1ed8fc0cf3b"
+    },
+    {
+      "id": "C-157",
+      "text": "* receipts carrying an isolation record: 10",
+      "where": "docs/EVIDENCE_INDEX.md:30",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:tools/evidence_index.py:102"
+      ],
+      "note": "Generated by tools/evidence_index.py from the evidence tree it describes. LOCAL_ONLY on purpose: the tree is not in the public export, because its receipts carry absolute machine paths and redacting them would break the digests they carry. Anyone holding the tree can re-derive this line; a mismatch is a gate failure.",
+      "anchor_digest": "88d2427d4f60769c71beb1d59974518883b3960124f55bda995ebc4d35863194"
+    },
+    {
+      "id": "C-158",
+      "text": "**10 of 10**",
+      "where": "docs/EVIDENCE_INDEX.md:33",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:tools/evidence_index.py:102"
+      ],
+      "note": "Generated by tools/evidence_index.py from the evidence tree it describes. LOCAL_ONLY on purpose: the tree is not in the public export, because its receipts carry absolute machine paths and redacting them would break the digests they carry. Anyone holding the tree can re-derive this line; a mismatch is a gate failure.",
+      "anchor_digest": "c32d2e52fed1fda8b27b25d7216d1595cbd8b732c39c94defafcf0f80c6c1324"
+    },
+    {
+      "id": "C-159",
+      "text": "| `strictroman4-i1-a1-K1-basis` | 1 | True | strict | True | True | read-only | denied |",
+      "where": "docs/EVIDENCE_INDEX.md:37",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:tools/evidence_index.py:102"
+      ],
+      "note": "Generated by tools/evidence_index.py from the evidence tree it describes. LOCAL_ONLY on purpose: the tree is not in the public export, because its receipts carry absolute machine paths and redacting them would break the digests they carry. Anyone holding the tree can re-derive this line; a mismatch is a gate failure.",
+      "anchor_digest": "0cd2d994f88bbaacfef61db64015a1651a5d4180104f6ffb52989eed90d8496a"
+    },
+    {
+      "id": "C-160",
+      "text": "| `strictroman4-i1-a1-K1` | 0 | True | strict | True | True | read-only | denied |",
+      "where": "docs/EVIDENCE_INDEX.md:38",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:tools/evidence_index.py:102"
+      ],
+      "note": "Generated by tools/evidence_index.py from the evidence tree it describes. LOCAL_ONLY on purpose: the tree is not in the public export, because its receipts carry absolute machine paths and redacting them would break the digests they carry. Anyone holding the tree can re-derive this line; a mismatch is a gate failure.",
+      "anchor_digest": "122a64ff76f19c82007c241442d9d95775c623c6173a49d4da9cf5d4cea4a0e1"
+    },
+    {
+      "id": "C-161",
+      "text": "| `strictroman4-i1-a1-K2-basis` | 0 | True | strict | True | True | read-only | denied |",
+      "where": "docs/EVIDENCE_INDEX.md:39",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:tools/evidence_index.py:102"
+      ],
+      "note": "Generated by tools/evidence_index.py from the evidence tree it describes. LOCAL_ONLY on purpose: the tree is not in the public export, because its receipts carry absolute machine paths and redacting them would break the digests they carry. Anyone holding the tree can re-derive this line; a mismatch is a gate failure.",
+      "anchor_digest": "9050e98883792f37f49b8244712091a170427bece08798a16b565c98d5b7fbb1"
+    },
+    {
+      "id": "C-162",
+      "text": "| `strictroman4-i1-a1-K2` | 0 | True | strict | True | True | read-only | denied |",
+      "where": "docs/EVIDENCE_INDEX.md:40",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:tools/evidence_index.py:102"
+      ],
+      "note": "Generated by tools/evidence_index.py from the evidence tree it describes. LOCAL_ONLY on purpose: the tree is not in the public export, because its receipts carry absolute machine paths and redacting them would break the digests they carry. Anyone holding the tree can re-derive this line; a mismatch is a gate failure.",
+      "anchor_digest": "7c57ee759a2d93880eb40c3bc7ca63e4a087b61ce2854513c39cb5dff2c3e032"
+    },
+    {
+      "id": "C-163",
+      "text": "| `strictroman4-i2-a1-K1` | 0 | True | strict | True | True | read-only | denied |",
+      "where": "docs/EVIDENCE_INDEX.md:41",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:tools/evidence_index.py:102"
+      ],
+      "note": "Generated by tools/evidence_index.py from the evidence tree it describes. LOCAL_ONLY on purpose: the tree is not in the public export, because its receipts carry absolute machine paths and redacting them would break the digests they carry. Anyone holding the tree can re-derive this line; a mismatch is a gate failure.",
+      "anchor_digest": "26ea80905f768d23980905418ea1d35e22874035fc11fe160cb40a34ef5a00f2"
+    },
+    {
+      "id": "C-164",
+      "text": "| `strictroman4-i2-a1-K2` | 0 | True | strict | True | True | read-only | denied |",
+      "where": "docs/EVIDENCE_INDEX.md:42",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:tools/evidence_index.py:102"
+      ],
+      "note": "Generated by tools/evidence_index.py from the evidence tree it describes. LOCAL_ONLY on purpose: the tree is not in the public export, because its receipts carry absolute machine paths and redacting them would break the digests they carry. Anyone holding the tree can re-derive this line; a mismatch is a gate failure.",
+      "anchor_digest": "5ecfd07a20861309ba1b695cee7979f1e4468406a961a972cf92679202ef50a9"
+    },
+    {
+      "id": "C-165",
+      "text": "| `strictroman4-i3-a1-K1` | 0 | True | strict | True | True | read-only | denied |",
+      "where": "docs/EVIDENCE_INDEX.md:43",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:tools/evidence_index.py:102"
+      ],
+      "note": "Generated by tools/evidence_index.py from the evidence tree it describes. LOCAL_ONLY on purpose: the tree is not in the public export, because its receipts carry absolute machine paths and redacting them would break the digests they carry. Anyone holding the tree can re-derive this line; a mismatch is a gate failure.",
+      "anchor_digest": "7598d478cf02a98bba772259a4cb13d1aef7f079b07f5d435e70ac1d4c54a04a"
+    },
+    {
+      "id": "C-166",
+      "text": "| `strictroman4-i3-a1-K2` | 0 | True | strict | True | True | read-only | denied |",
+      "where": "docs/EVIDENCE_INDEX.md:44",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:tools/evidence_index.py:102"
+      ],
+      "note": "Generated by tools/evidence_index.py from the evidence tree it describes. LOCAL_ONLY on purpose: the tree is not in the public export, because its receipts carry absolute machine paths and redacting them would break the digests they carry. Anyone holding the tree can re-derive this line; a mismatch is a gate failure.",
+      "anchor_digest": "a20f74d185ed105954fd98d2d4669bbe0d94d89f9f7f6ca4a31032e7a1048ed1"
+    },
+    {
+      "id": "C-167",
+      "text": "| `strictroman4-i3-a1-K3-basis` | 0 | True | strict | True | True | read-only | denied |",
+      "where": "docs/EVIDENCE_INDEX.md:45",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:tools/evidence_index.py:102"
+      ],
+      "note": "Generated by tools/evidence_index.py from the evidence tree it describes. LOCAL_ONLY on purpose: the tree is not in the public export, because its receipts carry absolute machine paths and redacting them would break the digests they carry. Anyone holding the tree can re-derive this line; a mismatch is a gate failure.",
+      "anchor_digest": "76d71bd2adc856bb68851708b8878030004c319ca9d5cdc840c76fbfe49218a4"
+    },
+    {
+      "id": "C-168",
+      "text": "| `strictroman4-i3-a1-K3` | 0 | True | strict | True | True | read-only | denied |",
+      "where": "docs/EVIDENCE_INDEX.md:46",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:tools/evidence_index.py:102"
+      ],
+      "note": "Generated by tools/evidence_index.py from the evidence tree it describes. LOCAL_ONLY on purpose: the tree is not in the public export, because its receipts carry absolute machine paths and redacting them would break the digests they carry. Anyone holding the tree can re-derive this line; a mismatch is a gate failure.",
+      "anchor_digest": "ab32500d1b85a23fc75c7f8a1a8351d63ac5920de3dd1c3f42576c2e05f7e559"
+    },
+    {
+      "id": "C-169",
+      "text": "* tree digest: `414bb7958722afa2` over 82 file(s), 149759 bytes",
+      "where": "docs/EVIDENCE_INDEX.md:55",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:tools/evidence_index.py:102"
+      ],
+      "note": "Generated by tools/evidence_index.py from the evidence tree it describes. LOCAL_ONLY on purpose: the tree is not in the public export, because its receipts carry absolute machine paths and redacting them would break the digests they carry. Anyone holding the tree can re-derive this line; a mismatch is a gate failure.",
+      "anchor_digest": "815cc63510487ea075b7f031e9cab86ba419764482cf88a41b3433432925a287"
+    },
+    {
+      "id": "C-170",
+      "text": "* nodes and their final lifecycle: `repair-1-1` = MERGED, `slugify` = MERGED",
+      "where": "docs/EVIDENCE_INDEX.md:56",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:tools/evidence_index.py:102"
+      ],
+      "note": "Generated by tools/evidence_index.py from the evidence tree it describes. LOCAL_ONLY on purpose: the tree is not in the public export, because its receipts carry absolute machine paths and redacting them would break the digests they carry. Anyone holding the tree can re-derive this line; a mismatch is a gate failure.",
+      "anchor_digest": "0e211a56889d7faa5987857a328cf7f82c9057246dfba8857f86c6008d7928ff"
+    },
+    {
+      "id": "C-171",
+      "text": "* repair nodes the run created by itself: `repair-1-1`",
+      "where": "docs/EVIDENCE_INDEX.md:57",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:tools/evidence_index.py:102"
+      ],
+      "note": "Generated by tools/evidence_index.py from the evidence tree it describes. LOCAL_ONLY on purpose: the tree is not in the public export, because its receipts carry absolute machine paths and redacting them would break the digests they carry. Anyone holding the tree can re-derive this line; a mismatch is a gate failure.",
+      "anchor_digest": "e94fabcb375122cedb23d551bdb163d489a89062f8ef257b7452f0a87ec1e6af"
+    },
+    {
+      "id": "C-172",
+      "text": "* closure generations: 2",
+      "where": "docs/EVIDENCE_INDEX.md:58",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:tools/evidence_index.py:102"
+      ],
+      "note": "Generated by tools/evidence_index.py from the evidence tree it describes. LOCAL_ONLY on purpose: the tree is not in the public export, because its receipts carry absolute machine paths and redacting them would break the digests they carry. Anyone holding the tree can re-derive this line; a mismatch is a gate failure.",
+      "anchor_digest": "16c16d5411b22d7a360376f04a564a834735c61e82df7e94fb75a0a4c3a06da3"
+    },
+    {
+      "id": "C-173",
+      "text": "* decisions recorded: 4, of which by a person: **0**",
+      "where": "docs/EVIDENCE_INDEX.md:59",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:tools/evidence_index.py:102"
+      ],
+      "note": "Generated by tools/evidence_index.py from the evidence tree it describes. LOCAL_ONLY on purpose: the tree is not in the public export, because its receipts carry absolute machine paths and redacting them would break the digests they carry. Anyone holding the tree can re-derive this line; a mismatch is a gate failure.",
+      "anchor_digest": "aa580e139b5ac90a4a273a6bf75e7c928f86313782e459d50a964dec10f25c32"
+    },
+    {
+      "id": "C-174",
+      "text": "* repository mutations nothing in the state accounts for: **0**",
+      "where": "docs/EVIDENCE_INDEX.md:60",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:tools/evidence_index.py:102"
+      ],
+      "note": "Generated by tools/evidence_index.py from the evidence tree it describes. LOCAL_ONLY on purpose: the tree is not in the public export, because its receipts carry absolute machine paths and redacting them would break the digests they carry. Anyone holding the tree can re-derive this line; a mismatch is a gate failure.",
+      "anchor_digest": "ffbfcc8d34d6962f4a838daa99a44053bdb4eb6ce377831637a1dd1297a3c090"
     }
   ],
   "not_claims": [
@@ -5989,6 +6220,125 @@
       "where": "docs/LIMITATIONS.md:218",
       "anchor_digest": "10c5a2a1c21387430ea4dc08f884b61ec8fe9513424cb99771eb4a8c064aa74f",
       "reason": "describes what the sandbox contributes to this limit and what it does not, not a measurement"
+    },
+    {
+      "id": "N-625",
+      "text": "## 12a. A criterion whose own file the candidate added discriminates trivially",
+      "where": "docs/LIMITATIONS.md:476",
+      "reason": "section heading of a named, tracked limitation, not a numeric measurement claim",
+      "anchor_digest": "b82d734c0bf7d38dc4cc05ac7e57f20b1101a86f26e88f818e3d8f8f4a8729f3"
+    },
+    {
+      "id": "N-626",
+      "text": "The acceptance-governing condition in limitation 12 -- red on the predecessor,",
+      "where": "docs/LIMITATIONS.md:478",
+      "reason": "a back-reference to limitation 12, not a numeric measurement claim",
+      "anchor_digest": "50e971ecd5491930fa975b3f4e5bcfa07de2db9a0721595c72fc7641d47ffd93"
+    },
+    {
+      "id": "N-627",
+      "text": "python3 -m unittest discover -s tests -p 'test_roman.py'",
+      "where": "docs/LIMITATIONS.md:484",
+      "reason": "the acceptance-check command of this project's own STRICT run, quoted verbatim",
+      "anchor_digest": "332e12b0ab4a594cf1866e771cc1bc673d2c0832cff28ad0d58fb640686bcf5d"
+    },
+    {
+      "id": "N-628",
+      "text": "Exit 0 on the candidate. On the baseline, exit 5:",
+      "where": "docs/LIMITATIONS.md:486",
+      "reason": "reports the two exit codes of one measured pair; the figures are the receipt's own and are carried by the claim on the following quoted output",
+      "anchor_digest": "e277149572b2fed5353ae98b7e8d63e56b8a433698ad902c1ebe417476ced8ac"
+    },
+    {
+      "id": "N-629",
+      "text": "Ran 0 tests in 0.000s",
+      "where": "docs/LIMITATIONS.md:488",
+      "reason": "verbatim output of the baseline check, quoted as evidence rather than asserted",
+      "anchor_digest": "3213ca88cc94f34d6207104b2aefdcc71e7f9df9a1836242d546d378bd3cb24f"
+    },
+    {
+      "id": "N-630",
+      "text": "runner says it executed nothing (exit 5, `NO TESTS RAN`, `FileNotFoundError`,",
+      "where": "docs/LIMITATIONS.md:499",
+      "reason": "names the signatures the detector looks for, which are strings in src/hoh/runner.py rather than a measurement",
+      "anchor_digest": "250378d1c98697ef85882ad5d021c7d71ec98dfaa361e04562ccc3656db48f14"
+    },
+    {
+      "id": "N-631",
+      "text": "`collected 0 items`) and the controller records them on the run state, so the",
+      "where": "docs/LIMITATIONS.md:500",
+      "reason": "describes where the detector writes its result, not a measured quantity",
+      "anchor_digest": "5b050932c6ce636ddcf07c45697f9d3c5984fed82d0c0b9f672ebb42dab26b85"
+    },
+    {
+      "id": "N-632",
+      "text": "`docs/LIMITATIONS.md` limit 2 has said since the first release that this",
+      "where": "docs/BENCHMARK_PROTOCOL.md:3",
+      "reason": "a back-reference to limitation 2, not a numeric measurement claim",
+      "anchor_digest": "fd301377407502a4b548f2516beb80991d5b528561e8eb1277f18c632f4c4b14"
+    },
+    {
+      "id": "N-633",
+      "text": "* **Primary: dispatches.** Each arm gets at most **9 role dispatches per",
+      "where": "docs/BENCHMARK_PROTOCOL.md:31",
+      "reason": "states the dispatch budget the protocol fixes for itself, a design parameter rather than a measured result",
+      "anchor_digest": "31fd52d86fa63b89ddcbc107e0a76dd2efee1d4a8d731b32b2723612429acdfa"
+    },
+    {
+      "id": "N-634",
+      "text": "2. **`parse_duration`** — a parser with ambiguous input (\"1m\" as minutes or",
+      "where": "docs/BENCHMARK_PROTOCOL.md:48",
+      "reason": "names one of the five tasks and the failure mode it targets, a design parameter rather than a measured result",
+      "anchor_digest": "50516a25aaa66079109b82a9f4300ddef16257b78f5ea72a4da69a4baa5dbb73"
+    },
+    {
+      "id": "N-635",
+      "text": "* The secondary comparison is `composition_defects`, B vs C, on tasks 3 and 4",
+      "where": "docs/BENCHMARK_PROTOCOL.md:85",
+      "reason": "names which arms and tasks the secondary comparison covers, a design parameter fixed before any run",
+      "anchor_digest": "01187c396699e8ad52a79675434cbd6ef10ffadaca89dd63f3e1a603cf1a8947"
+    },
+    {
+      "id": "N-636",
+      "text": "only — the two where composition exists. Reporting it on task 1 would be",
+      "where": "docs/BENCHMARK_PROTOCOL.md:86",
+      "reason": "continues the preceding line's statement about which tasks the comparison covers",
+      "anchor_digest": "d3df3a6581e9af5eaa3eb329533ff59423e27db3e3954802f9a9c5cf1796f229"
+    },
+    {
+      "id": "N-637",
+      "text": "* Repetitions: **3 per (task, arm)** where the budget allows, 1 where it does",
+      "where": "docs/BENCHMARK_PROTOCOL.md:99",
+      "reason": "states the repetition count the protocol fixes for itself, a design parameter rather than a measured result",
+      "anchor_digest": "2d00e776ada21fb378b11ff76687bfed085e80c0ec057400eb8a10139f68476e"
+    },
+    {
+      "id": "N-638",
+      "text": "1 is untouched by this benchmark and stays open.",
+      "where": "docs/BENCHMARK_PROTOCOL.md:117",
+      "reason": "a back-reference to limitation 1, restating that this benchmark does not touch it",
+      "anchor_digest": "c10e481dbd97b718e8705c0871441d6a1c46373325b0dbfdd3d9c38481c79c69"
+    },
+    {
+      "id": "N-639",
+      "text": "Until that file exists, the honest status of limit 2 is unchanged: **no",
+      "where": "docs/BENCHMARK_PROTOCOL.md:130",
+      "reason": "a back-reference to limitation 2, restating its unchanged status rather than asserting a new figure",
+      "anchor_digest": "d7c5c2706d8f6b5878fa214a1d1ae6f4e329b9bd7149b411dfd9fa7fb0c2f1d4"
+    },
+    {
+      "id": "N-640",
+      "text": "dispatch, criteria that discriminate, and — since O112 — how many of those",
+      "where": "docs/ROUTING.md:55",
+      "reason": "a back-reference to finding O112, not a numeric measurement claim",
+      "anchor_digest": "798e029702f2699b9288f8cbcc9621a9ec0d68ea2d28dabb807b62b1deadbb9d"
+    },
+    {
+      "id": "N-641",
+      "text": "`docs/LIMITATIONS.md` limit 2 is blocked on. Routing and the benchmark are",
+      "where": "docs/ROUTING.md:61",
+      "reason": "a back-reference to limitation 2, not a numeric measurement claim",
+      "anchor_digest": "48036092fb45a263aade9f41b33cd5feea5c2bd0724990a1efee5c7159d52298"
     }
   ],
   "claim_surfaces": [
@@ -6179,6 +6529,24 @@
       "path": "RELEASE_NOTES.md",
       "scope": "whole file",
       "why": "the release notes for `v0.1.0-rc1` -- the first document a reader of this release opens, stating plainly what this release is and is not",
+      "requires_reconciliation_on_change": true
+    },
+    {
+      "path": "docs/ROUTING.md",
+      "scope": "whole file",
+      "why": "records a decision about role and model routing and the evidence it rests on -- which is currently that none exists. A surface that says 'not decidable yet' has to be held to the same coverage rule as one that asserts a number, or 'deferred' becomes the place unchecked claims go",
+      "requires_reconciliation_on_change": true
+    },
+    {
+      "path": "docs/BENCHMARK_PROTOCOL.md",
+      "scope": "whole file",
+      "why": "the preregistered protocol for the comparison limit 2 is blocked on. It is committed before any arm runs precisely so that the analysis cannot be chosen after the results are visible, and a preregistration that can drift unchecked is not one",
+      "requires_reconciliation_on_change": true
+    },
+    {
+      "path": "docs/EVIDENCE_INDEX.md",
+      "scope": "whole file",
+      "why": "generated from the two evidence trees the public export cannot carry. Every number in it is a claim about evidence a reader cannot open, which makes it the surface where being wrong would cost the most -- so it is regenerated by tools/evidence_index.py and a mismatch with the trees is a gate failure, not a documentation lag",
       "requires_reconciliation_on_change": true
     }
   ],
@@ -6525,6 +6893,86 @@
       "path": "tools/union_gate.py",
       "reason": "source-code",
       "why": "source or test code under src/hoh/, tests/, or tools/; claims about its behaviour live in docs/** and are covered there, not by re-declaring the source itself as a claim surface"
+    },
+    {
+      "path": "dogfood/ATTRIBUTION.json",
+      "reason": "evidence-artifact",
+      "why": "machine-written evidence: a receipt, a run state, a project state or a summary derived from them. Every number in it was produced by the runner rather than authored, which is the distinction this ledger draws"
+    },
+    {
+      "path": "src/hoh/amendment.py",
+      "reason": "source-code",
+      "why": "Python source. Numbers in it are constants the code uses, and the claims about its behaviour live in the documents that describe it and in the tests that measure it"
+    },
+    {
+      "path": "src/hoh/assurance.py",
+      "reason": "source-code",
+      "why": "Python source. Numbers in it are constants the code uses, and the claims about its behaviour live in the documents that describe it and in the tests that measure it"
+    },
+    {
+      "path": "src/hoh/taxonomy.py",
+      "reason": "source-code",
+      "why": "Python source. Numbers in it are constants the code uses, and the claims about its behaviour live in the documents that describe it and in the tests that measure it"
+    },
+    {
+      "path": "src/hoh/telemetry.py",
+      "reason": "source-code",
+      "why": "Python source. Numbers in it are constants the code uses, and the claims about its behaviour live in the documents that describe it and in the tests that measure it"
+    },
+    {
+      "path": "tests/test_amendment.py",
+      "reason": "source-code",
+      "why": "a test module. Its numbers are the values it asserts, which are the measurement rather than a claim about it"
+    },
+    {
+      "path": "tests/test_assurance.py",
+      "reason": "source-code",
+      "why": "a test module. Its numbers are the values it asserts, which are the measurement rather than a claim about it"
+    },
+    {
+      "path": "tests/test_isolation_record.py",
+      "reason": "source-code",
+      "why": "a test module. Its numbers are the values it asserts, which are the measurement rather than a claim about it"
+    },
+    {
+      "path": "tests/test_meta_evidence.py",
+      "reason": "source-code",
+      "why": "a test module. Its numbers are the values it asserts, which are the measurement rather than a claim about it"
+    },
+    {
+      "path": "tests/test_refusal_evidence.py",
+      "reason": "source-code",
+      "why": "a test module. Its numbers are the values it asserts, which are the measurement rather than a claim about it"
+    },
+    {
+      "path": "tests/test_taxonomy_telemetry.py",
+      "reason": "source-code",
+      "why": "a test module. Its numbers are the values it asserts, which are the measurement rather than a claim about it"
+    },
+    {
+      "path": "tools/attribution.py",
+      "reason": "source-code",
+      "why": "a tool. Its numbers are thresholds and budgets it applies; what it measures is claimed in the documents that quote its output"
+    },
+    {
+      "path": "tools/benchmark.py",
+      "reason": "source-code",
+      "why": "a tool. Its numbers are thresholds and budgets it applies; what it measures is claimed in the documents that quote its output"
+    },
+    {
+      "path": "tools/collect_strict_evidence.py",
+      "reason": "source-code",
+      "why": "a tool. Its numbers are thresholds and budgets it applies; what it measures is claimed in the documents that quote its output"
+    },
+    {
+      "path": "tools/meta_evidence.py",
+      "reason": "source-code",
+      "why": "a tool. Its numbers are thresholds and budgets it applies; what it measures is claimed in the documents that quote its output"
+    },
+    {
+      "path": "tools/evidence_index.py",
+      "reason": "source-code",
+      "why": "the generator of docs/EVIDENCE_INDEX.md. Its numbers are the ones it reads out of the trees; the claim lives in the file it writes"
     }
   ]
 }

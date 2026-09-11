@@ -126,6 +126,14 @@ def _spec_block(spec_text: str) -> str:
     )
 
 
+#: The token the runner really substitutes, taken from where it is defined.
+#: Writing `{ARENA}` into the prompt by hand would be a second copy that can
+#: drift from the first -- and the repository's own hygiene check flags a
+#: literal `{...}` inside an f-string, correctly, because it cannot tell a
+#: deliberate literal from a missing substitution.
+from .runner import ARENA_PLACEHOLDER as _ARENA  # noqa: E402
+
+
 def planner_prompt(
     *,
     iteration: int,
@@ -202,6 +210,24 @@ Every acceptance_check needs a command that really is executable -- without one
 a criterion cannot be evidenced by machine and is therefore not a gate. Set
 "repair_only": true only for a regression or a security problem, and then with
 a justification in "repair_reason".
+
+/how-acceptance-check-commands-are-executed
+Read this before writing a command. Two runs in this project's own history
+each lost a whole iteration to the first rule below, because the planner was
+never told it.
+
+* The command already runs **inside** the directory under test. Do not `cd`
+  into it, and do not `cd` anywhere else: a command that changes directory is
+  refused before it runs, the criterion is recorded INCONCLUSIVE, and the
+  iteration is spent. If you need the path as a string, write the literal
+  token {_ARENA} -- the runner substitutes the real absolute path.
+* The interpreter is a **bare system `python3`**. Do not assume `pytest`,
+  `ruff` or anything else from the project's development environment is
+  importable; `python3 -m unittest` is available everywhere. If a tool may be
+  missing, the criterion has to work without it.
+* There is no network. A command that fetches something will fail.
+* The command must not write into the directory under test. A check that
+  rewrites what it checks has invalidated its own result.
 """
 
 
