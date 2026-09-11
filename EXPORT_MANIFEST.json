@@ -2,6 +2,11 @@
   "schema": "hoh-export-manifest/1",
   "entries": [
     {
+      "path": ".github/workflows/ci.yml",
+      "decision": "INCLUDE",
+      "rule": "repo-meta"
+    },
+    {
       "path": ".gitignore",
       "decision": "INCLUDE",
       "rule": "repo-meta"
@@ -907,12 +912,27 @@
       "rule": "package"
     },
     {
+      "path": "src/hoh/orchestrator.py",
+      "decision": "INCLUDE",
+      "rule": "package"
+    },
+    {
       "path": "src/hoh/policy/dangerous-patterns.txt",
       "decision": "INCLUDE",
       "rule": "package"
     },
     {
       "path": "src/hoh/policy/house-rules-patterns.txt",
+      "decision": "INCLUDE",
+      "rule": "package"
+    },
+    {
+      "path": "src/hoh/project.py",
+      "decision": "INCLUDE",
+      "rule": "package"
+    },
+    {
+      "path": "src/hoh/projectstore.py",
       "decision": "INCLUDE",
       "rule": "package"
     },
@@ -977,7 +997,17 @@
       "rule": "tests"
     },
     {
+      "path": "tests/test_orchestrator_parity.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
       "path": "tests/test_phase2.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_project_resume.py",
       "decision": "INCLUDE",
       "rule": "tests"
     },
@@ -1023,6 +1053,11 @@
     },
     {
       "path": "tools/check_claims.py",
+      "decision": "INCLUDE",
+      "rule": "tooling"
+    },
+    {
+      "path": "tools/clean_install_check.py",
       "decision": "INCLUDE",
       "rule": "tooling"
     },

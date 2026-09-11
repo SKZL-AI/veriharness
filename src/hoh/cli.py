@@ -896,6 +896,90 @@ def cmd_list(args) -> int:
 
 
 # --------------------------------------------------------------------------- #
+# The project layer: which runs happen at all
+# --------------------------------------------------------------------------- #
+
+
+def cmd_project(args) -> int:
+    """Inspect the orchestration layer above a single run.
+
+    Deliberately read-only for now. Driving a project needs a `RunLauncher`
+    bound to real Herdr dispatch, and shipping a command that *looks* like it
+    orchestrates while executing nothing would be worse than not shipping it:
+    the thing this project keeps finding is claims that outrun what was
+    measured. `status` and `resume` answer the question a returning session
+    actually has -- what does this state say to do next -- and they answer it
+    from the persisted file alone.
+    """
+    from .projectstore import ProjectStore, list_projects, resume_decision
+
+    if args.project_cmd == "list":
+        projekte = list_projects(args.root)
+        if not projekte:
+            print(f"no projects under {args.root}")
+            return 0
+        for pid in projekte:
+            try:
+                st = ProjectStore(args.root, pid).read_state()
+                verdikt, _ = resume_decision(st)
+                offen = sum(1 for n in st.nodes if not n.settled)
+                print(f"{pid}  {verdikt:9s}  nodes={len(st.nodes)} open={offen} "
+                      f"closure_gen={st.closure_generation}")
+            except StoreError as exc:
+                print(f"{pid}  UNREADABLE: {exc}")
+        return 0
+
+    store = ProjectStore(args.root, args.project_id)
+    if not store.exists():
+        print(f"project {args.project_id} has no state under {args.root}", file=sys.stderr)
+        return 2
+    try:
+        st = store.read_state()
+    except StoreError as exc:
+        # A damaged state blocks rather than being replaced, and the exit code
+        # says so: a reader scripting against this must not see 0.
+        print(f"UNREADABLE: {exc}", file=sys.stderr)
+        return 3
+
+    verdikt, grund = resume_decision(st)
+
+    if args.project_cmd == "resume":
+        print(json.dumps({"project_id": st.project_id, "verdict": verdikt,
+                          "reason": grund, "measurement_head": st.measurement_head,
+                          "closure_generation": st.closure_generation,
+                          "rc_closed": st.rc_closed()}, indent=2))
+        return 0
+
+    # status
+    print(f"project {st.project_id}  ({st.repo_path})")
+    print(f"  verdict          {verdikt}")
+    print(f"  reason           {grund}")
+    print(f"  dag terminal     {st.dag_terminal()}")
+    print(f"  gates green      {st.gates_green()}")
+    print(f"  RC_CLOSED        {st.rc_closed()}")
+    print(f"  measured at      {st.measurement_head or '(nothing recorded)'}")
+    print(f"  closure gen      {st.closure_generation}")
+    print(f"  write_seq        {st.write_seq}")
+    print("  nodes:")
+    for n in st.nodes:
+        marke = "repair" if n.repair_of else ""
+        print(f"    {n.id:24s} {n.lifecycle.value:10s} {n.action_class.value:8s} "
+              f"rej={n.rejections} {marke}")
+    if st.gates:
+        letzte = {}
+        for g in st.gates:
+            letzte[g.name] = g
+        print("  gates (most recent per name):")
+        for name, g in sorted(letzte.items()):
+            print(f"    {name:24s} {g.outcome.value:8s} @{g.subject}")
+    if st.decisions:
+        print(f"  decisions: {len(st.decisions)} recorded, latest:")
+        d = st.decisions[-1]
+        print(f"    {d.id} {d.kind.value} by {d.actor}: {d.reason}")
+    return 0
+
+
+# --------------------------------------------------------------------------- #
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -1039,6 +1123,20 @@ def build_parser() -> argparse.ArgumentParser:
 
     c = sub.add_parser("list", help="All runs")
     c.set_defaults(func=cmd_list, run_id=None)
+
+    pr = sub.add_parser(
+        "project",
+        help="The orchestration layer above a run: which runs happen at all",
+    )
+    ps = pr.add_subparsers(dest="project_cmd", required=True)
+    ps.add_parser("list", help="All projects with their resume verdict")
+    for name, helptext in (
+        ("status", "Full state: nodes, gates, closure, decisions"),
+        ("resume", "What a fresh session should do, as JSON"),
+    ):
+        sp = ps.add_parser(name, help=helptext)
+        sp.add_argument("project_id")
+    pr.set_defaults(func=cmd_project, run_id=None, project_id=None)
 
     return p
 

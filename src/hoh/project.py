@@ -1,0 +1,317 @@
+"""Typed contracts for the orchestration layer above a single run.
+
+`contracts.py` models one run: a plan, its candidates, its evidence, its
+verdict. This module models the layer above it -- which runs exist at all,
+what order they may go in, what the global gates said about the merged
+result, and what a human decided rather than the orchestrator.
+
+Why that layer needs a schema of its own, stated plainly because it is the
+whole justification for this file: the campaign that produced this project's
+own release ran that layer as an **agent session's behaviour**. It wrote the
+specifications, started the runs, read the verdicts, decided the merges, ran
+the global gates and turned their failures into repair runs -- and none of
+that was written down anywhere a second session could read. The knowledge
+lived in one conversation. If that conversation ended, the only recovery was
+a person reconstructing intent from git history.
+
+That is the gap this module closes. A new orchestrator session, holding
+nothing but this state, must be able to determine what to do next without
+guessing. Everything needed for that decision is therefore a field here, and
+every orchestrator decision that is not derivable from the tree -- adding a
+dependency edge, disposing of a policy finding, releasing a merge, creating a
+repair node -- becomes a digest-bound record rather than a remembered
+intention.
+
+Two distinctions from the run layer are carried over deliberately, because
+this project learned both the hard way:
+
+* **A terminal DAG is not a closed release.** `DAG_TERMINAL != RC_CLOSED`.
+  Every planned node being merged says nothing about whether the *combined*
+  state is sound. Closure additionally requires every global gate green and
+  no new repair node created by the pass that checked them, which makes
+  closure a fixpoint rather than the end of a list.
+* **A measurement has to name what it measured.** Gate results carry the
+  commit they ran against, not just a verdict. A green recorded without its
+  subject is indistinguishable from a green that has since gone stale.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+from enum import StrEnum
+from typing import Any
+
+from pydantic import Field, model_validator
+
+from .contracts import Strict, utcnow
+
+PROJECT_SCHEMA_VERSION = 1
+
+
+def digest_obj(obj: Any) -> str:
+    """A stable digest of any JSON-serialisable object.
+
+    Sorted keys and fixed separators: two runs that produced the same decision
+    must produce the same digest, or digest-binding is decorative.
+    """
+    text = json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
+
+
+class Lifecycle(StrEnum):
+    """Where a task node sits.
+
+    `BLOCKED` is deliberately distinct from `CONTINGENT`: blocked means a
+    policy or a human stands in the way and the orchestrator may not proceed
+    on its own; contingent means the node only becomes real if some earlier
+    result turns out a particular way. Collapsing them would let an
+    orchestrator talk itself past a policy gate by re-evaluating a condition.
+    """
+
+    READY = "READY"
+    RUNNING = "RUNNING"
+    MERGED = "MERGED"
+    BLOCKED = "BLOCKED"
+    CONTINGENT = "CONTINGENT"
+    ABANDONED = "ABANDONED"
+
+
+#: Lifecycle states that no longer block a dependent node.
+SETTLED = frozenset({Lifecycle.MERGED, Lifecycle.ABANDONED})
+
+
+class ActionClass(StrEnum):
+    """Whether a node contains an irreversible external action.
+
+    Kept deliberately narrow. A `git merge` into the mainline is local and
+    reversible; a `git push` is not. A tag is local; `push --tags` is not.
+    Only `EXTERNAL` requires an authority outside the orchestrator, and
+    treating anything else as external turns the gate into noise that gets
+    routinely waved through.
+    """
+
+    INTERNAL = "INTERNAL"
+    EXTERNAL = "EXTERNAL"
+
+
+class GateOutcome(StrEnum):
+    GREEN = "GREEN"
+    RED = "RED"
+    #: Not executed. Never to be read as green -- see the house rule this
+    #: project works under, and the dry-run defect that made it necessary to
+    #: give "not executed" a value of its own rather than an exit code of 0.
+    NOT_RUN = "NOT_RUN"
+
+
+class DecisionKind(StrEnum):
+    """Orchestrator decisions that are not derivable from the tree.
+
+    Each of these was, during this project's own campaign, a judgement made
+    inside a conversation and recoverable only from it.
+    """
+
+    ADD_DEPENDENCY = "ADD_DEPENDENCY"
+    SPEC_AMENDMENT = "SPEC_AMENDMENT"
+    POLICY_DISPOSITION = "POLICY_DISPOSITION"
+    MERGE_RELEASE = "MERGE_RELEASE"
+    CREATE_REPAIR_NODE = "CREATE_REPAIR_NODE"
+    ABANDON_NODE = "ABANDON_NODE"
+    CLOSURE_VERDICT = "CLOSURE_VERDICT"
+
+
+class GateResult(Strict):
+    """One global gate, and the state it actually ran against.
+
+    `subject` is not optional and not decorative. A gate result without the
+    commit it measured cannot be distinguished later from one that has gone
+    stale, and this project shipped a release whose figures were wrong for
+    exactly that reason: every gate agreed with a number because every gate
+    ran in the tree the number came from.
+    """
+
+    name: str
+    outcome: GateOutcome
+    subject: str = Field(description="commit or tree the gate ran against")
+    exit_code: int | None = None
+    detail: str = ""
+    at: str = Field(default_factory=utcnow)
+
+    @property
+    def counts_as_green(self) -> bool:
+        """NOT_RUN is not green. This property exists so no caller has to
+        remember that, and so the rule is testable in one place."""
+        return self.outcome is GateOutcome.GREEN
+
+
+class DecisionRecord(Strict):
+    """An orchestrator or human decision, bound to a digest of its content.
+
+    `actor` distinguishes the three authorities this project keeps apart:
+    an HoH role inside a run, the orchestrating session above it, and a human
+    acting as policy authority. Collapsing them is precisely the misdescription
+    this project had to correct publicly.
+    """
+
+    id: str
+    kind: DecisionKind
+    actor: str = Field(description="'orchestrator', 'human', or a role name")
+    reason: str
+    payload: dict[str, Any] = Field(default_factory=dict)
+    evidence: list[str] = Field(default_factory=list)
+    at: str = Field(default_factory=utcnow)
+    payload_digest: str = ""
+
+    @model_validator(mode="after")
+    def _bind(self) -> DecisionRecord:
+        expected = digest_obj(self.payload)
+        if not self.payload_digest:
+            object.__setattr__(self, "payload_digest", expected)
+        elif self.payload_digest != expected:
+            raise ValueError(
+                f"decision {self.id}: payload_digest {self.payload_digest} does not "
+                f"match its payload ({expected}) -- a rebound record is a new record"
+            )
+        return self
+
+
+class TaskNode(Strict):
+    """One unit of planned work in the project DAG."""
+
+    id: str
+    lifecycle: Lifecycle = Lifecycle.READY
+    action_class: ActionClass = ActionClass.INTERNAL
+    spec_path: str | None = None
+    spec_digest: str | None = None
+    run_id: str | None = Field(
+        default=None,
+        description=(
+            "The run this node executes as. NOT derivable from the id: a "
+            "continued run declares its own (d7-k -> d7-k2), and the branch is "
+            "a third quantity again. Deriving it means guessing."
+        ),
+    )
+    branch: str | None = None
+    dependencies: list[str] = Field(default_factory=list)
+    #: Paths the node declares it will write. Used to measure whether two
+    #: candidate-parallel nodes actually conflict, rather than assuming.
+    writes: list[str] = Field(default_factory=list)
+    #: Paths whose *content* the node's correctness depends on, even though it
+    #: does not write them. A node reading what another writes is dependent
+    #: even when their write sets are disjoint -- the failure this project hit
+    #: twice, where two individually correct runs merged into a broken state.
+    semantic_reads: list[str] = Field(default_factory=list)
+    produces: list[str] = Field(default_factory=list)
+    invalidates: list[str] = Field(default_factory=list)
+    rejections: int = 0
+    #: Which node's gate failure created this one, if any.
+    repair_of: str | None = None
+    closure_generation: int = 0
+    note: str = ""
+
+    @property
+    def settled(self) -> bool:
+        return self.lifecycle in SETTLED
+
+
+class ProjectState(Strict):
+    """The durable state of one orchestrated project.
+
+    Everything a fresh orchestrator session needs in order to decide what to
+    do next, without a conversation to remember.
+    """
+
+    schema_version: int = PROJECT_SCHEMA_VERSION
+    project_id: str
+    repo_path: str
+    created_at: str = Field(default_factory=utcnow)
+    updated_at: str = Field(default_factory=utcnow)
+
+    nodes: list[TaskNode] = Field(default_factory=list)
+    decisions: list[DecisionRecord] = Field(default_factory=list)
+    gates: list[GateResult] = Field(default_factory=list)
+
+    #: How many times global closure has been attempted. Each failed attempt
+    #: that produces repair work increments it, so a fixpoint is visible as a
+    #: generation that created no new nodes.
+    closure_generation: int = 0
+    #: The commit the last closure attempt attested. Named for the same reason
+    #: GateResult.subject is.
+    measurement_head: str | None = None
+    policy_digest: str | None = None
+
+    #: Monotonic; a writer holding an older value is stale and is refused.
+    write_seq: int = Field(default=0, ge=0)
+
+    def node(self, node_id: str) -> TaskNode | None:
+        for n in self.nodes:
+            if n.id == node_id:
+                return n
+        return None
+
+    def unknown_dependencies(self) -> dict[str, list[str]]:
+        """Dependencies naming nodes that do not exist.
+
+        Reported rather than ignored: a dependency on a node that was never
+        created reads, to a scheduler, exactly like a dependency that is
+        already satisfied.
+        """
+        bekannt = {n.id for n in self.nodes}
+        fehlend = {}
+        for n in self.nodes:
+            offen = [d for d in n.dependencies if d not in bekannt]
+            if offen:
+                fehlend[n.id] = offen
+        return fehlend
+
+    def ready(self) -> list[TaskNode]:
+        """Nodes that are READY and whose dependencies have all settled.
+
+        A node with an unknown dependency is **not** returned. Treating an
+        unresolvable dependency as satisfied is how a scheduler runs work
+        whose precondition never happened.
+        """
+        bekannt = {n.id: n for n in self.nodes}
+        offen = []
+        for n in self.nodes:
+            if n.lifecycle is not Lifecycle.READY:
+                continue
+            if any(d not in bekannt for d in n.dependencies):
+                continue
+            if all(bekannt[d].settled for d in n.dependencies):
+                offen.append(n)
+        return offen
+
+    def dag_terminal(self) -> bool:
+        """Every node settled. Necessary for closure, nowhere near sufficient."""
+        return all(n.settled for n in self.nodes)
+
+    def gates_green(self) -> bool:
+        """The latest result per gate name is GREEN, and at least one gate ran.
+
+        Zero gates is not green: a closure that checked nothing has not
+        established anything, and returning True for an empty set is the
+        purest form of the failure this whole project is about.
+        """
+        letzte: dict[str, GateResult] = {}
+        for g in self.gates:
+            letzte[g.name] = g
+        if not letzte:
+            return False
+        return all(g.counts_as_green for g in letzte.values())
+
+    def rc_closed(self) -> bool:
+        """`DAG_TERMINAL != RC_CLOSED`, expressed once, here.
+
+        Closure needs all three: the DAG terminal, every global gate green,
+        and no repair node still outstanding from the pass that checked them.
+        """
+        if not self.dag_terminal():
+            return False
+        if not self.gates_green():
+            return False
+        offen = [n for n in self.nodes if n.repair_of and not n.settled]
+        return not offen
+
+    def touch(self) -> None:
+        self.updated_at = utcnow()

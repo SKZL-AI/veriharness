@@ -1,0 +1,130 @@
+# Continuous integration for VeriHarness.
+#
+# The point of this workflow is narrow and worth stating, because a green badge
+# that proves nothing is worse than no badge. It answers one question: can a
+# stranger, starting from a clean checkout on a machine that is not the
+# author's, get a working installation?
+#
+# That question was open until 2026-09-10. `RC_GATE.md` carried "clean install"
+# as NOT_RUN through three release candidates, honestly labelled but unmeasured,
+# because the only machine that had ever built this package was the one that
+# wrote it.
+#
+# Note what the install job does *not* treat as success. Importing `hoh` proves
+# nothing: this project shipped a wheel once that imported cleanly and could not
+# execute a single acceptance check, because the guard pattern files were not
+# packaged. `tools/clean_install_check.py` therefore reads the policy back out
+# of the installed copy and calls the guard, requiring it to allow a harmless
+# command and refuse a forbidden one. Its own negative control removes the
+# package-data declaration and requires the check to go red.
+#
+# Herdr is deliberately absent here. HoH refuses to start without HERDR_ENV=1,
+# and standing up a terminal multiplexer in CI would test the mock, not the
+# integration. That gap is real and stays named rather than papered over: see
+# docs/LIMITATIONS.md.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  suite:
+    name: tests and linter (Python ${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # The floor is what pyproject declares (>=3.11); the ceiling is the
+        # newest release. A version that is claimed as supported and never
+        # exercised is a claim, not a fact.
+        python: ['3.11', '3.12', '3.13']
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Install test and lint tooling
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pytest ruff
+
+      - name: Ruff (F and E9 only, matching the release gate)
+        run: ruff check --select F,E9 src tests tools
+
+      - name: Test suite
+        run: python -m pytest -q
+
+  clean-install:
+    name: clean install from a built wheel
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install build backend
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install build
+
+      # Builds a wheel and an sdist from a clean copy, installs the wheel into
+      # a fresh virtual environment, runs the console script, reads the
+      # packaged policy back out of the install, and exercises the guard.
+      - name: Build, install into a fresh venv, and exercise the guard
+        run: python tools/clean_install_check.py --source .
+
+  minimal-example:
+    name: the recorded rejection still reads
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # examples/minimal/ ships a recorded rejection: a real candidate, a real
+      # failing preservation check, and the receipts behind the refusal. Running
+      # the loop itself needs Herdr and three agent sessions of quota, so what
+      # is checked here is that the recorded evidence is present and parses --
+      # the part a reader can verify without an API key.
+      - name: The recorded rejection is present and parses
+        run: |
+          python - <<'PY'
+          import json, pathlib, sys
+
+          wurzel = pathlib.Path("examples/minimal")
+          if not wurzel.is_dir():
+              sys.exit("examples/minimal/ is missing")
+
+          belege = sorted(wurzel.rglob("receipts/*.json"))
+          if not belege:
+              sys.exit("no receipts under examples/minimal/ -- the recorded rejection is the example")
+
+          fehler = []
+          for f in belege:
+              try:
+                  json.loads(f.read_text())
+              except Exception as e:
+                  fehler.append(f"{f}: {e}")
+          if fehler:
+              sys.exit("unparseable receipts:\n  " + "\n  ".join(fehler))
+
+          print(f"{len(belege)} recorded receipts, all parse")
+          PY

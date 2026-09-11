@@ -219,6 +219,12 @@ _VERSIONED_SIBLING_RE = re.compile(r"^(?P<base>.+)\.v\d+\.(?P<rest>.+)$")
 #: Directories whose entire subtree gets one fixed rule regardless of
 #: content. Checked, in this order, before any content-based rule.
 _DIRECTORY_RULES = (
+    # Continuous-integration configuration belongs in the published repository:
+    # it is what makes the clean-install claim checkable by someone who does not
+    # have this machine. Classified as repo-meta rather than tooling because it
+    # configures the host, not the project -- nothing under it is imported or
+    # executed by `hoh` itself.
+    (".github", "INCLUDE", "repo-meta"),
     ("tests", "INCLUDE", "tests"),
     ("tools", "INCLUDE", "tooling"),
     ("examples", "INCLUDE", "example"),
