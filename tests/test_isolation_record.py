@@ -910,6 +910,7 @@ def test_a_check_appending_to_the_proof_pipe_cannot_change_it(tmp_path):
     assert not r.isolation.honoured()
 
 
+@braucht_bwrap
 def test_a_check_that_tidies_its_own_tmpdir_is_not_punished(tmp_path):
     """An ordinary passing check that cleans up after itself used to destroy
     the proof and be scored as an infrastructure refusal."""
@@ -1179,3 +1180,44 @@ def test_nosandbox_refuses_strict_through_the_plan_as_well(tmp_path):
     )
     with pytest.raises(SandboxUnavailable, match="cannot provide"):
         NoSandbox().plan(["/bin/bash", "-c", "true"], spec)
+
+
+# --------------------------------------------------------------------------- #
+# The rule the CI had to find for us
+# --------------------------------------------------------------------------- #
+
+
+def test_every_test_that_really_needs_a_sandbox_says_so():
+    """A test that asks the *real* backend for STRICT needs `@braucht_bwrap`.
+
+    Found by CI, not here: on a runner that cannot create the namespace, the
+    runner refuses -- correctly -- and the check comes back 126. On this
+    machine it passes. One test in this file was missing the marker, and the
+    only place that could show was a machine that is not this one.
+
+    So the rule is checked here rather than remembered. A test that injects its
+    own backend is exempt: it never touches bubblewrap.
+    """
+    import ast
+
+    quelle = pathlib.Path(__file__).read_text()
+    zeilen = quelle.splitlines()
+    fehlend = []
+    for knoten in ast.parse(quelle).body:
+        if not isinstance(knoten, ast.FunctionDef):
+            continue
+        if not knoten.name.startswith("test_"):
+            continue
+        text = "\n".join(zeilen[knoten.lineno - 1: knoten.end_lineno])
+        if "run_check(" not in text or "Isolation.STRICT" not in text:
+            continue
+        if "sandbox=" in text:
+            continue
+        namen = {getattr(d, "id", getattr(d, "attr", ""))
+                 for d in knoten.decorator_list}
+        if "braucht_bwrap" not in namen:
+            fehlend.append(knoten.name)
+    assert not fehlend, (
+        "these ask the real backend for STRICT and will fail on a machine "
+        f"without namespaces: {fehlend}"
+    )
