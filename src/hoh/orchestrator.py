@@ -129,6 +129,27 @@ class RunLauncher(Protocol):
 
     def launch(self, node: TaskNode) -> RunOutcome: ...
 
+    def accepted_baseline(self, node: TaskNode) -> str | None:
+        """The candidate the run had already accepted, before this dispatch.
+
+        Read before launching and written into project state, because after a
+        crash it is the only thing that distinguishes "this dispatch accepted
+        something" from "something was accepted earlier".
+        """
+        ...
+
+    def evaluate(self, node: TaskNode) -> RunOutcome:
+        """The verdict of an already-dispatched run, **without dispatching**.
+
+        This is what makes a resume exactly-once. A fresh process that finds a
+        node marked RUNNING has three possibilities in front of it -- the work
+        finished, it crashed, or it is still going -- and re-dispatching to find
+        out would re-run an acceptance that may already have happened. Reading
+        the run's own recorded state answers the question without spending
+        anything, and returns UNDETERMINED when it genuinely cannot.
+        """
+        ...
+
     def merge(self, node: TaskNode, outcome: RunOutcome) -> bool:
         """Applies an accepted candidate. Returns whether it actually landed."""
         ...
@@ -282,18 +303,27 @@ class ProjectController:
             schritte.append(Step(0, HaltClass.BLOCKED_DEPENDENCY, detail=grund))
             return Result(HaltClass.BLOCKED_DEPENDENCY, grund, schritte)
 
-        # A RUNNING node means a previous session died mid-dispatch. Whether
-        # that work finished, crashed, or is still live cannot be read here.
+        # A RUNNING node means a previous session died mid-dispatch. Rather
+        # than halting on principle, ask the run's own recorded state what
+        # happened -- that is a read, costs nothing, and is the only way a
+        # resume can be exactly-once. Re-dispatching to find out would re-run
+        # an acceptance that may already have happened.
         laufend = [n for n in state.nodes if n.lifecycle is Lifecycle.RUNNING]
-        if laufend:
-            grund = (
-                "nodes recorded as RUNNING with no live controller: "
-                + ", ".join(n.id for n in laufend)
-                + " -- whether that work finished, crashed, or is still going has to be "
-                "established against the run record before anything else is decided"
-            )
-            schritte.append(Step(0, HaltClass.AMBIGUOUS, detail=grund))
-            return Result(HaltClass.AMBIGUOUS, grund, schritte)
+        for n in laufend:
+            ausgang = self.launcher.evaluate(n)
+            schritte.append(Step(0, "EVALUATED", n.id, f"{ausgang.verdict}: {ausgang.detail}"))
+            if ausgang.verdict is RunVerdict.UNDETERMINED:
+                grund = (
+                    f"node {n.id} is recorded as RUNNING and its run state does not say "
+                    f"what happened: {ausgang.detail}. Re-dispatching could repeat an "
+                    "acceptance that already landed, so this is not decided here"
+                )
+                schritte.append(Step(0, HaltClass.AMBIGUOUS, n.id, grund))
+                return Result(HaltClass.AMBIGUOUS, grund, schritte)
+            state = self._settle(state, n.id, ausgang, 0, schritte)
+            if isinstance(state, Result):
+                state.steps = schritte
+                return state
 
         for runde in range(1, self.max_rounds + 1):
             bereit = state.ready()
@@ -327,7 +357,35 @@ class ProjectController:
                              "measured semantic dependency")
                     )
 
+            # Before spending anything, ask whether this node's run has
+            # *already* accepted something newer than the baseline this node
+            # carries. It can have: a dispatch that succeeded and whose merge
+            # then failed leaves exactly that state, and re-dispatching would
+            # pay again for work that is already verified -- and could accept a
+            # second, different candidate for the same node.
+            #
+            # Found by the first real end-to-end run: the candidate was
+            # accepted, the merge was blocked by untracked build output, and
+            # after the obstruction was cleared the node was READY again with
+            # its acceptance still sitting in the run record.
+            vorab = self.launcher.evaluate(knoten)
+            if vorab.verdict is RunVerdict.ACCEPTED:
+                schritte.append(Step(runde, "ALREADY_ACCEPTED", knoten.id, vorab.detail))
+                ergebnis = self._settle(state, knoten.id, vorab, runde, schritte)
+                if isinstance(ergebnis, Result):
+                    ergebnis.steps = schritte
+                    ergebnis.rounds = runde
+                    ergebnis.repairs_created = reparaturen
+                    return ergebnis
+                state = ergebnis
+                continue
+
             knoten.lifecycle = Lifecycle.RUNNING
+            # The baseline goes into state before the dispatch, not after: it
+            # is what a fresh process needs in order to tell an acceptance from
+            # a run that ended where it started, and a process that dies during
+            # the dispatch is exactly when it is needed.
+            knoten.accepted_before = self.launcher.accepted_baseline(knoten)
             try:
                 state = self._persist(state)
             except StaleWrite as exc:
@@ -338,76 +396,96 @@ class ProjectController:
             assert knoten is not None
 
             ausgang = self.launcher.launch(knoten)
-
-            if ausgang.verdict is RunVerdict.PROVIDER_UNAVAILABLE:
-                knoten.lifecycle = Lifecycle.BLOCKED
-                knoten.note = ausgang.detail
-                state = self._persist(state)
-                grund = f"node {knoten.id}: {ausgang.detail or 'provider unavailable'}"
-                schritte.append(Step(runde, HaltClass.BLOCKED_PROVIDER, knoten.id, grund))
-                return Result(HaltClass.BLOCKED_PROVIDER, grund, schritte, runde, reparaturen)
-
-            if ausgang.verdict is RunVerdict.NOT_RUN:
-                knoten.lifecycle = Lifecycle.READY
-                state = self._persist(state)
-                grund = f"dry run: node {knoten.id} was not dispatched, so nothing was established"
-                schritte.append(Step(runde, HaltClass.NOT_RUN, knoten.id, grund))
-                return Result(HaltClass.NOT_RUN, grund, schritte, runde, reparaturen)
-
-            if ausgang.verdict is RunVerdict.ACCEPTED:
-                gelandet = self.launcher.merge(knoten, ausgang)
-                if not gelandet:
-                    # Accepted but the merge did not land: exactly the state
-                    # that must not be guessed at. Re-merging risks applying a
-                    # candidate twice; abandoning discards verified work.
-                    grund = (
-                        f"node {knoten.id} was accepted but its candidate did not land; "
-                        "re-merging risks applying it twice and abandoning discards "
-                        "verified work, so this is not decided here"
-                    )
-                    knoten.lifecycle = Lifecycle.BLOCKED
-                    knoten.note = grund
-                    state = self._persist(state)
-                    schritte.append(Step(runde, HaltClass.AMBIGUOUS, knoten.id, grund))
-                    return Result(HaltClass.AMBIGUOUS, grund, schritte, runde, reparaturen)
-                knoten.lifecycle = Lifecycle.MERGED
-                self._record(
-                    state, DecisionKind.MERGE_RELEASE,
-                    f"every criterion passed and the candidate landed on {ausgang.candidate or 'the mainline'}",
-                    {"node": knoten.id, "candidate": ausgang.candidate},
-                )
-                state = self._persist(state)
-                schritte.append(Step(runde, "MERGED", knoten.id))
-                continue
-
-            if ausgang.verdict is RunVerdict.REJECTED:
-                knoten.rejections += 1
-                if knoten.rejections > MAX_REJECTIONS:
-                    knoten.lifecycle = Lifecycle.ABANDONED
-                    self._record(
-                        state, DecisionKind.ABANDON_NODE,
-                        f"{knoten.rejections} rejections without progress",
-                        {"node": knoten.id},
-                    )
-                    schritte.append(Step(runde, "ABANDONED", knoten.id,
-                                         f"{knoten.rejections} rejections"))
-                else:
-                    knoten.lifecycle = Lifecycle.READY
-                    schritte.append(Step(runde, "REJECTED", knoten.id,
-                                         f"attempt {knoten.rejections}"))
-                state = self._persist(state)
-                continue
-
-            grund = f"node {knoten.id}: unclassifiable verdict {ausgang.verdict!r}"
-            knoten.lifecycle = Lifecycle.BLOCKED
-            knoten.note = grund
-            state = self._persist(state)
-            schritte.append(Step(runde, HaltClass.AMBIGUOUS, knoten.id, grund))
-            return Result(HaltClass.AMBIGUOUS, grund, schritte, runde, reparaturen)
+            ergebnis = self._settle(state, knoten.id, ausgang, runde, schritte)
+            if isinstance(ergebnis, Result):
+                ergebnis.steps = schritte
+                ergebnis.rounds = runde
+                ergebnis.repairs_created = reparaturen
+                return ergebnis
+            state = ergebnis
+            continue
 
         grund = f"{self.max_rounds} rounds without reaching a fixpoint"
         schritte.append(Step(self.max_rounds, HaltClass.ROUND_LIMIT, detail=grund))
         return Result(HaltClass.ROUND_LIMIT, grund, schritte, self.max_rounds, reparaturen)
+
+    def _settle(
+        self, state: ProjectState, node_id: str, ausgang: RunOutcome,
+        runde: int, schritte: list[Step],
+    ) -> "ProjectState | Result":
+        """Turns one run outcome into a persisted lifecycle transition.
+
+        Shared by the main loop and the resume path on purpose. Two copies of
+        this would be two chances for a resumed session to decide differently
+        from the session it is resuming -- and "differently" here means merging
+        twice or discarding verified work.
+        """
+        knoten = state.node(node_id)
+        assert knoten is not None
+
+        if ausgang.verdict is RunVerdict.PROVIDER_UNAVAILABLE:
+            knoten.lifecycle = Lifecycle.BLOCKED
+            knoten.note = ausgang.detail
+            self._persist(state)
+            grund = f"node {node_id}: {ausgang.detail or 'provider unavailable'}"
+            schritte.append(Step(runde, HaltClass.BLOCKED_PROVIDER, node_id, grund))
+            return Result(HaltClass.BLOCKED_PROVIDER, grund)
+
+        if ausgang.verdict is RunVerdict.NOT_RUN:
+            knoten.lifecycle = Lifecycle.READY
+            self._persist(state)
+            grund = f"dry run: node {node_id} was not dispatched, so nothing was established"
+            schritte.append(Step(runde, HaltClass.NOT_RUN, node_id, grund))
+            return Result(HaltClass.NOT_RUN, grund)
+
+        if ausgang.verdict is RunVerdict.ACCEPTED:
+            gelandet = self.launcher.merge(knoten, ausgang)
+            if not gelandet:
+                # Accepted but the merge did not land: exactly the state that
+                # must not be guessed at. Re-merging risks applying a candidate
+                # twice; abandoning discards verified work.
+                grund = (
+                    f"node {node_id} was accepted but its candidate did not land; "
+                    "re-merging risks applying it twice and abandoning discards "
+                    "verified work, so this is not decided here"
+                )
+                knoten.lifecycle = Lifecycle.BLOCKED
+                knoten.note = grund
+                self._persist(state)
+                schritte.append(Step(runde, HaltClass.AMBIGUOUS, node_id, grund))
+                return Result(HaltClass.AMBIGUOUS, grund)
+            knoten.lifecycle = Lifecycle.MERGED
+            self._record(
+                state, DecisionKind.MERGE_RELEASE,
+                f"every criterion passed and the candidate landed on "
+                f"{ausgang.candidate or 'the mainline'}",
+                {"node": node_id, "candidate": ausgang.candidate},
+            )
+            neu_state = self._persist(state)
+            schritte.append(Step(runde, "MERGED", node_id))
+            return neu_state
+
+        if ausgang.verdict is RunVerdict.REJECTED:
+            knoten.rejections += 1
+            if knoten.rejections > MAX_REJECTIONS:
+                knoten.lifecycle = Lifecycle.ABANDONED
+                self._record(
+                    state, DecisionKind.ABANDON_NODE,
+                    f"{knoten.rejections} rejections without progress",
+                    {"node": node_id},
+                )
+                schritte.append(Step(runde, "ABANDONED", node_id, f"{knoten.rejections} rejections"))
+            else:
+                knoten.lifecycle = Lifecycle.READY
+                schritte.append(Step(runde, "REJECTED", node_id, f"attempt {knoten.rejections}"))
+            return self._persist(state)
+
+        grund = f"node {node_id}: unclassifiable verdict {ausgang.verdict!r}"
+        knoten.lifecycle = Lifecycle.BLOCKED
+        knoten.note = grund
+        self._persist(state)
+        schritte.append(Step(runde, HaltClass.AMBIGUOUS, node_id, grund))
+        return Result(HaltClass.AMBIGUOUS, grund)
 
     # -- global closure ---------------------------------------------------- #
 

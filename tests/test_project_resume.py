@@ -557,3 +557,75 @@ def test_cli_list_zeigt_jedes_projekt_mit_verdikt(tmp_path, capsys):
     assert main(["--root", str(tmp_path), "project", "list"]) == 0
     aus = capsys.readouterr().out
     assert "eins" in aus and "zwei" in aus
+
+
+# --------------------------------------------------------------------------- #
+# A blocked node needs a way back, and it has to leave a record
+# --------------------------------------------------------------------------- #
+
+def test_unblock_verlangt_einen_grund_und_schreibt_ihn_auf(tmp_path):
+    """Refusing to decide was right; leaving no way back is not.
+
+    Without this the only route out of a blocked project is editing the state
+    file by hand -- the one thing a durable, digest-bound state exists to make
+    unnecessary. The reason is required, because "someone unblocked it" with no
+    why is exactly the unrecoverable intent this layer was built to stop losing.
+    """
+    from hoh.projectstore import unblock
+
+    s = ProjectStore(tmp_path, "p")
+    st = projekt(tmp_path)
+    st.nodes = [TaskNode(id="a", lifecycle=Lifecycle.BLOCKED,
+                         note="accepted but the candidate did not land")]
+    s.create(st)
+
+    nachher = unblock(s, "a", "untracked build output removed; the merge can land now")
+    n = nachher.node("a")
+    assert n.lifecycle is Lifecycle.READY
+    # The original reason stays readable: what it was blocked for matters after
+    # it is running again.
+    assert "did not land" in n.note
+    assert "untracked build output" in n.note
+    d = nachher.decisions[-1]
+    assert d.actor == "human"
+    assert "untracked build output" in d.reason
+    assert d.payload["was_blocked_for"].startswith("accepted but")
+
+
+def test_unblock_verweigert_was_nicht_blockiert_ist(tmp_path):
+    """Unblocking something that is not blocked would hide whatever it is
+    actually doing."""
+    from hoh.projectstore import unblock
+
+    s = ProjectStore(tmp_path, "p")
+    st = projekt(tmp_path)
+    st.nodes = [TaskNode(id="a", lifecycle=Lifecycle.RUNNING)]
+    s.create(st)
+    with pytest.raises(StoreError) as exc:
+        unblock(s, "a", "because I said so")
+    assert "not BLOCKED" in str(exc.value)
+
+
+def test_unblock_kennt_unbekannte_knoten_nicht(tmp_path):
+    from hoh.projectstore import unblock
+
+    s = ProjectStore(tmp_path, "p")
+    s.create(projekt(tmp_path))
+    with pytest.raises(StoreError):
+        unblock(s, "gibtesnicht", "x")
+
+
+def test_cli_unblock_hat_einen_eigenen_exitcode_fuer_verweigerung(tmp_path, capsys):
+    from hoh.cli import main
+
+    s = ProjectStore(tmp_path, "p")
+    st = projekt(tmp_path)
+    st.nodes = [TaskNode(id="a", lifecycle=Lifecycle.BLOCKED, note="stuck")]
+    s.create(st)
+
+    assert main(["--root", str(tmp_path), "project", "unblock", "p", "a",
+                 "--reason", "the obstruction is gone"]) == 0
+    assert s.read_state().node("a").lifecycle is Lifecycle.READY
+    # Doing it twice is refused, and not with 0.
+    assert main(["--root", str(tmp_path), "project", "unblock", "p", "a",
+                 "--reason", "again"]) == 4

@@ -1354,16 +1354,16 @@
     },
     {
       "id": "C-130",
-      "text": "| Recorded findings | **99** |",
+      "text": "| Recorded findings | **100** |",
       "where": "README.md:117",
       "status": "SUPPORTED",
       "evidence": [
         "receiptcount:d8=26",
         "run:d8/1"
       ],
-      "anchor_digest": "72c52763c66b10f385be9ccc03e3cfae1991f7dd2189b6426b37928a4064efca",
+      "anchor_digest": "e0abd2365a98c47f9e7209b18ea2546d6aaac55d4081099145b089a8c6f2fb3c",
       "local_only_resolution": "Resolved by the orchestrating agent session on 2026-09-10 in the development repository: 94 findings, by counting distinct finding numbers in the development ledger. Re-checkable with the operator tool kampagne-zahlen.py, which re-derives this figure from its source and compares it against this exact line (README.md:117), failing on any disagreement; its negative control nk-kampagne-zahlen.py falsifies each number in turn and requires the checker to go red on every one.",
-      "note": "Catalogued during the rc2 correction cycle. The figure is not left free-standing in prose: it is bound to its source by a checker that fails the release gate on drift, which is the defect class that made this cycle necessary. Figure updated from 94 to 95 on 2026-09-10, when finding O95 was recorded; the earlier wording was \"| Recorded findings | **94** |\". Finding count updated from 95 to 96 on 2026-09-10, when finding O96 was recorded; the earlier wording was \"| Recorded findings | **95** |\". Anchor re-derived on 2026-09-10 (similarity 0.97) after finding O97: the attribution figures are now measured at a named commit rather than at HEAD, because the commit that writes them changes them. The earlier wording was: \"| Recorded findings | **96** |\". Finding count updated to 98 on 2026-09-10 (O98 recorded); the earlier wording was \"| Recorded findings | **97** |\". Finding count updated to 99 on 2026-09-11 (O99 recorded); the earlier wording was \"| Recorded findings | **98** |\"."
+      "note": "Catalogued during the rc2 correction cycle. The figure is not left free-standing in prose: it is bound to its source by a checker that fails the release gate on drift, which is the defect class that made this cycle necessary. Figure updated from 94 to 95 on 2026-09-10, when finding O95 was recorded; the earlier wording was \"| Recorded findings | **94** |\". Finding count updated from 95 to 96 on 2026-09-10, when finding O96 was recorded; the earlier wording was \"| Recorded findings | **95** |\". Anchor re-derived on 2026-09-10 (similarity 0.97) after finding O97: the attribution figures are now measured at a named commit rather than at HEAD, because the commit that writes them changes them. The earlier wording was: \"| Recorded findings | **96** |\". Finding count updated to 98 on 2026-09-10 (O98 recorded); the earlier wording was \"| Recorded findings | **97** |\". Finding count updated to 99 on 2026-09-11 (O99 recorded); the earlier wording was \"| Recorded findings | **98** |\". Finding count updated to 100 on 2026-09-11 (O100 recorded); the earlier wording was \"| Recorded findings | **99** |\"."
     },
     {
       "id": "C-131",
@@ -1380,16 +1380,16 @@
     },
     {
       "id": "C-132",
-      "text": "campaign that produces 99 recorded findings against its own harness is not a",
+      "text": "campaign that produces 100 recorded findings against its own harness is not a",
       "where": "README.md:122",
       "status": "SUPPORTED",
       "evidence": [
         "receiptcount:d8=26",
         "run:d8/1"
       ],
-      "anchor_digest": "47f78dbde493ef6a239c602924b01a86e2050aae8bf2590274360b63bdff3008",
+      "anchor_digest": "81044d595e686e8f9d2a52a0100a432d19b1eb5b9e726388d92d1d414b16d0e1",
       "local_only_resolution": "Resolved by the orchestrating agent session on 2026-09-10 in the development repository: 94 findings, by counting distinct finding numbers in the development ledger. Re-checkable with the operator tool kampagne-zahlen.py, which re-derives this figure from its source and compares it against this exact line (README.md:122), failing on any disagreement; its negative control nk-kampagne-zahlen.py falsifies each number in turn and requires the checker to go red on every one.",
-      "note": "Catalogued during the rc2 correction cycle. The figure is not left free-standing in prose: it is bound to its source by a checker that fails the release gate on drift, which is the defect class that made this cycle necessary. Anchor re-derived on 2026-09-10: the earlier wording was \"campaign that produces 94 recorded findings against its own harness is not\" and implied that finding numbers can be traced into docs/LIMITATIONS.md. They cannot -- that document names no finding numbers, because U2 forbids a shipped file from referencing an unshipped one. The figure itself is unchanged. Figure updated from 94 to 95 on 2026-09-10, when finding O95 was recorded; the earlier wording was \"campaign that produces 94 recorded findings against its own harness is not a\". Finding count updated from 95 to 96 on 2026-09-10, when finding O96 was recorded; the earlier wording was \"campaign that produces 95 recorded findings against its own harness is not a\". Anchor re-derived on 2026-09-10 (similarity 0.99) after finding O97: the attribution figures are now measured at a named commit rather than at HEAD, because the commit that writes them changes them. The earlier wording was: \"campaign that produces 96 recorded findings against its own harness is not a\". Finding count updated to 98 on 2026-09-10 (O98 recorded); the earlier wording was \"campaign that produces 97 recorded findings against its own harness is not a\". Finding count updated to 99 on 2026-09-11 (O99 recorded); the earlier wording was \"campaign that produces 98 recorded findings against its own harness is not a\"."
+      "note": "Catalogued during the rc2 correction cycle. The figure is not left free-standing in prose: it is bound to its source by a checker that fails the release gate on drift, which is the defect class that made this cycle necessary. Anchor re-derived on 2026-09-10: the earlier wording was \"campaign that produces 94 recorded findings against its own harness is not\" and implied that finding numbers can be traced into docs/LIMITATIONS.md. They cannot -- that document names no finding numbers, because U2 forbids a shipped file from referencing an unshipped one. The figure itself is unchanged. Figure updated from 94 to 95 on 2026-09-10, when finding O95 was recorded; the earlier wording was \"campaign that produces 94 recorded findings against its own harness is not a\". Finding count updated from 95 to 96 on 2026-09-10, when finding O96 was recorded; the earlier wording was \"campaign that produces 95 recorded findings against its own harness is not a\". Anchor re-derived on 2026-09-10 (similarity 0.99) after finding O97: the attribution figures are now measured at a named commit rather than at HEAD, because the commit that writes them changes them. The earlier wording was: \"campaign that produces 96 recorded findings against its own harness is not a\". Finding count updated to 98 on 2026-09-10 (O98 recorded); the earlier wording was \"campaign that produces 97 recorded findings against its own harness is not a\". Finding count updated to 99 on 2026-09-11 (O99 recorded); the earlier wording was \"campaign that produces 98 recorded findings against its own harness is not a\". Finding count updated to 100 on 2026-09-11 (O100 recorded); the earlier wording was \"campaign that produces 99 recorded findings against its own harness is not a\"."
     },
     {
       "id": "C-133",
@@ -1458,16 +1458,16 @@
     },
     {
       "id": "C-138",
-      "text": "51 specifications, 45 merges and 99 recorded findings**, across five calendar",
+      "text": "51 specifications, 45 merges and 100 recorded findings**, across five calendar",
       "where": "docs/LIMITATIONS.md:28",
       "status": "SUPPORTED",
       "evidence": [
         "receiptcount:d8=26",
         "run:d8/1"
       ],
-      "anchor_digest": "8d123422a5090fc5914a2d4daa30ac8471deea5daf0190200e922d6abd0f669f",
+      "anchor_digest": "b62ec502b6d6b26966c57d8d5a0fc8d4b02bf176a2465e1fc48d099931579c3b",
       "local_only_resolution": "Resolved by the orchestrating agent session on 2026-09-10 in the development repository: 45 merges, 48 specifications, 94 findings, by counting distinct finding numbers in the development ledger; counting distinct spec_path values across all state.json; counting merge commits on the mainline. Re-checkable with the operator tool kampagne-zahlen.py, which re-derives this figure from its source and compares it against this exact line (docs/LIMITATIONS.md:28), failing on any disagreement; its negative control nk-kampagne-zahlen.py falsifies each number in turn and requires the checker to go red on every one.",
-      "note": "Catalogued during the rc2 correction cycle. The figure is not left free-standing in prose: it is bound to its source by a checker that fails the release gate on drift, which is the defect class that made this cycle necessary. Figure updated from 94 to 95 on 2026-09-10, when finding O95 was recorded; the earlier wording was \"48 specifications, 45 merges and 94 recorded findings**, across five calendar\". Anchor re-derived on 2026-09-10 (similarity 0.97); the earlier wording was: \"48 specifications, 45 merges and 95 recorded findings**, across five calendar\". What changed in the rc2 cycle: the specification count (48 basenames -> 51 distinct contents) and the attribution columns (now counted without merge commits). The statement itself was not withdrawn. Finding count updated from 95 to 96 on 2026-09-10, when finding O96 was recorded; the earlier wording was \"51 specifications, 45 merges and 95 recorded findings**, across five calendar\". Anchor re-derived on 2026-09-10 (similarity 0.99) after finding O97: the attribution figures are now measured at a named commit rather than at HEAD, because the commit that writes them changes them. The earlier wording was: \"51 specifications, 45 merges and 96 recorded findings**, across five calendar\". Finding count updated to 98 on 2026-09-10 (O98 recorded); the earlier wording was \"51 specifications, 45 merges and 97 recorded findings**, across five calendar\". Finding count updated to 99 on 2026-09-11 (O99 recorded); the earlier wording was \"51 specifications, 45 merges and 98 recorded findings**, across five calendar\"."
+      "note": "Catalogued during the rc2 correction cycle. The figure is not left free-standing in prose: it is bound to its source by a checker that fails the release gate on drift, which is the defect class that made this cycle necessary. Figure updated from 94 to 95 on 2026-09-10, when finding O95 was recorded; the earlier wording was \"48 specifications, 45 merges and 94 recorded findings**, across five calendar\". Anchor re-derived on 2026-09-10 (similarity 0.97); the earlier wording was: \"48 specifications, 45 merges and 95 recorded findings**, across five calendar\". What changed in the rc2 cycle: the specification count (48 basenames -> 51 distinct contents) and the attribution columns (now counted without merge commits). The statement itself was not withdrawn. Finding count updated from 95 to 96 on 2026-09-10, when finding O96 was recorded; the earlier wording was \"51 specifications, 45 merges and 95 recorded findings**, across five calendar\". Anchor re-derived on 2026-09-10 (similarity 0.99) after finding O97: the attribution figures are now measured at a named commit rather than at HEAD, because the commit that writes them changes them. The earlier wording was: \"51 specifications, 45 merges and 96 recorded findings**, across five calendar\". Finding count updated to 98 on 2026-09-10 (O98 recorded); the earlier wording was \"51 specifications, 45 merges and 97 recorded findings**, across five calendar\". Finding count updated to 99 on 2026-09-11 (O99 recorded); the earlier wording was \"51 specifications, 45 merges and 98 recorded findings**, across five calendar\". Finding count updated to 100 on 2026-09-11 (O100 recorded); the earlier wording was \"51 specifications, 45 merges and 99 recorded findings**, across five calendar\"."
     },
     {
       "id": "C-139",
@@ -1484,16 +1484,16 @@
     },
     {
       "id": "C-140",
-      "text": "decisions against 65 runs, 51 specifications, 45 merges and 99 findings. The",
+      "text": "decisions against 65 runs, 51 specifications, 45 merges and 100 findings. The",
       "where": "docs/LIMITATIONS.md:47",
       "status": "SUPPORTED",
       "evidence": [
         "receiptcount:d8=26",
         "run:d8/1"
       ],
-      "anchor_digest": "6a9cca82a40845860d2cd7848d9a9ab39fb2e822ef4170d6dc218f29a35776e2",
+      "anchor_digest": "d2b0057becd28bc7d7ca6fe11ff86ea5fa65052b5ee6476c9e02ee8dd122ce63",
       "local_only_resolution": "Resolved by the orchestrating agent session on 2026-09-10 in the development repository: 45 merges, 48 specifications, 65 runs, 94 findings, by counting distinct finding numbers in the development ledger; counting distinct spec_path values across all state.json; counting merge commits on the mainline; counting runs/*/state.json. Re-checkable with the operator tool kampagne-zahlen.py, which re-derives this figure from its source and compares it against this exact line (docs/LIMITATIONS.md:47), failing on any disagreement; its negative control nk-kampagne-zahlen.py falsifies each number in turn and requires the checker to go red on every one.",
-      "note": "Catalogued during the rc2 correction cycle. The figure is not left free-standing in prose: it is bound to its source by a checker that fails the release gate on drift, which is the defect class that made this cycle necessary. Figure updated from 94 to 95 on 2026-09-10, when finding O95 was recorded; the earlier wording was \"decisions against 65 runs, 48 specifications, 45 merges and 94 findings. The\". Anchor re-derived on 2026-09-10 (similarity 0.97); the earlier wording was: \"decisions against 65 runs, 48 specifications, 45 merges and 95 findings. The\". What changed in the rc2 cycle: the specification count (48 basenames -> 51 distinct contents) and the attribution columns (now counted without merge commits). The statement itself was not withdrawn. Finding count updated from 95 to 96 on 2026-09-10, when finding O96 was recorded; the earlier wording was \"decisions against 65 runs, 51 specifications, 45 merges and 95 findings. The\". Anchor re-derived on 2026-09-10 (similarity 0.99) after finding O97: the attribution figures are now measured at a named commit rather than at HEAD, because the commit that writes them changes them. The earlier wording was: \"decisions against 65 runs, 51 specifications, 45 merges and 96 findings. The\". Finding count updated to 98 on 2026-09-10 (O98 recorded); the earlier wording was \"decisions against 65 runs, 51 specifications, 45 merges and 97 findings. The\". Finding count updated to 99 on 2026-09-11 (O99 recorded); the earlier wording was \"decisions against 65 runs, 51 specifications, 45 merges and 98 findings. The\"."
+      "note": "Catalogued during the rc2 correction cycle. The figure is not left free-standing in prose: it is bound to its source by a checker that fails the release gate on drift, which is the defect class that made this cycle necessary. Figure updated from 94 to 95 on 2026-09-10, when finding O95 was recorded; the earlier wording was \"decisions against 65 runs, 48 specifications, 45 merges and 94 findings. The\". Anchor re-derived on 2026-09-10 (similarity 0.97); the earlier wording was: \"decisions against 65 runs, 48 specifications, 45 merges and 95 findings. The\". What changed in the rc2 cycle: the specification count (48 basenames -> 51 distinct contents) and the attribution columns (now counted without merge commits). The statement itself was not withdrawn. Finding count updated from 95 to 96 on 2026-09-10, when finding O96 was recorded; the earlier wording was \"decisions against 65 runs, 51 specifications, 45 merges and 95 findings. The\". Anchor re-derived on 2026-09-10 (similarity 0.99) after finding O97: the attribution figures are now measured at a named commit rather than at HEAD, because the commit that writes them changes them. The earlier wording was: \"decisions against 65 runs, 51 specifications, 45 merges and 96 findings. The\". Finding count updated to 98 on 2026-09-10 (O98 recorded); the earlier wording was \"decisions against 65 runs, 51 specifications, 45 merges and 97 findings. The\". Finding count updated to 99 on 2026-09-11 (O99 recorded); the earlier wording was \"decisions against 65 runs, 51 specifications, 45 merges and 98 findings. The\". Finding count updated to 100 on 2026-09-11 (O100 recorded); the earlier wording was \"decisions against 65 runs, 51 specifications, 45 merges and 99 findings. The\"."
     },
     {
       "id": "C-141",
@@ -1572,6 +1572,28 @@
       "anchor_digest": "e89ebe855d0a95d78f6848cbf7dfb1435ff15bca192e7d4cabaa2499037de016",
       "local_only_resolution": "Resolved by the orchestrating agent session on 2026-09-10 in the development repository by re-deriving the attribution counts at the named commit 30ff053 rather than at HEAD. Re-checkable with the operator tool kampagne-zahlen.py, which prints the commit it measured at and fails on any disagreement.",
       "note": "Catalogued during the rc3 correction cycle (finding O97)."
+    },
+    {
+      "id": "C-147",
+      "text": "isolation, `git rev-parse --show-toplevel` exits `0` and prints the",
+      "where": "docs/LIMITATIONS.md:172",
+      "status": "SUPPORTED",
+      "evidence": [
+        "test:tests/test_sandbox.py::test_limit_6_git_klettert_draussen_raus_und_drinnen_nicht"
+      ],
+      "anchor_digest": "4358edc2ed2e4b7c608d0655af5982da51ad6be54b9dda790a836d38891cc36e",
+      "note": "Measured on 2026-09-11 by running git rev-parse --show-toplevel in the same arena directory inside and outside the Linux sandbox backend. verify_limit_6 in src/hoh/sandbox.py returns both measurements; the test demands they differ."
+    },
+    {
+      "id": "C-148",
+      "text": "`128` and prints nothing -- git finds no repository, which is the truthful",
+      "where": "docs/LIMITATIONS.md:175",
+      "status": "SUPPORTED",
+      "evidence": [
+        "test:tests/test_sandbox.py::test_limit_6_git_klettert_draussen_raus_und_drinnen_nicht"
+      ],
+      "anchor_digest": "db3b3a4ebe81cf76cb108c77934369c96d893d0f71e3c20e1e89621d88bced66",
+      "note": "Measured on 2026-09-11 by running git rev-parse --show-toplevel in the same arena directory inside and outside the Linux sandbox backend. verify_limit_6 in src/hoh/sandbox.py returns both measurements; the test demands they differ."
     }
   ],
   "not_claims": [
@@ -5907,6 +5929,13 @@
       "where": "RELEASE_NOTES.md:35",
       "anchor_digest": "eecbe15972907a66b841d33512fe8079fc3767062877708f0a175a097be58a3a",
       "reason": "describes the rc3 correction and how it was found, not a numeric measurement"
+    },
+    {
+      "id": "N-619",
+      "text": "answer for a directory that has none. `verify_limit_6` returns both",
+      "where": "docs/LIMITATIONS.md:176",
+      "anchor_digest": "4e58662370c3d6ed39a1b6cd0a81b98d6e3a4e609660ca3b116aff55ca87af5b",
+      "reason": "describes what the sandbox measurement does and does not establish, not a measurement"
     }
   ],
   "claim_surfaces": [
@@ -6255,6 +6284,11 @@
       "why": "source or test code under src/hoh/, tests/, or tools/; claims about its behaviour live in docs/** and are covered there, not by re-declaring the source itself as a claim surface"
     },
     {
+      "path": "src/hoh/launcher.py",
+      "reason": "source-code",
+      "why": "the binding to real Herdr/HoH dispatch: what it asserts -- that a run ending on the same candidate it started with is not an acceptance, that a provider outage is not a rejection -- is exercised in tests/test_launcher_verdicts.py against constructed run states"
+    },
+    {
       "path": "src/hoh/orchestrator.py",
       "reason": "source-code",
       "why": "the control-plane executor: what it asserts -- that every halt carries a class, that a stale writer is not a corrupt state, that closure is a fixpoint -- holds or fails when the loop runs, and is exercised against the prototype oracle in tests/test_orchestrator_parity.py"
@@ -6293,6 +6327,11 @@
       "path": "src/hoh/runner.py",
       "reason": "source-code",
       "why": "source or test code under src/hoh/, tests/, or tools/; claims about its behaviour live in docs/** and are covered there, not by re-declaring the source itself as a claim surface"
+    },
+    {
+      "path": "src/hoh/sandbox.py",
+      "reason": "source-code",
+      "why": "the sandbox contract and its Linux backend: what it asserts -- that limit 6 is closed, limit 4 only narrowed and limit 5 untouched -- is measured by running commands inside and outside isolation in tests/test_sandbox.py, not by prose"
     },
     {
       "path": "src/hoh/stages.py",
@@ -6340,6 +6379,11 @@
       "why": "source or test code under src/hoh/, tests/, or tools/; claims about its behaviour live in docs/** and are covered there, not by re-declaring the source itself as a claim surface"
     },
     {
+      "path": "tests/test_launcher_verdicts.py",
+      "reason": "source-code",
+      "why": "a test module: its numbers are the run states it constructs and the verdicts it demands"
+    },
+    {
       "path": "tests/test_orchestrator_parity.py",
       "reason": "source-code",
       "why": "a test module: its numbers are the scenarios it constructs and the halt classes it demands, verified by running it"
@@ -6363,6 +6407,11 @@
       "path": "tests/test_runner.py",
       "reason": "source-code",
       "why": "source or test code under src/hoh/, tests/, or tools/; claims about its behaviour live in docs/** and are covered there, not by re-declaring the source itself as a claim surface"
+    },
+    {
+      "path": "tests/test_sandbox.py",
+      "reason": "source-code",
+      "why": "a test module: it measures the same command inside and outside a sandbox and demands they differ"
     },
     {
       "path": "tests/test_source_hygiene.py",

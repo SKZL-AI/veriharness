@@ -204,6 +204,14 @@ class TaskNode(Strict):
     produces: list[str] = Field(default_factory=list)
     invalidates: list[str] = Field(default_factory=list)
     rejections: int = 0
+    #: What the run had already accepted when this node was last dispatched.
+    #: Recorded in state, not held in memory, because it is the only thing that
+    #: lets a *fresh* process tell an acceptance from a run that ended where it
+    #: started. Without it, a resuming session looking at a CHECKPOINTED run
+    #: cannot distinguish "this dispatch accepted something" from "something was
+    #: accepted three iterations ago", and merging on the second is a double
+    #: apply.
+    accepted_before: str | None = None
     #: Which node's gate failure created this one, if any.
     repair_of: str | None = None
     closure_generation: int = 0

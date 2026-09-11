@@ -73,13 +73,20 @@ def prototyp():
 class Start(RunLauncher):
     """A scripted outside world, identical in shape to the prototype's."""
 
-    def __init__(self, verdicts=None, classes=None, depends=False, merge_lands=True):
+    def __init__(self, verdicts=None, classes=None, depends=False, merge_lands=True,
+                 evaluations=None):
         self.verdicts = dict(verdicts or {})
         self.classes = dict(classes or {})
         self.depends = depends
         self.merge_lands = merge_lands
+        # What an already-dispatched run is found to have done. The default is
+        # UNDETERMINED: a fixture that has dispatched nothing genuinely cannot
+        # say, and defaulting to anything else would let the resume path look
+        # more decisive than it is.
+        self.evaluations = dict(evaluations or {})
         self.launched: list[str] = []
         self.merged: list[str] = []
+        self.evaluated: list[str] = []
 
     def action_class(self, node: TaskNode) -> ActionClass:
         return self.classes.get(node.id, ActionClass.INTERNAL)
@@ -93,6 +100,15 @@ class Start(RunLauncher):
         if isinstance(v, list):
             v = v.pop(0) if v else RunVerdict.ACCEPTED
         return RunOutcome(verdict=v, candidate=f"{node.id}-cand")
+
+    def accepted_baseline(self, node: TaskNode) -> str | None:
+        return None
+
+    def evaluate(self, node: TaskNode) -> RunOutcome:
+        self.evaluated.append(node.id)
+        v = self.evaluations.get(node.id, RunVerdict.UNDETERMINED)
+        return RunOutcome(verdict=v, detail="from the recorded run state",
+                          candidate=f"{node.id}-cand")
 
     def merge(self, node: TaskNode, outcome: RunOutcome) -> bool:
         if not self.merge_lands:
@@ -128,9 +144,9 @@ def projekt(tmp_path, nodes, pid="p") -> ProjectStore:
 
 
 def fahre(tmp_path, nodes, *, verdicts=None, classes=None, gates=None,
-          max_rounds=40, max_repairs=5, merge_lands=True):
+          max_rounds=40, max_repairs=5, merge_lands=True, evaluations=None):
     s = projekt(tmp_path, nodes)
-    start = Start(verdicts, classes, merge_lands=merge_lands)
+    start = Start(verdicts, classes, merge_lands=merge_lands, evaluations=evaluations)
     g = Gates(gates)
     c = ProjectController(s, start, g, max_rounds=max_rounds, max_repairs=max_repairs)
     return c.run(), start, s
@@ -464,3 +480,100 @@ def test_jeder_halt_traegt_eine_klasse(tmp_path):
         ergebnis = c.run()
         assert ergebnis.halt is erwartet, f"case {i}: {ergebnis.halt} {ergebnis.reason}"
         assert ergebnis.reason, f"case {i} halted without a reason"
+
+
+# --------------------------------------------------------------------------- #
+# Resume: a RUNNING node is read, not re-dispatched
+# --------------------------------------------------------------------------- #
+
+def test_laufender_knoten_wird_gelesen_nicht_neu_gestartet(tmp_path):
+    """The heart of exactly-once.
+
+    A fresh process finding a node marked RUNNING must not re-dispatch it to
+    find out what happened -- that would repeat an acceptance that may already
+    have landed. It reads the run's own recorded state instead, which costs
+    nothing and is decisive when the run finished.
+    """
+    ergebnis, start, store = fahre(
+        tmp_path, [TaskNode(id="a", lifecycle=Lifecycle.RUNNING)],
+        evaluations={"a": RunVerdict.ACCEPTED}, gates=[GateOutcome.GREEN],
+    )
+    assert ergebnis.halt is HaltClass.CLOSED, ergebnis.reason
+    assert start.evaluated == ["a"], "the run state must be read"
+    assert start.launched == [], "and the run must not be dispatched again"
+    assert start.merged == ["a"], "exactly one merge"
+    assert store.read_state().node("a").lifecycle is Lifecycle.MERGED
+
+
+def test_laufender_knoten_ohne_erkennbares_ergebnis_haelt_an(tmp_path):
+    """When the run state cannot say, the loop stops rather than guessing."""
+    ergebnis, start, _ = fahre(
+        tmp_path, [TaskNode(id="a", lifecycle=Lifecycle.RUNNING)],
+        gates=[GateOutcome.GREEN],
+    )
+    assert ergebnis.halt is HaltClass.AMBIGUOUS
+    assert "could repeat an acceptance" in ergebnis.reason
+    assert start.launched == []
+
+
+def test_laufender_knoten_mit_ablehnung_geht_zurueck_in_die_schleife(tmp_path):
+    """A crashed dispatch whose run was rejected resumes as ordinary work."""
+    ergebnis, start, store = fahre(
+        tmp_path, [TaskNode(id="a", lifecycle=Lifecycle.RUNNING)],
+        evaluations={"a": RunVerdict.REJECTED},
+        verdicts={"a": RunVerdict.ACCEPTED}, gates=[GateOutcome.GREEN],
+    )
+    assert ergebnis.halt is HaltClass.CLOSED, ergebnis.reason
+    # Evaluated twice: once on resume, and once again before the dispatch. The
+    # second read is what stops the loop paying for work a previous dispatch
+    # already had accepted -- it costs nothing and it is the whole mechanism
+    # behind exactly-once.
+    assert start.evaluated == ["a", "a"], start.evaluated
+    assert start.launched == ["a"], "after the rejection it is dispatched once, normally"
+    assert store.read_state().node("a").rejections == 1
+
+
+def test_basislinie_wird_vor_dem_dispatch_persistiert(tmp_path):
+    """What was accepted *before* a dispatch goes into state, not memory.
+
+    A process that dies during the dispatch is exactly when it is needed: it is
+    the only thing that lets the next process tell an acceptance from a run
+    that ended where it started.
+    """
+    s = projekt(tmp_path, [TaskNode(id="a")])
+
+    class MerktBasislinie(Start):
+        def accepted_baseline(self, node):
+            return "a-i1"
+
+        def launch(self, node):
+            # What is on disk at the moment of dispatch is what a crash leaves.
+            self.gesehen = ProjectStore(tmp_path, "p").read_state().node("a").accepted_before
+            return super().launch(node)
+
+    start = MerktBasislinie()
+    c = ProjectController(s, start, Gates([GateOutcome.GREEN]))
+    ergebnis = c.run()
+    assert ergebnis.halt is HaltClass.CLOSED
+    assert start.gesehen == "a-i1", "the baseline must be durable before the dispatch"
+
+
+def test_bereits_angenommener_kandidat_wird_nicht_neu_dispatcht(tmp_path):
+    """A node whose run already accepted something is merged, not re-run.
+
+    The state this covers is real and was found by the first end-to-end run: a
+    dispatch succeeded, the merge was blocked by untracked build output, the
+    obstruction was cleared, and the node came back READY with its acceptance
+    still sitting in the run record. Dispatching again would pay a second time
+    for verified work -- and could accept a second, different candidate for the
+    same node.
+    """
+    ergebnis, start, store = fahre(
+        tmp_path, [TaskNode(id="a")],
+        evaluations={"a": RunVerdict.ACCEPTED}, gates=[GateOutcome.GREEN],
+    )
+    assert ergebnis.halt is HaltClass.CLOSED, ergebnis.reason
+    assert start.launched == [], "nothing may be dispatched when the work is already accepted"
+    assert start.merged == ["a"], "exactly one merge"
+    assert any(s.kind == "ALREADY_ACCEPTED" for s in ergebnis.steps), \
+        [s.kind for s in ergebnis.steps]

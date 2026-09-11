@@ -291,6 +291,55 @@ def resume_decision(state: ProjectState) -> tuple[str, str]:
     )
 
 
+def unblock(store: "ProjectStore", node_id: str, reason: str,
+            *, actor: str = "human") -> ProjectState:
+    """Returns a BLOCKED node to READY, on the record.
+
+    A blocked node is one the orchestrator refused to decide about -- an
+    accepted candidate whose merge did not land, a provider outage, a verdict
+    nothing could classify. Refusing was right; leaving no way back is not.
+    Without this, the only route out of a blocked project is editing the state
+    file by hand, which is the one thing a durable, digest-bound state exists
+    to make unnecessary.
+
+    The reason is required and becomes a decision record, because "someone
+    unblocked it" without why is exactly the kind of unrecoverable intent this
+    whole layer was built to stop losing. The node's note is kept, not
+    overwritten: what it was blocked for stays readable after it is running
+    again.
+    """
+    from .project import DecisionKind, DecisionRecord
+
+    state = store.read_state()
+    node = state.node(node_id)
+    if node is None:
+        raise StoreError(f"project {store.project_id} has no node {node_id}")
+    if node.lifecycle is not Lifecycle.BLOCKED:
+        raise StoreError(
+            f"node {node_id} is {node.lifecycle.value}, not BLOCKED -- unblocking "
+            "something that is not blocked would hide whatever it is actually doing"
+        )
+    vorher = node.note
+    node.lifecycle = Lifecycle.READY
+    node.note = (f"{vorher} | unblocked {utc()}: {reason}" if vorher else reason)
+    state.decisions.append(
+        DecisionRecord(
+            id=f"D{len(state.decisions) + 1:04d}",
+            kind=DecisionKind.POLICY_DISPOSITION,
+            actor=actor,
+            reason=reason,
+            payload={"node": node_id, "was_blocked_for": vorher or ""},
+        )
+    )
+    store.write_state(state)
+    return store.read_state()
+
+
+def utc() -> str:
+    from .contracts import utcnow
+    return utcnow()
+
+
 def list_projects(root: Path | str) -> list[str]:
     basis = Path(root).expanduser().resolve() / PROJECTS_DIRNAME
     if not basis.is_dir():

@@ -911,7 +911,7 @@ def cmd_project(args) -> int:
     actually has -- what does this state say to do next -- and they answer it
     from the persisted file alone.
     """
-    from .projectstore import ProjectStore, list_projects, resume_decision
+    from .projectstore import ProjectStore, list_projects, resume_decision, unblock
 
     if args.project_cmd == "list":
         projekte = list_projects(args.root)
@@ -940,6 +940,16 @@ def cmd_project(args) -> int:
         # says so: a reader scripting against this must not see 0.
         print(f"UNREADABLE: {exc}", file=sys.stderr)
         return 3
+
+    if args.project_cmd == "unblock":
+        try:
+            st = unblock(store, args.node, args.reason)
+        except StoreError as exc:
+            print(f"refused: {exc}", file=sys.stderr)
+            return 4
+        n = st.node(args.node)
+        print(f"{args.node} is now {n.lifecycle.value}; recorded as {st.decisions[-1].id}")
+        return 0
 
     verdikt, grund = resume_decision(st)
 
@@ -1136,7 +1146,15 @@ def build_parser() -> argparse.ArgumentParser:
     ):
         sp = ps.add_parser(name, help=helptext)
         sp.add_argument("project_id")
-    pr.set_defaults(func=cmd_project, run_id=None, project_id=None)
+    ub = ps.add_parser(
+        "unblock",
+        help="Return a BLOCKED node to READY, with a reason that goes on the record",
+    )
+    ub.add_argument("project_id")
+    ub.add_argument("node")
+    ub.add_argument("--reason", required=True,
+                    help="why it is safe to proceed -- becomes a decision record")
+    pr.set_defaults(func=cmd_project, run_id=None, project_id=None, node=None, reason=None)
 
     return p
 

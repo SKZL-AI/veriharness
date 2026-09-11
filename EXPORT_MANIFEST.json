@@ -912,6 +912,11 @@
       "rule": "package"
     },
     {
+      "path": "src/hoh/launcher.py",
+      "decision": "INCLUDE",
+      "rule": "package"
+    },
+    {
       "path": "src/hoh/orchestrator.py",
       "decision": "INCLUDE",
       "rule": "package"
@@ -948,6 +953,11 @@
     },
     {
       "path": "src/hoh/runner.py",
+      "decision": "INCLUDE",
+      "rule": "package"
+    },
+    {
+      "path": "src/hoh/sandbox.py",
       "decision": "INCLUDE",
       "rule": "package"
     },
@@ -997,6 +1007,11 @@
       "rule": "tests"
     },
     {
+      "path": "tests/test_launcher_verdicts.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
       "path": "tests/test_orchestrator_parity.py",
       "decision": "INCLUDE",
       "rule": "tests"
@@ -1018,6 +1033,11 @@
     },
     {
       "path": "tests/test_runner.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_sandbox.py",
       "decision": "INCLUDE",
       "rule": "tests"
     },

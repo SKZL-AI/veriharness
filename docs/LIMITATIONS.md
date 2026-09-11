@@ -25,7 +25,7 @@ system's own top layer as if it were external supervision.
 
 Measured on the campaign that produced this release: **65 runs carrying 1,988
 receipts (880 of them control runs), 100 iterations that produced receipts,
-51 specifications, 45 merges and 99 recorded findings**, across five calendar
+51 specifications, 45 merges and 100 recorded findings**, across five calendar
 days and 3.5 days of elapsed wall-clock -- and the position paper, the claims
 ledger, the release documents and the export machinery among the artifacts
 produced.
@@ -44,7 +44,7 @@ in this campaign was escalated **by rule, not by necessity**. A human decided
 seven things -- `DEC-R1`, `DEC-R1a`, `DEC-R2`, `DEC-R3`, `DEC-R4`, `DEC-R5`,
 `DEC-R6`: the project's public name, which files the export carries, how one
 class of reference is dispositioned, and whether to publish. Seven governance
-decisions against 65 runs, 51 specifications, 45 merges and 99 findings. The
+decisions against 65 runs, 51 specifications, 45 merges and 100 findings. The
 same orchestration configured with those policies delegated in advance would
 have resolved them itself. That is a statement about the design, not a
 measurement: this deployment did not run that way, so it is listed here as
@@ -98,6 +98,25 @@ size-limited output -- narrows the blast radius; none of it is a substitute
 for a real OS sandbox (namespaces, seccomp, network isolation). Do not point
 HoH's acceptance checks at a plan you do not already trust.
 
+**Since 2026-09-11 there is an OS sandbox, and it does not close this limit.**
+`src/hoh/sandbox.py` provides filesystem and network isolation through Linux
+namespaces: the candidate mounted read-only, a separate writable scratch area,
+no network, an environment that is not inherited. Measured, not asserted -- a
+command inside it cannot read a file outside the declared binds, and
+`/proc/net/route` shows zero routes. What that changes is *how far a command
+can reach*. It does not make a pattern denylist sound, and a command the
+denylist does not name is still allowed to do whatever it does. The honest
+statement is that the blast radius shrinks to the sandbox, not that the guard
+became a security boundary.
+
+Two further qualifications, because "we added a sandbox" is exactly the kind
+of sentence that gets over-read. The sandbox is **not yet the path acceptance
+checks take**: it exists, is tested, and is selectable, and `runner.py` does
+not use it, so no check in this project's own history has run inside one. And
+it fails closed by construction -- asking for isolation the backend cannot
+provide raises rather than quietly running unsandboxed, because a sandbox that
+silently degrades is worse than none.
+
 ## 5. The `{ARENA}` placeholder and the runner's real path can diverge
 
 A check command that needs the path of the object under test writes the
@@ -111,6 +130,14 @@ string that gets executed. In the cases this project has exercised, that gap
 has not produced an escape, but the guard's own reasoning and the runner's
 own behavior are not, and are not claimed to be, verifying the identical
 string.
+
+**The sandbox added in 2026-09-11 does not touch this one at all**, and it is
+worth saying so next to the sentence rather than leaving a reader to infer it.
+The divergence is two different strings inside HoH's own code -- the guard
+reasons about the command with the placeholder replaced by the literal
+`"ARENA"`, the runner substitutes the real absolute path -- and no amount of
+isolation makes two different strings equal. Isolation reduces what the
+divergence can cost. It does not remove the divergence.
 
 ## 6. The arena is nested inside the project's own git working tree
 
@@ -139,6 +166,23 @@ question about the *outer* repository instead of the arena subdirectory
 precisely because pytest's own temp-directory redirection landed inside
 this nested arena. The nesting is a structural fact of how this project
 runs itself today, not something the arena isolation removes.
+
+**As of 2026-09-11 this specific failure is closed inside the sandbox, and
+measured both ways.** The same command, in the same directory: run outside
+isolation, `git rev-parse --show-toplevel` exits `0` and prints the
+*ancestor* repository's path. Run inside `src/hoh/sandbox.py`'s Linux
+backend, which does not carry the parent `.git` into the namespace, it exits
+`128` and prints nothing -- git finds no repository, which is the truthful
+answer for a directory that has none. `verify_limit_6` returns both
+measurements rather than a verdict, because the claim worth making is the
+comparison; a bare "it is fixed" would not be checkable.
+
+Two things that does **not** yet mean. `runner.py` does not use the sandbox,
+so no acceptance check in this project's own history has run inside one --
+the capability exists and is not the default path. And the nesting itself is
+unchanged: the arena still sits inside the project's working tree. What the
+sandbox removes is the parent `.git` that git climbs to, not the structure
+that makes climbing possible.
 
 A second, independent instance of the same class of failure is directly
 reproducible on any materialized arena, without needing pytest at all: an
