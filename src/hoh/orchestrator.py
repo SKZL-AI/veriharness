@@ -101,6 +101,12 @@ class RunVerdict(StrEnum):
     PROVIDER_UNAVAILABLE = "PROVIDER_UNAVAILABLE"
     #: Dispatched but its outcome is not yet determinable.
     UNDETERMINED = "UNDETERMINED"
+    #: Stopped waiting for a human approval -- a trust dialog, a confirmation.
+    #: Distinct from UNDETERMINED because it is not unclassifiable at all: it
+    #: is known, actionable, and needs exactly one thing, which is a person.
+    #: Reporting it as "unclassifiable" would send someone looking for a defect
+    #: instead of answering the prompt.
+    NEEDS_APPROVAL = "NEEDS_APPROVAL"
     #: A dry run performed no dispatch.
     NOT_RUN = "NOT_RUN"
 
@@ -128,6 +134,22 @@ class RunLauncher(Protocol):
         ...
 
     def launch(self, node: TaskNode) -> RunOutcome: ...
+
+    def prepare(self, node: TaskNode) -> str | None:
+        """Makes a node runnable, or explains why it is not.
+
+        Returns None when the node is ready to dispatch, otherwise a reason.
+
+        This exists for repair nodes. A gate failure produces a node with no
+        specification and no run behind it -- the failure is known, the work to
+        fix it is not yet written down. During this project's own campaign a
+        person wrote each repair specification by hand, which is exactly the
+        step that kept the loop from closing on its own. A launcher that can
+        author one from the failure and start a run closes it; one that cannot
+        says so here, and the node blocks rather than being dispatched into
+        nothing.
+        """
+        return None
 
     def accepted_baseline(self, node: TaskNode) -> str | None:
         """The candidate the run had already accepted, before this dispatch.
@@ -357,6 +379,18 @@ class ProjectController:
                              "measured semantic dependency")
                     )
 
+            # A node with no run behind it -- a repair node, typically -- has to
+            # be made runnable first. If the launcher cannot, it blocks: a
+            # dispatch into nothing produces a verdict about nothing.
+            hindernis = self.launcher.prepare(knoten)
+            if hindernis:
+                knoten.lifecycle = Lifecycle.BLOCKED
+                knoten.note = hindernis
+                state = self._persist(state)
+                grund = f"node {knoten.id} cannot be made runnable: {hindernis}"
+                schritte.append(Step(runde, HaltClass.BLOCKED_DEPENDENCY, knoten.id, grund))
+                return Result(HaltClass.BLOCKED_DEPENDENCY, grund, schritte, runde, reparaturen)
+
             # Before spending anything, ask whether this node's run has
             # *already* accepted something newer than the baseline this node
             # carries. It can have: a dispatch that succeeded and whose merge
@@ -430,6 +464,14 @@ class ProjectController:
             grund = f"node {node_id}: {ausgang.detail or 'provider unavailable'}"
             schritte.append(Step(runde, HaltClass.BLOCKED_PROVIDER, node_id, grund))
             return Result(HaltClass.BLOCKED_PROVIDER, grund)
+
+        if ausgang.verdict is RunVerdict.NEEDS_APPROVAL:
+            knoten.lifecycle = Lifecycle.BLOCKED
+            knoten.note = ausgang.detail
+            self._persist(state)
+            grund = f"node {node_id} is waiting for a human approval: {ausgang.detail}"
+            schritte.append(Step(runde, HaltClass.BLOCKED_EXTERNAL, node_id, grund))
+            return Result(HaltClass.BLOCKED_EXTERNAL, grund)
 
         if ausgang.verdict is RunVerdict.NOT_RUN:
             knoten.lifecycle = Lifecycle.READY

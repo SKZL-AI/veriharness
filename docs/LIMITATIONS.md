@@ -25,7 +25,7 @@ system's own top layer as if it were external supervision.
 
 Measured on the campaign that produced this release: **65 runs carrying 1,988
 receipts (880 of them control runs), 100 iterations that produced receipts,
-51 specifications, 45 merges and 100 recorded findings**, across five calendar
+51 specifications, 45 merges and 101 recorded findings**, across five calendar
 days and 3.5 days of elapsed wall-clock -- and the position paper, the claims
 ledger, the release documents and the export machinery among the artifacts
 produced.
@@ -44,7 +44,7 @@ in this campaign was escalated **by rule, not by necessity**. A human decided
 seven things -- `DEC-R1`, `DEC-R1a`, `DEC-R2`, `DEC-R3`, `DEC-R4`, `DEC-R5`,
 `DEC-R6`: the project's public name, which files the export carries, how one
 class of reference is dispositioned, and whether to publish. Seven governance
-decisions against 65 runs, 51 specifications, 45 merges and 100 findings. The
+decisions against 65 runs, 51 specifications, 45 merges and 101 findings. The
 same orchestration configured with those policies delegated in advance would
 have resolved them itself. That is a statement about the design, not a
 measurement: this deployment did not run that way, so it is listed here as
@@ -56,8 +56,24 @@ failure modes this campaign actually hit -- budget exhaustion, a role harness
 whose credential had expired, a lost tool directory after a power cut, a
 composition failure between two individually correct runs -- behave when nobody
 is reachable for a week. A human *was* reachable throughout and answered those
-seven times. Nothing here shows an orchestrator surviving its own restart, or a
-provider outage, without one.
+seven times.
+
+**One half of that sentence has since been measured, and it is worth separating
+from the half that has not.** Until 2026-09-11 this paragraph also said
+"nothing here shows an orchestrator surviving its own restart". That is no
+longer true. A real run was driven by the control plane and killed twice with
+`os._exit(9)` -- once after a candidate was accepted but before the merge, once
+after the merge but before global closure -- and a fresh process, holding
+nothing but the persisted state, resumed correctly both times: it read the run
+record rather than re-dispatching, merged exactly once, and reached a fixpoint.
+Five distinct process ids, and the run's own write sequence unchanged across
+the resume, so nothing was re-run.
+
+What that does *not* establish is the rest of the paragraph. Surviving a
+restart is not the same as surviving a week without anyone reachable, and the
+demonstration above took minutes, not days. A provider outage across a long
+idle period, an orchestrator restarted repeatedly, and the accumulation of
+small ambiguities over weeks all remain untested.
 
 `Budgets.max_wallclock_seconds` and `max_iterations` exist and are enforced
 (`RunState.budget_exhausted` in `src/hoh/contracts.py`), but an enforced ceiling

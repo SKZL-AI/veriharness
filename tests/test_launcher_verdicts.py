@@ -189,3 +189,62 @@ def test_trockenlauf_meldet_NOT_RUN_und_mergt_nicht(tmp_path):
     ergebnis = starter.launch(TaskNode(id="a"))
     assert ergebnis.verdict is RunVerdict.NOT_RUN
     assert starter.merge(TaskNode(id="a"), ergebnis) is False
+
+
+# --------------------------------------------------------------------------- #
+# Waiting for a person is not the same as not knowing
+# --------------------------------------------------------------------------- #
+
+def test_trust_dialog_ist_freigabebedarf_nicht_unklar(starter, tmp_path):
+    """HoH will not answer a trust dialog, and that is deliberate: granting
+    trust to a directory it was merely pointed at is the one capability it
+    refuses to take. So a run can stop there.
+
+    Reporting that as "unclassifiable" would send someone looking for a defect
+    instead of answering the prompt. Found the first time a repair node was
+    dispatched for real -- and note that `blocked_kind` was None, so the case
+    is recognisable only from the reason text.
+    """
+    st = zustand(
+        tmp_path, stage=Stage.DEVELOPING, condition=Condition.BLOCKED,
+        stop_reason=("iteration aborted: developer waits for an approval in pane w17:p5Y. "
+                     "A blocked dialog is not answered automatically.\n"
+                     "--- Visible in pane ---\nYes, I trust this folder"),
+    )
+    ergebnis = starter._verdict(st, None, Leer())
+    assert ergebnis.verdict is RunVerdict.NEEDS_APPROVAL
+    assert "approval" in ergebnis.detail.lower()
+    # One line, not the whole pane dump: a halt reason a person has to scroll
+    # is a halt reason nobody reads.
+    assert "\n" not in ergebnis.detail
+
+
+def test_freigabebedarf_haelt_als_captain_gate_an(tmp_path):
+    """It halts BLOCKED_EXTERNAL -- the class that legitimately needs a human --
+    rather than AMBIGUOUS."""
+    from hoh.orchestrator import HaltClass, ProjectController, RunOutcome
+    from hoh.project import GateOutcome, GateResult, ProjectState
+    from hoh.projectstore import ProjectStore
+
+    class Wartet:
+        def action_class(self, node): return ActionClass.INTERNAL
+        def depends_on(self, a, b): return False
+        def prepare(self, node): return None
+        def accepted_baseline(self, node): return None
+        def evaluate(self, node): return RunOutcome(RunVerdict.UNDETERMINED, "")
+        def launch(self, node):
+            return RunOutcome(RunVerdict.NEEDS_APPROVAL, "trust dialog in pane w17")
+        def merge(self, node, outcome): raise AssertionError("must not merge")
+
+    class Gruen:
+        def subject(self): return "abc1234"
+        def run(self, subject):
+            return [GateResult(name="g", outcome=GateOutcome.GREEN, subject=subject)]
+
+    s = ProjectStore(tmp_path, "p")
+    st = ProjectState(project_id="p", repo_path=str(tmp_path))
+    st.nodes = [TaskNode(id="a")]
+    s.create(st)
+    ergebnis = ProjectController(s, Wartet(), Gruen()).run()
+    assert ergebnis.halt is HaltClass.BLOCKED_EXTERNAL, ergebnis.reason
+    assert "trust dialog" in ergebnis.reason
