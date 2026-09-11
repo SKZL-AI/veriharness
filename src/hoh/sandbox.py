@@ -84,8 +84,13 @@ class SandboxSpec:
     ro_binds: tuple[Path, ...] = ()
     #: Wall-clock ceiling, seconds.
     timeout: int = 600
-    #: Address-space ceiling, bytes. None leaves it to the backend default.
+    #: Address-space ceiling, bytes, applied with setrlimit before exec so the
+    #: sandboxed process and everything it starts inherit it. None means no
+    #: limit -- and it means that honestly: this field was declared before it
+    #: was enforced, which is a protection that exists only in a docstring.
     memory_bytes: int | None = None
+    #: Ceiling on open file descriptors. Same discipline: enforced, or None.
+    max_open_files: int | None = None
 
 
 @dataclass
@@ -112,6 +117,32 @@ class SandboxBackend(Protocol):
         ...
 
     def run(self, argv: list[str], spec: SandboxSpec) -> SandboxResult: ...
+
+
+def _limits_for(spec: SandboxSpec):
+    """A `preexec_fn` applying the spec's resource ceilings, or None.
+
+    Applied between fork and exec so the sandboxed process and everything it
+    starts inherit them -- a limit set on the parent only would be a limit the
+    check command escapes by starting a child.
+
+    Returns None when nothing is limited, so no hook is installed at all rather
+    than one that does nothing.
+    """
+    if spec.memory_bytes is None and spec.max_open_files is None:
+        return None
+
+    def anwenden() -> None:                      # pragma: no cover - runs post-fork
+        import resource
+
+        if spec.memory_bytes is not None:
+            resource.setrlimit(resource.RLIMIT_AS,
+                               (spec.memory_bytes, spec.memory_bytes))
+        if spec.max_open_files is not None:
+            resource.setrlimit(resource.RLIMIT_NOFILE,
+                               (spec.max_open_files, spec.max_open_files))
+
+    return anwenden
 
 
 def _env_for(spec: SandboxSpec) -> dict[str, str]:
@@ -190,7 +221,7 @@ class BubblewrapSandbox(SandboxBackend):
             raise SandboxUnavailable(grund)
         p = subprocess.run(
             self._argv(argv, spec), capture_output=True, text=True,
-            timeout=spec.timeout, env={},
+            timeout=spec.timeout, env={}, preexec_fn=_limits_for(spec),
         )
         return SandboxResult(p.returncode, p.stdout, p.stderr,
                              isolation=spec.isolation, detail=self.name)
@@ -219,7 +250,7 @@ class NoSandbox(SandboxBackend):
             )
         p = subprocess.run(
             argv, capture_output=True, text=True, cwd=str(spec.candidate),
-            env=_env_for(spec), timeout=spec.timeout,
+            env=_env_for(spec), timeout=spec.timeout, preexec_fn=_limits_for(spec),
         )
         return SandboxResult(p.returncode, p.stdout, p.stderr,
                              isolation=Isolation.NONE, detail="no isolation applied")

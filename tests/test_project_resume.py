@@ -629,3 +629,114 @@ def test_cli_unblock_hat_einen_eigenen_exitcode_fuer_verweigerung(tmp_path, caps
     # Doing it twice is refused, and not with 0.
     assert main(["--root", str(tmp_path), "project", "unblock", "p", "a",
                  "--reason", "again"]) == 4
+
+
+# --------------------------------------------------------------------------- #
+# Repository changes made outside the loop
+# --------------------------------------------------------------------------- #
+
+def test_externe_aenderung_wird_mit_beiden_koepfen_festgehalten(tmp_path):
+    """The gap the first real end-to-end run exposed.
+
+    A merge conflict was resolved by a person, in git, and nothing about it
+    reached project state: the tree changed, a later closure measured the
+    changed tree, and the state carried no trace of why it looked that way.
+    """
+    from hoh.projectstore import record_external_action
+
+    s = ProjectStore(tmp_path, "p")
+    st = projekt(tmp_path)
+    st.nodes = [TaskNode(id="a", lifecycle=Lifecycle.BLOCKED)]
+    s.create(st)
+
+    nachher = record_external_action(
+        s, actor="human", reason="resolved a modify/delete conflict on build output",
+        node="a", head_before="abc1234", head_after="def5678",
+    )
+    r = nachher.external_actions[-1]
+    assert r.actor == "human"
+    assert r.head_before == "abc1234" and r.head_after == "def5678"
+    assert r.changed_the_tree is True
+    assert r.node == "a"
+    # Placed in the state's own history, not only in wall-clock time.
+    assert r.write_seq >= 1
+
+
+def test_externe_aenderungen_stehen_nicht_unter_den_entscheidungen(tmp_path):
+    """A decision is something this system chose; an external action is
+    something that happened to it. Collapsing them would let the record imply
+    authorship it does not have."""
+    from hoh.projectstore import record_external_action
+
+    s = ProjectStore(tmp_path, "p")
+    s.create(projekt(tmp_path))
+    nachher = record_external_action(s, actor="operator", reason="cleaned build output")
+    assert len(nachher.external_actions) == 1
+    assert nachher.decisions == []
+
+
+def test_eine_aenderung_die_nichts_bewegt_ist_auch_eine(tmp_path):
+    """An aborted merge is worth recording, and it is a different thing from
+    one that landed -- a reader should not have to compare digits to find out.
+    """
+    from hoh.projectstore import record_external_action
+
+    s = ProjectStore(tmp_path, "p")
+    s.create(projekt(tmp_path))
+    nachher = record_external_action(
+        s, actor="operator", reason="attempted a merge, aborted it",
+        head_before="abc1234", head_after="abc1234",
+    )
+    assert nachher.external_actions[-1].changed_the_tree is False
+
+
+def test_externe_aenderung_an_einem_unbekannten_knoten_wird_verweigert(tmp_path):
+    from hoh.projectstore import record_external_action
+
+    s = ProjectStore(tmp_path, "p")
+    s.create(projekt(tmp_path))
+    with pytest.raises(StoreError):
+        record_external_action(s, actor="human", reason="x", node="gibtesnicht")
+
+
+def test_externe_aenderungen_ueberleben_den_neustart(tmp_path):
+    from hoh.projectstore import record_external_action
+
+    s = ProjectStore(tmp_path, "p")
+    s.create(projekt(tmp_path))
+    record_external_action(s, actor="human", reason="resolved a conflict by hand",
+                          head_before="a1", head_after="b2")
+    zurueck = ProjectStore(tmp_path, "p").read_state()
+    assert zurueck.external_actions[-1].reason == "resolved a conflict by hand"
+    assert zurueck.external_actions[-1].action_id == "X0001"
+
+
+def test_cli_record_action_misst_den_head_selbst(tmp_path, capsys):
+    """The head after is measured, not typed: a record whose numbers came from
+    the person being recorded proves nothing."""
+    import subprocess
+
+    from hoh.cli import main
+
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-q", "-b", "master"], cwd=repo, check=True)
+    subprocess.run(["git", "config", "user.email", "a@example.invalid"], cwd=repo, check=True)
+    subprocess.run(["git", "config", "user.name", "A"], cwd=repo, check=True)
+    (repo / "f.txt").write_text("x\n")
+    subprocess.run(["git", "add", "-A"], cwd=repo, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "init"], cwd=repo, check=True)
+    echter = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=repo,
+                            capture_output=True, text=True).stdout.strip()
+
+    s = ProjectStore(tmp_path, "p")
+    st = ProjectState(project_id="p", repo_path=str(repo))
+    s.create(st)
+
+    capsys.readouterr()
+    assert main(["--root", str(tmp_path), "project", "record-action", "p",
+                 "--actor", "human", "--reason", "resolved a conflict",
+                 "--head-before", "0000000"]) == 0
+    r = s.read_state().external_actions[-1]
+    assert r.head_after == echter, f"{r.head_after} != {echter}"
+    assert r.head_before == "0000000"

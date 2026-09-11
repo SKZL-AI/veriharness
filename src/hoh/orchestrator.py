@@ -77,6 +77,16 @@ class HaltClass(StrEnum):
     #: fixpoint -- the prototype's first version returned 0 from un-run gates
     #: and reported success, which is NOT_RUN counted as passed.
     NOT_RUN = "NOT_RUN"
+    #: The candidate was accepted and git refused the merge, saying exactly
+    #: why. Kept apart from AMBIGUOUS deliberately: when the tool has named the
+    #: conflicting paths, the state is known, and calling it unclassifiable
+    #: sends a reader looking for a mystery instead of at a conflict.
+    MERGE_CONFLICT = "MERGE_CONFLICT"
+    #: The merge could not even be attempted because the working tree was in
+    #: the way -- local modifications or untracked files git would overwrite.
+    #: Separate from MERGE_CONFLICT because the remedy is different: clear the
+    #: tree rather than reconcile content.
+    MERGE_OBSTRUCTED = "MERGE_OBSTRUCTED"
     #: A state or verdict the controller cannot classify. The defect class:
     #: each one is a place where a human would have to step in.
     AMBIGUOUS = "AMBIGUOUS"
@@ -86,6 +96,8 @@ class HaltClass(StrEnum):
 NEEDS_A_HUMAN = frozenset(
     {
         HaltClass.BLOCKED_EXTERNAL,
+        HaltClass.MERGE_CONFLICT,
+        HaltClass.MERGE_OBSTRUCTED,
         HaltClass.BLOCKED_PROVIDER,
         HaltClass.BLOCKED_DEPENDENCY,
         HaltClass.CORRUPT_STATE,
@@ -116,6 +128,45 @@ class RunOutcome:
     verdict: RunVerdict
     detail: str = ""
     candidate: str | None = None
+
+
+class MergeFailure(StrEnum):
+    """Why a merge did not land. Only UNKNOWN means the tool did not say."""
+
+    CONFLICT = "CONFLICT"
+    OBSTRUCTED = "OBSTRUCTED"
+    NO_BRANCH = "NO_BRANCH"
+    UNKNOWN = "UNKNOWN"
+
+
+@dataclass
+class MergeResult:
+    """What happened when the candidate was applied, in enough detail to act on.
+
+    A bare boolean was the first version, and it forced every failure into one
+    halt class. Git had already said which paths conflicted; throwing that away
+    and reporting "unclassifiable" was the controller discarding evidence it
+    had been handed.
+    """
+
+    landed: bool
+    failure: MergeFailure | None = None
+    detail: str = ""
+    conflicting_paths: tuple[str, ...] = ()
+    branch: str = ""
+    target_head_before: str = ""
+    merge_base: str = ""
+    candidate: str = ""
+
+    def summary(self) -> str:
+        teile = [f"branch {self.branch}" if self.branch else ""]
+        if self.target_head_before:
+            teile.append(f"target was at {self.target_head_before}")
+        if self.merge_base:
+            teile.append(f"merge-base {self.merge_base}")
+        if self.conflicting_paths:
+            teile.append("conflicting: " + ", ".join(self.conflicting_paths[:6]))
+        return "; ".join(x for x in teile if x)
 
 
 class RunLauncher(Protocol):
@@ -172,8 +223,8 @@ class RunLauncher(Protocol):
         """
         ...
 
-    def merge(self, node: TaskNode, outcome: RunOutcome) -> bool:
-        """Applies an accepted candidate. Returns whether it actually landed."""
+    def merge(self, node: TaskNode, outcome: RunOutcome) -> "MergeResult":
+        """Applies an accepted candidate, and says what happened if it did not."""
         ...
 
 
@@ -481,21 +532,33 @@ class ProjectController:
             return Result(HaltClass.NOT_RUN, grund)
 
         if ausgang.verdict is RunVerdict.ACCEPTED:
-            gelandet = self.launcher.merge(knoten, ausgang)
-            if not gelandet:
-                # Accepted but the merge did not land: exactly the state that
-                # must not be guessed at. Re-merging risks applying a candidate
-                # twice; abandoning discards verified work.
+            m = self.launcher.merge(knoten, ausgang)
+            if not isinstance(m, MergeResult):        # a bool, from an older launcher
+                m = MergeResult(landed=bool(m), failure=None if m else MergeFailure.UNKNOWN)
+            if not m.landed:
+                # Accepted, and the candidate did not land. Nothing here is
+                # resolved automatically -- re-merging risks applying a
+                # candidate twice, and abandoning discards verified work. What
+                # *is* decided here is which of those states it is, because git
+                # usually said.
+                klasse = {
+                    MergeFailure.CONFLICT: HaltClass.MERGE_CONFLICT,
+                    MergeFailure.OBSTRUCTED: HaltClass.MERGE_OBSTRUCTED,
+                }.get(m.failure, HaltClass.AMBIGUOUS)
+                was = {
+                    HaltClass.MERGE_CONFLICT: "git reported a content conflict",
+                    HaltClass.MERGE_OBSTRUCTED: "the working tree was in the way",
+                }.get(klasse, "the merge failed and git did not say why")
                 grund = (
-                    f"node {node_id} was accepted but its candidate did not land; "
-                    "re-merging risks applying it twice and abandoning discards "
-                    "verified work, so this is not decided here"
+                    f"node {node_id} was accepted but its candidate did not land: "
+                    f"{was}. {m.summary()}"
+                    + (f" -- {m.detail}" if m.detail else "")
                 )
                 knoten.lifecycle = Lifecycle.BLOCKED
                 knoten.note = grund
                 self._persist(state)
-                schritte.append(Step(runde, HaltClass.AMBIGUOUS, node_id, grund))
-                return Result(HaltClass.AMBIGUOUS, grund)
+                schritte.append(Step(runde, klasse, node_id, grund))
+                return Result(klasse, grund)
             knoten.lifecycle = Lifecycle.MERGED
             self._record(
                 state, DecisionKind.MERGE_RELEASE,

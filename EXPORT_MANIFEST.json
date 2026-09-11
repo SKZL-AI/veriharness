@@ -872,6 +872,11 @@
       "rule": "package"
     },
     {
+      "path": "src/hoh/approval.py",
+      "decision": "INCLUDE",
+      "rule": "package"
+    },
+    {
       "path": "src/hoh/cli.py",
       "decision": "INCLUDE",
       "rule": "package"
@@ -980,6 +985,11 @@
       "path": "src/hoh/workspace.py",
       "decision": "INCLUDE",
       "rule": "package"
+    },
+    {
+      "path": "tests/test_approval.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
     },
     {
       "path": "tests/test_claims_anchors.py",

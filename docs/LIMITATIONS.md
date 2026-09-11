@@ -25,7 +25,7 @@ system's own top layer as if it were external supervision.
 
 Measured on the campaign that produced this release: **65 runs carrying 1,988
 receipts (880 of them control runs), 100 iterations that produced receipts,
-51 specifications, 45 merges and 101 recorded findings**, across five calendar
+51 specifications, 45 merges and 102 recorded findings**, across five calendar
 days and 3.5 days of elapsed wall-clock -- and the position paper, the claims
 ledger, the release documents and the export machinery among the artifacts
 produced.
@@ -44,7 +44,7 @@ in this campaign was escalated **by rule, not by necessity**. A human decided
 seven things -- `DEC-R1`, `DEC-R1a`, `DEC-R2`, `DEC-R3`, `DEC-R4`, `DEC-R5`,
 `DEC-R6`: the project's public name, which files the export carries, how one
 class of reference is dispositioned, and whether to publish. Seven governance
-decisions against 65 runs, 51 specifications, 45 merges and 101 findings. The
+decisions against 65 runs, 51 specifications, 45 merges and 102 findings. The
 same orchestration configured with those policies delegated in advance would
 have resolved them itself. That is a statement about the design, not a
 measurement: this deployment did not run that way, so it is listed here as
@@ -183,22 +183,46 @@ precisely because pytest's own temp-directory redirection landed inside
 this nested arena. The nesting is a structural fact of how this project
 runs itself today, not something the arena isolation removes.
 
-**As of 2026-09-11 this specific failure is closed inside the sandbox, and
-measured both ways.** The same command, in the same directory: run outside
-isolation, `git rev-parse --show-toplevel` exits `0` and prints the
-*ancestor* repository's path. Run inside `src/hoh/sandbox.py`'s Linux
-backend, which does not carry the parent `.git` into the namespace, it exits
-`128` and prints nothing -- git finds no repository, which is the truthful
-answer for a directory that has none. `verify_limit_6` returns both
-measurements rather than a verdict, because the claim worth making is the
-comparison; a bare "it is fixed" would not be checkable.
+**What the sandbox added here, stated precisely, because the first version of
+this paragraph was wrong in both directions.**
 
-Two things that does **not** yet mean. `runner.py` does not use the sandbox,
-so no acceptance check in this project's own history has run inside one --
-the capability exists and is not the default path. And the nesting itself is
-unchanged: the arena still sits inside the project's working tree. What the
-sandbox removes is the parent `.git` that git climbs to, not the structure
-that makes climbing possible.
+It said the sandbox closed this failure. It did not, because the common case
+was already closed: since 2026-09-08 `_env` sets `GIT_CEILING_DIRECTORIES` to
+the arena's parent, and with that in place `git rev-parse --show-toplevel`
+inside an arena exits `128` instead of naming the ancestor repository. A
+sandbox was not needed for that and is not what fixed it.
+
+What *was* still open is narrower and sharper than this limit's own wording
+suggests. The mitigation is an environment variable, and the thing it
+constrains is a shell command that can remove it. Measured through `run_check`
+itself:
+
+| Regime | Exit | Answer |
+|---|---|---|
+| Ceiling set, no sandbox | `128` | prevented |
+| **The check removes the ceiling**, no sandbox | `0` | **names the ancestor repository** |
+| The check removes the ceiling, sandboxed | `128` | prevented |
+
+`env -u GIT_CEILING_DIRECTORIES git rev-parse --show-toplevel` climbs straight
+back out, and the command guard does not catch it: there is no absolute path
+and no `..` in that command for it to object to.
+
+So the sandbox's contribution is to make the boundary **structural rather than
+configured** -- there is no parent `.git` to find, so removing a variable
+accomplishes nothing. That is worth having, and it is a smaller claim than
+"closed".
+
+The general lesson is worth more than the instance. A mitigation that consists
+of an environment variable is not enforceable against the thing it constrains,
+because the constrained process inherits the environment meant to limit it.
+That is the same family as limit 4, with the difference that this one read like
+a boundary.
+
+Two things this still does not mean. `STRICT` isolation is available and is not
+the default, so most checks continue to run the historical way. And the nesting
+itself is unchanged: the arena still sits inside the project's working tree.
+What the sandbox removes is the parent `.git` that git climbs to, not the
+structure that makes climbing possible.
 
 A second, independent instance of the same class of failure is directly
 reproducible on any materialized arena, without needing pytest at all: an

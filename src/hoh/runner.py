@@ -42,6 +42,11 @@ against a runner defect.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from . import sandbox as sandbox_mod
+
 import os
 import platform
 import re
@@ -489,6 +494,8 @@ def run_check(
     env: dict[str, str] | None = None,
     max_output_bytes: int = MAX_OUTPUT_BYTES,
     receipt_suffix: str = "",
+    isolation: "sandbox_mod.Isolation | None" = None,
+    sandbox: "sandbox_mod.SandboxBackend | None" = None,
 ) -> tuple[Receipt, str]:
     """Runs a check and returns (Receipt, transcript text).
 
@@ -500,7 +507,33 @@ def run_check(
     A timeout, exceeding the output limit or a process that cannot be started
     is an **infrastructure error**: `runner_ok=False`, and `Receipt.outcome()`
     then returns `INCONCLUSIVE` -- independently of `expect_exit`.
+
+    **Isolation.** `isolation` selects how the command is executed:
+
+    * `NONE` -- the historical path. A bash process with a reduced environment
+      and `setrlimit`, which the module docstring above is careful to call a
+      tripwire rather than a boundary. It stays the default so that nothing
+      about adding a sandbox silently changes what existing runs do.
+    * `STRICT` -- executed inside a `SandboxBackend`. If no backend can provide
+      it, the check does **not** fall back: it fails closed with
+      `runner_ok=False`, which reaches the controller as `INCONCLUSIVE` rather
+      than as a verdict. A sandbox that silently degrades is worse than none,
+      because the reason to ask for one is the assumption that it is there.
+
+    A sandboxed run is not merely a differently-spawned process, and the
+    receipt says which it was: `note` records the isolation applied, so a
+    receipt read six months later does not have to be guessed at.
     """
+    from .sandbox import (
+        Isolation as _Isolation,
+        SandboxSpec,
+        SandboxUnavailable,
+        select as _select,
+    )
+
+    if isolation is None:
+        isolation = _Isolation.NONE
+
     assert_command_allowed(check.command)
     assert_stays_in_arena(check.command)
 
@@ -546,6 +579,20 @@ def run_check(
     # chmod-ing the sink's parent to read-only. This is also the shape A08
     # (disk full) takes, which is why it is worth more than its size suggests:
     # the difference between "the run stopped" and "the run says why".
+    # Resolve the backend before anything is created. Failing closed here,
+    # before a sink or a directory exists, keeps a refused sandbox from leaving
+    # half a run's worth of artifacts behind.
+    if isolation is not _Isolation.NONE and sandbox is None:
+        try:
+            sandbox = _select(isolation)
+        except SandboxUnavailable as exc:
+            sandbox = None
+            isolation_error = str(exc)
+        else:
+            isolation_error = ""
+    else:
+        isolation_error = ""
+
     buffer: object | None = None
     try:
         workdir.mkdir(parents=True, exist_ok=True)
@@ -554,7 +601,37 @@ def run_check(
     except OSError as exc:
         exit_code, runner_ok = 127, False
         note = f"Output buffer could not be created: {exc}"
-    if buffer is not None:
+    if isolation_error:
+        # Asked for isolation, could not have it. Not a product verdict: a
+        # check that did not run in the regime it was supposed to has measured
+        # nothing, and saying so is the whole point of failing closed.
+        exit_code, runner_ok = 126, False
+        note = f"Isolation {isolation.value} was requested and is unavailable: {isolation_error}"
+    elif buffer is not None and sandbox is not None:
+        with buffer as fh:
+            scratch = sink.parent / f".hoh-scratch-{receipt_id}"
+            scratch.mkdir(parents=True, exist_ok=True)
+            spec = SandboxSpec(
+                candidate=workdir, scratch=scratch, isolation=isolation,
+                timeout=timeout,
+            )
+            try:
+                ergebnis = sandbox.run(["/bin/bash", "-c", resolved_command], spec)
+            except SandboxUnavailable as exc:
+                exit_code, runner_ok = 126, False
+                note = f"Isolation {isolation.value} became unavailable: {exc}"
+            except subprocess.TimeoutExpired:
+                exit_code, runner_ok = 124, False
+                note = f"Timeout after {timeout}s inside the sandbox"
+            except OSError as exc:
+                exit_code, runner_ok = 127, False
+                note = f"Sandboxed process could not be started: {exc}"
+            else:
+                fh.write((ergebnis.stdout + ergebnis.stderr).encode("utf-8", "replace"))
+                fh.flush()
+                exit_code = ergebnis.exit_code
+                note = f"executed under {ergebnis.isolation.value} isolation ({ergebnis.detail})"
+    elif buffer is not None:
         with buffer as fh:
             try:
                 proc = subprocess.Popen(

@@ -17,7 +17,7 @@ import pytest
 
 from hoh.contracts import Budgets, Candidate, Condition, RunState, Stage, Usage
 from hoh.launcher import HohRunLauncher
-from hoh.orchestrator import RunVerdict
+from hoh.orchestrator import RunOutcome, RunVerdict
 from hoh.project import ActionClass, TaskNode
 
 
@@ -188,7 +188,7 @@ def test_trockenlauf_meldet_NOT_RUN_und_mergt_nicht(tmp_path):
     starter = HohRunLauncher(tmp_path, tmp_path, dry_run=True)
     ergebnis = starter.launch(TaskNode(id="a"))
     assert ergebnis.verdict is RunVerdict.NOT_RUN
-    assert starter.merge(TaskNode(id="a"), ergebnis) is False
+    assert starter.merge(TaskNode(id="a"), ergebnis).landed is False
 
 
 # --------------------------------------------------------------------------- #
@@ -248,3 +248,138 @@ def test_freigabebedarf_haelt_als_captain_gate_an(tmp_path):
     ergebnis = ProjectController(s, Wartet(), Gruen()).run()
     assert ergebnis.halt is HaltClass.BLOCKED_EXTERNAL, ergebnis.reason
     assert "trust dialog" in ergebnis.reason
+
+
+# --------------------------------------------------------------------------- #
+# A refused merge is a known state when git said why
+# --------------------------------------------------------------------------- #
+
+def test_echter_konflikt_wird_als_konflikt_erkannt(starter):
+    """Observed verbatim in the first real repair cycle."""
+    from hoh.launcher import HohRunLauncher as L
+    from hoh.orchestrator import MergeFailure
+
+    text = (
+        "CONFLICT (modify/delete): __pycache__/slug.cpython-313.pyc deleted in HEAD "
+        "and modified in hoh-repair-2-1.  Version hoh-repair-2-1 of "
+        "__pycache__/slug.cpython-313.pyc left in tree.\n"
+        "Automatic merge failed; fix conflicts and then commit the result.\n"
+    )
+    assert L._classify(text) is MergeFailure.CONFLICT
+    assert "__pycache__/slug.cpython-313.pyc" in L._conflicting_paths(text)
+
+
+def test_verstellter_arbeitsbaum_ist_kein_konflikt(starter):
+    """Also observed verbatim, and it needs a different remedy: clear the tree,
+    not reconcile content. Git prints this *before* attempting any merge, so
+    the two messages never appear together."""
+    from hoh.launcher import HohRunLauncher as L
+    from hoh.orchestrator import MergeFailure
+
+    text = (
+        "error: The following untracked working tree files would be overwritten by merge:\n"
+        "\t__pycache__/slug.cpython-313.pyc\n"
+        "Please move or remove them before you merge.\nAborting\n"
+    )
+    assert L._classify(text) is MergeFailure.OBSTRUCTED
+
+    text2 = (
+        "error: Your local changes to the following files would be overwritten by merge:\n"
+        "\ttests/__pycache__/test_slug.cpython-313-pytest-9.0.3.pyc\n"
+        "Please commit your changes or stash them before you merge.\nAborting\n"
+    )
+    assert L._classify(text2) is MergeFailure.OBSTRUCTED
+
+
+@pytest.mark.parametrize("text", [
+    "fatal: refusing to merge unrelated histories",
+    "error: object file .git/objects/ab/cdef is empty",
+    "fatal: Not possible to fast-forward, aborting.",
+    "",
+    "something nobody has seen before",
+])
+def test_unbekannter_mergefehler_wird_nicht_zum_konflikt_gemacht(text):
+    """The negative control.
+
+    A misclassified failure is worse than an unclassified one: it sends the
+    reader somewhere specific and wrong. Anything git did not clearly describe
+    stays UNKNOWN, and the controller halts AMBIGUOUS for it -- which is the
+    honest verdict when the tool did not say.
+    """
+    from hoh.launcher import HohRunLauncher as L
+    from hoh.orchestrator import MergeFailure
+
+    assert L._classify(text) is MergeFailure.UNKNOWN
+
+
+def test_der_halt_traegt_die_konfliktdetails(tmp_path):
+    """The halt names the branch, the head, the merge base and the paths --
+    the evidence git handed over, rather than a summary of it."""
+    from hoh.orchestrator import (
+        GateRunner, HaltClass, MergeFailure, MergeResult, ProjectController, RunLauncher,
+    )
+    from hoh.project import GateOutcome, GateResult, Lifecycle, ProjectState
+    from hoh.projectstore import ProjectStore
+
+    class Kollidiert(RunLauncher):
+        def action_class(self, node): return ActionClass.INTERNAL
+        def depends_on(self, a, b): return False
+        def prepare(self, node): return None
+        def accepted_baseline(self, node): return None
+        def evaluate(self, node): return RunOutcome(RunVerdict.UNDETERMINED, "")
+        def launch(self, node): return RunOutcome(RunVerdict.ACCEPTED, "ok", candidate="c1")
+        def merge(self, node, outcome):
+            return MergeResult(
+                landed=False, failure=MergeFailure.CONFLICT,
+                detail="Automatic merge failed; fix conflicts",
+                conflicting_paths=("slug.py",), branch="hoh-a",
+                target_head_before="abc1234", merge_base="def5678", candidate="c1",
+            )
+
+    class Gruen(GateRunner):
+        def subject(self): return "abc1234"
+        def run(self, subject):
+            return [GateResult(name="g", outcome=GateOutcome.GREEN, subject=subject)]
+
+    s = ProjectStore(tmp_path, "p")
+    st = ProjectState(project_id="p", repo_path=str(tmp_path))
+    st.nodes = [TaskNode(id="a")]
+    s.create(st)
+    ergebnis = ProjectController(s, Kollidiert(), Gruen()).run()
+
+    assert ergebnis.halt is HaltClass.MERGE_CONFLICT, ergebnis.reason
+    for erwartet in ("hoh-a", "abc1234", "def5678", "slug.py", "content conflict"):
+        assert erwartet in ergebnis.reason, f"{erwartet!r} missing from: {ergebnis.reason}"
+    assert s.read_state().node("a").lifecycle is Lifecycle.BLOCKED
+
+
+def test_unbekannter_mergefehler_haelt_weiterhin_ambiguous_an(tmp_path):
+    from hoh.orchestrator import (
+        GateRunner, HaltClass, MergeFailure, MergeResult, ProjectController, RunLauncher,
+    )
+    from hoh.project import GateOutcome, GateResult, ProjectState
+    from hoh.projectstore import ProjectStore
+
+    class Raetselhaft(RunLauncher):
+        def action_class(self, node): return ActionClass.INTERNAL
+        def depends_on(self, a, b): return False
+        def prepare(self, node): return None
+        def accepted_baseline(self, node): return None
+        def evaluate(self, node): return RunOutcome(RunVerdict.UNDETERMINED, "")
+        def launch(self, node): return RunOutcome(RunVerdict.ACCEPTED, "ok")
+        def merge(self, node, outcome):
+            return MergeResult(landed=False, failure=MergeFailure.UNKNOWN,
+                               detail="fatal: refusing to merge unrelated histories")
+
+    class Gruen(GateRunner):
+        def subject(self): return "abc1234"
+        def run(self, subject):
+            return [GateResult(name="g", outcome=GateOutcome.GREEN, subject=subject)]
+
+    s = ProjectStore(tmp_path, "p")
+    st = ProjectState(project_id="p", repo_path=str(tmp_path))
+    st.nodes = [TaskNode(id="a")]
+    s.create(st)
+    ergebnis = ProjectController(s, Raetselhaft(), Gruen()).run()
+    assert ergebnis.halt is HaltClass.AMBIGUOUS
+    assert "did not say why" in ergebnis.reason

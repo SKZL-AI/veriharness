@@ -911,7 +911,9 @@ def cmd_project(args) -> int:
     actually has -- what does this state say to do next -- and they answer it
     from the persisted file alone.
     """
-    from .projectstore import ProjectStore, list_projects, resume_decision, unblock
+    from .projectstore import (
+        ProjectStore, list_projects, record_external_action, resume_decision, unblock,
+    )
 
     if args.project_cmd == "list":
         projekte = list_projects(args.root)
@@ -940,6 +942,21 @@ def cmd_project(args) -> int:
         # says so: a reader scripting against this must not see 0.
         print(f"UNREADABLE: {exc}", file=sys.stderr)
         return 3
+
+    if args.project_cmd == "record-action":
+        try:
+            st = record_external_action(
+                store, actor=args.actor, reason=args.reason,
+                repo_path=st.repo_path, node=args.node,
+                head_before=args.head_before or "",
+            )
+        except StoreError as exc:
+            print(f"refused: {exc}", file=sys.stderr)
+            return 4
+        r = st.external_actions[-1]
+        print(f"{r.action_id} recorded: {r.actor} -- {r.head_before or '?'} -> "
+              f"{r.head_after or '?'}{' (tree unchanged)' if not r.changed_the_tree else ''}")
+        return 0
 
     if args.project_cmd == "unblock":
         try:
@@ -986,6 +1003,15 @@ def cmd_project(args) -> int:
         print(f"  decisions: {len(st.decisions)} recorded, latest:")
         d = st.decisions[-1]
         print(f"    {d.id} {d.kind.value} by {d.actor}: {d.reason}")
+    if st.external_actions:
+        # Shown separately, and shown at all: a repository change that is
+        # invisible here is one a later closure measures without anyone being
+        # able to say where it came from.
+        print(f"  external actions: {len(st.external_actions)} recorded")
+        for r in st.external_actions[-3:]:
+            bewegt = "" if r.changed_the_tree else "  (tree unchanged)"
+            print(f"    {r.action_id} {r.actor}: {r.head_before or '?'} -> "
+                  f"{r.head_after or '?'}{bewegt}  {r.reason[:60]}")
     return 0
 
 
@@ -1154,7 +1180,20 @@ def build_parser() -> argparse.ArgumentParser:
     ub.add_argument("node")
     ub.add_argument("--reason", required=True,
                     help="why it is safe to proceed -- becomes a decision record")
-    pr.set_defaults(func=cmd_project, run_id=None, project_id=None, node=None, reason=None)
+    ra = ps.add_parser(
+        "record-action",
+        help="Record a repository change made outside the loop, so closure can be traced",
+    )
+    ra.add_argument("project_id")
+    ra.add_argument("--actor", required=True,
+                    help="'human', 'operator', or the tool that made the change")
+    ra.add_argument("--reason", required=True, help="why it was made")
+    ra.add_argument("--node", default=None, help="the node it relates to, if any")
+    ra.add_argument("--head-before", default="",
+                    help="the repository head before the change -- it cannot be "
+                         "measured afterwards, so it has to be supplied")
+    pr.set_defaults(func=cmd_project, run_id=None, project_id=None, node=None,
+                    reason=None, actor=None, head_before=None)
 
     return p
 

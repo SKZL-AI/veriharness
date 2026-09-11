@@ -340,6 +340,50 @@ def utc() -> str:
     return utcnow()
 
 
+def record_external_action(
+    store: "ProjectStore", *, actor: str, reason: str,
+    repo_path: Path | str | None = None, node: str | None = None,
+    action_class: str = "repository-mutation",
+    head_before: str = "", head_after: str = "",
+) -> ProjectState:
+    """Writes a repository mutation made outside the loop into project state.
+
+    The heads are measured here when the caller does not supply them, because
+    a record whose numbers were typed by the person being recorded is a record
+    that proves nothing. `head_after` is read now; `head_before` has to come
+    from the caller, since by the time anyone thinks to record the action it
+    has already happened -- and that asymmetry is worth knowing about rather
+    than papering over with a plausible value.
+    """
+    from .project import ExternalActionRecord
+
+    state = store.read_state()
+    if node is not None and state.node(node) is None:
+        raise StoreError(f"project {store.project_id} has no node {node}")
+
+    if repo_path and not head_after:
+        head_after = _head(Path(repo_path))
+
+    state.external_actions.append(
+        ExternalActionRecord(
+            action_id=f"X{len(state.external_actions) + 1:04d}",
+            actor=actor, reason=reason, action_class=action_class, node=node,
+            head_before=head_before, head_after=head_after,
+            write_seq=state.write_seq,
+        )
+    )
+    store.write_state(state)
+    return store.read_state()
+
+
+def _head(repo: Path) -> str:
+    import subprocess
+
+    p = subprocess.run(["git", "rev-parse", "--short", "HEAD"],
+                       cwd=str(repo), capture_output=True, text=True)
+    return p.stdout.strip()
+
+
 def list_projects(root: Path | str) -> list[str]:
     basis = Path(root).expanduser().resolve() / PROJECTS_DIRNAME
     if not basis.is_dir():

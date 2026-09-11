@@ -175,6 +175,57 @@ class DecisionRecord(Strict):
         return self
 
 
+class ExternalActionRecord(Strict):
+    """A repository mutation made outside the loop, written into the record.
+
+    This exists because of a gap the first real end-to-end run exposed. A merge
+    conflict was resolved by a person, in git, and nothing about it reached
+    project state: the tree changed, a later closure measured the changed tree,
+    and the state carried no trace of why it looked the way it did. The report
+    disclosed it afterwards, which is better than hiding it and much worse than
+    recording it.
+
+    The heads and tree digests on either side are the point. "Someone fixed the
+    conflict" is a sentence; `abc1234 -> def5678` is something a later reader
+    can check against the repository and either confirm or contradict.
+
+    Nothing here authorises the action. It records one that happened -- which
+    is the only honest thing a record can do about a change it did not make.
+    """
+
+    action_id: str
+    #: 'human', 'operator', or a named tool. Not free text for its own sake:
+    #: the three authorities this project keeps apart are exactly what a reader
+    #: needs in order to weigh the change.
+    actor: str
+    reason: str
+    action_class: str = Field(
+        default="repository-mutation",
+        description="what kind of change this was, for later filtering",
+    )
+    node: str | None = None
+    head_before: str = ""
+    head_after: str = ""
+    tree_digest_before: str = ""
+    tree_digest_after: str = ""
+    #: The project's write sequence when this was recorded, so the action can
+    #: be placed in the state's own history rather than only in wall-clock time.
+    write_seq: int = 0
+    command_digest: str | None = None
+    at: str = Field(default_factory=utcnow)
+
+    @property
+    def changed_the_tree(self) -> bool:
+        """Whether anything actually moved.
+
+        A recorded action that changed nothing is not a defect -- an aborted
+        merge is worth recording too -- but it is a different thing from one
+        that did, and a reader should not have to compare digits to find out.
+        """
+        return bool(self.head_before and self.head_after
+                    and self.head_before != self.head_after)
+
+
 class TaskNode(Strict):
     """One unit of planned work in the project DAG."""
 
@@ -238,6 +289,11 @@ class ProjectState(Strict):
     nodes: list[TaskNode] = Field(default_factory=list)
     decisions: list[DecisionRecord] = Field(default_factory=list)
     gates: list[GateResult] = Field(default_factory=list)
+    #: Repository mutations made outside the loop. Kept apart from `decisions`
+    #: on purpose: a decision is something this system chose, an external
+    #: action is something that happened to it, and collapsing the two would
+    #: let the record imply authorship it does not have.
+    external_actions: list[ExternalActionRecord] = Field(default_factory=list)
 
     #: How many times global closure has been attempted. Each failed attempt
     #: that produces repair work increments it, so a fixpoint is visible as a

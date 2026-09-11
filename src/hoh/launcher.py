@@ -30,12 +30,16 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
+from .approval import Approval, ApprovalProvider, NoApprovalProvider
 from .contracts import Condition, Stage
-from .orchestrator import RunLauncher, RunOutcome, RunVerdict
+from .orchestrator import (
+    MergeFailure, MergeResult, RunLauncher, RunOutcome, RunVerdict,
+)
 from .project import ActionClass, TaskNode
 from .store import RunStore, StoreError
 
@@ -73,7 +77,7 @@ class HohRunLauncher(RunLauncher):
         qa: str = "claude",
         timeout: int = 7200,
         dry_run: bool = False,
-        trust_script: Path | str | None = None,
+        approvals: "ApprovalProvider | None" = None,
     ) -> None:
         self.root = Path(root).expanduser().resolve()
         self.repo_path = Path(repo_path).expanduser().resolve()
@@ -85,12 +89,14 @@ class HohRunLauncher(RunLauncher):
         self.planner, self.developer, self.qa = planner, developer, qa
         self.timeout = timeout
         self.dry_run = dry_run
-        # Granting a worktree trust is an operator action, not something HoH
-        # does: HoH trusts only its own directories, on purpose, because
-        # otherwise it could obtain access to any directory simply by being
-        # pointed at it. A deployment layer may hold that authority; this is
-        # where it is named, so it is visible rather than implicit.
-        self.trust_script = Path(trust_script).expanduser() if trust_script else None
+        # Granting a worktree trust is an authority a deployment may hold, and
+        # HoH deliberately does not: trusting on request would let anything
+        # that can name a path obtain an agent's access to it. Absent by
+        # default -- with no provider the run blocks and a person answers,
+        # which is what happened before this existed.
+        self.approvals = approvals or NoApprovalProvider()
+        #: Every answer the authority gave, so a halt can quote it.
+        self.approvals_given: list[Approval] = []
 
     # -- classification ---------------------------------------------------- #
 
@@ -180,31 +186,17 @@ class HohRunLauncher(RunLauncher):
         ])
         if wt.exit_code != 0 and "already exists" not in (wt.stdout + wt.stderr):
             return f"could not create the worktree for {run_id}: {(wt.stderr or wt.stdout)[-200:]}"
-        worktree = self._worktree_path(wt.stdout) or (
-            Path.home() / ".herdr" / "worktrees" / self.repo_path.name / zweig
-        )
+        worktree = self._worktree_path(wt.stdout) or self._worktree_for(zweig)
         if not worktree.is_dir():
             return f"no worktree at {worktree} for {run_id}"
 
-        # Without this the run starts and then stops at a trust dialog, which
-        # HoH will not answer. Measured the first time a repair node was
+        # Without an approval the run starts and then stops at a trust dialog,
+        # which HoH will not answer. Measured the first time a repair node was
         # dispatched for real: the run reached DEVELOPING and blocked on
         # "Yes, I trust this folder".
-        if self.trust_script and self.trust_script.exists():
-            tr = subprocess.run(
-                [str(self.trust_script), str(worktree), str(self.repo_path)],
-                capture_output=True, text=True, timeout=300,
-            )
-            if tr.returncode != 0:
-                return (
-                    f"could not grant trust for {worktree}: "
-                    f"{(tr.stderr or tr.stdout)[-200:]}"
-                )
-        elif self.trust_script:
-            return (
-                f"no trust helper at {self.trust_script}; the run would start and "
-                "then stop at a trust dialog, which HoH does not answer"
-            )
+        freigabe = self._approve(worktree)
+        if not freigabe.granted:
+            return freigabe.as_reason()
 
         st = self._run_cli([
             "python3", "-m", "hoh.cli", "--root", str(self.root), "start",
@@ -240,19 +232,10 @@ class HohRunLauncher(RunLauncher):
                 f"clear: {grund.splitlines()[0][:160] if grund else 'no reason recorded'}"
             )
 
-        worktree = Path.home() / ".herdr" / "worktrees" / self.repo_path.name / zweig
-        if self.trust_script and self.trust_script.exists() and worktree.is_dir():
-            tr = subprocess.run(
-                [str(self.trust_script), str(worktree), str(self.repo_path)],
-                capture_output=True, text=True, timeout=300,
-            )
-            if tr.returncode != 0:
-                return f"could not grant trust for {worktree}: {(tr.stderr or tr.stdout)[-160:]}"
-        else:
-            return (
-                f"run {run_id} waits on a trust approval for {worktree} and no "
-                "trust helper is configured to grant it"
-            )
+        worktree = self._worktree_for(zweig)
+        freigabe = self._approve(worktree)
+        if not freigabe.granted:
+            return f"run {run_id} waits on a trust approval -- {freigabe.as_reason()}"
 
         ub = self._run_cli([
             "python3", "-m", "hoh.cli", "--root", str(self.root), "unblock", run_id,
@@ -260,6 +243,16 @@ class HohRunLauncher(RunLauncher):
         if ub.exit_code != 0:
             return f"trust granted but run {run_id} stayed blocked: {(ub.stderr or ub.stdout)[-160:]}"
         return None
+
+    def _approve(self, worktree: Path) -> Approval:
+        """Asks the configured authority, and records what it answered."""
+        freigabe = self.approvals.approve(worktree, self.repo_path)
+        self.approvals_given.append(freigabe)
+        return freigabe
+
+    def _worktree_for(self, zweig: str) -> Path:
+        """Where Herdr puts a worktree for this repository and branch."""
+        return Path.home() / ".herdr" / "worktrees" / self.repo_path.name / zweig
 
     @staticmethod
     def _worktree_path(stdout: str) -> Path | None:
@@ -445,33 +438,103 @@ class HohRunLauncher(RunLauncher):
 
     # -- merge ------------------------------------------------------------- #
 
-    def merge(self, node: TaskNode, outcome: RunOutcome) -> bool:
-        """Merges the node's branch into the mainline, idempotently.
+    def merge(self, node: TaskNode, outcome: RunOutcome) -> MergeResult:
+        """Applies an accepted candidate, idempotently, and reports the failure.
 
-        Returns False rather than raising when the merge does not land: the
-        controller has a halt class for exactly that, and it is one of the
-        cases that must not be guessed at.
+        Nothing here resolves a conflict. What it does is refuse to throw away
+        what git already said: the conflicting paths, the head the target was
+        at, and the merge base are all recorded, so the halt names a state
+        rather than a mystery.
+
+        Classification is by what git reports, and only three shapes are
+        claimed. Anything else stays UNKNOWN rather than being squeezed into
+        the nearest label -- a misclassified failure is worse than an
+        unclassified one, because it sends the reader somewhere specific and
+        wrong.
         """
-        if self.dry_run:
-            return False
         zweig = node.branch or f"hoh-{node.run_id or node.id}"
+        ergebnis = MergeResult(landed=False, branch=zweig, candidate=outcome.candidate or "")
+        if self.dry_run:
+            ergebnis.failure = MergeFailure.UNKNOWN
+            ergebnis.detail = "dry run: no merge attempted"
+            return ergebnis
 
         if self._git("rev-parse", "--verify", "--quiet", zweig).returncode != 0:
-            return False
+            ergebnis.failure = MergeFailure.NO_BRANCH
+            ergebnis.detail = f"branch {zweig} does not exist in {self.repo_path}"
+            return ergebnis
+
+        ergebnis.target_head_before = self._git(
+            "rev-parse", "--short", self.mainline).stdout.strip()
+        ergebnis.merge_base = self._git(
+            "merge-base", zweig, self.mainline).stdout.strip()[:12]
 
         # Already contained: a resumed session must not merge twice, and the
         # cheapest way to know is to ask whether the branch is an ancestor.
         if self._git("merge-base", "--is-ancestor", zweig, self.mainline).returncode == 0:
-            return True
+            ergebnis.landed = True
+            ergebnis.detail = "already contained in the mainline"
+            return ergebnis
 
         if self._git("rev-parse", "--abbrev-ref", "HEAD").stdout.strip() != self.mainline:
-            if self._git("checkout", self.mainline).returncode != 0:
-                return False
+            aus = self._git("checkout", self.mainline)
+            if aus.returncode != 0:
+                ergebnis.failure = MergeFailure.OBSTRUCTED
+                ergebnis.detail = (aus.stderr or aus.stdout).strip().splitlines()[:1][0][:200] \
+                    if (aus.stderr or aus.stdout).strip() else "checkout failed"
+                return ergebnis
 
         p = self._git("merge", "--no-ff", zweig, "-m",
                       f"Take accepted candidate {node.id} ({outcome.detail})")
-        if p.returncode != 0:
-            # Leave no half-merge behind for the next session to puzzle over.
-            self._git("merge", "--abort")
-            return False
-        return True
+        if p.returncode == 0:
+            ergebnis.landed = True
+            return ergebnis
+
+        text = (p.stdout or "") + (p.stderr or "")
+        ergebnis.conflicting_paths = self._conflicting_paths(text)
+        ergebnis.detail = self._first_meaningful(text)
+        ergebnis.failure = self._classify(text)
+        # Leave no half-merge behind for the next session to puzzle over.
+        self._git("merge", "--abort")
+        return ergebnis
+
+    @staticmethod
+    def _classify(text: str) -> MergeFailure:
+        """What git said, mapped to a shape -- or UNKNOWN.
+
+        The obstruction check comes first: git prints "would be overwritten by
+        merge" for a dirty or occupied working tree *before* it attempts any
+        content merge, so that message never accompanies a real conflict.
+        """
+        unten = text.lower()
+        if ("would be overwritten by merge" in unten
+                or "your local changes to the following files" in unten
+                or "please commit your changes or stash them" in unten):
+            return MergeFailure.OBSTRUCTED
+        if "conflict (" in unten or "automatic merge failed" in unten:
+            return MergeFailure.CONFLICT
+        return MergeFailure.UNKNOWN
+
+    @staticmethod
+    def _conflicting_paths(text: str) -> tuple[str, ...]:
+        pfade: list[str] = []
+        for zeile in text.splitlines():
+            s = zeile.strip()
+            m = re.match(r"CONFLICT \([^)]*\): (.+?) (deleted in|added in|merge conflict)", s)
+            if m:
+                pfade.append(m.group(1))
+                continue
+            if s and not s.startswith(("error:", "CONFLICT", "Auto", "Please", "Aborting",
+                                       "Merge", "warning:", "hint:")) and "/" in s or (
+                    s.endswith((".py", ".txt", ".md", ".json", ".pyc"))):
+                if s not in pfade and len(s) < 200 and " " not in s:
+                    pfade.append(s)
+        return tuple(dict.fromkeys(pfade))
+
+    @staticmethod
+    def _first_meaningful(text: str) -> str:
+        for zeile in text.splitlines():
+            s = zeile.strip()
+            if s and not s.startswith(("hint:", "warning:")):
+                return s[:200]
+        return "git produced no output"

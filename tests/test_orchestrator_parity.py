@@ -389,13 +389,18 @@ def test_absturz_nach_dem_merge_wird_nicht_doppelt_gemergt(tmp_path):
 
 
 def test_akzeptiert_aber_nicht_gelandet_wird_nicht_geraten(tmp_path):
-    """Accepted, merge did not land: re-merging risks a double apply and
-    abandoning discards verified work, so it halts."""
+    """Accepted, merge did not land: nothing is resolved automatically.
+
+    This fixture's launcher returns a bare `False`, the way an older launcher
+    would, and says nothing about why. That is the one case that genuinely
+    stays AMBIGUOUS -- the halt is honest about the tool having been silent,
+    rather than inventing a category for it.
+    """
     ergebnis, start, store = fahre(
         tmp_path, [TaskNode(id="a")], gates=[GateOutcome.GREEN], merge_lands=False
     )
     assert ergebnis.halt is HaltClass.AMBIGUOUS
-    assert "applying it twice" in ergebnis.reason
+    assert "did not say why" in ergebnis.reason
     assert store.read_state().node("a").lifecycle is Lifecycle.BLOCKED
 
 
