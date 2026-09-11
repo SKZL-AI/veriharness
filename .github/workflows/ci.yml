@@ -57,9 +57,22 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
 
-      - name: Install test and lint tooling
+      # `setuptools` is explicit and not incidental. U3 in tools/union_gate.py
+      # builds a wheel with `pip wheel --no-build-isolation`, which requires the
+      # build backend to be present in the environment rather than fetched. A
+      # fresh Python 3.13 venv has no setuptools at all, so U3 skipped, and a
+      # skipped invariant does not fail the gate -- the suite then reported six
+      # failures with no visible cause. Installing the project itself, not just
+      # the test tooling, is the other half: it is what proves `dependencies` in
+      # pyproject.toml is complete. The first run of this workflow installed
+      # only pytest and ruff and every test module failed on
+      # `ModuleNotFoundError: No module named 'pydantic'` -- a declared runtime
+      # dependency that happened to be present on the author's machine and
+      # nowhere else. That is precisely the failure this job exists to find.
+      - name: Install the project and test tooling
         run: |
-          python -m pip install --upgrade pip
+          python -m pip install --upgrade pip setuptools
+          python -m pip install -e .
           python -m pip install pytest ruff
 
       - name: Ruff (F and E9 only, matching the release gate)

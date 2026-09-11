@@ -15,6 +15,8 @@ import re
 import shutil
 import subprocess
 import sys
+
+import pytest
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -615,3 +617,94 @@ def test_running_the_gate_leaves_the_fixture_byte_identical(tmp_path):
 
     diff = set(before) ^ set(after) | {k for k in before if before.get(k) != after.get(k)}
     assert before == after, f"the fixture's files changed after running union_gate.py: {diff}"
+
+
+# --------------------------------------------------------------------------- #
+# A skipped invariant verifies nothing -- and said so misleadingly
+# --------------------------------------------------------------------------- #
+
+def test_failure_line_nimmt_stderr_zuerst():
+    """A failed command's informative half is stderr, not stdout.
+
+    The previous order preferred stdout, and on a failed `pip wheel` that
+    produced an actively misleading diagnostic: pip writes progress to stdout
+    and its error to stderr, so the reported reason was "Preparing metadata
+    (pyproject.toml): finished with status 'done'" -- a line that reads like
+    success -- while `BackendUnavailable: Cannot import 'setuptools.build_meta'`
+    sat unread on stderr. A diagnostic that points away from the cause is worse
+    than none, because it gets believed.
+    """
+    stdout = "Preparing metadata (pyproject.toml): finished with status 'done'\n"
+    stderr = "BackendUnavailable: Cannot import 'setuptools.build_meta'\n"
+    assert ug._failure_line(stdout, stderr) == (
+        "BackendUnavailable: Cannot import 'setuptools.build_meta'"
+    )
+    # stdout still answers when stderr is empty, and neither is not a crash.
+    assert ug._failure_line(stdout, "") == (
+        "Preparing metadata (pyproject.toml): finished with status 'done'"
+    )
+    assert ug._failure_line("", "") == "no output"
+
+
+def test_require_macht_ein_uebersprungenes_invariant_rot(tmp_path):
+    """`--require N` turns a SKIPPED invariant into a failure.
+
+    Without it a gate can exit 0 while an invariant checked nothing, which is
+    NOT_RUN counted as a pass one level down. Measured on 2026-09-11: CI ran
+    this gate in a fresh virtual environment with no setuptools, U3 could not
+    build a wheel, and the gate exited 0 having verified nothing about what the
+    wheel ships.
+
+    A repository with no pyproject.toml reproduces the skip deterministically
+    and without depending on what the interpreter happens to have installed.
+    """
+    (tmp_path / "README.md").write_text("no pyproject here\n", encoding="utf-8")
+
+    ergebnisse, rc = ug.run_gate(tmp_path)
+    assert ergebnisse[2].status == ug.STATUS_SKIPPED, ergebnisse[2]
+    assert rc == 0, "a skipped invariant alone does not fail the gate -- that is the point"
+
+    ergebnisse, rc = ug.run_gate(tmp_path, frozenset({3}))
+    assert ergebnisse[2].status == ug.STATUS_SKIPPED
+    assert rc == 1, "U3 was required to run and did not"
+
+    # In this deliberately empty fixture every invariant skips, which is
+    # itself the sharpest statement of the problem: without --require the gate
+    # reports exit 0 having checked precisely nothing.
+    assert all(r.status == ug.STATUS_SKIPPED for r in ergebnisse), [
+        (r.status, r.detail) for r in ergebnisse
+    ]
+    _, rc_alle = ug.run_gate(tmp_path, frozenset({1, 2, 3, 4, 5}))
+    assert rc_alle == 1
+
+    # And requiring an invariant that genuinely ran changes nothing. Checked
+    # on the result objects rather than by running the gate against this
+    # repository a second time: that would re-invoke the whole suite through
+    # U5, from inside the suite.
+    lief = [ug.Result(ug.STATUS_PASS, "")] * 5
+    assert ug._exit_for(lief, frozenset({1, 2, 3, 4, 5})) == 0
+
+
+def test_require_wird_streng_gelesen():
+    """A malformed --require is refused rather than quietly ignored.
+
+    An option that silently accepts nonsense is an option that silently stops
+    protecting anything.
+    """
+    assert ug._parse_required("") == frozenset()
+    assert ug._parse_required("3") == frozenset({3})
+    assert ug._parse_required("U1,u3, 5") == frozenset({1, 3, 5})
+    for schrott in ("x", "0", "6", "3,x"):
+        with pytest.raises(SystemExit):
+            ug._parse_required(schrott)
+
+
+def test_require_erscheint_in_der_ausgabe(tmp_path, capsys):
+    """The reader is told which invariant was required and did not run."""
+    (tmp_path / "README.md").write_text("no pyproject here\n", encoding="utf-8")
+    capsys.readouterr()
+    rc = ug.main([str(tmp_path), "--require", "3"])
+    aus = capsys.readouterr().out
+    assert rc == 1
+    assert "U3: SKIPPED" in aus
+    assert "required to run and did not" in aus
