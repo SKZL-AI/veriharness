@@ -102,6 +102,13 @@ class GateOutcome(StrEnum):
     #: project works under, and the dry-run defect that made it necessary to
     #: give "not executed" a value of its own rather than an exit code of 0.
     NOT_RUN = "NOT_RUN"
+    #: The gate ran and the environment structurally cannot answer it -- a
+    #: checkout with no `runs/` tree, a machine that cannot create the
+    #: namespace a sandbox needs. A fact about the environment, not about the
+    #: product, and **not** a pass: a project whose gate cannot be evaluated
+    #: has not been shown to be closed. The same distinction
+    #: `assurance.ResultState` draws, in the vocabulary the closure reads.
+    UNSUPPORTED_ENVIRONMENT = "UNSUPPORTED_ENVIRONMENT"
 
 
 class DecisionKind(StrEnum):
@@ -136,11 +143,28 @@ class GateResult(Strict):
     exit_code: int | None = None
     detail: str = ""
     at: str = Field(default_factory=utcnow)
+    #: The closure pass this result belongs to. Zero for results written before
+    #: the field existed, which reads as "an earlier pass" and is right for
+    #: them.
+    #:
+    #: It exists because a gate that is renamed or removed used to leave its
+    #: last result standing for ever. `gates_green` read the latest result per
+    #: *name*, so a gate called `claims` that was split into four narrower ones
+    #: kept its final RED in the record and the project could never close
+    #: again -- permanently blocked by a check that no longer runs. Measured on
+    #: this project's own self-dogfood campaign, at closure generation 14.
+    generation: int = 0
 
     @property
     def counts_as_green(self) -> bool:
-        """NOT_RUN is not green. This property exists so no caller has to
-        remember that, and so the rule is testable in one place."""
+        """Only GREEN is green.
+
+        `NOT_RUN` is not, and neither is `UNSUPPORTED_ENVIRONMENT`: a gate that
+        could not be evaluated has shown nothing, and a closure that counted it
+        would be reporting the environment rather than the product. This
+        property exists so no caller has to remember that, and so the rule is
+        testable in one place.
+        """
         return self.outcome is GateOutcome.GREEN
 
 
@@ -350,15 +374,44 @@ class ProjectState(Strict):
         """Every node settled. Necessary for closure, nowhere near sufficient."""
         return all(n.settled for n in self.nodes)
 
+    def latest_generation(self) -> int:
+        return max((g.generation for g in self.gates), default=0)
+
+    def retired_gates(self) -> list[str]:
+        """Gates that reported in an earlier pass and not in the latest one.
+
+        Named rather than dropped. A gate disappearing from a closure is either
+        a deliberate reconfiguration or a check that quietly stopped running,
+        and those look identical from the record unless something says which
+        gates went missing.
+        """
+        jetzt = self.latest_generation()
+        if not jetzt:
+            return []
+        aktuell = {g.name for g in self.gates if g.generation == jetzt}
+        frueher = {g.name for g in self.gates if g.generation and g.generation < jetzt}
+        return sorted(frueher - aktuell)
+
     def gates_green(self) -> bool:
-        """The latest result per gate name is GREEN, and at least one gate ran.
+        """Every gate of the **latest closure pass** is GREEN, and one ran.
+
+        Restricted to the latest pass, because a gate that no longer runs is
+        not evidence about the current state. Reading the latest result per
+        *name* across all of history meant a renamed gate kept its final RED
+        for ever -- measured here at closure generation 14, on a gate that had
+        been split into four narrower ones. `retired_gates()` names what went
+        missing, so a reconfiguration is visible rather than silent.
 
         Zero gates is not green: a closure that checked nothing has not
         established anything, and returning True for an empty set is the
         purest form of the failure this whole project is about.
         """
+        jetzt = self.latest_generation()
+        # Results written before `generation` existed all carry 0; falling back
+        # to the whole list keeps their behaviour exactly as it was.
+        kandidaten = [g for g in self.gates if g.generation == jetzt] or list(self.gates)
         letzte: dict[str, GateResult] = {}
-        for g in self.gates:
+        for g in kandidaten:
             letzte[g.name] = g
         if not letzte:
             return False

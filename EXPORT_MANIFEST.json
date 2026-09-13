@@ -167,6 +167,11 @@
       "rule": "public-docs"
     },
     {
+      "path": "docs/BENCHMARK_RESULTS.md",
+      "decision": "INCLUDE",
+      "rule": "public-docs"
+    },
+    {
       "path": "docs/EVIDENCE_INDEX.md",
       "decision": "INCLUDE",
       "rule": "public-docs"
@@ -382,6 +387,181 @@
       "rule": "internal-working-document"
     },
     {
+      "path": "dogfood/benchmark/results/ledger_apply.A.1.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/benchmark/results/ledger_apply.B.1.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/benchmark/results/ledger_apply.C.1.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/benchmark/results/parse_duration.A.1.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/benchmark/results/parse_duration.B.1.attempt1.v20260913T104811Z.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/benchmark/results/parse_duration.B.1.attempt2.v20260913T105148Z.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/benchmark/results/parse_duration.B.1.attempt3.v20260913T105936Z.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/benchmark/results/parse_duration.B.1.attempt4.v20260913T111123Z.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/benchmark/results/parse_duration.B.1.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/benchmark/results/parse_duration.C.1.attempt1.v20260913T104811Z.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/benchmark/results/parse_duration.C.1.attempt2.v20260913T105148Z.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/benchmark/results/parse_duration.C.1.attempt3.v20260913T105936Z.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/benchmark/results/parse_duration.C.1.attempt4.v20260913T111123Z.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/benchmark/results/parse_duration.C.1.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/benchmark/results/retry_backoff.A.1.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/benchmark/results/retry_backoff.B.1.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/benchmark/results/retry_backoff.C.1.attempt1.v20260913T104811Z.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/benchmark/results/retry_backoff.C.1.attempt2.v20260913T105148Z.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/benchmark/results/retry_backoff.C.1.attempt3.v20260913T105936Z.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/benchmark/results/retry_backoff.C.1.attempt4.v20260913T111123Z.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/benchmark/results/retry_backoff.C.1.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/benchmark/results/slug_pair.A.1.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/benchmark/results/slug_pair.B.1.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/benchmark/results/slug_pair.C.1.attempt1.v20260913T104811Z.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/benchmark/results/slug_pair.C.1.attempt2.v20260913T105148Z.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/benchmark/results/slug_pair.C.1.attempt3.v20260913T105936Z.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/benchmark/results/slug_pair.C.1.attempt4.v20260913T111123Z.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/benchmark/results/slug_pair.C.1.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/benchmark/results/to_roman.A.1.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/benchmark/results/to_roman.B.1.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/benchmark/results/to_roman.C.1.attempt1.v20260913T104811Z.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/benchmark/results/to_roman.C.1.attempt2.v20260913T105148Z.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/benchmark/results/to_roman.C.1.attempt3.v20260913T105936Z.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/benchmark/results/to_roman.C.1.attempt4.v20260913T111123Z.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/benchmark/results/to_roman.C.1.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
       "path": "dogfood/benchmark/tasks/ledger_apply/SPEC.md",
       "decision": "EXCLUDE",
       "rule": "internal-working-document"
@@ -453,6 +633,726 @@
     },
     {
       "path": "dogfood/benchmark/tasks/to_roman/hidden_test.py",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/README.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/phase-branch-log.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/projects/selbst/.lock",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/projects/selbst/parked/project.json.v1.20260911T211434Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/projects/selbst/parked/project.json.v10.20260911T223349Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/projects/selbst/parked/project.json.v11.20260911T223524Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/projects/selbst/parked/project.json.v12.20260911T223626Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/projects/selbst/parked/project.json.v13.20260911T223626Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/projects/selbst/parked/project.json.v14.20260911T223626Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/projects/selbst/parked/project.json.v15.20260911T231005Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/projects/selbst/parked/project.json.v16.20260911T231005Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/projects/selbst/parked/project.json.v17.20260912T000405Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/projects/selbst/parked/project.json.v18.20260912T000405Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/projects/selbst/parked/project.json.v19.20260912T000832Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/projects/selbst/parked/project.json.v2.20260911T211552Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/projects/selbst/parked/project.json.v20.20260912T000832Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/projects/selbst/parked/project.json.v21.20260912T000832Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/projects/selbst/parked/project.json.v22.20260912T001145Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/projects/selbst/parked/project.json.v23.20260912T001249Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/projects/selbst/parked/project.json.v24.20260912T001346Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/projects/selbst/parked/project.json.v25.20260912T001440Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/projects/selbst/parked/project.json.v26.20260912T001537Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/projects/selbst/parked/project.json.v27.20260912T001630Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/projects/selbst/parked/project.json.v28.20260912T001727Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/projects/selbst/parked/project.json.v29.20260912T001820Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/projects/selbst/parked/project.json.v3.20260911T211601Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/projects/selbst/parked/project.json.v30.20260912T001917Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/projects/selbst/parked/project.json.v31.20260912T002014Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/projects/selbst/parked/project.json.v32.20260912T002107Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/projects/selbst/parked/project.json.v33.20260912T002204Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/projects/selbst/parked/project.json.v34.20260912T002257Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/projects/selbst/parked/project.json.v35.20260912T002354Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/projects/selbst/parked/project.json.v36.20260912T002447Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/projects/selbst/parked/project.json.v37.20260912T002545Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/projects/selbst/parked/project.json.v38.20260912T002638Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/projects/selbst/parked/project.json.v39.20260912T002735Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/projects/selbst/parked/project.json.v4.20260911T215602Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/projects/selbst/parked/project.json.v40.20260912T002828Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/projects/selbst/parked/project.json.v41.20260912T002925Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/projects/selbst/parked/project.json.v42.20260912T003021Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/projects/selbst/parked/project.json.v43.20260912T003114Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/projects/selbst/parked/project.json.v44.20260912T003211Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/projects/selbst/parked/project.json.v45.20260912T003305Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/projects/selbst/parked/project.json.v46.20260912T003401Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/projects/selbst/parked/project.json.v47.20260912T003454Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/projects/selbst/parked/project.json.v48.20260912T003551Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/projects/selbst/parked/project.json.v49.20260912T003644Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/projects/selbst/parked/project.json.v5.20260911T215655Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/projects/selbst/parked/project.json.v50.20260912T003741Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/projects/selbst/parked/project.json.v51.20260912T003834Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/projects/selbst/parked/project.json.v52.20260912T003931Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/projects/selbst/parked/project.json.v53.20260912T004024Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/projects/selbst/parked/project.json.v54.20260912T004120Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/projects/selbst/parked/project.json.v55.20260912T004213Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/projects/selbst/parked/project.json.v56.20260912T004309Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/projects/selbst/parked/project.json.v57.20260912T004405Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/projects/selbst/parked/project.json.v58.20260912T004458Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/projects/selbst/parked/project.json.v59.20260912T004554Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/projects/selbst/parked/project.json.v6.20260911T215655Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/projects/selbst/parked/project.json.v60.20260912T004647Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/projects/selbst/parked/project.json.v61.20260912T004743Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/projects/selbst/parked/project.json.v62.20260912T004836Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/projects/selbst/parked/project.json.v63.20260913T104938Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/projects/selbst/parked/project.json.v64.20260913T104938Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/projects/selbst/parked/project.json.v7.20260911T215656Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/projects/selbst/parked/project.json.v8.20260911T223018Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/projects/selbst/parked/project.json.v9.20260911T223343Z",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/projects/selbst/project.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/repair-1-1/answers/i1-a0-planner.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/repair-1-1/answers/i1-a1-qa.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/repair-1-1/receipts/repair-1-1-i1-a1-K1-basis.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/repair-1-1/receipts/repair-1-1-i1-a1-K1.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/repair-1-1/receipts/repair-1-1-i1-a1-K2-basis.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/repair-1-1/receipts/repair-1-1-i1-a1-K2.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/repair-1-1/results/plan-i1-a1.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/repair-1-1/results/qa-i1-a1.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/repair-1-1/state.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/repair-2-1/answers/i1-a0-planner.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/repair-2-1/answers/i1-a1-planner.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/repair-2-1/answers/i1-a2-qa.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/repair-2-1/answers/i2-a0-planner.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/repair-2-1/answers/i2-a1-qa.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/repair-2-1/answers/i3-a0-planner.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/repair-2-1/answers/i3-a1-qa.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/repair-2-1/answers/i4-a0-planner.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/repair-2-1/receipts/repair-2-1-i1-a2-K1-basis.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/repair-2-1/receipts/repair-2-1-i1-a2-K1.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/repair-2-1/receipts/repair-2-1-i1-a2-K2-basis.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/repair-2-1/receipts/repair-2-1-i1-a2-K2.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/repair-2-1/receipts/repair-2-1-i2-a1-K1-basis.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/repair-2-1/receipts/repair-2-1-i2-a1-K1.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/repair-2-1/receipts/repair-2-1-i2-a1-K2-basis.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/repair-2-1/receipts/repair-2-1-i2-a1-K2.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/repair-2-1/receipts/repair-2-1-i2-a1-K3-basis.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/repair-2-1/receipts/repair-2-1-i2-a1-K3.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/repair-2-1/receipts/repair-2-1-i3-a1-K1.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/repair-2-1/receipts/repair-2-1-i3-a1-K2.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/repair-2-1/receipts/repair-2-1-i3-a1-K3.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/repair-2-1/results/plan-i1-a1.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/repair-2-1/results/plan-i1-a2.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/repair-2-1/results/plan-i2-a1.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/repair-2-1/results/plan-i3-a1.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/repair-2-1/results/qa-i1-a2.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/repair-2-1/results/qa-i2-a1.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/repair-2-1/results/qa-i3-a1.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/repair-2-1/state.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/telemetry-wiring/answers/i1-a0-planner.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/telemetry-wiring/answers/i1-a1-qa.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/telemetry-wiring/answers/i2-a0-planner.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/telemetry-wiring/answers/i2-a1-qa.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/telemetry-wiring/answers/i3-a0-planner.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/telemetry-wiring/answers/i3-a1-qa.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/telemetry-wiring/receipts/telemetry-wiring-i1-a1-K1-basis.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/telemetry-wiring/receipts/telemetry-wiring-i1-a1-K1.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/telemetry-wiring/receipts/telemetry-wiring-i1-a1-K2-basis.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/telemetry-wiring/receipts/telemetry-wiring-i1-a1-K2.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/telemetry-wiring/receipts/telemetry-wiring-i1-a1-K3-basis.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/telemetry-wiring/receipts/telemetry-wiring-i1-a1-K3.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/telemetry-wiring/receipts/telemetry-wiring-i2-a1-K1-basis.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/telemetry-wiring/receipts/telemetry-wiring-i2-a1-K1.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/telemetry-wiring/receipts/telemetry-wiring-i2-a1-K2-basis.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/telemetry-wiring/receipts/telemetry-wiring-i2-a1-K2.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/telemetry-wiring/receipts/telemetry-wiring-i2-a1-K3-basis.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/telemetry-wiring/receipts/telemetry-wiring-i2-a1-K3.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/telemetry-wiring/receipts/telemetry-wiring-i2-a1-K4-basis.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/telemetry-wiring/receipts/telemetry-wiring-i2-a1-K4.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/telemetry-wiring/receipts/telemetry-wiring-i3-a1-K1-basis.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/telemetry-wiring/receipts/telemetry-wiring-i3-a1-K1.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/telemetry-wiring/receipts/telemetry-wiring-i3-a1-K2-basis.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/telemetry-wiring/receipts/telemetry-wiring-i3-a1-K2.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/telemetry-wiring/receipts/telemetry-wiring-i3-a1-K3-basis.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/telemetry-wiring/receipts/telemetry-wiring-i3-a1-K3.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/telemetry-wiring/receipts/telemetry-wiring-i3-a1-K4-basis.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/telemetry-wiring/receipts/telemetry-wiring-i3-a1-K4.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/telemetry-wiring/receipts/telemetry-wiring-i3-a1-K5-basis.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/telemetry-wiring/receipts/telemetry-wiring-i3-a1-K5.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/telemetry-wiring/results/plan-i1-a1.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/telemetry-wiring/results/plan-i2-a1.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/telemetry-wiring/results/plan-i3-a1.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/telemetry-wiring/results/qa-i1-a1.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/telemetry-wiring/results/qa-i2-a1.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/telemetry-wiring/results/qa-i3-a1.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/root/telemetry-wiring/state.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/selfhost-e2e/spec.md",
       "decision": "EXCLUDE",
       "rule": "internal-working-document"
     },
@@ -2163,6 +3063,11 @@
     },
     {
       "path": "tests/test_taxonomy_telemetry.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_telemetry_wiring.py",
       "decision": "INCLUDE",
       "rule": "tests"
     },

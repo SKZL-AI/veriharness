@@ -25,7 +25,7 @@ system's own top layer as if it were external supervision.
 
 Measured on the campaign that produced this release: **65 runs carrying 1,988
 receipts (880 of them control runs), 100 iterations that produced receipts,
-51 specifications, 45 merges and 118 recorded findings**, across five calendar
+51 specifications, 45 merges and 125 recorded findings**, across five calendar
 days and 3.5 days of elapsed wall-clock -- and the position paper, the claims
 ledger, the release documents and the export machinery among the artifacts
 produced.
@@ -44,7 +44,7 @@ in this campaign was escalated **by rule, not by necessity**. A human decided
 seven things -- `DEC-R1`, `DEC-R1a`, `DEC-R2`, `DEC-R3`, `DEC-R4`, `DEC-R5`,
 `DEC-R6`: the project's public name, which files the export carries, how one
 class of reference is dispositioned, and whether to publish. Seven governance
-decisions against 65 runs, 51 specifications, 45 merges and 118 findings. The
+decisions against 65 runs, 51 specifications, 45 merges and 125 findings. The
 same orchestration configured with those policies delegated in advance would
 have resolved them itself. That is a statement about the design, not a
 measurement: this deployment did not run that way, so it is listed here as
@@ -101,16 +101,42 @@ is not the same claim as demonstrated multi-month reliability under it. Anyone
 evaluating HoH for long-horizon use should treat that gap as open, and should
 not read "five days orchestrated" as evidence for the month that follows.
 
-## 2. No baseline, no matched-budget comparison
+## 2. A baseline now exists, and it does not favour the harness
 
-There is no matched-budget comparison against a plain agent working the same
-specification without HoH's plan/develop/verify loop around it, and no
-baseline run of any kind exists in this repository's evidence. It is
-therefore not demonstrated that the same number of role-run dollars spent
-without HoH's overhead would produce a worse (or better) outcome. The
-project's claim is about what gets caught before acceptance, not about being
-more cost-effective than an unsupervised agent -- that comparison has not
-been run.
+This limitation used to read: no baseline of any kind exists. One does now,
+under a protocol committed before the first arm ran
+(`docs/BENCHMARK_PROTOCOL.md`), and the result is reported here rather than
+somewhere more flattering.
+
+**Arm A -- a plain agent, no harness -- passed all five hidden suites.**
+Including the composition task, where a plausible implementation is correct
+once and wrong when applied twice, and the task where a weak test suite lets a
+wrong implementation through. Between 20 and 114 seconds each.
+
+Arm B, one HoH run, passed four of five; the fifth produced no final state.
+Arm C, the full control plane, produced a final state once in five.
+
+Two readings, and the honest one is the first:
+
+* **These five tasks do not discriminate between the arms.** That is a finding
+  about the benchmark's design, not a verdict on any arm. A task a competent
+  agent finishes in twenty seconds cannot show what verification adds.
+* **The B-vs-C comparison is not supported at all.** Four arm-C cells and one
+  arm-B cell stopped at an interactive permission prompt, five attempts each --
+  the planner running shell commands it is not supposed to run (limitation
+  12b). One data point is not a comparison and is not offered as one.
+
+So what is now demonstrated is narrower than the limitation's old wording
+suggested was missing, and in the opposite direction: on tasks of this size,
+an unsupervised agent did the work correctly every time. Nothing here shows
+the harness catching something the plain agent got wrong, because on these
+tasks the plain agent got nothing wrong.
+
+What remains untested is the case the project is actually about: work large
+enough that a single agent's self-report is not trustworthy, and composition
+across several accepted increments. Designing tasks that reach it is open, and
+`docs/BENCHMARK_RESULTS.md` carries the full table, every excluded cell and
+the reason it stopped.
 
 ## 3. Provider cost is not measured
 
@@ -513,6 +539,41 @@ the failing test *before* the run, in the baseline. Then the baseline fails
 with the behaviour's absence -- `NotImplementedError`, a wrong value, an
 assertion -- and the criterion demonstrates what it claims to. This project's
 third STRICT acceptance run is built that way.
+
+## 12b. The planner's read-only contract is a sentence, not a boundary
+
+The planner prompt says, in those words: *"This is a pure planning invocation:
+implement nothing, edit nothing, test nothing. You may **read** the project
+directory in order to ground the plan in the actual project -- you may not
+write there."*
+
+Nothing enforces it. The developer role gets an arena and a candidate binding;
+the planner gets a request.
+
+Measured, not inferred. Five benchmark cells stopped at an interactive
+permission prompt, each attempted five times, and the transcripts show the
+planner moving the file under test, writing a reference implementation, and
+executing the acceptance criteria it was drafting:
+
+    Bash(cd .../scratchpad && mv duration.py durati...)
+    K1 exit= 1 / K2 exit= 1 / K3 exit= 1
+    Confirmed: all three checks pass (exit 0) against a correct reference
+    implementation and correctly fail (exit 1) against the current stub
+
+What stopped it was the surrounding harness's permission gate, which is not
+part of HoH and is not present in every deployment.
+
+Two costs, and the second is the one that matters:
+
+* the criteria a planner has already tested against its own reference are
+  criteria it believes are green, which is precisely the mixing that keeping
+  planning and verification apart is supposed to prevent;
+* a planner that can write into the project can change the thing a later
+  criterion measures, and no binding in the run would show it.
+
+**Priority: high, and open.** The fix is structural -- the planner needs the
+working arrangement the developer already has, a directory it cannot write --
+not a firmer sentence in the prompt.
 
 ## 13. An iteration budget is charged when an iteration begins, and a state written by an older version keeps what that version charged
 

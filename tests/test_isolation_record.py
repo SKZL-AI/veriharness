@@ -445,6 +445,16 @@ def test_the_network_is_unavailable_under_strict(tmp_path):
 
 @braucht_bwrap
 def test_home_and_tmpdir_point_into_the_scratch_area(tmp_path):
+    """HOME/TMPDIR must be redirected to a scratch directory beside the
+    arena -- never the arena itself, and never the real host home.
+
+    A plain "the host home is not a substring of the output" check is not
+    portable: it silently assumes the host's own `$HOME` cannot lie on the
+    same path lineage as `tmp_path`, which does not hold in every sandbox
+    this suite runs in. So the property is checked structurally instead --
+    against what the runner actually put in `$HOME`, not against where this
+    particular machine happens to keep its home directory.
+    """
     arena = arena_mit_datei(tmp_path)
     r, log = run_check(
         pruefung(command='echo "HOME=$HOME TMPDIR=$TMPDIR"'),
@@ -453,7 +463,21 @@ def test_home_and_tmpdir_point_into_the_scratch_area(tmp_path):
     )
     assert r.exit_code == 0
     assert ".hoh-scratch-" in log
-    assert str(pathlib.Path.home()) not in log.split("--- output ---")[1]
+
+    output = log.split("--- output ---")[1]
+    zeile = next(z for z in output.splitlines() if z.startswith("HOME="))
+    home_teil, tmp_teil = zeile.split(" ", 1)
+    home_wert = home_teil.split("=", 1)[1]
+    tmp_wert = tmp_teil.split("=", 1)[1]
+
+    assert home_wert == tmp_wert
+    scratch = pathlib.Path(home_wert)
+    assert scratch.parent == arena.parent, "scratch must sit BESIDE the arena"
+    assert scratch.name.startswith(".hoh-scratch-")
+    assert scratch != arena, "HOME/TMPDIR must not point at the arena itself"
+    assert str(scratch) != str(pathlib.Path.home()), (
+        "HOME/TMPDIR must not point at the real host home"
+    )
 
 
 @braucht_bwrap

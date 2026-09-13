@@ -740,3 +740,197 @@ def test_cli_record_action_misst_den_head_selbst(tmp_path, capsys):
     r = s.read_state().external_actions[-1]
     assert r.head_after == echter, f"{r.head_after} != {echter}"
     assert r.head_before == "0000000"
+
+
+# --------------------------------------------------------------------------- #
+# A node that should never have been started
+# --------------------------------------------------------------------------- #
+
+
+def _projekt_mit_knoten(tmp_path, lifecycle):
+    from hoh.project import ActionClass, ProjectState, TaskNode
+    from hoh.projectstore import ProjectStore
+
+    store = ProjectStore(tmp_path / "root", "p")
+    store.write_state(ProjectState(
+        project_id="p", repo_path=str(tmp_path / "repo"),
+        nodes=[TaskNode(
+            id="repair-1-1", spec_path="s.md", spec_digest="d",
+            lifecycle=lifecycle, action_class=ActionClass.INTERNAL,
+            repair_of="a", note="the suite failed on the merged state",
+        )],
+    ))
+    return store
+
+
+def test_a_node_can_be_abandoned_with_a_reason(tmp_path):
+    """The orchestrator abandons a node by itself only after repeated
+    rejections. That covers work that keeps failing; it does not cover work
+    that should never have been started -- a repair node created for a gate
+    failure that came from the harness measuring the wrong tree."""
+    from hoh.project import Lifecycle
+    from hoh.projectstore import abandon
+
+    store = _projekt_mit_knoten(tmp_path, Lifecycle.READY)
+    st = abandon(store, "repair-1-1",
+                 "the gate failure it repairs came from the driver, not the "
+                 "merged state, which was green", actor="main-session")
+    knoten = st.node("repair-1-1")
+    assert knoten.lifecycle is Lifecycle.ABANDONED
+    assert knoten.settled
+    assert "abandoned" in knoten.note
+    assert "the suite failed" in knoten.note, "the original note was overwritten"
+
+
+def test_abandoning_records_who_and_why(tmp_path):
+    from hoh.project import DecisionKind, Lifecycle
+    from hoh.projectstore import abandon
+
+    store = _projekt_mit_knoten(tmp_path, Lifecycle.BLOCKED)
+    st = abandon(store, "repair-1-1", "no defect to repair", actor="captain")
+    e = st.decisions[-1]
+    assert e.kind is DecisionKind.ABANDON_NODE
+    assert e.actor == "captain"
+    assert e.reason == "no defect to repair"
+    assert e.payload["was"] == "BLOCKED"
+
+
+def test_a_settled_node_is_not_re_settled(tmp_path):
+    """Abandoning something already merged would rewrite a decision that has
+    already had effects in the repository."""
+    from hoh.project import Lifecycle
+    from hoh.projectstore import StoreError, abandon
+
+    store = _projekt_mit_knoten(tmp_path, Lifecycle.MERGED)
+    with pytest.raises(StoreError, match="already MERGED"):
+        abandon(store, "repair-1-1", "x")
+
+
+def test_abandoning_an_unknown_node_is_refused(tmp_path):
+    from hoh.project import Lifecycle
+    from hoh.projectstore import StoreError, abandon
+
+    store = _projekt_mit_knoten(tmp_path, Lifecycle.READY)
+    with pytest.raises(StoreError, match="has no node"):
+        abandon(store, "nope", "x")
+
+
+def test_an_abandoned_node_no_longer_blocks_closure(tmp_path):
+    """`rc_closed` requires every repair node to be settled. ABANDONED is a
+    settled state -- that is what makes this a disposition rather than a way
+    of ignoring the node."""
+    from hoh.project import GateOutcome, GateResult, Lifecycle
+    from hoh.projectstore import abandon
+
+    store = _projekt_mit_knoten(tmp_path, Lifecycle.READY)
+    st = store.read_state()
+    st.nodes[0].lifecycle = Lifecycle.READY
+    st.gates.append(GateResult(name="suite", subject="a" * 12,
+                               outcome=GateOutcome.GREEN, exit_code=0))
+    store.write_state(st)
+    assert not store.read_state().rc_closed()
+
+    st = abandon(store, "repair-1-1", "the premise was false")
+    assert st.rc_closed(), "an abandoned repair node still blocked closure"
+
+
+def test_an_unevaluable_gate_is_not_green():
+    """A gate that ran and could not be answered -- no `runs/` tree in the
+    checkout, no namespace on the machine -- is a fact about the environment.
+    It is not a failure and it is certainly not a pass: a project whose gate
+    cannot be evaluated has not been shown to be closed."""
+    from hoh.project import GateOutcome, GateResult
+
+    for ergebnis in (GateOutcome.NOT_RUN, GateOutcome.UNSUPPORTED_ENVIRONMENT,
+                     GateOutcome.RED):
+        g = GateResult(name="claims", subject="a" * 12, outcome=ergebnis,
+                       exit_code=1)
+        assert not g.counts_as_green, ergebnis.value
+    assert GateResult(name="claims", subject="a" * 12,
+                      outcome=GateOutcome.GREEN, exit_code=0).counts_as_green
+
+
+def test_an_unevaluable_gate_blocks_closure(tmp_path):
+    from hoh.project import GateOutcome, GateResult, ProjectState
+
+    st = ProjectState(project_id="p", repo_path=str(tmp_path))
+    st.gates.append(GateResult(name="claims", subject="a" * 12,
+                               outcome=GateOutcome.UNSUPPORTED_ENVIRONMENT,
+                               exit_code=1))
+    assert not st.gates_green()
+
+
+# --------------------------------------------------------------------------- #
+# A gate that no longer runs must not keep voting
+# --------------------------------------------------------------------------- #
+
+
+def _mit_gates(tmp_path, *gates):
+    from hoh.project import GateResult, ProjectState
+
+    st = ProjectState(project_id="p", repo_path=str(tmp_path))
+    for name, outcome, gen in gates:
+        st.gates.append(GateResult(name=name, subject="a" * 12, outcome=outcome,
+                                   exit_code=0, generation=gen))
+    return st
+
+
+def test_a_renamed_gate_does_not_block_closure_for_ever(tmp_path):
+    """Measured on this project's own self-dogfood campaign, at closure
+    generation 14. A gate called `claims` was split into four narrower gates.
+    Its last result was RED, `gates_green` read the latest result per *name*
+    across all of history, and the project could never close again -- blocked
+    by a check that no longer ran."""
+    from hoh.project import GateOutcome as G
+
+    st = _mit_gates(
+        tmp_path,
+        ("claims", G.RED, 1),
+        ("suite", G.GREEN, 1),
+        ("claims-schema", G.GREEN, 2),
+        ("claims-ids", G.GREEN, 2),
+        ("suite", G.GREEN, 2),
+    )
+    assert st.gates_green()
+    assert st.retired_gates() == ["claims"], (
+        "the gate that stopped running has to be named, not silently dropped"
+    )
+
+
+def test_a_red_gate_in_the_latest_pass_still_blocks(tmp_path):
+    """The control. Scoping to the latest pass must not become a way for a
+    failing gate to age out of relevance."""
+    from hoh.project import GateOutcome as G
+
+    st = _mit_gates(tmp_path, ("suite", G.GREEN, 1), ("suite", G.RED, 2))
+    assert not st.gates_green()
+
+
+def test_results_from_before_the_field_existed_behave_as_they_did(tmp_path):
+    """Everything written earlier carries generation 0. The fallback keeps
+    those states reading exactly as they used to."""
+    from hoh.project import GateOutcome as G
+
+    st = _mit_gates(tmp_path, ("suite", G.RED, 0), ("suite", G.GREEN, 0))
+    assert st.gates_green(), "the later result still wins within one generation"
+    assert st.retired_gates() == []
+
+    st2 = _mit_gates(tmp_path, ("suite", G.GREEN, 0), ("claims", G.RED, 0))
+    assert not st2.gates_green()
+
+
+def test_nothing_is_retired_when_every_gate_still_reports(tmp_path):
+    from hoh.project import GateOutcome as G
+
+    st = _mit_gates(tmp_path, ("suite", G.GREEN, 1), ("suite", G.GREEN, 2))
+    assert st.retired_gates() == []
+
+
+def test_the_orchestrator_stamps_the_pass_on_every_result(tmp_path):
+    """The field is only useful if the thing that writes gates fills it."""
+    import inspect
+
+    from hoh import orchestrator
+
+    quelle = inspect.getsource(orchestrator)
+    assert "g.generation = naechste" in quelle

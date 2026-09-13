@@ -176,9 +176,21 @@ class HohRunLauncher(RunLauncher):
             # real -- the node was unblocked, the run was still BLOCKED from
             # its previous attempt, and `hoh run` refused to start at all.
             return self._ensure_runnable(run_id, zweig, store)
+        # A repair node's specification belongs to the **run**, not to the
+        # repository under test. It used to be written to
+        # `<repo>/.hoh-repair-<id>.md`, where it is untracked, unprotected and
+        # in the way: this project's own export refused it as an unclassified
+        # path, the cleanup that followed moved it aside, and a repair run that
+        # was live at the time blocked on "specification is missing". A file
+        # that a run depends on must not sit where tidying the repository can
+        # remove it.
+        #
+        # Under `--root` it travels with the run's receipts and state, is
+        # readable afterwards, and no repository ever has to ignore it.
         spec_pfad = Path(node.spec_path) if node.spec_path else (
-            self.repo_path / f".hoh-repair-{run_id}.md"
+            self.root / run_id / f"repair-{run_id}.md"
         )
+        spec_pfad.parent.mkdir(parents=True, exist_ok=True)
         if not spec_pfad.exists():
             if not node.repair_of:
                 return (
@@ -385,7 +397,10 @@ class HohRunLauncher(RunLauncher):
         vorher_id = getattr(vorher, "candidate_id", vorher)
         nachher = state.last_accepted_candidate
 
-        if state.condition is Condition.BLOCKED:
+        # Handled first, and deliberately: an acceptance that a run recorded is
+        # a fact about that run, and nothing that happens afterwards -- a
+        # block, a spent budget, another iteration -- un-records it.
+        if state.condition is Condition.BLOCKED and nachher is None:
             art = (state.blocked_kind or "").lower()
             grund_text = (state.blocked_reason or state.stop_reason or "").lower()
             # A trust dialog is not an unclassifiable state. HoH deliberately
@@ -404,9 +419,10 @@ class HohRunLauncher(RunLauncher):
                     RunVerdict.PROVIDER_UNAVAILABLE,
                     f"blocked on the provider: {state.blocked_reason or art}",
                 )
-            # Blocked for some other reason is not a rejection either -- it is
+            # Blocked with nothing accepted is not a rejection either -- it is
             # a state nobody has classified, and guessing is what this whole
-            # design exists to avoid.
+            # design exists to avoid. A block *after* an acceptance is handled
+            # above, by the rule that an acceptance is durable.
             return RunOutcome(
                 RunVerdict.UNDETERMINED,
                 f"run blocked ({state.blocked_kind}): {state.blocked_reason}",
@@ -416,10 +432,7 @@ class HohRunLauncher(RunLauncher):
             return RunOutcome(RunVerdict.UNDETERMINED,
                               f"run ended {state.condition.value}: {state.stop_reason}")
 
-        if state.stage in (Stage.CHECKPOINTED, Stage.READY_FOR_DELIVERY):
-            if nachher is None:
-                return RunOutcome(RunVerdict.UNDETERMINED,
-                                  "run checkpointed with no accepted candidate recorded")
+        if nachher is not None:
             if vorher_id is not None and nachher.candidate_id == vorher_id:
                 # The run ended where it started. Merging on this would apply
                 # the same candidate a second time.
@@ -428,8 +441,32 @@ class HohRunLauncher(RunLauncher):
                     f"no new candidate: still {nachher.candidate_id}",
                     candidate=nachher.commit,
                 )
+            # **An acceptance is durable.** It does not depend on the stage the
+            # run happened to stop in afterwards. This check used to live
+            # inside the `CHECKPOINTED` branch, so a run that accepted a
+            # candidate and then kept iterating -- because the budget allowed
+            # it -- was reported by the stage it ran out in: `REJECTED` from
+            # PLANNING, "iterations spent without a checkpoint". The candidate
+            # was in the state the whole time.
+            #
+            # Measured twice in the benchmark, on two different branches of
+            # this function (O122). A verdict that discards a recorded
+            # acceptance costs the work, not just the report.
+            nachsatz = ""
+            if state.stage not in (Stage.CHECKPOINTED, Stage.READY_FOR_DELIVERY):
+                nachsatz = (
+                    f", and the run then continued to "
+                    f"{state.stage.value}/{state.condition.value}"
+                )
+                if state.condition is Condition.BLOCKED:
+                    nachsatz += f": {state.blocked_reason}"
             return RunOutcome(RunVerdict.ACCEPTED,
-                              f"accepted {nachher.candidate_id}", candidate=nachher.commit)
+                              f"accepted {nachher.candidate_id}{nachsatz}",
+                              candidate=nachher.commit)
+
+        if state.stage in (Stage.CHECKPOINTED, Stage.READY_FOR_DELIVERY):
+            return RunOutcome(RunVerdict.UNDETERMINED,
+                              "run checkpointed with no accepted candidate recorded")
 
         # A run that exists and has not begun. The most knowable state there
         # is, and reporting it as unclassifiable deadlocked an unattended run:

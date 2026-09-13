@@ -335,6 +335,57 @@ def unblock(store: "ProjectStore", node_id: str, reason: str,
     return store.read_state()
 
 
+def abandon(store: "ProjectStore", node_id: str, reason: str,
+            *, actor: str = "human") -> ProjectState:
+    """Settles a node as ABANDONED, on the record.
+
+    The orchestrator abandons a node by itself only after `MAX_REJECTIONS`
+    attempts without progress. That covers the case where the work keeps
+    failing; it does not cover the case where the work should never have been
+    started.
+
+    This project met the second case in its own campaign. A global gate
+    reported a failure that came from the harness measuring the wrong tree, a
+    repair node was created and dispatched for it, and the merged state was in
+    fact green. There was nothing to repair, and no supported way to say so: a
+    human could `unblock` the node but not settle it, so the only routes were
+    letting it fail four more times -- spending real dispatches on work nobody
+    wanted -- or editing the state file by hand, which is exactly what a
+    durable, digest-bound state exists to make unnecessary. `unblock` had the
+    same gap on the other side (O100) and was fixed the same way.
+
+    The reason is required and becomes a decision record. A settled node is not
+    re-settled: abandoning something already merged would rewrite a decision
+    that has consequences in the repository.
+    """
+    from .project import DecisionKind, DecisionRecord
+
+    state = store.read_state()
+    node = state.node(node_id)
+    if node is None:
+        raise StoreError(f"project {store.project_id} has no node {node_id}")
+    if node.settled:
+        raise StoreError(
+            f"node {node_id} is already {node.lifecycle.value}; abandoning a "
+            "settled node would rewrite a decision that has already had effects"
+        )
+    vorher = node.note
+    vorheriger_zustand = node.lifecycle.value
+    node.lifecycle = Lifecycle.ABANDONED
+    node.note = (f"{vorher} | abandoned {utc()}: {reason}" if vorher else reason)
+    state.decisions.append(
+        DecisionRecord(
+            id=f"D{len(state.decisions) + 1:04d}",
+            kind=DecisionKind.ABANDON_NODE,
+            actor=actor,
+            reason=reason,
+            payload={"node": node_id, "was": vorheriger_zustand},
+        )
+    )
+    store.write_state(state)
+    return store.read_state()
+
+
 def utc() -> str:
     from .contracts import utcnow
     return utcnow()

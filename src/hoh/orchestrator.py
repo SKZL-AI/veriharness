@@ -647,9 +647,14 @@ class ProjectController:
             schritte.append(Step(runde, HaltClass.NOT_RUN, detail=grund))
             return Result(HaltClass.NOT_RUN, grund), state, reparaturen
 
+        # Stamped with the pass they belong to, before the counter moves, so a
+        # gate that stops running in a later pass cannot keep voting.
+        naechste = state.closure_generation + 1
+        for g in ergebnisse:
+            g.generation = naechste
         state.gates.extend(ergebnisse)
         state.measurement_head = subjekt
-        state.closure_generation += 1
+        state.closure_generation = naechste
         state = self._persist(state)
 
         if state.rc_closed():

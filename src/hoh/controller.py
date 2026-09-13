@@ -56,6 +56,7 @@ from .runner import (
     verify_receipt,
 )
 from .store import RunStore
+from .telemetry import TelemetryLog, record_from_role
 from .workspace import commit_candidate, materialize, snapshot, unchanged
 
 
@@ -420,9 +421,29 @@ class Controller:
             spec_digest=state.spec_digest,
             run_id=state.run_id,
         )
-        raw = self._dispatch_with_repair(Role.PLANNER, prompt, state)
-        plan = roles.parse_plan(raw)
-        self._assert_plan_bound(plan, state, base)
+        started_at = utcnow()
+        # 'ok' is earned only once the plan has answered, schema-parsed, AND
+        # bound correctly to this run/iteration/spec/base -- a plan that
+        # parses but is bound to the wrong run is rejected by `_plan` itself
+        # (see `_assert_plan_bound`), and a telemetry record claiming success
+        # for it would contradict the very rejection it describes.
+        try:
+            raw = self._dispatch_with_repair(Role.PLANNER, prompt, state)
+            plan = roles.parse_plan(raw)
+            self._assert_plan_bound(plan, state, base)
+        except Exception as exc:
+            self.note_dispatch(
+                role=Role.PLANNER.value, run_id=state.run_id, iteration=state.iteration,
+                attempt=state.attempt, started_at=started_at, ended_at=utcnow(),
+                backend=type(self.dispatcher).__name__, outcome="failed",
+                detail=str(exc), usage={}, state=state,
+            )
+            raise
+        self.note_dispatch(
+            role=Role.PLANNER.value, run_id=state.run_id, iteration=state.iteration,
+            attempt=state.attempt, started_at=started_at, ended_at=utcnow(),
+            backend=type(self.dispatcher).__name__, outcome="ok", usage={}, state=state,
+        )
         return plan
 
     @staticmethod
@@ -468,7 +489,22 @@ class Controller:
             warm_start=state.last_accepted_candidate is not None,
             evidence=evidence,
         )
-        self._dispatch(Role.DEVELOPER, prompt, state)
+        started_at = utcnow()
+        try:
+            self._dispatch(Role.DEVELOPER, prompt, state)
+        except Exception as exc:
+            self.note_dispatch(
+                role=Role.DEVELOPER.value, run_id=state.run_id, iteration=state.iteration,
+                attempt=state.attempt, started_at=started_at, ended_at=utcnow(),
+                backend=type(self.dispatcher).__name__, outcome="failed",
+                detail=str(exc), usage={}, state=state,
+            )
+            raise
+        self.note_dispatch(
+            role=Role.DEVELOPER.value, run_id=state.run_id, iteration=state.iteration,
+            attempt=state.attempt, started_at=started_at, ended_at=utcnow(),
+            backend=type(self.dispatcher).__name__, outcome="ok", usage={}, state=state,
+        )
 
     def _verify(
         self,
@@ -559,6 +595,7 @@ class Controller:
         # provides for one schema repair per role output, without exempting
         # any role.
         outage = ""
+        started_at = utcnow()
         try:
             raw = self._dispatch_with_repair(Role.QA, prompt, state)
         except DispatchError as exc:
@@ -581,6 +618,14 @@ class Controller:
             # happened.
             raw = ""
             outage = str(exc)
+
+        self.note_dispatch(
+            role=Role.QA.value, run_id=state.run_id, iteration=state.iteration,
+            attempt=state.attempt, started_at=started_at, ended_at=utcnow(),
+            backend=type(self.dispatcher).__name__,
+            outcome="failed" if outage else "ok",
+            detail=outage, usage={}, state=state,
+        )
 
         verdicts, gaps, summary = self._parse_qa(
             raw, plan=plan, receipts=receipts, state=state, candidate=candidate,
@@ -1165,6 +1210,42 @@ class Controller:
                 + "; ".join(f"{cid}: {reason}" for cid, reason in blind.items())
             )
         return final_verdicts, gaps, str(data.get("summary") or "")
+
+    # -- Telemetry ------------------------------------------------------------ #
+
+    def telemetry(self) -> TelemetryLog:
+        """The append-only dispatch log for this run, beside its other evidence."""
+        return TelemetryLog(self.store.dir / "telemetry.jsonl")
+
+    def note_dispatch(
+        self,
+        *,
+        role: str,
+        run_id: str,
+        iteration: int,
+        attempt: int,
+        started_at: str,
+        ended_at: str,
+        backend: str = "",
+        outcome: str = "ok",
+        detail: str = "",
+        usage: dict | None = None,
+        state: RunState | None = None,
+        **rest,
+    ) -> None:
+        """Records one role dispatch. Never raises: telemetry is a record of
+        the work, not a precondition for it (see `telemetry.py`). A write
+        failure is noted on `state`, when one was given, and swallowed."""
+        try:
+            record = record_from_role(
+                role=role, run_id=run_id, iteration=iteration, attempt=attempt,
+                started_at=started_at, ended_at=ended_at, backend=backend,
+                outcome=outcome, detail=detail, usage=usage, **rest,
+            )
+            self.telemetry().append(record)
+        except Exception as exc:
+            if state is not None:
+                state.note(f"telemetry not written for {role} dispatch: {exc}")
 
     # -- Dispatch with one repair round -------------------------------------- #
 

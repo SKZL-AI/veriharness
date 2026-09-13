@@ -74,9 +74,22 @@
       "is_development_node": false,
       "range": {
         "from": "77fd07ffa6e0578c1579b3273cf58df854c675e5",
-        "to": "HEAD"
+        "to": "3dcbc7b7574cdbe1b5a492024b08f1dc8ad7d260"
       },
       "why_not_the_product": "Not a development node: it is the measurement of who did the development. Named as a range rather than as a list because the commit that writes this entry cannot know its own sha -- the same self-reference O97 hit with the attribution table, solved the same way, by naming a boundary instead of a value."
+    },
+    {
+      "id": "telemetry-wiring",
+      "category": "VERIHARNESS_RUN",
+      "is_development_node": true,
+      "node_id": "telemetry-wiring",
+      "project_state": "dogfood/selfhost-e2e/root/projects/selbst/project.json",
+      "range": {
+        "from": "3dcbc7b7574cdbe1b5a492024b08f1dc8ad7d260",
+        "to": "HEAD"
+      },
+      "why_not_the_product": "This one *was* the product. The control plane specified it, dispatched three iterations, accepted a candidate and decided the merge; the main session started the process and answered four blocks, each recorded in the project state with its reason. The range runs to HEAD because the merge and the entry describing it cannot name their own shas -- the same self-reference O97 hit, solved the same way.",
+      "merge_commit": "6512538ac54173ef6606348c2e80c57a42b92c02"
     }
   ]
 }

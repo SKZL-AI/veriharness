@@ -411,3 +411,93 @@ def test_ein_begonnener_lauf_ist_nicht_ungestartet(starter, tmp_path):
     fertig = zustand(tmp_path, stage=Stage.CHECKPOINTED,
                      last_accepted_candidate=kandidat("r-i1"))
     assert starter._verdict(fertig, None, Leer()).verdict is RunVerdict.ACCEPTED
+
+
+# --------------------------------------------------------------------------- #
+# An acceptance is not undone by a later block
+# --------------------------------------------------------------------------- #
+
+
+def _blockiert(tmp_path, *, accepted=None, kind="plan-binding", reason="x"):
+    z = zustand(tmp_path, stage=Stage.PLANNING, condition=Condition.BLOCKED)
+    z.blocked_kind = kind
+    z.blocked_reason = reason
+    if accepted:
+        z.last_accepted_candidate = kandidat(accepted, "c" * 40)
+    return z
+
+
+def test_a_run_that_accepted_and_then_blocked_is_still_accepted(tmp_path):
+    """Measured in the benchmark's arm C.
+
+    `to_roman` accepted `ntoroman-i2`, kept iterating because the budget
+    allowed it, and blocked at iteration 4 on a plan whose `base_candidate_id`
+    named a *rejected* candidate -- which the product refused, correctly. The
+    node then came back UNDETERMINED and the arm produced no final state on a
+    task whose work had been finished two iterations earlier.
+
+    The acceptance happened, it is durable, and the candidate is in the state.
+    The block is still reported -- in the detail, where a reader sees it.
+    """
+    l = HohRunLauncher(tmp_path, tmp_path)
+    z = _blockiert(
+        tmp_path, accepted="ntoroman-i2",
+        reason="The plan is not bound to this run: base_candidate_id "
+               "'ntoroman-i3' instead of 'ntoroman-i2'",
+    )
+    out = l._verdict(z, None, None)
+    assert out.verdict is RunVerdict.ACCEPTED
+    assert "ntoroman-i2" in out.detail
+    assert "BLOCKED" in out.detail, "the block has to stay visible"
+    assert "base_candidate_id" in out.detail, "and so does its reason"
+    assert out.candidate == "c" * 40
+
+
+def test_a_block_with_nothing_accepted_stays_undetermined(tmp_path):
+    """The control. Reporting a block as an acceptance in general would be the
+    guess this whole design exists to avoid."""
+    l = HohRunLauncher(tmp_path, tmp_path)
+    z = _blockiert(tmp_path, kind="disk", reason="no space left on device")
+    assert l._verdict(z, None, None).verdict is RunVerdict.UNDETERMINED
+
+
+def test_a_block_after_re_accepting_the_same_candidate_is_a_rejection(tmp_path):
+    """If the accepted candidate is the one the node already merged, the run
+    ended where it started. That is a rejection -- the same answer this
+    function gives for the same situation in CHECKPOINTED -- and a block does
+    not turn it into progress. Merging on it would apply one candidate twice.
+    """
+    l = HohRunLauncher(tmp_path, tmp_path)
+    z = _blockiert(tmp_path, accepted="ntoroman-i2")
+    out = l._verdict(z, "ntoroman-i2", None)
+    assert out.verdict is RunVerdict.REJECTED
+    assert "no new candidate" in out.detail
+
+
+def test_an_acceptance_survives_a_spent_budget(tmp_path):
+    """The second branch the same defect lived on.
+
+    A run that accepted a candidate and then kept iterating -- because the
+    budget allowed it -- ended in PLANNING when the iterations ran out, and was
+    reported by the stage it stopped in: REJECTED, "iterations spent without a
+    checkpoint". The candidate was in the state the whole time.
+    """
+    l = HohRunLauncher(tmp_path, tmp_path)
+    z = zustand(tmp_path, stage=Stage.PLANNING, condition=Condition.ACTIVE)
+    z.iteration = 4
+    z.last_accepted_candidate = kandidat("repair-2-1-i2", "d" * 40)
+    out = l._verdict(z, None, None)
+    assert out.verdict is RunVerdict.ACCEPTED
+    assert "repair-2-1-i2" in out.detail
+    assert "PLANNING" in out.detail, "where it ended up is still reported"
+
+
+def test_a_run_still_planning_with_nothing_accepted_is_rejected(tmp_path):
+    """The control: without an acceptance, spending the iterations is exactly
+    what a rejection is."""
+    l = HohRunLauncher(tmp_path, tmp_path)
+    z = zustand(tmp_path, stage=Stage.PLANNING, condition=Condition.ACTIVE)
+    z.iteration = 4
+    out = l._verdict(z, None, None)
+    assert out.verdict is RunVerdict.REJECTED
+    assert "without a checkpoint" in out.detail

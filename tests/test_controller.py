@@ -14,6 +14,7 @@ from pathlib import Path
 
 import pytest
 
+from hoh import roles
 from hoh.contracts import Budgets, Outcome, Role, RunState, Stage
 from hoh.controller import Controller, DispatchError, new_run_id
 from hoh.evidence import EvidenceStatus
@@ -377,6 +378,30 @@ def test_a_second_schema_violation_aborts(tmp_path, repo, spec):
 
     with pytest.raises(DispatchError, match="repair budget"):
         ctrl.run_iteration(state)
+
+
+def test_a_misbound_plan_is_recorded_as_a_failed_dispatch(tmp_path, repo, spec):
+    """A plan that is schema-valid JSON but bound to the wrong run is
+    rejected by `_assert_plan_bound` -- the telemetry record for that
+    dispatch has to say so too. `note_dispatch(outcome="ok")` must not fire
+    before the binding check has actually passed, or the record would claim
+    success for a dispatch the controller itself refused."""
+
+    def misbound(s: RunState) -> dict:
+        bad = plan_for(s)
+        bad["run_id"] = "some-other-run"
+        return bad
+
+    d = FakeDispatcher(repo=repo, plan_json=misbound, qa_json=qa_pass)
+    ctrl, state, _ = build(tmp_path, repo, spec, d)
+
+    with pytest.raises(roles.RoleOutputError, match="not bound to this run"):
+        ctrl.run_iteration(state)
+
+    planner_records = [r for r in ctrl.telemetry().read() if r.role == "planner"]
+    assert len(planner_records) == 1
+    assert planner_records[0].outcome == "failed"
+    assert "run_id" in planner_records[0].detail
 
 
 # --- Warm start across two loops (A02) ------------------------------------- #

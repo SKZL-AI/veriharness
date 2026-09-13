@@ -143,14 +143,14 @@
     },
     {
       "id": "C-013",
-      "text": "There is no matched-budget comparison against a plain agent working the same specification without HoH's plan/develop/verify loop around it, and no baseline run of any kind exists in this repository's evidence.",
-      "where": "docs/LIMITATIONS.md:86",
-      "status": "UNSUPPORTED",
+      "text": "**Arm A -- a plain agent, no harness -- passed all five hidden suites.**",
+      "where": "docs/LIMITATIONS.md:111",
+      "status": "SUPPORTED",
       "evidence": [
-        "file:docs/LIMITATIONS.md:25"
+        "file:tools/benchmark.py:1"
       ],
-      "note": "Absence claim: no comparison or baseline run exists in this project's evidence. None of this schema's evidence forms (test/file/receipt/run/cite) can positively prove a negative, so this is recorded as UNSUPPORTED rather than implied to be independently checkable; docs/LIMITATIONS.md's second limitation states it in full.",
-      "anchor_digest": "0595ff55129ddff2b4ecfe36c56426981c7f4e78689d88d7248daf6dba0360c0"
+      "note": "Absence claim: no comparison or baseline run exists in this project's evidence. None of this schema's evidence forms (test/file/receipt/run/cite) can positively prove a negative, so this is recorded as UNSUPPORTED rather than implied to be independently checkable; docs/LIMITATIONS.md's second limitation states it in full. Superseded on 2026-09-13 by measurement. The earlier claim, recorded from the first release until this date, was: \"There is no matched-budget comparison against a plain agent working the same specification without HoH's plan/develop/verify loop around it, and no baseline run of any kind exists in this repository's evidence.\" It was true when written and is no longer: a matched-budget benchmark was run under a protocol committed before the first arm, and its result is the line now anchored here. The correction is by addition -- the old wording stays in this note -- and the direction is worth stating: the baseline did not favour the harness.",
+      "anchor_digest": "43a97da49a59e25f650fa0cb1a78dbb3b90cb659cae350fb3779f166aa837175"
     },
     {
       "id": "C-014",
@@ -1354,16 +1354,16 @@
     },
     {
       "id": "C-130",
-      "text": "| Recorded findings | **118** |",
+      "text": "| Recorded findings | **125** |",
       "where": "README.md:117",
       "status": "SUPPORTED",
       "evidence": [
         "receiptcount:d8=26",
         "run:d8/1"
       ],
-      "anchor_digest": "be02ecc6429f706b47d677aa5ad24c7bdfdf1cd04d677dcb2fd306dc6684585c",
+      "anchor_digest": "5ac8044f0c24e5df99da681825691eef56e990b71d55752d1d87739abb323b4b",
       "local_only_resolution": "Resolved by the orchestrating agent session on 2026-09-10 in the development repository: 94 findings, by counting distinct finding numbers in the development ledger. Re-checkable with the operator tool kampagne-zahlen.py, which re-derives this figure from its source and compares it against this exact line (README.md:117), failing on any disagreement; its negative control nk-kampagne-zahlen.py falsifies each number in turn and requires the checker to go red on every one.",
-      "note": "Catalogued during the rc2 correction cycle. The figure is not left free-standing in prose: it is bound to its source by a checker that fails the release gate on drift, which is the defect class that made this cycle necessary. Figure updated from 94 to 95 on 2026-09-10, when finding O95 was recorded; the earlier wording was \"| Recorded findings | **94** |\". Finding count updated from 95 to 96 on 2026-09-10, when finding O96 was recorded; the earlier wording was \"| Recorded findings | **95** |\". Anchor re-derived on 2026-09-10 (similarity 0.97) after finding O97: the attribution figures are now measured at a named commit rather than at HEAD, because the commit that writes them changes them. The earlier wording was: \"| Recorded findings | **96** |\". Finding count updated to 98 on 2026-09-10 (O98 recorded); the earlier wording was \"| Recorded findings | **97** |\". Finding count updated to 99 on 2026-09-11 (O99 recorded); the earlier wording was \"| Recorded findings | **98** |\". Finding count updated to 100 on 2026-09-11 (O100 recorded); the earlier wording was \"| Recorded findings | **99** |\". Finding count updated to 101 on 2026-09-11 (O101 recorded); the earlier wording was \"| Recorded findings | **100** |\". Anchor re-derived on 2026-09-11 (similarity 0.97) when the finding count advanced and limit 6 was corrected; the earlier wording was \"| Recorded findings | **101** |\". Finding count updated from 105 to 111 on 2026-09-11, when findings O106-O111 were recorded (the meta-evidence rule layer and five defects an adversarial double review found in the isolation evidence path); the earlier wording was: \"| Recorded findings | **105** |\". Finding count updated from 111 to 113 on 2026-09-11, when O112 (a red baseline is not automatically a demonstrated increment) and O113 (the first STRICT run's isolation claim was unevidenced) were recorded; the earlier wording was: \"| Recorded findings | **111** |\". Finding count updated from 113 to 116 on 2026-09-12, when O114 (the isolation proof lay in the writable area of the thing being checked), O115 (STRICT_REAL_AGENT_E2E, at the fourth attempt) and O116 (the planner was never told how its own criteria are executed) were recorded; the earlier wording was: \"| Recorded findings | **113** |\". Finding count updated from 116 to 118 on 2026-09-12, when O117 (the first development node through the product's own control plane, and the gate that measured the wrong tree) and O118 (an environment dependence only the external CI could see) were recorded; the earlier wording was: \"| Recorded findings | **116** |\"."
+      "note": "Catalogued during the rc2 correction cycle. The figure is not left free-standing in prose: it is bound to its source by a checker that fails the release gate on drift, which is the defect class that made this cycle necessary. Figure updated from 94 to 95 on 2026-09-10, when finding O95 was recorded; the earlier wording was \"| Recorded findings | **94** |\". Finding count updated from 95 to 96 on 2026-09-10, when finding O96 was recorded; the earlier wording was \"| Recorded findings | **95** |\". Anchor re-derived on 2026-09-10 (similarity 0.97) after finding O97: the attribution figures are now measured at a named commit rather than at HEAD, because the commit that writes them changes them. The earlier wording was: \"| Recorded findings | **96** |\". Finding count updated to 98 on 2026-09-10 (O98 recorded); the earlier wording was \"| Recorded findings | **97** |\". Finding count updated to 99 on 2026-09-11 (O99 recorded); the earlier wording was \"| Recorded findings | **98** |\". Finding count updated to 100 on 2026-09-11 (O100 recorded); the earlier wording was \"| Recorded findings | **99** |\". Finding count updated to 101 on 2026-09-11 (O101 recorded); the earlier wording was \"| Recorded findings | **100** |\". Anchor re-derived on 2026-09-11 (similarity 0.97) when the finding count advanced and limit 6 was corrected; the earlier wording was \"| Recorded findings | **101** |\". Finding count updated from 105 to 111 on 2026-09-11, when findings O106-O111 were recorded (the meta-evidence rule layer and five defects an adversarial double review found in the isolation evidence path); the earlier wording was: \"| Recorded findings | **105** |\". Finding count updated from 111 to 113 on 2026-09-11, when O112 (a red baseline is not automatically a demonstrated increment) and O113 (the first STRICT run's isolation claim was unevidenced) were recorded; the earlier wording was: \"| Recorded findings | **111** |\". Finding count updated from 113 to 116 on 2026-09-12, when O114 (the isolation proof lay in the writable area of the thing being checked), O115 (STRICT_REAL_AGENT_E2E, at the fourth attempt) and O116 (the planner was never told how its own criteria are executed) were recorded; the earlier wording was: \"| Recorded findings | **113** |\". Finding count updated from 116 to 118 on 2026-09-12, when O117 (the first development node through the product's own control plane, and the gate that measured the wrong tree) and O118 (an environment dependence only the external CI could see) were recorded; the earlier wording was: \"| Recorded findings | **116** |\". Finding count updated from 118 to 119 on 2026-09-12, when O119 (a run's own specification was written into the repository it checks) was recorded; the earlier wording was: \"| Recorded findings | **118** |\". Finding count updated from 119 to 120 on 2026-09-12, when O120 (a human could unblock a node but not abandon one) was recorded; the earlier wording was: \"| Recorded findings | **119** |\". Finding count updated from 120 to 121 on 2026-09-12, when O121 (a gate that cannot answer is not red) was recorded; the earlier wording was: \"| Recorded findings | **120** |\". Finding count updated from 121 to 122 on 2026-09-12, when O122 (an acceptance was discarded by a later block) was recorded; the earlier wording was: \"| Recorded findings | **121** |\". Finding count updated from 122 to 123 on 2026-09-12, when O123 (a renamed gate made the project permanently unclosable) was recorded; the earlier wording was: \"| Recorded findings | **122** |\". Finding count updated from 123 to 124 on 2026-09-13, when O124 (the self-hosting campaign reached its fixpoint, and what it cost) was recorded; the earlier wording was: \"| Recorded findings | **123** |\". Finding count updated from 124 to 125 on 2026-09-13, when O125 (the planner writes, and its own prompt forbids it) was recorded; the earlier wording was: \"| Recorded findings | **124** |\"."
     },
     {
       "id": "C-131",
@@ -1380,16 +1380,16 @@
     },
     {
       "id": "C-132",
-      "text": "campaign that produces 118 recorded findings against its own harness is not a",
+      "text": "campaign that produces 125 recorded findings against its own harness is not a",
       "where": "README.md:122",
       "status": "SUPPORTED",
       "evidence": [
         "receiptcount:d8=26",
         "run:d8/1"
       ],
-      "anchor_digest": "89cb1b48472838777cb6a4dc4cc3cc1d66e01497a94f0890961bb8f9a21a24c8",
+      "anchor_digest": "b919cef07c430d2f5e51909c09bb11928e886dd2c8c3a2c1ff7b7af214eccd35",
       "local_only_resolution": "Resolved by the orchestrating agent session on 2026-09-10 in the development repository: 94 findings, by counting distinct finding numbers in the development ledger. Re-checkable with the operator tool kampagne-zahlen.py, which re-derives this figure from its source and compares it against this exact line (README.md:122), failing on any disagreement; its negative control nk-kampagne-zahlen.py falsifies each number in turn and requires the checker to go red on every one.",
-      "note": "Catalogued during the rc2 correction cycle. The figure is not left free-standing in prose: it is bound to its source by a checker that fails the release gate on drift, which is the defect class that made this cycle necessary. Anchor re-derived on 2026-09-10: the earlier wording was \"campaign that produces 94 recorded findings against its own harness is not\" and implied that finding numbers can be traced into docs/LIMITATIONS.md. They cannot -- that document names no finding numbers, because U2 forbids a shipped file from referencing an unshipped one. The figure itself is unchanged. Figure updated from 94 to 95 on 2026-09-10, when finding O95 was recorded; the earlier wording was \"campaign that produces 94 recorded findings against its own harness is not a\". Finding count updated from 95 to 96 on 2026-09-10, when finding O96 was recorded; the earlier wording was \"campaign that produces 95 recorded findings against its own harness is not a\". Anchor re-derived on 2026-09-10 (similarity 0.99) after finding O97: the attribution figures are now measured at a named commit rather than at HEAD, because the commit that writes them changes them. The earlier wording was: \"campaign that produces 96 recorded findings against its own harness is not a\". Finding count updated to 98 on 2026-09-10 (O98 recorded); the earlier wording was \"campaign that produces 97 recorded findings against its own harness is not a\". Finding count updated to 99 on 2026-09-11 (O99 recorded); the earlier wording was \"campaign that produces 98 recorded findings against its own harness is not a\". Finding count updated to 100 on 2026-09-11 (O100 recorded); the earlier wording was \"campaign that produces 99 recorded findings against its own harness is not a\". Finding count updated to 101 on 2026-09-11 (O101 recorded); the earlier wording was \"campaign that produces 100 recorded findings against its own harness is not a\". Anchor re-derived on 2026-09-11 (similarity 0.99) when the finding count advanced and limit 6 was corrected; the earlier wording was \"campaign that produces 101 recorded findings against its own harness is not a\". Finding count updated from 105 to 111 on 2026-09-11, when findings O106-O111 were recorded (the meta-evidence rule layer and five defects an adversarial double review found in the isolation evidence path); the earlier wording was: \"campaign that produces 105 recorded findings against its own harness is not a\". Finding count updated from 111 to 113 on 2026-09-11, when O112 (a red baseline is not automatically a demonstrated increment) and O113 (the first STRICT run's isolation claim was unevidenced) were recorded; the earlier wording was: \"campaign that produces 111 recorded findings against its own harness is not a\". Finding count updated from 113 to 116 on 2026-09-12, when O114 (the isolation proof lay in the writable area of the thing being checked), O115 (STRICT_REAL_AGENT_E2E, at the fourth attempt) and O116 (the planner was never told how its own criteria are executed) were recorded; the earlier wording was: \"campaign that produces 113 recorded findings against its own harness is not a\". Finding count updated from 116 to 118 on 2026-09-12, when O117 (the first development node through the product's own control plane, and the gate that measured the wrong tree) and O118 (an environment dependence only the external CI could see) were recorded; the earlier wording was: \"campaign that produces 116 recorded findings against its own harness is not a\"."
+      "note": "Catalogued during the rc2 correction cycle. The figure is not left free-standing in prose: it is bound to its source by a checker that fails the release gate on drift, which is the defect class that made this cycle necessary. Anchor re-derived on 2026-09-10: the earlier wording was \"campaign that produces 94 recorded findings against its own harness is not\" and implied that finding numbers can be traced into docs/LIMITATIONS.md. They cannot -- that document names no finding numbers, because U2 forbids a shipped file from referencing an unshipped one. The figure itself is unchanged. Figure updated from 94 to 95 on 2026-09-10, when finding O95 was recorded; the earlier wording was \"campaign that produces 94 recorded findings against its own harness is not a\". Finding count updated from 95 to 96 on 2026-09-10, when finding O96 was recorded; the earlier wording was \"campaign that produces 95 recorded findings against its own harness is not a\". Anchor re-derived on 2026-09-10 (similarity 0.99) after finding O97: the attribution figures are now measured at a named commit rather than at HEAD, because the commit that writes them changes them. The earlier wording was: \"campaign that produces 96 recorded findings against its own harness is not a\". Finding count updated to 98 on 2026-09-10 (O98 recorded); the earlier wording was \"campaign that produces 97 recorded findings against its own harness is not a\". Finding count updated to 99 on 2026-09-11 (O99 recorded); the earlier wording was \"campaign that produces 98 recorded findings against its own harness is not a\". Finding count updated to 100 on 2026-09-11 (O100 recorded); the earlier wording was \"campaign that produces 99 recorded findings against its own harness is not a\". Finding count updated to 101 on 2026-09-11 (O101 recorded); the earlier wording was \"campaign that produces 100 recorded findings against its own harness is not a\". Anchor re-derived on 2026-09-11 (similarity 0.99) when the finding count advanced and limit 6 was corrected; the earlier wording was \"campaign that produces 101 recorded findings against its own harness is not a\". Finding count updated from 105 to 111 on 2026-09-11, when findings O106-O111 were recorded (the meta-evidence rule layer and five defects an adversarial double review found in the isolation evidence path); the earlier wording was: \"campaign that produces 105 recorded findings against its own harness is not a\". Finding count updated from 111 to 113 on 2026-09-11, when O112 (a red baseline is not automatically a demonstrated increment) and O113 (the first STRICT run's isolation claim was unevidenced) were recorded; the earlier wording was: \"campaign that produces 111 recorded findings against its own harness is not a\". Finding count updated from 113 to 116 on 2026-09-12, when O114 (the isolation proof lay in the writable area of the thing being checked), O115 (STRICT_REAL_AGENT_E2E, at the fourth attempt) and O116 (the planner was never told how its own criteria are executed) were recorded; the earlier wording was: \"campaign that produces 113 recorded findings against its own harness is not a\". Finding count updated from 116 to 118 on 2026-09-12, when O117 (the first development node through the product's own control plane, and the gate that measured the wrong tree) and O118 (an environment dependence only the external CI could see) were recorded; the earlier wording was: \"campaign that produces 116 recorded findings against its own harness is not a\". Finding count updated from 118 to 119 on 2026-09-12, when O119 (a run's own specification was written into the repository it checks) was recorded; the earlier wording was: \"campaign that produces 118 recorded findings against its own harness is not a\". Finding count updated from 119 to 120 on 2026-09-12, when O120 (a human could unblock a node but not abandon one) was recorded; the earlier wording was: \"campaign that produces 119 recorded findings against its own harness is not a\". Finding count updated from 120 to 121 on 2026-09-12, when O121 (a gate that cannot answer is not red) was recorded; the earlier wording was: \"campaign that produces 120 recorded findings against its own harness is not a\". Finding count updated from 121 to 122 on 2026-09-12, when O122 (an acceptance was discarded by a later block) was recorded; the earlier wording was: \"campaign that produces 121 recorded findings against its own harness is not a\". Finding count updated from 122 to 123 on 2026-09-12, when O123 (a renamed gate made the project permanently unclosable) was recorded; the earlier wording was: \"campaign that produces 122 recorded findings against its own harness is not a\". Finding count updated from 123 to 124 on 2026-09-13, when O124 (the self-hosting campaign reached its fixpoint, and what it cost) was recorded; the earlier wording was: \"campaign that produces 123 recorded findings against its own harness is not a\". Finding count updated from 124 to 125 on 2026-09-13, when O125 (the planner writes, and its own prompt forbids it) was recorded; the earlier wording was: \"campaign that produces 124 recorded findings against its own harness is not a\"."
     },
     {
       "id": "C-133",
@@ -1458,16 +1458,16 @@
     },
     {
       "id": "C-138",
-      "text": "51 specifications, 45 merges and 118 recorded findings**, across five calendar",
+      "text": "51 specifications, 45 merges and 125 recorded findings**, across five calendar",
       "where": "docs/LIMITATIONS.md:28",
       "status": "SUPPORTED",
       "evidence": [
         "receiptcount:d8=26",
         "run:d8/1"
       ],
-      "anchor_digest": "fe8c0aea045d410f7f9884e76798ef0f2e3168898c12dc7d8e895b0c84eb7284",
+      "anchor_digest": "b229c019f319174b4a0f27d1405db3eed6b7df262504aa3e67b81b863ed0b7aa",
       "local_only_resolution": "Resolved by the orchestrating agent session on 2026-09-10 in the development repository: 45 merges, 48 specifications, 94 findings, by counting distinct finding numbers in the development ledger; counting distinct spec_path values across all state.json; counting merge commits on the mainline. Re-checkable with the operator tool kampagne-zahlen.py, which re-derives this figure from its source and compares it against this exact line (docs/LIMITATIONS.md:28), failing on any disagreement; its negative control nk-kampagne-zahlen.py falsifies each number in turn and requires the checker to go red on every one.",
-      "note": "Catalogued during the rc2 correction cycle. The figure is not left free-standing in prose: it is bound to its source by a checker that fails the release gate on drift, which is the defect class that made this cycle necessary. Figure updated from 94 to 95 on 2026-09-10, when finding O95 was recorded; the earlier wording was \"48 specifications, 45 merges and 94 recorded findings**, across five calendar\". Anchor re-derived on 2026-09-10 (similarity 0.97); the earlier wording was: \"48 specifications, 45 merges and 95 recorded findings**, across five calendar\". What changed in the rc2 cycle: the specification count (48 basenames -> 51 distinct contents) and the attribution columns (now counted without merge commits). The statement itself was not withdrawn. Finding count updated from 95 to 96 on 2026-09-10, when finding O96 was recorded; the earlier wording was \"51 specifications, 45 merges and 95 recorded findings**, across five calendar\". Anchor re-derived on 2026-09-10 (similarity 0.99) after finding O97: the attribution figures are now measured at a named commit rather than at HEAD, because the commit that writes them changes them. The earlier wording was: \"51 specifications, 45 merges and 96 recorded findings**, across five calendar\". Finding count updated to 98 on 2026-09-10 (O98 recorded); the earlier wording was \"51 specifications, 45 merges and 97 recorded findings**, across five calendar\". Finding count updated to 99 on 2026-09-11 (O99 recorded); the earlier wording was \"51 specifications, 45 merges and 98 recorded findings**, across five calendar\". Finding count updated to 100 on 2026-09-11 (O100 recorded); the earlier wording was \"51 specifications, 45 merges and 99 recorded findings**, across five calendar\". Finding count updated to 101 on 2026-09-11 (O101 recorded); the earlier wording was \"51 specifications, 45 merges and 100 recorded findings**, across five calendar\". Anchor re-derived on 2026-09-11 (similarity 0.99) when the finding count advanced and limit 6 was corrected; the earlier wording was \"51 specifications, 45 merges and 101 recorded findings**, across five calendar\". Finding count updated from 105 to 111 on 2026-09-11, when findings O106-O111 were recorded (the meta-evidence rule layer and five defects an adversarial double review found in the isolation evidence path); the earlier wording was: \"51 specifications, 45 merges and 105 recorded findings**, across five calendar\". Finding count updated from 111 to 113 on 2026-09-11, when O112 (a red baseline is not automatically a demonstrated increment) and O113 (the first STRICT run's isolation claim was unevidenced) were recorded; the earlier wording was: \"51 specifications, 45 merges and 111 recorded findings**, across five calendar\". Finding count updated from 113 to 116 on 2026-09-12, when O114 (the isolation proof lay in the writable area of the thing being checked), O115 (STRICT_REAL_AGENT_E2E, at the fourth attempt) and O116 (the planner was never told how its own criteria are executed) were recorded; the earlier wording was: \"51 specifications, 45 merges and 113 recorded findings**, across five calendar\". Finding count updated from 116 to 118 on 2026-09-12, when O117 (the first development node through the product's own control plane, and the gate that measured the wrong tree) and O118 (an environment dependence only the external CI could see) were recorded; the earlier wording was: \"51 specifications, 45 merges and 116 recorded findings**, across five calendar\"."
+      "note": "Catalogued during the rc2 correction cycle. The figure is not left free-standing in prose: it is bound to its source by a checker that fails the release gate on drift, which is the defect class that made this cycle necessary. Figure updated from 94 to 95 on 2026-09-10, when finding O95 was recorded; the earlier wording was \"48 specifications, 45 merges and 94 recorded findings**, across five calendar\". Anchor re-derived on 2026-09-10 (similarity 0.97); the earlier wording was: \"48 specifications, 45 merges and 95 recorded findings**, across five calendar\". What changed in the rc2 cycle: the specification count (48 basenames -> 51 distinct contents) and the attribution columns (now counted without merge commits). The statement itself was not withdrawn. Finding count updated from 95 to 96 on 2026-09-10, when finding O96 was recorded; the earlier wording was \"51 specifications, 45 merges and 95 recorded findings**, across five calendar\". Anchor re-derived on 2026-09-10 (similarity 0.99) after finding O97: the attribution figures are now measured at a named commit rather than at HEAD, because the commit that writes them changes them. The earlier wording was: \"51 specifications, 45 merges and 96 recorded findings**, across five calendar\". Finding count updated to 98 on 2026-09-10 (O98 recorded); the earlier wording was \"51 specifications, 45 merges and 97 recorded findings**, across five calendar\". Finding count updated to 99 on 2026-09-11 (O99 recorded); the earlier wording was \"51 specifications, 45 merges and 98 recorded findings**, across five calendar\". Finding count updated to 100 on 2026-09-11 (O100 recorded); the earlier wording was \"51 specifications, 45 merges and 99 recorded findings**, across five calendar\". Finding count updated to 101 on 2026-09-11 (O101 recorded); the earlier wording was \"51 specifications, 45 merges and 100 recorded findings**, across five calendar\". Anchor re-derived on 2026-09-11 (similarity 0.99) when the finding count advanced and limit 6 was corrected; the earlier wording was \"51 specifications, 45 merges and 101 recorded findings**, across five calendar\". Finding count updated from 105 to 111 on 2026-09-11, when findings O106-O111 were recorded (the meta-evidence rule layer and five defects an adversarial double review found in the isolation evidence path); the earlier wording was: \"51 specifications, 45 merges and 105 recorded findings**, across five calendar\". Finding count updated from 111 to 113 on 2026-09-11, when O112 (a red baseline is not automatically a demonstrated increment) and O113 (the first STRICT run's isolation claim was unevidenced) were recorded; the earlier wording was: \"51 specifications, 45 merges and 111 recorded findings**, across five calendar\". Finding count updated from 113 to 116 on 2026-09-12, when O114 (the isolation proof lay in the writable area of the thing being checked), O115 (STRICT_REAL_AGENT_E2E, at the fourth attempt) and O116 (the planner was never told how its own criteria are executed) were recorded; the earlier wording was: \"51 specifications, 45 merges and 113 recorded findings**, across five calendar\". Finding count updated from 116 to 118 on 2026-09-12, when O117 (the first development node through the product's own control plane, and the gate that measured the wrong tree) and O118 (an environment dependence only the external CI could see) were recorded; the earlier wording was: \"51 specifications, 45 merges and 116 recorded findings**, across five calendar\". Finding count updated from 118 to 119 on 2026-09-12, when O119 (a run's own specification was written into the repository it checks) was recorded; the earlier wording was: \"51 specifications, 45 merges and 118 recorded findings**, across five calendar\". Finding count updated from 119 to 120 on 2026-09-12, when O120 (a human could unblock a node but not abandon one) was recorded; the earlier wording was: \"51 specifications, 45 merges and 119 recorded findings**, across five calendar\". Finding count updated from 120 to 121 on 2026-09-12, when O121 (a gate that cannot answer is not red) was recorded; the earlier wording was: \"51 specifications, 45 merges and 120 recorded findings**, across five calendar\". Finding count updated from 121 to 122 on 2026-09-12, when O122 (an acceptance was discarded by a later block) was recorded; the earlier wording was: \"51 specifications, 45 merges and 121 recorded findings**, across five calendar\". Finding count updated from 122 to 123 on 2026-09-12, when O123 (a renamed gate made the project permanently unclosable) was recorded; the earlier wording was: \"51 specifications, 45 merges and 122 recorded findings**, across five calendar\". Finding count updated from 123 to 124 on 2026-09-13, when O124 (the self-hosting campaign reached its fixpoint, and what it cost) was recorded; the earlier wording was: \"51 specifications, 45 merges and 123 recorded findings**, across five calendar\". Finding count updated from 124 to 125 on 2026-09-13, when O125 (the planner writes, and its own prompt forbids it) was recorded; the earlier wording was: \"51 specifications, 45 merges and 124 recorded findings**, across five calendar\"."
     },
     {
       "id": "C-139",
@@ -1484,16 +1484,16 @@
     },
     {
       "id": "C-140",
-      "text": "decisions against 65 runs, 51 specifications, 45 merges and 118 findings. The",
+      "text": "decisions against 65 runs, 51 specifications, 45 merges and 125 findings. The",
       "where": "docs/LIMITATIONS.md:47",
       "status": "SUPPORTED",
       "evidence": [
         "receiptcount:d8=26",
         "run:d8/1"
       ],
-      "anchor_digest": "1368d9f8e75374d36fee386e074ce492938a6931ff9c9d5bf6b9c2f85de50b04",
+      "anchor_digest": "b87c6d6a1aa9f0f9e3a6e7bd875c81e94e720fbf5f7e5052e18872281dc5417b",
       "local_only_resolution": "Resolved by the orchestrating agent session on 2026-09-10 in the development repository: 45 merges, 48 specifications, 65 runs, 94 findings, by counting distinct finding numbers in the development ledger; counting distinct spec_path values across all state.json; counting merge commits on the mainline; counting runs/*/state.json. Re-checkable with the operator tool kampagne-zahlen.py, which re-derives this figure from its source and compares it against this exact line (docs/LIMITATIONS.md:47), failing on any disagreement; its negative control nk-kampagne-zahlen.py falsifies each number in turn and requires the checker to go red on every one.",
-      "note": "Catalogued during the rc2 correction cycle. The figure is not left free-standing in prose: it is bound to its source by a checker that fails the release gate on drift, which is the defect class that made this cycle necessary. Figure updated from 94 to 95 on 2026-09-10, when finding O95 was recorded; the earlier wording was \"decisions against 65 runs, 48 specifications, 45 merges and 94 findings. The\". Anchor re-derived on 2026-09-10 (similarity 0.97); the earlier wording was: \"decisions against 65 runs, 48 specifications, 45 merges and 95 findings. The\". What changed in the rc2 cycle: the specification count (48 basenames -> 51 distinct contents) and the attribution columns (now counted without merge commits). The statement itself was not withdrawn. Finding count updated from 95 to 96 on 2026-09-10, when finding O96 was recorded; the earlier wording was \"decisions against 65 runs, 51 specifications, 45 merges and 95 findings. The\". Anchor re-derived on 2026-09-10 (similarity 0.99) after finding O97: the attribution figures are now measured at a named commit rather than at HEAD, because the commit that writes them changes them. The earlier wording was: \"decisions against 65 runs, 51 specifications, 45 merges and 96 findings. The\". Finding count updated to 98 on 2026-09-10 (O98 recorded); the earlier wording was \"decisions against 65 runs, 51 specifications, 45 merges and 97 findings. The\". Finding count updated to 99 on 2026-09-11 (O99 recorded); the earlier wording was \"decisions against 65 runs, 51 specifications, 45 merges and 98 findings. The\". Finding count updated to 100 on 2026-09-11 (O100 recorded); the earlier wording was \"decisions against 65 runs, 51 specifications, 45 merges and 99 findings. The\". Finding count updated to 101 on 2026-09-11 (O101 recorded); the earlier wording was \"decisions against 65 runs, 51 specifications, 45 merges and 100 findings. The\". Anchor re-derived on 2026-09-11 (similarity 0.99) when the finding count advanced and limit 6 was corrected; the earlier wording was \"decisions against 65 runs, 51 specifications, 45 merges and 101 findings. The\". Finding count updated from 105 to 111 on 2026-09-11, when findings O106-O111 were recorded (the meta-evidence rule layer and five defects an adversarial double review found in the isolation evidence path); the earlier wording was: \"decisions against 65 runs, 51 specifications, 45 merges and 105 findings. The\". Finding count updated from 111 to 113 on 2026-09-11, when O112 (a red baseline is not automatically a demonstrated increment) and O113 (the first STRICT run's isolation claim was unevidenced) were recorded; the earlier wording was: \"decisions against 65 runs, 51 specifications, 45 merges and 111 findings. The\". Finding count updated from 113 to 116 on 2026-09-12, when O114 (the isolation proof lay in the writable area of the thing being checked), O115 (STRICT_REAL_AGENT_E2E, at the fourth attempt) and O116 (the planner was never told how its own criteria are executed) were recorded; the earlier wording was: \"decisions against 65 runs, 51 specifications, 45 merges and 113 findings. The\". Finding count updated from 116 to 118 on 2026-09-12, when O117 (the first development node through the product's own control plane, and the gate that measured the wrong tree) and O118 (an environment dependence only the external CI could see) were recorded; the earlier wording was: \"decisions against 65 runs, 51 specifications, 45 merges and 116 findings. The\"."
+      "note": "Catalogued during the rc2 correction cycle. The figure is not left free-standing in prose: it is bound to its source by a checker that fails the release gate on drift, which is the defect class that made this cycle necessary. Figure updated from 94 to 95 on 2026-09-10, when finding O95 was recorded; the earlier wording was \"decisions against 65 runs, 48 specifications, 45 merges and 94 findings. The\". Anchor re-derived on 2026-09-10 (similarity 0.97); the earlier wording was: \"decisions against 65 runs, 48 specifications, 45 merges and 95 findings. The\". What changed in the rc2 cycle: the specification count (48 basenames -> 51 distinct contents) and the attribution columns (now counted without merge commits). The statement itself was not withdrawn. Finding count updated from 95 to 96 on 2026-09-10, when finding O96 was recorded; the earlier wording was \"decisions against 65 runs, 51 specifications, 45 merges and 95 findings. The\". Anchor re-derived on 2026-09-10 (similarity 0.99) after finding O97: the attribution figures are now measured at a named commit rather than at HEAD, because the commit that writes them changes them. The earlier wording was: \"decisions against 65 runs, 51 specifications, 45 merges and 96 findings. The\". Finding count updated to 98 on 2026-09-10 (O98 recorded); the earlier wording was \"decisions against 65 runs, 51 specifications, 45 merges and 97 findings. The\". Finding count updated to 99 on 2026-09-11 (O99 recorded); the earlier wording was \"decisions against 65 runs, 51 specifications, 45 merges and 98 findings. The\". Finding count updated to 100 on 2026-09-11 (O100 recorded); the earlier wording was \"decisions against 65 runs, 51 specifications, 45 merges and 99 findings. The\". Finding count updated to 101 on 2026-09-11 (O101 recorded); the earlier wording was \"decisions against 65 runs, 51 specifications, 45 merges and 100 findings. The\". Anchor re-derived on 2026-09-11 (similarity 0.99) when the finding count advanced and limit 6 was corrected; the earlier wording was \"decisions against 65 runs, 51 specifications, 45 merges and 101 findings. The\". Finding count updated from 105 to 111 on 2026-09-11, when findings O106-O111 were recorded (the meta-evidence rule layer and five defects an adversarial double review found in the isolation evidence path); the earlier wording was: \"decisions against 65 runs, 51 specifications, 45 merges and 105 findings. The\". Finding count updated from 111 to 113 on 2026-09-11, when O112 (a red baseline is not automatically a demonstrated increment) and O113 (the first STRICT run's isolation claim was unevidenced) were recorded; the earlier wording was: \"decisions against 65 runs, 51 specifications, 45 merges and 111 findings. The\". Finding count updated from 113 to 116 on 2026-09-12, when O114 (the isolation proof lay in the writable area of the thing being checked), O115 (STRICT_REAL_AGENT_E2E, at the fourth attempt) and O116 (the planner was never told how its own criteria are executed) were recorded; the earlier wording was: \"decisions against 65 runs, 51 specifications, 45 merges and 113 findings. The\". Finding count updated from 116 to 118 on 2026-09-12, when O117 (the first development node through the product's own control plane, and the gate that measured the wrong tree) and O118 (an environment dependence only the external CI could see) were recorded; the earlier wording was: \"decisions against 65 runs, 51 specifications, 45 merges and 116 findings. The\". Finding count updated from 118 to 119 on 2026-09-12, when O119 (a run's own specification was written into the repository it checks) was recorded; the earlier wording was: \"decisions against 65 runs, 51 specifications, 45 merges and 118 findings. The\". Finding count updated from 119 to 120 on 2026-09-12, when O120 (a human could unblock a node but not abandon one) was recorded; the earlier wording was: \"decisions against 65 runs, 51 specifications, 45 merges and 119 findings. The\". Finding count updated from 120 to 121 on 2026-09-12, when O121 (a gate that cannot answer is not red) was recorded; the earlier wording was: \"decisions against 65 runs, 51 specifications, 45 merges and 120 findings. The\". Finding count updated from 121 to 122 on 2026-09-12, when O122 (an acceptance was discarded by a later block) was recorded; the earlier wording was: \"decisions against 65 runs, 51 specifications, 45 merges and 121 findings. The\". Finding count updated from 122 to 123 on 2026-09-12, when O123 (a renamed gate made the project permanently unclosable) was recorded; the earlier wording was: \"decisions against 65 runs, 51 specifications, 45 merges and 122 findings. The\". Finding count updated from 123 to 124 on 2026-09-13, when O124 (the self-hosting campaign reached its fixpoint, and what it cost) was recorded; the earlier wording was: \"decisions against 65 runs, 51 specifications, 45 merges and 123 findings. The\". Finding count updated from 124 to 125 on 2026-09-13, when O125 (the planner writes, and its own prompt forbids it) was recorded; the earlier wording was: \"decisions against 65 runs, 51 specifications, 45 merges and 124 findings. The\"."
     },
     {
       "id": "C-141",
@@ -1871,6 +1871,237 @@
       ],
       "note": "Generated by tools/evidence_index.py from the evidence tree it describes. LOCAL_ONLY on purpose: the tree is not in the public export, because its receipts carry absolute machine paths and redacting them would break the digests they carry. Anyone holding the tree can re-derive this line; a mismatch is a gate failure.",
       "anchor_digest": "ffbfcc8d34d6962f4a838daa99a44053bdb4eb6ce377831637a1dd1297a3c090"
+    },
+    {
+      "id": "C-175",
+      "text": "Generated by `python3 tools/benchmark.py report --write` from the cells in",
+      "where": "docs/BENCHMARK_RESULTS.md:3",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:tools/benchmark.py:606"
+      ],
+      "note": "Generated by tools/benchmark.py from the cells in dogfood/benchmark/results/, which are not in the public export. Anyone holding them can re-derive this line.",
+      "anchor_digest": "8005e1d0e1a332889fbbe885c4f864795cff737465a4dd2a4a620ff1c41bca49"
+    },
+    {
+      "id": "C-176",
+      "text": "**15 of 15 cells have run.**",
+      "where": "docs/BENCHMARK_RESULTS.md:7",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:tools/benchmark.py:606"
+      ],
+      "note": "Generated by tools/benchmark.py from the cells in dogfood/benchmark/results/, which are not in the public export. Anyone holding them can re-derive this line.",
+      "anchor_digest": "e97fb2798662f21a443c50d92d8b11ad22693b88a2eb82143406bd2c99eba49f"
+    },
+    {
+      "id": "C-177",
+      "text": "| `parse_duration/C` | node nparse4o90hmk9 is waiting for a human approval: iteration aborted: planner waits for an approval in pane w17:p8N. A blocked dialog is not answered automatically. |",
+      "where": "docs/BENCHMARK_RESULTS.md:26",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:tools/benchmark.py:606"
+      ],
+      "note": "Generated by tools/benchmark.py from the cells in dogfood/benchmark/results/, which are not in the public export. Anyone holding them can re-derive this line.",
+      "anchor_digest": "05c75d732d5328d4fa89e116b39dc28e52634aa67dfd806f1c4ec3eb2780da2c"
+    },
+    {
+      "id": "C-178",
+      "text": "| `retry_backoff/C` | node nretryceoewd3m is waiting for a human approval: iteration aborted: planner waits for an approval in pane w17:p8P. A blocked dialog is not answered automatically. |",
+      "where": "docs/BENCHMARK_RESULTS.md:27",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:tools/benchmark.py:606"
+      ],
+      "note": "Generated by tools/benchmark.py from the cells in dogfood/benchmark/results/, which are not in the public export. Anyone holding them can re-derive this line.",
+      "anchor_digest": "96a2062215bd1ab938d3280fc1b4ccf29cf5e850f1c68f61a8e2e05a92aecd70"
+    },
+    {
+      "id": "C-179",
+      "text": "| `slug_pair/C` | node nslugpljjzphb8 is waiting for a human approval: iteration aborted: planner waits for an approval in pane w17:p8Q. A blocked dialog is not answered automatically. |",
+      "where": "docs/BENCHMARK_RESULTS.md:28",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:tools/benchmark.py:606"
+      ],
+      "note": "Generated by tools/benchmark.py from the cells in dogfood/benchmark/results/, which are not in the public export. Anyone holding them can re-derive this line.",
+      "anchor_digest": "74ce6714998e3b2d4fce7e529fa07f364751e8296c8d6a8d5da27d770ecc1cd7"
+    },
+    {
+      "id": "C-180",
+      "text": "| `to_roman/C` | node ntoromsrd2ds4p is waiting for a human approval: iteration aborted: planner waits for an approval in pane w17:p8M. A blocked dialog is not answered automatically. |",
+      "where": "docs/BENCHMARK_RESULTS.md:29",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:tools/benchmark.py:606"
+      ],
+      "note": "Generated by tools/benchmark.py from the cells in dogfood/benchmark/results/, which are not in the public export. Anyone holding them can re-derive this line.",
+      "anchor_digest": "161ab5d258a8f5deeea95e05a5b92a065813fa401ed25a04a55476c8628e0fd7"
+    },
+    {
+      "id": "C-181",
+      "text": "| `ledger_apply` | A | 26 | 1 |",
+      "where": "docs/BENCHMARK_RESULTS.md:49",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:tools/benchmark.py:606"
+      ],
+      "note": "Generated by tools/benchmark.py from the cells in dogfood/benchmark/results/, which are not in the public export. Anyone holding them can re-derive this line.",
+      "anchor_digest": "ca72ef084f9e23fd573de4d065ded1566156d05406def6f4e1dc9c9e7966c129"
+    },
+    {
+      "id": "C-182",
+      "text": "| `ledger_apply` | B | 372 | 9 |",
+      "where": "docs/BENCHMARK_RESULTS.md:50",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:tools/benchmark.py:606"
+      ],
+      "note": "Generated by tools/benchmark.py from the cells in dogfood/benchmark/results/, which are not in the public export. Anyone holding them can re-derive this line.",
+      "anchor_digest": "fe2602002d3f5b566f0b11e294d79ddfacdc23082d08e297e86249f3144a18ce"
+    },
+    {
+      "id": "C-183",
+      "text": "| `ledger_apply` | C | 1308 | 9 |",
+      "where": "docs/BENCHMARK_RESULTS.md:51",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:tools/benchmark.py:606"
+      ],
+      "note": "Generated by tools/benchmark.py from the cells in dogfood/benchmark/results/, which are not in the public export. Anyone holding them can re-derive this line.",
+      "anchor_digest": "299716ff705646f63e6741adc165b059f79063309d15c18f6899cf7f727d8472"
+    },
+    {
+      "id": "C-184",
+      "text": "| `parse_duration` | A | 114 | 1 |",
+      "where": "docs/BENCHMARK_RESULTS.md:52",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:tools/benchmark.py:606"
+      ],
+      "note": "Generated by tools/benchmark.py from the cells in dogfood/benchmark/results/, which are not in the public export. Anyone holding them can re-derive this line.",
+      "anchor_digest": "d29c7784357b3fb84d582b9bb3c07201c49680795f50db891c7eabd1220ddb81"
+    },
+    {
+      "id": "C-185",
+      "text": "| `parse_duration` | B | 131 | 3 |",
+      "where": "docs/BENCHMARK_RESULTS.md:53",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:tools/benchmark.py:606"
+      ],
+      "note": "Generated by tools/benchmark.py from the cells in dogfood/benchmark/results/, which are not in the public export. Anyone holding them can re-derive this line.",
+      "anchor_digest": "5b89b74beedc1af7d975ad1f56374c09c3451fb552ba04e65807d144ac4943f2"
+    },
+    {
+      "id": "C-186",
+      "text": "| `parse_duration` | C | 180 | 9 |",
+      "where": "docs/BENCHMARK_RESULTS.md:54",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:tools/benchmark.py:606"
+      ],
+      "note": "Generated by tools/benchmark.py from the cells in dogfood/benchmark/results/, which are not in the public export. Anyone holding them can re-derive this line.",
+      "anchor_digest": "8c6a874fda24d1f602930edc3870a6635c7fba31a1574ca89116038201b328ff"
+    },
+    {
+      "id": "C-187",
+      "text": "| `retry_backoff` | A | 31 | 1 |",
+      "where": "docs/BENCHMARK_RESULTS.md:55",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:tools/benchmark.py:606"
+      ],
+      "note": "Generated by tools/benchmark.py from the cells in dogfood/benchmark/results/, which are not in the public export. Anyone holding them can re-derive this line.",
+      "anchor_digest": "fc5db086d10251e54fe43014377755d8f7b803ed080ba7a6a2d45433c4aca00f"
+    },
+    {
+      "id": "C-188",
+      "text": "| `retry_backoff` | B | 381 | 9 |",
+      "where": "docs/BENCHMARK_RESULTS.md:56",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:tools/benchmark.py:606"
+      ],
+      "note": "Generated by tools/benchmark.py from the cells in dogfood/benchmark/results/, which are not in the public export. Anyone holding them can re-derive this line.",
+      "anchor_digest": "64550d953b38a24a50b0b9dd111675216370d96c76626ac04481354a76be28ad"
+    },
+    {
+      "id": "C-189",
+      "text": "| `retry_backoff` | C | 140 | 9 |",
+      "where": "docs/BENCHMARK_RESULTS.md:57",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:tools/benchmark.py:606"
+      ],
+      "note": "Generated by tools/benchmark.py from the cells in dogfood/benchmark/results/, which are not in the public export. Anyone holding them can re-derive this line.",
+      "anchor_digest": "d2fc95b37cef0f7dbae97f2a8caa96b2e663a7e13440e75b32437dd5417cbec6"
+    },
+    {
+      "id": "C-190",
+      "text": "| `slug_pair` | A | 20 | 1 |",
+      "where": "docs/BENCHMARK_RESULTS.md:58",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:tools/benchmark.py:606"
+      ],
+      "note": "Generated by tools/benchmark.py from the cells in dogfood/benchmark/results/, which are not in the public export. Anyone holding them can re-derive this line.",
+      "anchor_digest": "e5307323493c56ecfd8dec3a2cfb6aec1705b0681cf35cabe64e809a4aa5190b"
+    },
+    {
+      "id": "C-191",
+      "text": "| `slug_pair` | B | 283 | 9 |",
+      "where": "docs/BENCHMARK_RESULTS.md:59",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:tools/benchmark.py:606"
+      ],
+      "note": "Generated by tools/benchmark.py from the cells in dogfood/benchmark/results/, which are not in the public export. Anyone holding them can re-derive this line.",
+      "anchor_digest": "0efafb9bd4187589c3e9949b85dedc891d8e11a55cdfaf1b9ab769a92fb0b3e2"
+    },
+    {
+      "id": "C-192",
+      "text": "| `slug_pair` | C | 59 | 9 |",
+      "where": "docs/BENCHMARK_RESULTS.md:60",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:tools/benchmark.py:606"
+      ],
+      "note": "Generated by tools/benchmark.py from the cells in dogfood/benchmark/results/, which are not in the public export. Anyone holding them can re-derive this line.",
+      "anchor_digest": "d0124877c0af6570e65fc8b0da811a6bfcdf0c848248ac5011c5d4b30157af57"
+    },
+    {
+      "id": "C-193",
+      "text": "| `to_roman` | A | 24 | 1 |",
+      "where": "docs/BENCHMARK_RESULTS.md:61",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:tools/benchmark.py:606"
+      ],
+      "note": "Generated by tools/benchmark.py from the cells in dogfood/benchmark/results/, which are not in the public export. Anyone holding them can re-derive this line.",
+      "anchor_digest": "e14b68f5fea856d17e62db9379ffe9c00bc6fc531ff681ca2eedfc71d956634d"
+    },
+    {
+      "id": "C-194",
+      "text": "| `to_roman` | B | 286 | 9 |",
+      "where": "docs/BENCHMARK_RESULTS.md:62",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:tools/benchmark.py:606"
+      ],
+      "note": "Generated by tools/benchmark.py from the cells in dogfood/benchmark/results/, which are not in the public export. Anyone holding them can re-derive this line.",
+      "anchor_digest": "1890c889510316e1a3da3a57987baf13fc7a6ec3eac5264dd5401ab0dd81413f"
+    },
+    {
+      "id": "C-195",
+      "text": "| `to_roman` | C | 93 | 9 |",
+      "where": "docs/BENCHMARK_RESULTS.md:63",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:tools/benchmark.py:606"
+      ],
+      "note": "Generated by tools/benchmark.py from the cells in dogfood/benchmark/results/, which are not in the public export. Anyone holding them can re-derive this line.",
+      "anchor_digest": "1396c62afd3595cb4a35e71dffbb66b7565b605ae6cda96e4d8e559993d45b50"
     }
   ],
   "not_claims": [
@@ -6339,6 +6570,48 @@
       "where": "docs/ROUTING.md:61",
       "reason": "a back-reference to limitation 2, not a numeric measurement claim",
       "anchor_digest": "48036092fb45a263aade9f41b33cd5feea5c2bd0724990a1efee5c7159d52298"
+    },
+    {
+      "id": "N-642",
+      "text": "## 12b. The planner's read-only contract is a sentence, not a boundary",
+      "where": "docs/LIMITATIONS.md:517",
+      "reason": "quotes the planner prompt's own wording verbatim; the numbers are part of the quoted contract, not an assertion about HoH",
+      "anchor_digest": "043d604d0b766ece86d45678c10c1a79d8536291cecc603bd8048e0fa777c84c"
+    },
+    {
+      "id": "N-643",
+      "text": "K1 exit= 1 / K2 exit= 1 / K3 exit= 1",
+      "where": "docs/LIMITATIONS.md:533",
+      "reason": "reproduces a transcript line from a measured run, quoted as evidence rather than asserted",
+      "anchor_digest": "7b04e65d32d55a31bf2055fa4c327b04fab9e9e40449bec3bf462c308ad72b88"
+    },
+    {
+      "id": "N-644",
+      "text": "Confirmed: all three checks pass (exit 0) against a correct reference",
+      "where": "docs/LIMITATIONS.md:534",
+      "reason": "continues the quoted transcript",
+      "anchor_digest": "e3fb869a562fc97f572b58012ba027b3131647c5820c55f773c6cc08bbed5756"
+    },
+    {
+      "id": "N-645",
+      "text": "implementation and correctly fail (exit 1) against the current stub",
+      "where": "docs/LIMITATIONS.md:535",
+      "reason": "continues the quoted transcript",
+      "anchor_digest": "24ff648e16dbad38ab11499be1bf8d3c37b0feb8e457fa2a8a7b5e2c323c2fe0"
+    },
+    {
+      "id": "N-646",
+      "text": "wrong implementation through. Between 20 and 114 seconds each.",
+      "where": "docs/LIMITATIONS.md:114",
+      "reason": "a back-reference to another limitation or to the results document, not a numeric measurement claim of its own",
+      "anchor_digest": "bd85110b5ee16a5b0ae3be1a7c300bbc43fe19af5a32df4adfeff895f2e2e999"
+    },
+    {
+      "id": "N-647",
+      "text": "12b). One data point is not a comparison and is not offered as one.",
+      "where": "docs/LIMITATIONS.md:127",
+      "reason": "a back-reference to another limitation or to the results document, not a numeric measurement claim of its own",
+      "anchor_digest": "da66074dca481a27bd31e87a2a69af99c78bfb353c3c16fd268fa3120dfb3038"
     }
   ],
   "claim_surfaces": [
@@ -6547,6 +6820,12 @@
       "path": "docs/EVIDENCE_INDEX.md",
       "scope": "whole file",
       "why": "generated from the two evidence trees the public export cannot carry. Every number in it is a claim about evidence a reader cannot open, which makes it the surface where being wrong would cost the most -- so it is regenerated by tools/evidence_index.py and a mismatch with the trees is a gate failure, not a documentation lag",
+      "requires_reconciliation_on_change": true
+    },
+    {
+      "path": "docs/BENCHMARK_RESULTS.md",
+      "scope": "whole file",
+      "why": "the comparison limit 2 is blocked on, generated from the cells that actually ran. It is the surface where a reader is most likely to take a number and quote it, so it is held to the coverage rule like any other -- and it names the cells that did not run, in full",
       "requires_reconciliation_on_change": true
     }
   ],
@@ -6973,6 +7252,11 @@
       "path": "tools/evidence_index.py",
       "reason": "source-code",
       "why": "the generator of docs/EVIDENCE_INDEX.md. Its numbers are the ones it reads out of the trees; the claim lives in the file it writes"
+    },
+    {
+      "path": "tests/test_telemetry_wiring.py",
+      "reason": "source-code",
+      "why": "the criterion that defined the first node this project's own control plane executed. It existed and failed before the work began, which is what made its baseline red for a behavioural reason; its numbers are the values it asserts"
     }
   ]
 }

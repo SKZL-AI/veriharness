@@ -292,3 +292,45 @@ def test_the_arena_token_survives_the_prompt_unformatted():
     """The prompt is an f-string; a bare `{ARENA}` in it would be a KeyError or
     a silently swallowed placeholder."""
     assert "{ARENA}" in _planner_text()
+
+
+# --------------------------------------------------------------------------- #
+# A run's own files live with the run
+# --------------------------------------------------------------------------- #
+
+
+def test_a_repair_specification_is_written_under_the_run_root(tmp_path):
+    """It used to go to `<repo>/.hoh-repair-<id>.md`.
+
+    That location is untracked, unprotected and in the way. This project's own
+    export refused it as an unclassified path; the cleanup that followed moved
+    it aside; and a repair run that was live at that moment blocked on
+    "specification is missing". A file a run depends on must not sit where
+    tidying the repository can remove it.
+    """
+    from hoh.launcher import HohRunLauncher
+    from hoh.project import ActionClass, Lifecycle, TaskNode
+
+    root = tmp_path / "root"
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    # Not a dry run: `prepare` returns before writing anything in that mode,
+    # and the location of the file is the whole point here. The worktree and
+    # the run will fail to be created -- there is no harness -- which is fine:
+    # the specification is written before either is attempted.
+    launcher = HohRunLauncher(root, repo)
+    knoten = TaskNode(
+        id="repair-1-1", spec_path="", spec_digest="d",
+        lifecycle=Lifecycle.READY, action_class=ActionClass.INTERNAL,
+        repair_of="node-a",
+        note="the suite failed on the merged state",
+    )
+
+    launcher.prepare(knoten)
+
+    geschrieben = list(root.rglob("repair-*.md"))
+    assert geschrieben, "the repair specification was not written under the run root"
+    assert repo not in geschrieben[0].parents, (
+        "the specification was written into the repository under test"
+    )
+    assert not list(repo.glob(".hoh-repair-*.md"))
