@@ -18,6 +18,8 @@ from pathlib import Path
 
 import pytest
 
+from conftest import braucht_evidenz
+
 WURZEL = Path(__file__).resolve().parent.parent
 
 
@@ -61,6 +63,9 @@ def test_campaign_v1_still_holds_the_fifteen_cells_it_was_measured_with():
 
 
 def test_the_report_reads_the_campaign_it_is_asked_for(tmp_path, monkeypatch):
+    braucht_evidenz(
+        "dogfood/benchmark/tasks",
+        "the hidden suites are the benchmark's verdict and are not published, so a clone cannot re-derive a campaign's plan from them")
     import json
 
     v2 = tmp_path / "results-v2"
@@ -82,6 +87,9 @@ def test_the_report_reads_the_campaign_it_is_asked_for(tmp_path, monkeypatch):
 def test_a_replication_cannot_overwrite_the_document_it_replicates(tmp_path,
                                                                    monkeypatch):
     """One forgotten flag would have rewritten v1's results in place."""
+    braucht_evidenz(
+        "dogfood/benchmark/results-v2",
+        "campaign result trees are not published; docs/BENCHMARK_RESULTS_v2.md carries what they measured")
     import json
 
     v2 = tmp_path / "results-v2"

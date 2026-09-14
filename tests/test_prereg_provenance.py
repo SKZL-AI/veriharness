@@ -27,6 +27,8 @@ from pathlib import Path
 
 import pytest
 
+from conftest import braucht_evidenz
+
 HOH = Path(__file__).resolve().parent.parent
 PFAD = "docs/benchmarks/v3/PREREGISTRATION.json"
 NACHWEIS = HOH / "docs/benchmarks/v3/PREREGISTRATION_PROVENANCE.json"
@@ -126,6 +128,9 @@ def test_no_provider_dispatch_in_a_v3_run_tree_predates_the_binding_commit(
 def test_the_stored_answer_matches_a_fresh_derivation(bindend):
     """The artifact is a record, not a source. If it drifts from what git and
     the result files say, the record is the thing that is wrong."""
+    braucht_evidenz(
+        "dogfood/benchmark/results-v3",
+        "campaign result trees carry the absolute paths their checks ran at and are not published; docs/BENCHMARK_RESULTS_v3.md carries what they measured")
     if not NACHWEIS.is_file():
         pytest.skip("no provenance artifact installed")
     gespeichert = json.loads(NACHWEIS.read_text())
@@ -146,6 +151,12 @@ def test_the_earlier_registration_is_a_different_blob_and_is_kept(bindend):
     """Two registrations, two blobs. The parked one is not deleted, and it is
     not the one that binds -- both halves matter, and a check that only said
     "a registration was committed" would be satisfied by the wrong one."""
+    if not sorted((HOH / "docs/benchmarks/v3").glob("PREREGISTRATION.json.v*")):
+        pytest.skip(
+            "no parked predecessor registration in this tree -- a superseded "
+            "registration is history rather than evidence and is not "
+            "published; the binding one is, and that the two carry different "
+            "blobs is checkable from git in the producing repository")
     commit, _ = bindend
     alle = [z.split(" ", 1)[0] for z in
             git("log", "--reverse", "--format=%H", "--", PFAD).splitlines()]

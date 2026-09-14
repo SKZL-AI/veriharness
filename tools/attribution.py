@@ -113,8 +113,39 @@ def _shas(repo: Path, eintrag: dict, probleme: list[str]) -> list[str]:
     return text.splitlines()
 
 
+def _anker_vorhanden(repo: Path, anker: str) -> bool:
+    """Does this repository contain the anchor commit at all?
+
+    The ledger describes the history of the repository that produced it. A
+    published export is a different repository with a different history, so
+    none of the shas exist there -- which is not a defect in the ledger, it is
+    the export being an export. The exact-head CI found this the first time
+    `dogfood/ATTRIBUTION.json` was published: sixty entries reported as naming
+    commits that are "not a commit after the anchor", when what was true is
+    that the anchor is not in that clone either.
+    """
+    p = subprocess.run(["git", "-C", str(repo), "cat-file", "-e", f"{anker}^{{commit}}"],
+                       capture_output=True, text=True)
+    return p.returncode == 0
+
+
 def pruefe(repo: Path, ledger: dict) -> dict:
     anker = ledger["anchor"]
+    if not _anker_vorhanden(repo, anker):
+        return {
+            "anchor": anker,
+            "commits_after_anchor": 0,
+            "categories": {},
+            "development_nodes": 0,
+            "through_the_product": 0,
+            "problems": [],
+            "environment_gap": (
+                f"this repository does not contain the anchor commit "
+                f"{anker[:12]}, so it is not the history this ledger "
+                f"describes. Published exports carry the ledger as a record "
+                f"and cannot verify it; the repository that produced it can."
+            ),
+        }
     alle = commits_since(repo, anker)
     bekannt = set(alle)
     gesehen: dict[str, str] = {}

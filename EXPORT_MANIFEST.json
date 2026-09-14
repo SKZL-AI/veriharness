@@ -3727,6 +3727,11 @@
       "rule": "package"
     },
     {
+      "path": "tests/conftest.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
       "path": "tests/test_amendment.py",
       "decision": "INCLUDE",
       "rule": "tests"

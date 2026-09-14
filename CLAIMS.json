@@ -11370,6 +11370,11 @@
       "why": "source or test code under src/hoh/, tests/, or tools/; claims about its behaviour live in docs/** and are covered there, not by re-declaring the source itself as a claim surface"
     },
     {
+      "path": "tests/conftest.py",
+      "reason": "source-code",
+      "why": "shared test fixtures. It carries no figures at all -- its content is the rule that a test measuring evidence the export deliberately withholds must skip with the artifact and the reason named, rather than pass quietly or fail misleadingly"
+    },
+    {
       "path": "tests/test_amendment.py",
       "reason": "source-code",
       "why": "a test module. Its numbers are the values it asserts, which are the measurement rather than a claim about it"

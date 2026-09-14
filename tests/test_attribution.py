@@ -59,17 +59,44 @@ def test_an_open_range_is_reported_as_a_problem(tmp_path):
     assert any("ends at HEAD" in p for p in bericht["problems"])
 
 
+def _fremde_historie() -> bool:
+    """Is this a clone that does not contain the history the ledger describes?
+
+    A published export is a different repository with different commits, so
+    the ledger travels with it as a *record* and cannot be verified there.
+    Found by the exact-head CI the first time the ledger was published: sixty
+    entries reported as naming commits "not after the anchor", when the truth
+    was that the anchor is not in that clone either.
+    """
+    anker = _ledger()["anchor"]
+    return not at._anker_vorhanden(WURZEL, anker)
+
+
 def test_the_real_ledger_still_tiles_the_history():
     if not (WURZEL / ".git").exists():
         pytest.skip("not a git checkout")
     bericht = at.pruefe(WURZEL, _ledger())
+    if bericht.get("environment_gap"):
+        assert bericht["problems"] == [], (
+            "a clone without this history reports the gap, not defects")
+        pytest.skip(bericht["environment_gap"])
     assert bericht["problems"] == [], bericht["problems"]
+
+
+def test_a_clone_without_the_history_reports_a_gap_rather_than_defects():
+    """The control for the skip above: the gap has to be *stated*, not
+    inferred from an empty problem list."""
+    bericht = at.pruefe(WURZEL, {"anchor": "0" * 40, "entries": []})
+    assert bericht["problems"] == []
+    assert "does not contain the anchor commit" in bericht["environment_gap"]
 
 
 def test_every_commit_after_the_anchor_belongs_to_exactly_one_entry():
     """Stated as its own test, because it is the denominator."""
     if not (WURZEL / ".git").exists():
         pytest.skip("not a git checkout")
+    if _fremde_historie():
+        pytest.skip("this clone does not contain the history the ledger describes")
     ledger = _ledger()
     alle = at.commits_since(WURZEL, ledger["anchor"])
     gesehen: dict[str, str] = {}
@@ -87,12 +114,22 @@ def test_every_commit_after_the_anchor_belongs_to_exactly_one_entry():
 
 
 def test_a_veriharness_claim_must_point_at_a_state_that_exists():
-    """Claiming the product did it is free; pointing at what it left is not."""
+    """Claiming the product did it is free; pointing at what it left is not.
+
+    The **naming** is required everywhere, including in an export: an entry
+    with no `project_state` is an unsupported claim wherever it is read. The
+    file existing is required only where the evidence lives -- the run trees
+    are classified EXCLUDE and a published clone does not carry them, which is
+    the export working rather than a missing state.
+    """
+    fremd = _fremde_historie()
     for e in _ledger()["entries"]:
         if e["category"] != "VERIHARNESS_RUN":
             continue
         zustand = e.get("project_state", "")
         assert zustand, e["id"]
+        if fremd:
+            continue
         assert (WURZEL / zustand).is_file(), f"{e['id']}: {zustand}"
 
 
