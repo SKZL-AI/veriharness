@@ -12804,6 +12804,11 @@
       "why": "continuous-integration configuration read by the host, not by a reader: the version numbers in it are the matrix it executes against, which either runs or does not"
     },
     {
+      "path": ".github/workflows/publish-pypi.yml",
+      "reason": "pattern-data",
+      "why": "Executable release configuration or verification code; successful publication is recorded separately after the index checks pass."
+    },
+    {
       "path": ".gitignore",
       "reason": "pattern-data",
       "why": "machine-read glob/regex patterns; digits here are syntax (or, for .gitignore, pattern-provenance annotation), not an assertion a reader relies on",
@@ -13136,6 +13141,11 @@
       "why": "source or test code under src/hoh/, tests/, or tools/; claims about its behaviour live in docs/** and are covered there, not by re-declaring the source itself as a claim surface"
     },
     {
+      "path": "tests/test_distribution_release.py",
+      "reason": "source-code",
+      "why": "Executable release configuration or verification code; successful publication is recorded separately after the index checks pass."
+    },
+    {
       "path": "tests/test_evidence.py",
       "reason": "source-code",
       "why": "source or test code under src/hoh/, tests/, or tools/; claims about its behaviour live in docs/** and are covered there, not by re-declaring the source itself as a claim surface"
@@ -13314,6 +13324,16 @@
       "path": "tools/confinement_evidence.py",
       "reason": "source-code",
       "why": "a tool: it measures a run's capability boundary and carries its own instrument control"
+    },
+    {
+      "path": "tools/distribution_release.py",
+      "reason": "source-code",
+      "why": "Executable release configuration or verification code; successful publication is recorded separately after the index checks pass."
+    },
+    {
+      "path": "tools/distribution_smoke.py",
+      "reason": "source-code",
+      "why": "Executable release configuration or verification code; successful publication is recorded separately after the index checks pass."
     },
     {
       "path": "tools/evidence_index.py",
