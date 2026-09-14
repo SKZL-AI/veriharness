@@ -5,15 +5,15 @@ command that produced it, and the verdict is the conjunction of the
 rows rather than a judgement typed above them. A row this tool cannot
 evaluate is `NOT_RUN`, which is never a pass.
 
-Measured at `559449a` on 2026-09-14.
+Measured at `f8c3038` on 2026-09-14.
 
     TECHNICALLY_STABLE_READY = no
 
-Open, and each one blocking: external_ci.
+Open, and each one blocking: benchmark_v3_preregistration, benchmark_v3, external_ci.
 
 | condition | state | measured | command |
 |---|---|---|---|
-| `tests` | PASS | 1235 passed | `python3 -m pytest -q` |
+| `tests` | PASS | 1247 passed | `python3 -m pytest -q` |
 | `lint` | PASS | clean | `ruff check --select F,E9 src tests tools` |
 | `claims` | PASS | OK: all checks passed | `python3 tools/check_claims.py check all` |
 | `union_invariants` | PASS | U1-U5 pass | `python3 tools/union_gate.py` |
@@ -22,9 +22,9 @@ Open, and each one blocking: external_ci.
 | `budget_enforcement` | PASS | VERIFIED; ceilings [9, 8, 4], product refused a dispatch at [8, 4]; 2 falsifier(s) all detected | `python3 tools/budget_evidence.py --out dogfood/budget-enforcement/BUDGET_EVIDENCE.json` |
 | `post_o143_closure` | PASS | VERIFIED; halt CLOSED; 18 of 18 declared dispatches (primary 9, repair 9); 1 repair node(s); 0 human decision(s) | `python3 tools/closure_e2e.py` |
 | `telemetry_on_real_dispatches` | PASS | 2 audit(s): fully validated on benchmark-v3-telemetry; no field gaps | `python3 tools/telemetry_audit.py --run-root PATH --run-id ID --out dogfood/<tree>/TELEMETRY_AUDIT.json` |
-| `benchmark_v3_preregistration` | PASS | DRIFTED, 51 file(s) frozen at d22fc1536f43 -- moved after the campaign, accounted for: tools/benchmark.py, tools/readiness.py | `python3 tools/prereg.py check --campaign v3` |
+| `benchmark_v3_preregistration` | FAIL | DRIFTED, 51 file(s) frozen at d22fc1536f43 -- moved: tools/benchmark.py, tools/readiness.py, tools/repetition_plan.py; tools/repetition_plan.py drifted and is not named in the artifact | `python3 tools/prereg.py check --campaign v3` |
 | `benchmark_v2_historical` | FAIL (advisory) | HISTORICAL_COMPLETE; matched_budget_valid = NO; budget_rule violated: 2 cell(s) ran past the dispatch budget without being stopped | `python3 tools/repetition_plan.py --campaign v2` |
-| `benchmark_v3` | PASS | 15 of 15 cells; COMPLETE; matched_budget_valid = YES; freeze DRIFTED (post-campaign repair, accounted for) | `python3 tools/prereg.py check --campaign v3 && python3 tools/repetition_plan.py --campaign v3` |
+| `benchmark_v3` | FAIL | 15 of 15 cells; COMPLETE; matched_budget_valid = YES; freeze DRIFTED -- the instrument freeze is DRIFTED and the drift is not accounted for: tools/repetition_plan.py drifted and is not named in the artifact | `python3 tools/prereg.py check --campaign v3 && python3 tools/repetition_plan.py --campaign v3` |
 | `export_manifest` | FAIL (advisory) | no leaks, 1 dangling reference(s), 0 other problem(s) | `python3 tools/export_manifest.py check` |
 | `clean_install` | PASS | 0 red step(s) | `python3 tools/clean_install_check.py` |
 | `attribution` | PASS | 1 of 10 nodes through the product | `python3 tools/attribution.py` |

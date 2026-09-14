@@ -703,33 +703,72 @@ def zeile_audit() -> Zeile:
 
 
 def zeile_ci() -> Zeile:
-    """Has an external CI run against this head, and did it pass?
+    """Has an external CI run against the exact export this tree produces?
 
-    Named rather than omitted. A row set that quietly leaves CI out lets a
-    reader assume it is covered by the local suite, and it is not: the whole
-    point of the external run is that it happens somewhere this session does
-    not control. Where there is no remote to ask, the row is `NOT_RUN`, which
-    blocks -- a release without that evidence is not ready, and saying so is
-    cheaper than discovering it after the tag.
+    It used to ask `git remote` here. The internal tree has none, deliberately:
+    the rule that keeps measurements off the network is why the public
+    repository is updated from a separate staging checkout carrying only
+    INCLUDE paths. So the row could never be satisfied in the architecture it
+    is part of -- which makes a release gate unreachable rather than strict,
+    and an unreachable gate is one somebody eventually routes around.
+
+    The evidence exists somewhere else, so it is recorded and bound to *what
+    was tested*: `tools/exact_head_ci.py` writes the run, the export commit,
+    and a digest over every INCLUDE path and its contents. This row recomputes
+    that digest from the working tree. A CI result is evidence about a set of
+    bytes; if the export has changed since, the run is no longer about the
+    thing being released and the evidence is refused rather than reused.
+
+    The sandbox is read per **step**. Its job is green on runners that cannot
+    create the namespace it needs, because the step is skipped, and a green
+    job whose relevant step did not run has measured nothing.
     """
-    befehl = "gh run list --limit 1 (requires a remote and gh)"
-    rc, aus = _lauf("git", "remote", timeout=30)
-    if rc != 0 or not aus.strip():
+    befehl = ("python3 tools/exact_head_ci.py --run-id ID --export-commit SHA")
+    pfad = HOH / "dogfood/external-ci/EXACT_HEAD_CI.json"
+    if not pfad.is_file():
         return Zeile("external_ci", NOT_RUN,
-                     "no git remote is configured in this checkout", befehl,
-                     "this row cannot be answered here and is not marked "
-                     "advisory: the external run is evidence a release needs, "
-                     "and a checkout that cannot produce it is a checkout that "
+                     "no external CI evidence recorded", befehl,
+                     "the external run is evidence a release needs, and a "
+                     "checkout that cannot produce it is a checkout that "
                      "cannot declare itself ready")
-    rc, aus = _lauf("gh", "run", "list", "--limit", "1", timeout=120)
-    if rc != 0:
-        return Zeile("external_ci", NOT_RUN,
-                     "gh could not be asked: " + aus.splitlines()[0][:60]
-                     if aus else "gh could not be asked", befehl)
-    erste = aus.splitlines()[0] if aus else ""
-    return Zeile("external_ci",
-                 PASS if "success" in erste or "completed" in erste else FAIL,
-                 erste[:70] or "no runs listed", befehl)
+    c = json.loads(pfad.read_text())
+
+    import importlib.util as _il
+
+    spec = _il.spec_from_file_location("exact_head_ci",
+                                       HIER / "exact_head_ci.py")
+    eh = _il.module_from_spec(spec)
+    spec.loader.exec_module(eh)
+    try:
+        digest, n = eh.export_content_digest(HOH)
+    except SystemExit as exc:
+        return Zeile("external_ci", FAIL, f"the export cannot be digested: {exc}",
+                     befehl)
+
+    if digest != c.get("export_content_digest"):
+        return Zeile(
+            "external_ci", FAIL,
+            f"the recorded run tested a different export "
+            f"({str(c.get('export_content_digest'))[:12]} over "
+            f"{c.get('export_paths')} path(s); this tree is {digest[:12]} over "
+            f"{n}). Re-export, re-run CI, and record it again.", befehl,
+            "a CI result is evidence about a set of bytes, not about a branch "
+            "name; reusing it after the export changed would be citing a "
+            "measurement of something else")
+
+    rot = [j["name"] for j in (c.get("jobs") or [])
+           if j.get("conclusion") != "success"]
+    return Zeile(
+        "external_ci",
+        PASS if c.get("run_conclusion") == "success" and not rot else FAIL,
+        f"{c.get('run_conclusion')} on {str(c.get('export_commit'))[:12]} "
+        f"({len(c.get('jobs') or [])} job(s)"
+        + (f", red: {', '.join(rot)}" if rot else "")
+        + f"); sandbox_external_env = {c.get('sandbox_external_env')}",
+        befehl,
+        "the sandbox line is read from its step, not its job: a green job "
+        "whose relevant step was skipped has measured nothing, and "
+        "UNSUPPORTED_ENVIRONMENT is that state rather than a pass")
 
 
 #: The dispositions `docs/ROUTING.md` may record. Anything else -- including

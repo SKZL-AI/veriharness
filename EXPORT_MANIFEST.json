@@ -1037,6 +1037,11 @@
       "rule": "parked-predecessor"
     },
     {
+      "path": "dogfood/external-ci/EXACT_HEAD_CI.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
       "path": "dogfood/planner-confinement.v20260913T135001Z/SUMMARY.json",
       "decision": "EXCLUDE",
       "rule": "internal-working-document"
@@ -3973,6 +3978,11 @@
     },
     {
       "path": "tools/evidence_index.py",
+      "decision": "INCLUDE",
+      "rule": "tooling"
+    },
+    {
+      "path": "tools/exact_head_ci.py",
       "decision": "INCLUDE",
       "rule": "tooling"
     },
