@@ -5,11 +5,11 @@ command that produced it, and the verdict is the conjunction of the
 rows rather than a judgement typed above them. A row this tool cannot
 evaluate is `NOT_RUN`, which is never a pass.
 
-Measured at `f8c3038` on 2026-09-14.
+Measured at `ddc9b5d` on 2026-09-14.
 
     TECHNICALLY_STABLE_READY = no
 
-Open, and each one blocking: benchmark_v3_preregistration, benchmark_v3, external_ci.
+Open, and each one blocking: external_ci.
 
 | condition | state | measured | command |
 |---|---|---|---|
@@ -22,15 +22,15 @@ Open, and each one blocking: benchmark_v3_preregistration, benchmark_v3, externa
 | `budget_enforcement` | PASS | VERIFIED; ceilings [9, 8, 4], product refused a dispatch at [8, 4]; 2 falsifier(s) all detected | `python3 tools/budget_evidence.py --out dogfood/budget-enforcement/BUDGET_EVIDENCE.json` |
 | `post_o143_closure` | PASS | VERIFIED; halt CLOSED; 18 of 18 declared dispatches (primary 9, repair 9); 1 repair node(s); 0 human decision(s) | `python3 tools/closure_e2e.py` |
 | `telemetry_on_real_dispatches` | PASS | 2 audit(s): fully validated on benchmark-v3-telemetry; no field gaps | `python3 tools/telemetry_audit.py --run-root PATH --run-id ID --out dogfood/<tree>/TELEMETRY_AUDIT.json` |
-| `benchmark_v3_preregistration` | FAIL | DRIFTED, 51 file(s) frozen at d22fc1536f43 -- moved: tools/benchmark.py, tools/readiness.py, tools/repetition_plan.py; tools/repetition_plan.py drifted and is not named in the artifact | `python3 tools/prereg.py check --campaign v3` |
+| `benchmark_v3_preregistration` | PASS | DRIFTED, 51 file(s) frozen at d22fc1536f43 -- moved after the campaign, accounted for: tools/benchmark.py, tools/readiness.py, tools/repetition_plan.py | `python3 tools/prereg.py check --campaign v3` |
 | `benchmark_v2_historical` | FAIL (advisory) | HISTORICAL_COMPLETE; matched_budget_valid = NO; budget_rule violated: 2 cell(s) ran past the dispatch budget without being stopped | `python3 tools/repetition_plan.py --campaign v2` |
-| `benchmark_v3` | FAIL | 15 of 15 cells; COMPLETE; matched_budget_valid = YES; freeze DRIFTED -- the instrument freeze is DRIFTED and the drift is not accounted for: tools/repetition_plan.py drifted and is not named in the artifact | `python3 tools/prereg.py check --campaign v3 && python3 tools/repetition_plan.py --campaign v3` |
+| `benchmark_v3` | PASS | 15 of 15 cells; COMPLETE; matched_budget_valid = YES; freeze DRIFTED (post-campaign repair, accounted for) | `python3 tools/prereg.py check --campaign v3 && python3 tools/repetition_plan.py --campaign v3` |
 | `export_manifest` | FAIL (advisory) | no leaks, 1 dangling reference(s), 0 other problem(s) | `python3 tools/export_manifest.py check` |
 | `clean_install` | PASS | 0 red step(s) | `python3 tools/clean_install_check.py` |
 | `attribution` | PASS | 1 of 10 nodes through the product | `python3 tools/attribution.py` |
 | `evidence_index` | PASS | EVIDENCE_INDEX.md matches the trees it describes | `python3 tools/evidence_index.py` |
 | `paper_audit` | PASS | 8 of 8 checks | `python3 tools/audit_refs.py <each check>` |
-| `external_ci` | NOT_RUN | no git remote is configured in this checkout | `gh run list --limit 1 (requires a remote and gh)` |
+| `external_ci` | FAIL | the recorded run tested a different export (68f677b51f86 over 146 path(s); this tree is 2359320842b0 over 146). Re-export, re-run CI, and record it again. | `python3 tools/exact_head_ci.py --run-id ID --export-commit SHA` |
 | `routing` | PASS | DEFERRED_ON_EVIDENCE | `read docs/ROUTING.md` |
 
 ## Why some rows are advisory
@@ -44,7 +44,7 @@ Open, and each one blocking: benchmark_v3_preregistration, benchmark_v3, externa
 * **`export_manifest`** — the dangling references are limitation 12e: published documents citing internal ones. Advisory, because none of them is a false claim -- what a reader loses is the ability to follow a citation.
 * **`attribution`** — the ratio is not a gate -- it is reported so that nobody has to take the phase's own description of itself on trust.
 * **`paper_audit`** — `coverage` is red on a maintenance item paper/AUDIT.md itself flags and explains: paper/NUMBERS.md catalogues the 2 of a '2 of 3' ratio and not the 3. It is a documented, deliberately deferred operator item, not an unexamined failure.
-* **`external_ci`** — this row cannot be answered here and is not marked advisory: the external run is evidence a release needs, and a checkout that cannot produce it is a checkout that cannot declare itself ready.
+* **`external_ci`** — a CI result is evidence about a set of bytes, not about a branch name; reusing it after the export changed would be citing a measurement of something else.
 * **`routing`** — a disposition, not an open question: the condition for revisiting it is named and was checked.
 
 ## What this does not decide

@@ -42,6 +42,34 @@ HIER = Path(__file__).resolve().parent
 HOH = HIER.parent
 
 
+def export_path_digests(root: Path = HOH) -> dict[str, str]:
+    """One digest per INCLUDE path, so a mismatch can be *named*.
+
+    An aggregate digest can only say "something moved". That is not enough
+    here: the readiness board and the claims ledger are themselves INCLUDE
+    files that the readiness run rewrites, so every run of the gate changes
+    the export it is reporting on. A row comparing aggregates would be
+    permanently red for a reason that has nothing to do with the software --
+    and a permanently red gate is one somebody routes around.
+
+    With per-path digests the row can say which paths differ and decide.
+    """
+    manifest = root / "EXPORT_MANIFEST.json"
+    daten = json.loads(manifest.read_text(encoding="utf-8"))
+    eintraege = daten.get("entries") if isinstance(daten, dict) else daten
+    raus = {}
+    for e in eintraege or []:
+        if e.get("decision") != "INCLUDE":
+            continue
+        f = root / e["path"]
+        if not f.is_file():
+            raise SystemExit(
+                f"{e['path']} is INCLUDE but absent: the export cannot be "
+                f"digested, and a CI result about it would be about nothing")
+        raus[e["path"]] = hashlib.sha256(f.read_bytes()).hexdigest()
+    return raus
+
+
 def export_content_digest(root: Path = HOH) -> tuple[str, int]:
     """(digest over the INCLUDE set's paths and bytes, number of paths).
 
@@ -69,6 +97,39 @@ def export_content_digest(root: Path = HOH) -> tuple[str, int]:
     return h.hexdigest(), n
 
 
+def commit_path_digests(repo: Path, commit: str) -> dict[str, str]:
+    """One digest per file in `commit`, read from the repository that has it.
+
+    This is the only honest source. An earlier version digested the *working
+    tree* at recording time, which is circular: if the tree had moved since
+    CI ran, the recording said "this run tested this export" about bytes the
+    run had never seen, and the readiness row then compared the tree with
+    itself and passed trivially.
+
+    What CI checked out is the commit, so the commit is what gets read.
+    """
+    p = subprocess.run(["git", "-C", str(repo), "ls-tree", "-r", commit],
+                       capture_output=True, text=True)
+    if p.returncode != 0:
+        raise SystemExit(
+            f"{repo} cannot read {commit[:12]}: "
+            f"{(p.stderr or p.stdout).strip()[:160]}. The export commit has to "
+            f"be readable somewhere, or the recording is about nothing.")
+    raus = {}
+    for zeile in p.stdout.splitlines():
+        try:
+            kopf, pfad = zeile.split("\t", 1)
+            _modus, art, blob = kopf.split()
+        except ValueError:                          # pragma: no cover - exotic
+            continue
+        if art != "blob":
+            continue
+        inhalt = subprocess.run(["git", "-C", str(repo), "cat-file", "blob", blob],
+                                capture_output=True)
+        raus[pfad] = hashlib.sha256(inhalt.stdout).hexdigest()
+    return raus
+
+
 def _gh(*args: str) -> str:
     p = subprocess.run(["gh", *args], capture_output=True, text=True)
     if p.returncode != 0:
@@ -81,6 +142,10 @@ def main(argv=None) -> int:
     ap.add_argument("--run-id", required=True)
     ap.add_argument("--export-commit", required=True)
     ap.add_argument("--repo", default="SKZL-AI/veriharness")
+    ap.add_argument("--export-repo", type=Path, required=True,
+                    help="a checkout that contains the export commit, so the "
+                         "digests come from what CI tested rather than from "
+                         "this working tree")
     ap.add_argument("--out", type=Path,
                     default=HOH / "dogfood/external-ci/EXACT_HEAD_CI.json")
     args = ap.parse_args(argv)
@@ -109,7 +174,13 @@ def main(argv=None) -> int:
             else:
                 sandbox = "NOT_DETERMINABLE"
 
-    digest, n = export_content_digest()
+    je_pfad = commit_path_digests(args.export_repo, args.export_commit)
+    h = hashlib.sha256()
+    for rel in sorted(je_pfad):
+        h.update(rel.encode())
+        h.update(b"\0")
+        h.update(bytes.fromhex(je_pfad[rel]))
+    digest, n = h.hexdigest(), len(je_pfad)
     intern = subprocess.run(["git", "-C", str(HOH), "rev-parse", "HEAD"],
                             capture_output=True, text=True, check=True).stdout.strip()
     daten = {
@@ -121,6 +192,7 @@ def main(argv=None) -> int:
         "internal_commit": intern,
         "export_content_digest": digest,
         "export_paths": n,
+        "path_digests": je_pfad,
         "jobs": jobs,
         "sandbox_external_env": sandbox,
         "measured_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),

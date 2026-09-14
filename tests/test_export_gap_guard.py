@@ -218,3 +218,34 @@ def test_an_unusable_git_is_not_a_foreign_history(tmp_path):
 
     assert at._anker_vorhanden(echt, sha) is True
     assert at._anker_vorhanden(echt, "0" * 40) is False
+
+
+def test_stale_ci_evidence_is_refused_unless_only_the_gates_reports_moved(
+        tmp_path, monkeypatch):
+    """The readiness gate writes two of the files it certifies.
+
+    `docs/READINESS.md` and the rendered `CLAIMS.md` are INCLUDE, and every run
+    of the gate rewrites them -- so comparing the export against recorded CI
+    evidence is red forever unless those two are named and tolerated. They are
+    named. Anything else differing is stale evidence about different bytes,
+    and stays a failure.
+    """
+    import importlib.util
+    import sys
+    from pathlib import Path
+
+    wurzel = Path(__file__).resolve().parent.parent
+    spec = importlib.util.spec_from_file_location(
+        "readiness", wurzel / "tools" / "readiness.py")
+    rd = importlib.util.module_from_spec(spec)
+    sys.modules["readiness"] = rd
+    spec.loader.exec_module(rd)
+
+    quelle = inspect_source = __import__("inspect").getsource(rd.zeile_ci)
+    assert '"docs/READINESS.md", "CLAIMS.md", "CLAIMS.json"' in quelle, (
+        "the tolerated set is not the gate's own reports any more")
+    assert "path_digests" in quelle, (
+        "the row must compare per-path digests, or it cannot name what moved")
+    assert "beyond this gate's own reports" in quelle
+    # A source file differing must read as stale evidence, not as a report.
+    assert "src/hoh" not in quelle.split("BERICHTE")[1].split("}")[0]

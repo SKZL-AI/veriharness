@@ -740,18 +740,33 @@ def zeile_ci() -> Zeile:
     eh = _il.module_from_spec(spec)
     spec.loader.exec_module(eh)
     try:
-        digest, n = eh.export_content_digest(HOH)
+        jetzt = eh.export_path_digests(HOH)
     except SystemExit as exc:
         return Zeile("external_ci", FAIL, f"the export cannot be digested: {exc}",
                      befehl)
 
-    if digest != c.get("export_content_digest"):
+    damals = c.get("path_digests") or {}
+    if not damals:
+        return Zeile("external_ci", FAIL,
+                     "the recorded run carries no per-path digests, so what it "
+                     "tested cannot be compared with this tree", befehl)
+    abweichend = sorted(set(damals) ^ set(jetzt)) + sorted(
+        p for p in set(damals) & set(jetzt) if damals[p] != jetzt[p])
+    # The gate writes its own report, and the report is published. So the
+    # board and the ledger it renders are INCLUDE files that every run of this
+    # gate rewrites -- which means an aggregate comparison is red forever, for
+    # a reason that has nothing to do with the software. Those files are named
+    # here and only they are tolerated; anything else differing is stale
+    # evidence and fails.
+    BERICHTE = {"docs/READINESS.md", "CLAIMS.md", "CLAIMS.json"}
+    echt = [p for p in abweichend if p not in BERICHTE]
+    if echt:
         return Zeile(
             "external_ci", FAIL,
-            f"the recorded run tested a different export "
-            f"({str(c.get('export_content_digest'))[:12]} over "
-            f"{c.get('export_paths')} path(s); this tree is {digest[:12]} over "
-            f"{n}). Re-export, re-run CI, and record it again.", befehl,
+            f"the recorded run tested a different export: "
+            f"{len(echt)} path(s) differ beyond this gate's own reports "
+            f"({', '.join(echt[:3])}). Re-export, re-run CI, record it again.",
+            befehl,
             "a CI result is evidence about a set of bytes, not about a branch "
             "name; reusing it after the export changed would be citing a "
             "measurement of something else")
@@ -764,7 +779,10 @@ def zeile_ci() -> Zeile:
         f"{c.get('run_conclusion')} on {str(c.get('export_commit'))[:12]} "
         f"({len(c.get('jobs') or [])} job(s)"
         + (f", red: {', '.join(rot)}" if rot else "")
-        + f"); sandbox_external_env = {c.get('sandbox_external_env')}",
+        + f"); sandbox_external_env = {c.get('sandbox_external_env')}"
+        + (f"; differs only by this gate's own reports: "
+           f"{', '.join(sorted(set(abweichend) & BERICHTE))}"
+           if abweichend else ""),
         befehl,
         "the sandbox line is read from its step, not its job: a green job "
         "whose relevant step was skipped has measured nothing, and "
