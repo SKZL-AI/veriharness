@@ -18,7 +18,10 @@ import json
 import sys
 from pathlib import Path
 
-from conftest import braucht_evidenz
+from conftest import (
+    HIDDEN_FIXTURES,
+    braucht_evidenz,
+)
 
 WURZEL = Path(__file__).resolve().parent.parent
 
@@ -155,9 +158,7 @@ def test_an_asserted_dispatch_figure_cannot_certify_conformance(tmp_path,
     `min(iterations * 3, DISPATCH_BUDGET)`, which cannot exceed 9 by
     construction. Reading that as "within budget" cleared campaign v1 falsely.
     """
-    braucht_evidenz(
-        "dogfood/benchmark/tasks",
-        "the hidden suites are the benchmark's verdict and are not published, so a clone cannot re-derive a campaign's plan from them")
+    braucht_evidenz(HIDDEN_FIXTURES)
     quelle = tmp_path / "results"
     quelle.mkdir()
     (quelle / "t.C.1.json").write_text(json.dumps({
@@ -189,9 +190,7 @@ def test_a_run_over_budget_that_was_not_stopped_is_a_violation(tmp_path,
                                                                monkeypatch):
     """The frozen protocol: a run that exceeds the budget is stopped and
     recorded as BUDGET_EXHAUSTED."""
-    braucht_evidenz(
-        "dogfood/benchmark/tasks",
-        "the hidden suites are the benchmark's verdict and are not published, so a clone cannot re-derive a campaign's plan from them")
+    braucht_evidenz(HIDDEN_FIXTURES)
     quelle = tmp_path / "results-v2"
     quelle.mkdir()
     _gezaehlte_zelle(quelle, halt="CLOSED")
@@ -220,9 +219,7 @@ def test_a_run_over_budget_is_a_violation_even_when_it_was_stopped(
     the enforcement failed, and a campaign cannot certify its matched budget
     on the strength of a word in its own result file.
     """
-    braucht_evidenz(
-        "dogfood/benchmark/tasks",
-        "the hidden suites are the benchmark's verdict and are not published, so a clone cannot re-derive a campaign's plan from them")
+    braucht_evidenz(HIDDEN_FIXTURES)
     quelle = tmp_path / "results-v2"
     quelle.mkdir()
     _gezaehlte_zelle(quelle, halt="BUDGET_EXHAUSTED")
@@ -240,9 +237,7 @@ def test_a_run_inside_the_budget_whose_figure_was_counted_is_conformant(
         tmp_path, monkeypatch):
     """The positive control. Without it every test above passes on a rule that
     calls everything a violation."""
-    braucht_evidenz(
-        "dogfood/benchmark/tasks",
-        "the hidden suites are the benchmark's verdict and are not published, so a clone cannot re-derive a campaign's plan from them")
+    braucht_evidenz(HIDDEN_FIXTURES)
     quelle = tmp_path / "results-v2"
     quelle.mkdir()
     _gezaehlte_zelle(quelle, halt="CLOSED", dispatches=7,
@@ -264,9 +259,7 @@ def test_a_figure_nothing_counted_is_unknown_however_the_record_is_shaped(
     future campaign by construction -- and arm A's constant 1 would have
     certified as measured.
     """
-    braucht_evidenz(
-        "dogfood/benchmark/tasks",
-        "the hidden suites are the benchmark's verdict and are not published, so a clone cannot re-derive a campaign's plan from them")
+    braucht_evidenz(HIDDEN_FIXTURES)
     quelle = tmp_path / "results-v2"
     quelle.mkdir()
     _gezaehlte_zelle(quelle, halt="CLOSED", dispatches=7, dispatch_count=None)
@@ -282,9 +275,7 @@ def test_a_log_line_that_could_not_answer_makes_the_figure_unknown(
     """A telemetry line written before `provider_calls` existed cannot say
     what it cost, and reading it as one call is how the asserted figure got
     in."""
-    braucht_evidenz(
-        "dogfood/benchmark/tasks",
-        "the hidden suites are the benchmark's verdict and are not published, so a clone cannot re-derive a campaign's plan from them")
+    braucht_evidenz(HIDDEN_FIXTURES)
     quelle = tmp_path / "results-v2"
     quelle.mkdir()
     _gezaehlte_zelle(quelle, halt="CLOSED", dispatches=7,
@@ -302,9 +293,7 @@ def test_a_crashed_repetition_is_not_counted_as_one(tmp_path, monkeypatch):
     being non-empty, and an arm whose single provider call raised still
     writes `{dispatches: 1, error: ...}`.
     """
-    braucht_evidenz(
-        "dogfood/benchmark/tasks",
-        "the hidden suites are the benchmark's verdict and are not published, so a clone cannot re-derive a campaign's plan from them")
+    braucht_evidenz(HIDDEN_FIXTURES)
     quelle = tmp_path / "results-v2"
     quelle.mkdir()
     # A declared task, so the cell has a row whether or not it was counted.
@@ -330,9 +319,7 @@ def test_a_crashed_repetition_is_not_counted_as_one(tmp_path, monkeypatch):
 def test_copies_of_one_run_are_not_three_repetitions(tmp_path, monkeypatch):
     """`len(reps)` counted distinct labels, and a label is written into the
     file by whoever wrote the file."""
-    braucht_evidenz(
-        "dogfood/benchmark/tasks",
-        "the hidden suites are the benchmark's verdict and are not published, so a clone cannot re-derive a campaign's plan from them")
+    braucht_evidenz(HIDDEN_FIXTURES)
     quelle = tmp_path / "results-v2"
     quelle.mkdir()
     for rep in (1, 2, 3):

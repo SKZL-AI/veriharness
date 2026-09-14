@@ -17,7 +17,11 @@ import importlib.util
 import sys
 from pathlib import Path
 
-from conftest import braucht_evidenz
+from conftest import (
+    RUN_EVIDENCE_V2,
+    RUN_EVIDENCE_V3,
+    braucht_evidenz,
+)
 
 WURZEL = Path(__file__).resolve().parent.parent
 
@@ -236,9 +240,7 @@ def test_the_release_critical_campaign_row_blocks_and_the_historical_one_does_no
     """v2 is immutable, so a blocking row over it could never be satisfied --
     and a gate that cannot be satisfied puts pressure on re-interpreting the
     dataset, which the protocol forbids by name. v3 carries the block."""
-    braucht_evidenz(
-        "dogfood/benchmark/results-v3",
-        "campaign result trees carry the absolute paths their checks ran at and are not published; docs/BENCHMARK_RESULTS_v3.md carries what they measured")
+    braucht_evidenz(RUN_EVIDENCE_V3)
     import inspect
 
     assert "beratend=True" in inspect.getsource(rd.zeile_benchmark_v2)
@@ -407,9 +409,7 @@ def test_the_historical_row_does_not_render_green_while_saying_no():
     """A green PASS whose own text reads `matched_budget_valid = NO` tells a
     reader scanning the column the opposite of what it says. The advisory
     flag, not the state, is what keeps it from blocking."""
-    braucht_evidenz(
-        "dogfood/benchmark/results-v2",
-        "campaign result trees are not published; docs/BENCHMARK_RESULTS_v2.md carries what they measured")
+    braucht_evidenz(RUN_EVIDENCE_V2)
     z = rd.zeile_benchmark_v2()
     assert z.beratend
     assert z.zustand == rd.FAIL

@@ -124,6 +124,21 @@ def _anker_vorhanden(repo: Path, anker: str) -> bool:
     commits that are "not a commit after the anchor", when what was true is
     that the anchor is not in that clone either.
     """
+    # Two different absences, and only one of them authorises a skip. A
+    # repository that answers "no such object" demonstrably does not contain
+    # the anchor. A `git` that cannot run at all answers nothing, and reading
+    # its silence as "different history" would be the fail-open shape this
+    # project has been removing: the check would go quiet exactly when it
+    # cannot see.
+    versuch = subprocess.run(
+        ["git", "-C", str(repo), "rev-parse", "--is-inside-work-tree"],
+        capture_output=True, text=True)
+    if versuch.returncode != 0 or versuch.stdout.strip() != "true":
+        raise RuntimeError(
+            f"{repo} is not a git work tree, or git could not answer: "
+            f"{(versuch.stderr or versuch.stdout).strip()[:120]}. Whether this "
+            f"repository contains the ledger's anchor is then unknown, and "
+            f"unknown is not an environment gap.")
     p = subprocess.run(["git", "-C", str(repo), "cat-file", "-e", f"{anker}^{{commit}}"],
                        capture_output=True, text=True)
     return p.returncode == 0

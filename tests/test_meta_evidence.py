@@ -14,6 +14,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from conftest import CONFINEMENT_EVIDENCE, braucht_evidenz
+
 
 WURZEL = Path(__file__).resolve().parent.parent
 
@@ -280,9 +282,7 @@ def test_the_confinement_metric_reads_the_counters_not_only_the_verdict():
 
     wurzel = WURZEL / "dogfood" / "planner-confinement"
     if not (wurzel / "SUMMARY.json").is_file():
-        import pytest
-
-        pytest.skip("no confinement evidence in this checkout")
+        braucht_evidenz(CONFINEMENT_EVIDENCE)
     zustand, detail = me._falsifiziere_eingrenzung(Path(wurzel))
     assert zustand.value == "KILLED", detail
     assert "still said VERIFIED" in detail

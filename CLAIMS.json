@@ -11440,6 +11440,11 @@
       "why": "source or test code under src/hoh/, tests/, or tools/; claims about its behaviour live in docs/** and are covered there, not by re-declaring the source itself as a claim surface"
     },
     {
+      "path": "tests/test_export_gap_guard.py",
+      "reason": "source-code",
+      "why": "a test module. Its numbers are the values it asserts -- the manifest decisions and rules a skip may or may not rest on -- which are the measurement rather than a claim about it"
+    },
+    {
       "path": "tests/test_export_manifest.py",
       "reason": "source-code",
       "why": "source or test code under src/hoh/, tests/, or tools/; claims about its behaviour live in docs/** and are covered there, not by re-declaring the source itself as a claim surface"

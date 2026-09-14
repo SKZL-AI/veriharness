@@ -218,6 +218,23 @@ CLAIMS_LEDGER_BASENAMES = frozenset({"CLAIMS.json", "CLAIMS.md"})
 #: A root-level parked predecessor: NAME.v<digits>.<rest>, sibling of NAME.
 _VERSIONED_SIBLING_RE = re.compile(r"^(?P<base>.+)\.v\d+\.(?P<rest>.+)$")
 
+#: The other shape this project parks things under: `<name>.v<UTC stamp>`,
+#: written by `RunStore` and by the pre-registration freeze. The first form
+#: above counts versions; this one stamps them. Both mean the same thing --
+#: replaced, kept, not current -- and both belong to the same rule wherever
+#: they sit. It used to be recognised only at the repository root, so a parked
+#: file one directory down fell through to `unclassified`, which is the
+#: manifest's way of saying nobody decided. A test that skips on an absent
+#: path may only do so when the manifest *declares* the withholding, and
+#: `unclassified` is not a declaration.
+#: Two stamp formats are in use and both mean the same thing: `RunStore`
+#: writes `20260913T215702Z`, the pre-registration freeze writes
+#: `2026-09-13T21-57-02Z`. A rule that knew only one classified the other as
+#: `unclassified`, which is the manifest's way of saying nobody decided -- and
+#: an undecided path must never satisfy a test's environment-gap skip.
+_VERSIONED_STAMP_RE = re.compile(
+    r"^(?P<base>.+)\.v\d{4}-?\d{2}-?\d{2}T\d{2}-?\d{2}-?\d{2}Z$")
+
 #: Directories whose entire subtree gets one fixed rule regardless of
 #: content. Checked, in this order, before any content-based rule.
 _DIRECTORY_RULES = (
@@ -624,6 +641,13 @@ def _classify(rel_path: str, root: Path) -> tuple[str, str]:
     """Returns (decision, rule) for one file. rel_path uses forward slashes."""
     parts = rel_path.split("/")
     top = parts[0]
+
+    # A parked predecessor, at any depth. Asked before the directory rules so
+    # that a stamped sibling is classified by what it *is* rather than by
+    # where it happens to live.
+    m = _VERSIONED_STAMP_RE.match(parts[-1])
+    if m and (root / "/".join(parts[:-1]) / m.group("base")).is_file():
+        return "EXCLUDE", "parked-predecessor"
 
     if rel_path == "pyproject.toml" or top == "src":
         return "INCLUDE", "package"

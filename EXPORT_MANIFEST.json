@@ -259,7 +259,7 @@
     {
       "path": "docs/benchmarks/v3/PREREGISTRATION.json.v2026-09-13T21-57-02Z",
       "decision": "EXCLUDE",
-      "rule": "unclassified"
+      "rule": "parked-predecessor"
     },
     {
       "path": "docs/benchmarks/v3/PREREGISTRATION_PROVENANCE.json",
@@ -279,22 +279,22 @@
     {
       "path": "dogfood/ABSCHLUSSBERICHT.md.v20260909T142857Z",
       "decision": "EXCLUDE",
-      "rule": "internal-working-document"
+      "rule": "parked-predecessor"
     },
     {
       "path": "dogfood/ABSCHLUSSBERICHT.md.v20260909T154058Z",
       "decision": "EXCLUDE",
-      "rule": "internal-working-document"
+      "rule": "parked-predecessor"
     },
     {
       "path": "dogfood/ABSCHLUSSBERICHT.md.v20260909T180906Z",
       "decision": "EXCLUDE",
-      "rule": "internal-working-document"
+      "rule": "parked-predecessor"
     },
     {
       "path": "dogfood/ABSCHLUSSBERICHT.md.v20260909T192206Z",
       "decision": "EXCLUDE",
-      "rule": "internal-working-document"
+      "rule": "parked-predecessor"
     },
     {
       "path": "dogfood/ATTRIBUTION.json",
@@ -1034,7 +1034,7 @@
     {
       "path": "dogfood/closure-e2e/CLOSURE_E2E.json.v2026-09-14T07-44-38Z",
       "decision": "EXCLUDE",
-      "rule": "internal-working-document"
+      "rule": "parked-predecessor"
     },
     {
       "path": "dogfood/planner-confinement.v20260913T135001Z/SUMMARY.json",
@@ -2339,7 +2339,7 @@
     {
       "path": "dogfood/specs/d7k-consolidation.md.v20260909T142252Z",
       "decision": "EXCLUDE",
-      "rule": "internal-working-document"
+      "rule": "parked-predecessor"
     },
     {
       "path": "dogfood/specs/d7r-review-repairs.md",
@@ -2349,7 +2349,7 @@
     {
       "path": "dogfood/specs/d7r-review-repairs.md.v20260909T170426Z",
       "decision": "EXCLUDE",
-      "rule": "internal-working-document"
+      "rule": "parked-predecessor"
     },
     {
       "path": "dogfood/specs/d7w-a-claim-that-outruns-its-tree.md",
@@ -2374,7 +2374,7 @@
     {
       "path": "dogfood/specs/d7y-references-that-do-not-ship.md.v20260909T165355Z",
       "decision": "EXCLUDE",
-      "rule": "internal-working-document"
+      "rule": "parked-predecessor"
     },
     {
       "path": "dogfood/specs/d7z-a-hand-count-of-a-moving-tree.md",
@@ -3159,7 +3159,7 @@
     {
       "path": "dogfood/unattended-e2e/root/repair-1-1/state.json.v2026-09-11T14-48-18Z",
       "decision": "EXCLUDE",
-      "rule": "internal-working-document"
+      "rule": "parked-predecessor"
     },
     {
       "path": "dogfood/unattended-e2e/root/repair-1-1/state.json.v2026-09-11T14-48-18Z-001",
@@ -3174,7 +3174,7 @@
     {
       "path": "dogfood/unattended-e2e/root/repair-1-1/state.json.v2026-09-11T14-50-41Z",
       "decision": "EXCLUDE",
-      "rule": "internal-working-document"
+      "rule": "parked-predecessor"
     },
     {
       "path": "dogfood/unattended-e2e/root/repair-1-1/state.json.v2026-09-11T14-50-41Z-001",
@@ -3189,7 +3189,7 @@
     {
       "path": "dogfood/unattended-e2e/root/repair-1-1/state.json.v2026-09-11T14-51-40Z",
       "decision": "EXCLUDE",
-      "rule": "internal-working-document"
+      "rule": "parked-predecessor"
     },
     {
       "path": "dogfood/unattended-e2e/root/repair-1-1/state.json.v2026-09-11T14-51-40Z-001",
@@ -3204,12 +3204,12 @@
     {
       "path": "dogfood/unattended-e2e/root/repair-1-1/state.json.v2026-09-11T14-51-41Z",
       "decision": "EXCLUDE",
-      "rule": "internal-working-document"
+      "rule": "parked-predecessor"
     },
     {
       "path": "dogfood/unattended-e2e/root/repair-1-1/state.json.v2026-09-11T14-53-48Z",
       "decision": "EXCLUDE",
-      "rule": "internal-working-document"
+      "rule": "parked-predecessor"
     },
     {
       "path": "dogfood/unattended-e2e/root/repair-1-1/state.json.v2026-09-11T14-53-48Z-001",
@@ -3344,7 +3344,7 @@
     {
       "path": "dogfood/unattended-e2e/root/slugify/state.json.v2026-09-11T14-44-55Z",
       "decision": "EXCLUDE",
-      "rule": "internal-working-document"
+      "rule": "parked-predecessor"
     },
     {
       "path": "dogfood/unattended-e2e/root/slugify/state.json.v2026-09-11T14-44-55Z-001",
@@ -3359,7 +3359,7 @@
     {
       "path": "dogfood/unattended-e2e/root/slugify/state.json.v2026-09-11T14-46-09Z",
       "decision": "EXCLUDE",
-      "rule": "internal-working-document"
+      "rule": "parked-predecessor"
     },
     {
       "path": "dogfood/unattended-e2e/root/slugify/state.json.v2026-09-11T14-46-09Z-001",
@@ -3369,12 +3369,12 @@
     {
       "path": "dogfood/unattended-e2e/root/slugify/state.json.v2026-09-11T14-46-10Z",
       "decision": "EXCLUDE",
-      "rule": "internal-working-document"
+      "rule": "parked-predecessor"
     },
     {
       "path": "dogfood/unattended-e2e/root/slugify/state.json.v2026-09-11T14-46-48Z",
       "decision": "EXCLUDE",
-      "rule": "internal-working-document"
+      "rule": "parked-predecessor"
     },
     {
       "path": "dogfood/unattended-e2e/root/slugify/state.json.v2026-09-11T14-46-48Z-001",
@@ -3389,12 +3389,12 @@
     {
       "path": "dogfood/unattended-e2e/root/slugify/state.json.v2026-09-11T14-46-49Z",
       "decision": "EXCLUDE",
-      "rule": "internal-working-document"
+      "rule": "parked-predecessor"
     },
     {
       "path": "dogfood/unattended-e2e/root/slugify/state.json.v2026-09-11T14-48-16Z",
       "decision": "EXCLUDE",
-      "rule": "internal-working-document"
+      "rule": "parked-predecessor"
     },
     {
       "path": "dogfood/unattended-e2e/root/slugify/state.json.v2026-09-11T14-48-16Z-001",
@@ -3793,6 +3793,11 @@
     },
     {
       "path": "tests/test_evidence.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_export_gap_guard.py",
       "decision": "INCLUDE",
       "rule": "tests"
     },

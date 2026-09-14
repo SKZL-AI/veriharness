@@ -18,7 +18,12 @@ from pathlib import Path
 
 import pytest
 
-from conftest import braucht_evidenz
+from conftest import (
+    RUN_EVIDENCE_V1,
+    HIDDEN_FIXTURES,
+    RUN_EVIDENCE_V2,
+    braucht_evidenz,
+)
 
 WURZEL = Path(__file__).resolve().parent.parent
 
@@ -57,15 +62,13 @@ def test_campaign_v1_still_holds_the_fifteen_cells_it_was_measured_with():
     """
     quelle = bm.ergebnisse_fuer("v1")
     if not quelle.is_dir():
-        pytest.skip("campaign v1's cells are not in this checkout")
+        braucht_evidenz(RUN_EVIDENCE_V1)
     zellen = [f for f in quelle.glob("*.json") if ".attempt" not in f.name]
     assert len(zellen) == 15, sorted(f.name for f in zellen)
 
 
 def test_the_report_reads_the_campaign_it_is_asked_for(tmp_path, monkeypatch):
-    braucht_evidenz(
-        "dogfood/benchmark/tasks",
-        "the hidden suites are the benchmark's verdict and are not published, so a clone cannot re-derive a campaign's plan from them")
+    braucht_evidenz(HIDDEN_FIXTURES)
     import json
 
     v2 = tmp_path / "results-v2"
@@ -87,9 +90,7 @@ def test_the_report_reads_the_campaign_it_is_asked_for(tmp_path, monkeypatch):
 def test_a_replication_cannot_overwrite_the_document_it_replicates(tmp_path,
                                                                    monkeypatch):
     """One forgotten flag would have rewritten v1's results in place."""
-    braucht_evidenz(
-        "dogfood/benchmark/results-v2",
-        "campaign result trees are not published; docs/BENCHMARK_RESULTS_v2.md carries what they measured")
+    braucht_evidenz(RUN_EVIDENCE_V2)
     import json
 
     v2 = tmp_path / "results-v2"

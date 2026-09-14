@@ -25,7 +25,8 @@ import sys
 from collections import Counter
 from pathlib import Path
 
-import pytest
+
+from conftest import RUN_EVIDENCE_V3, braucht_evidenz
 
 HOH = Path(__file__).resolve().parent.parent
 ERGEBNISSE = HOH / "dogfood/benchmark/results-v3"
@@ -33,7 +34,7 @@ ERGEBNISSE = HOH / "dogfood/benchmark/results-v3"
 
 def zellen() -> list[dict]:
     if not ERGEBNISSE.is_dir():
-        pytest.skip("campaign v3 has no results in this checkout")
+        braucht_evidenz(RUN_EVIDENCE_V3)
     raus = []
     for f in sorted(ERGEBNISSE.glob("*.json")):
         if ".attempt" in f.name or re.search(r"\.v\d{8}T\d{6}Z\.json$", f.name):
