@@ -12397,6 +12397,34 @@
       "where": "paper/POSITION_PAPER.md:975",
       "reason": "continues the sentence above it, giving the pass and skip counts a fresh clone of the export reports together with the clone shape each was measured in; the figures are recorded at C-460 and the rule that they are never summed is what the passage is for",
       "anchor_digest": "451156176af545b13af151d5af550d46302501055fac0208a72613c7771f9a27"
+    },
+    {
+      "id": "N-970",
+      "text": "  export check prints \"passes U2b + the leak scan\", the row counted every line",
+      "where": "RELEASE_NOTES.md:113",
+      "reason": "restates finding O165 -- a readiness row that counted the export check's own success line as a finding, so a green run reported one dangling reference and said nothing about the ten acknowledged ones -- from DOGFOOD_LEDGER.md, an internal working document this ledger's declared coverage does not extend to; the live figures are what `python3 tools/export_manifest.py check` prints",
+      "anchor_digest": "4745169f5d4c2aef774f0046a8ea28679b89319e7fd150810875c7cbf6cfa603"
+    },
+    {
+      "id": "N-971",
+      "text": "  mentioning U2b, and a green export therefore reported \"1 dangling",
+      "where": "RELEASE_NOTES.md:114",
+      "reason": "restates the same finding O165 from DOGFOOD_LEDGER.md, outside this ledger's declared coverage; the corrected row is in tools/readiness.py and its regression test with a negative control is in tests/test_readiness.py",
+      "anchor_digest": "33101e181e3e03f72e95d2644b54c02152539ac072d2246e04da89126ede255e"
+    },
+    {
+      "id": "N-972",
+      "text": "* Three documents that said a fresh clone reports 30 environment-gap skips.",
+      "where": "RELEASE_NOTES.md:116",
+      "reason": "restates finding O168 -- the export skip count holds for a --depth 1 clone and not a full one -- whose corrected figures are recorded at C-460 and printed in README.md, paper/POSITION_PAPER.md and this document with the clone shape beside each",
+      "anchor_digest": "db0448572b1989ac9b7874ea28ad1f430b054a98d08d079ac74ac6f02c90d4a7"
+    },
+    {
+      "id": "N-973",
+      "text": "  That holds for a `--depth 1` clone and not a full one, where two of the skips",
+      "where": "RELEASE_NOTES.md:117",
+      "reason": "restates the same finding O168 and how it was found, by running the export's own suite before pushing it; the figures themselves are recorded at C-460",
+      "anchor_digest": "1976746ad293119f5adaada64dafa24d6b4aed552dd678b74719ce08ba6378c2"
     }
   ],
   "claim_surfaces": [

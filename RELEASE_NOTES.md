@@ -109,6 +109,14 @@ Each of these would have shipped green. The harness found them in itself.
   against itself.
 * An export-skip rule that would have turned a **lost public file** green by
   skipping instead of red.
+* A readiness row that counted **its own success message as a finding**: the
+  export check prints "passes U2b + the leak scan", the row counted every line
+  mentioning U2b, and a green export therefore reported "1 dangling
+  reference(s)" while saying nothing about the ten acknowledged ones.
+* Three documents that said a fresh clone reports 30 environment-gap skips.
+  That holds for a `--depth 1` clone and not a full one, where two of the skips
+  do not exist -- found by running this export's own suite before pushing it,
+  and corrected in all three rather than in the one that was quoted most.
 * A sentence in the position paper that carried a correct number and **a
   command beside it that computed something else** -- lines rather than
   distinct ids -- so a reader following the printed recipe would not get the
