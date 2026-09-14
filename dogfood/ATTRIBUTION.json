@@ -211,6 +211,15 @@
         "7f5c26f968198ae5fc9a7c0011b5a9d32d229f40"
       ],
       "why_not_the_product": "The previous attribution entry, and the release notes' own findings list gaining the two entries it had left out. Neither could go through a run: a ledger cannot be written by the thing it accounts for, and the second is the same class -- deciding what this release says about its own defects is the orchestrator's judgement, and a run would have had to be handed the judgement to write it down."
+    },
+    {
+      "id": "v010-readiness-board",
+      "category": "MAIN_ORCHESTRATOR_DIRECT",
+      "is_development_node": false,
+      "commits": [
+        "c54b8e5322df9ab6538df3103e9d223e127c88f4"
+      ],
+      "why_not_the_product": "The readiness board and the external-CI evidence that binds it to the export CI actually tested. Running the gates and recording what they returned is the orchestrator's own act by construction: a run cannot be the thing that certifies the release it is part of, and the evidence file names a GitHub run id, which the product has no way to reach."
     }
   ]
 }
