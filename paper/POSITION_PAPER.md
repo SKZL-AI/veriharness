@@ -971,10 +971,13 @@ GitHub's runners cannot create the namespace; that is reported as
 `UNSUPPORTED_ENVIRONMENT` and never derived as a pass from the green job. A
 fresh depth-1 clone of the public export reports its passes and its
 environment-gap skips as two separate figures that are never summed, each
-skip naming the artifact withheld and why -- 1220 and 30 at the `v0.1.0` tag,
-against 1222 and 28 in a full clone, because two of the skips exist only when
-the history is shallow. The figure carries the clone it was taken in, for the
-same reason every other figure here carries its state. A skip is authorised
+skip naming the artifact withheld and why. Measured on the published `v0.1.0`
+tag: **30** skips shallow and **28** full, because two of them exist only when
+the history is shallow; the passes beside them were 1221 and 1223. The skip
+count is the figure this paragraph is about and does not move with the suite;
+the pass count does, and saying which clone and which tag each was taken in is
+the same discipline every other number here carries -- learned the hard way,
+three times, in the release that published this section. A skip is authorised
 only when the export manifest declares that path excluded for the reason the
 test expects: missing-and-included fails, missing-and-unclassified fails,
 missing-manifest fails, and wrong-reason fails. Five negative controls hold

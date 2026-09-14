@@ -270,11 +270,12 @@ green with its relevant step skipped, because GitHub's runners cannot create
 the namespace -- reported as `UNSUPPORTED_ENVIRONMENT`, never derived as a
 pass from the green job. A fresh clone of this repository reports its passes
 and its environment-gap skips as two separate numbers that are never summed,
-each skip naming the withheld artifact and why. At the `v0.1.0` tag that is
-**1220 passed and 30 skipped** in a `--depth 1` clone, which is what CI makes,
-and **1222 passed and 28 skipped** in a full one -- two of the skips exist
-only when the history is shallow, so the number is quoted with the clone it
-was measured in rather than on its own. A skip is
+each skip naming the withheld artifact and why. Measured on a fresh clone of
+the published `v0.1.0` tag: **30 skips** in a `--depth 1` clone, which is what
+CI makes, and **28** in a full one -- two of them exist only when the history
+is shallow, so the count is quoted with the clone it was taken in. The passes
+beside them were 1221 and 1223 respectively; that number moves with every test
+added, which is why the skip count is the one this paragraph is about. A skip is
 authorised only when `EXPORT_MANIFEST.json` declares that path excluded for
 the reason the test expects; missing-and-included fails, missing-and-
 unclassified fails, missing-manifest fails, wrong-reason fails. Five negative

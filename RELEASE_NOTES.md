@@ -148,10 +148,12 @@ Each of these would have shipped green. The harness found them in itself.
   evidence, raw receipts and internal working documents deliberately stay out.
   That is why a fresh clone reports explicit environment-gap skips, each naming
   the withheld artifact and why -- counted separately from its passes, and
-  never summed with them. At this tag: **1220 passed, 30 skipped** in a
-  `--depth 1` clone, **1222 passed, 28 skipped** in a full one. Two of the
-  skips exist only when the history is shallow, so each figure is quoted with
-  the clone it was measured in.
+  never summed with them. Measured on a fresh clone of the published tag:
+  **30 skips** in a `--depth 1` clone and **28** in a full one, two of them
+  existing only when the history is shallow. The passes beside them were 1221
+  and 1223. The tagged tree's own copy of this paragraph says 1220 and 1222 --
+  it was written before the last regression test was added, and the tag is not
+  being moved to hide that. See the note at the end of these notes.
 
 ## Verifying this release yourself
 
@@ -168,6 +170,34 @@ ruff check --select F,E9 src tests tools
 that re-derives it -- including the rows that are advisory and the one that is
 `UNSUPPORTED_ENVIRONMENT` because GitHub's runners cannot create the namespace
 it needs.
+
+
+## Corrected after the tag was cut, and the tag is not being moved
+
+`v0.1.0` was published, and then verified the way these notes tell a reader to
+verify it: a fresh clone of the published tag, suite run, numbers compared.
+Two of them were one short.
+
+The tagged tree's own copy of this file, of `README.md` and of the position
+paper says a `--depth 1` clone reports **1220 passed** and a full clone
+**1222**. Measured on the published tag: **1221** and **1223**. The skip
+counts -- 30 and 28 -- were right, and they are the figure those sentences are
+about. The passes moved because the last regression test added before the tag
+(for finding O169, the attribution check that had no reachable green state)
+landed after the sentence was written.
+
+This is the third instance of one class in a single release, and the class is
+the subject of the section it keeps damaging: a number and the state it was
+taken at drifting apart. The first was a heading tally with a command beside it
+that counted something else; the second was a skip count true of one clone
+shape and not the other; this is the third. The wording in all three places now
+leads with the figure that does not move and names the tag and the clone the
+others were taken in.
+
+`v0.1.0` stays published, tagged and unmoved, exactly as `v0.1.0-rc1` through
+`rc3` did when the same thing happened to them. A tag that is silently
+corrected is worse than a tag with a known, stated, one-off-by-one error, and
+this project has said so in print three times now.
 
 ---
 

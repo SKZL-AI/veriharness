@@ -98,19 +98,21 @@ def test_every_commit_after_the_anchor_belongs_to_exactly_one_entry():
     if _fremde_historie():
         pytest.skip("this clone does not contain the history the ledger describes")
     ledger = _ledger()
-    alle = at.commits_since(WURZEL, ledger["anchor"])
     gesehen: dict[str, str] = {}
     for e in ledger["entries"]:
         for sha in at._shas(WURZEL, e, []):
             assert sha not in gesehen, f"{sha[:12]} claimed twice"
             gesehen[sha] = e["id"]
-    # HEAD may be unattributed, and exactly it: a commit cannot name its own
-    # sha, so its entry is written in the next commit. One is the bounded price
-    # of closed ranges; two is the gap this check exists for.
-    offen = [c for c in alle if c not in gesehen]
-    assert offen in ([], [alle[-1]]), (
-        "commits after the anchor with no entry: "
-        + ", ".join(c[:12] for c in offen))
+    # The gap question is asked of the tool, not re-implemented here. This
+    # test used to carry its own copy of the tolerance rule -- "HEAD and
+    # exactly HEAD" -- and when O169 widened that rule by one shape, the tool
+    # went green and this test stayed red against the same history. A rule
+    # written down twice is a rule that will disagree with itself; the part
+    # that belongs here is the one above, which the tool does not check: that
+    # no commit is claimed by two entries.
+    bericht = at.pruefe(WURZEL, ledger)
+    luecken = [p for p in bericht["problems"] if "belong to no entry" in p]
+    assert not luecken, "; ".join(luecken)
 
 
 def test_a_veriharness_claim_must_point_at_a_state_that_exists():
@@ -175,7 +177,7 @@ def test_two_unattributed_commits_are_still_a_gap():
     bericht = at.pruefe(WURZEL, {"anchor": "HEAD~3", "entries": []})
     assert any("belong to no entry" in p for p in bericht["problems"])
 
-def test_a_trailing_ledger_only_commit_is_tolerated_and_anything_else_is_not():
+def test_a_ledger_only_commit_is_tolerated_and_anything_else_is_not():
     """O169: with only the tip tolerated, this check had no reachable green.
 
     The commit that writes an entry cannot name its own sha, so it is written
@@ -184,15 +186,21 @@ def test_a_trailing_ledger_only_commit_is_tolerated_and_anything_else_is_not():
     needs another commit, which is then the tip. A release that needs both an
     attribution commit and a commit after it can therefore never be green.
 
-    The widening is exactly one shape: a trailing commit that touched
-    `dogfood/ATTRIBUTION.json` and nothing else. That is the ledger recording
-    itself, checked against git rather than against a commit message, because
-    a commit that changed no code, no document and no evidence cannot be work
-    this ledger is failing to account for.
+    The widening is exactly one shape: a commit that touched
+    `dogfood/ATTRIBUTION.json` and nothing else, wherever it sits. That is the
+    ledger recording itself, checked against git rather than against a commit
+    message, because a commit that changed no code, no document and no
+    evidence cannot be work this ledger is failing to account for.
+
+    Position was tried first -- only a trailing *run* of such commits -- and it
+    was wrong within the hour: one attributed commit landing after the
+    ledger-only one ends the run, and a content-free commit becomes a gap
+    again. What makes it safe is what it touched, not where it is, so this
+    pins the ledger-only commit with ordinary work committed after it.
 
     Both halves are pinned here. The negative control is the one that matters:
-    a trailing commit touching anything besides the ledger must still be a gap
-    once it is no longer the tip, or the widening swallowed the check.
+    a commit touching anything besides the ledger must still be a gap once it
+    is no longer the tip, or the widening swallowed the check.
     """
     import subprocess as _sp
     import tempfile as _tf
@@ -225,15 +233,23 @@ def test_a_trailing_ledger_only_commit_is_tolerated_and_anything_else_is_not():
 
         (repo / "a.txt").write_text("3\n")
         g("add", "-A"); g("commit", "-q", "-m", "more work")
+        spaeter = g("rev-parse", "HEAD")
 
+        (repo / "a.txt").write_text("4\n")
+        g("add", "-A"); g("commit", "-q", "-m", "tip")
+
+        # `spaeter` is named, so the ledger-only commit is neither the tip nor
+        # part of a trailing run of unattributed commits. Under the first
+        # version of this rule -- a trailing run -- this fixture went red.
         ledger = {"anchor": anker, "entries": [
             {"id": "e", "category": "MAIN_ORCHESTRATOR_DIRECT",
-             "is_development_node": False, "commits": [arbeit],
+             "is_development_node": False, "commits": [arbeit, spaeter],
              "why_not_the_product": "fixture"},
         ]}
         bericht = at.pruefe(repo, ledger)
-        # `more work` is the tip and tolerated; the ledger-only commit before
-        # it is tolerated by the new rule; `work plus ledger` is named.
+        # `tip` is tolerated as the tip; `more work` and `work plus ledger` are
+        # named; the ledger-only commit is buried between named commits and is
+        # tolerated on what it touched rather than on where it is.
         assert not any("belong to no entry" in p for p in bericht["problems"]), (
             bericht["problems"])
 

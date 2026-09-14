@@ -248,23 +248,21 @@ def pruefe(repo: Path, ledger: dict) -> dict:
     # attribution commit and a commit after it. The attribution commit is the
     # tip and is tolerated; the next commit displaces it and it becomes a gap;
     # writing an entry for it needs another commit, which is then the tip, and
-    # so on. So a trailing commit that touches *only* `dogfood/ATTRIBUTION.json`
-    # is tolerated as well. It is the ledger writing itself, by construction:
-    # a commit that changed nothing else cannot be work this ledger is failing
-    # to account for. A trailing commit that touches anything besides the
-    # ledger is still a gap, and a gap anywhere but at the end is still a gap
-    # -- the walk stops at the first commit that does not qualify rather than
-    # filtering the whole list, so an unattributed commit in the middle cannot
-    # be excused by a tidy tail.
-    offen = set(nicht_zugeordnet)
-    for sha in reversed(alle):
-        if sha not in offen:
-            break
-        if sha == alle[-1] or _nur_das_ledger(repo, sha):
-            offen.discard(sha)
-            continue
-        break
-    nicht_zugeordnet = [c for c in nicht_zugeordnet if c in offen]
+    # so on. So a commit that touches *only* `dogfood/ATTRIBUTION.json` is
+    # tolerated as well, wherever it sits in the history. It is the ledger
+    # writing itself, by construction: a commit that changed no code, no
+    # document and no evidence cannot be work this ledger is failing to
+    # account for, and where it sits does not change that. Position was tried
+    # first -- only a trailing *run* of such commits -- and it was wrong for a
+    # reason worth keeping: as soon as one attributed commit lands after the
+    # ledger-only one, the run ends and a content-free commit becomes a gap
+    # again. The property that makes it safe is what it touched, not where it
+    # is. Anything that touched more than the ledger is still a gap, at the end
+    # or in the middle.
+    nicht_zugeordnet = [
+        c for c in nicht_zugeordnet
+        if c != alle[-1] and not _nur_das_ledger(repo, c)
+    ]
     if nicht_zugeordnet:
         probleme.append(
             f"{len(nicht_zugeordnet)} commit(s) after the anchor belong to no "

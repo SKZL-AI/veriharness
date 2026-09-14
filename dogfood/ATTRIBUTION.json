@@ -231,6 +231,25 @@
         "bfa64658c5370a2efec7c2a6559159492d8c0265"
       ],
       "why_not_the_product": "The last three commits before the v0.1.0 tag: an attribution entry, the readiness board recorded at the export CI actually tested, and O169 -- the finding that this very check had no reachable green state, together with its fix and the negative control that keeps the fix from swallowing the check. None of it could go through a run. Two of the three are this ledger and that board writing themselves, which is the orchestrator's act by construction, and the third changes the gate that decides whether the ledger is complete. A run repairing the check that certifies it would be the circularity every other entry here is written to avoid."
+    },
+    {
+      "id": "v010-post-tag-correction",
+      "category": "MAIN_ORCHESTRATOR_DIRECT",
+      "is_development_node": false,
+      "commits": [
+        "0996717b704266cb1628a2acbed57ae17e493b9f",
+        "514eabe1fecfe6cbfd09db44832ac368030a0ef2"
+      ],
+      "why_not_the_product": "The readiness board at the tag, and O170 -- the correction found by verifying the published tag the way its own documents tell a reader to. Neither could go through a run: the first is the board recording the gates, and the second is this project correcting a statement it made about its own published artifact, which is the orchestrator's act by definition. The repair also touched tools/attribution.py's test, and a run repairing the check that certifies its own accounting is the circularity every entry here is written to avoid."
+    },
+    {
+      "id": "v010-o169-positionless",
+      "category": "MAIN_ORCHESTRATOR_DIRECT",
+      "is_development_node": false,
+      "commits": [
+        "d8cc3ec23e1058cc2af40a5c47d58aa904bb64db"
+      ],
+      "why_not_the_product": "The second repair of O169: the tolerance rule was positional and position is the wrong property. Outside any run for the same reason the first repair was -- it changes the gate that decides whether this ledger is complete, and a run repairing the check that certifies its own accounting is the circularity every entry here exists to avoid."
     }
   ]
 }
