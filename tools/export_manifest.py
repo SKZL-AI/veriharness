@@ -1054,6 +1054,24 @@ U2B_ANERKANNT: dict[str, str] = {
         "tree contains, and where its substance is published, is described in "
         "docs/EVIDENCE_INDEX.md. Only this one reference is acknowledged; "
         "every other reference AUDIT.md makes still has to resolve",
+    "paper/AUDIT.md -> dogfood/benchmark/results-v3":
+        "campaign v3's 45 raw cell files, named as the place the arm figures "
+        "in sections 12 and 13 of the paper were recomputed from -- "
+        "independently of the reporter that wrote the result documents, "
+        "which is the whole point of naming them. The cells record the "
+        "absolute paths the runs executed at, so the export does not carry "
+        "them (limit 12e). What a reader can follow instead is "
+        "docs/BENCHMARK_RESULTS_v3.md, the published surface of the same "
+        "data. Naming that document in the source column instead would say "
+        "the figures were recomputed from the reporter's own output, which "
+        "is exactly the circularity these rows exist to avoid",
+    "paper/AUDIT.md -> dogfood/closure-e2e/CLOSURE_E2E.json":
+        "the recorded evidence file of the post-O143 operational closure, "
+        "named as the place its figures were read back from. It records "
+        "machine-local run roots, so the export does not carry it (limit "
+        "12e). What a reader can follow instead is docs/READINESS.md, whose "
+        "post_o143_closure row carries the same figures and the command that "
+        "re-derives them",
 }
 
 

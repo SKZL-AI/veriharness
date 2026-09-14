@@ -756,7 +756,258 @@ deliberate.
     unblock <run> --reason "..."` lifts the block by hand, once the cause is
     confirmed, and only then does the role run again.
 
-## 12. What this paper does not claim
+## 12. The matched-budget benchmark, in three campaigns
+
+`docs/LIMITATIONS.md` limit 2 said from the first release that this project
+had **no baseline of any kind**, so every claim about what the harness is
+worth was a claim about its internals. Three campaigns now exist, and none is
+edited in the light of another.
+
+### The design, frozen before any arm ran
+
+`docs/BENCHMARK_PROTOCOL.md` was committed before the first cell. Five small
+tasks, each chosen for a failure mode the others lack; three arms -- **A** a
+plain agent with no harness, **B** one `hoh run`, **C** the full control plane
+with global gates and repair nodes; a hidden test suite per task that is the
+verdict and that no arm sees; and a matched budget defined on the resource
+that is actually scarce, role dispatches.
+
+The primary metric is the **false accept**: the arm's own checks green and the
+hidden suite red. It is the metric a verification harness has to be judged on,
+because it is the one a harness is supposed to prevent and the one an
+unharnessed agent has no defence against.
+
+### v1 -- before the planner boundary was closed
+
+A plain agent passed all five hidden suites. The full control plane produced a
+final state in one cell of five, and in **four of the five** the reason is the
+same defect in this harness: a planner pane that had finished was read as
+waiting for a human approval (O127). That attribution is measured rather than
+inferred -- those four run trees still hold a valid plan of 5, 6, 4 and 3
+acceptance criteria, written while the state said the planner was blocked
+(C-239, and the per-cell reasons at C-177..C-180). Nothing was re-run and no
+cell was reinterpreted afterwards; `docs/BENCHMARK_RESULTS.md` keeps it as
+measured, and its own cost column is the one v2 later proved was asserted
+rather than counted (C-218..C-232).
+
+### v2 -- the replication that found two things
+
+One **false accept**: `slug_pair`, arm B. Its own acceptance criteria were
+green and the hidden suite was red, on a normalisation that dropped a
+character (C-313). That is the defect class this benchmark exists to detect,
+detected.
+
+And a defect in the benchmark itself: the *matched* budget was never matched.
+**All five** arm-C cells spent eighteen dispatches against a declared nine
+(`docs/BENCHMARK_RESULTS_v2.md`'s own cost table, `over budget = yes` on every
+one), because every run was given its own ceiling and a node plus its repair
+node therefore drew twice the allowance. Worse, the figure the campaign
+reported for two of them was a constant written beside the result rather than
+a count of anything -- discovered after cell 1 and declared in the protocol at
+C-217, in the direction unfavourable to the harnessed arms. v2 keeps
+`matched_budget_valid = NO`; that cannot be repaired after the fact and is
+not.
+
+### v3 -- pre-registered in full, and commit-bound
+
+Everything v2 exposed was fixed before v3 ran, and the campaign was
+pre-registered so the analysis could not be chosen afterwards: 5 tasks x 3
+arms x **3 repetitions**, unconditionally; nine dispatches per **cell**,
+shared by a node and its repair nodes and enforced rather than described; what
+counts as a dispatch, stated exactly; what happens on exhaustion; and which
+files may not change while the campaign runs.
+
+The exact registration bytes were bound in a git commit **12.8 seconds before
+the first cell started and 50 seconds before the earliest provider dispatch
+recorded in any v3 run tree**. `docs/benchmarks/v3/PREREGISTRATION_PROVENANCE.json`
+establishes that from git objects -- blob `f8bad644`, sha256 `a1c179c4…`,
+binding commit `d6ae7cd`, ancestry to `HEAD` -- rather than from the order of
+a log or a file's mtime, and `tests/test_prereg_provenance.py` re-derives it
+on every suite run rather than reading the answer back. The readiness row
+that carries this is C-257; the two timestamps themselves live in that
+provenance file, which `CLAIMS.json` does not cover.
+
+| arm | hidden suite | false accepts | what it produced | claim |
+|---|---|---|---|---|
+| A -- plain agent | 15/15 PASS | 0 | answered | C-446 |
+| B -- one `hoh run` | 14/15 PASS | 1 | 15/15 accepted | C-447 |
+| C -- full control plane | 14/15 PASS | 0 | 15/15 `BUDGET_EXHAUSTED`, 0/15 `CLOSED` | C-448 |
+
+Arm C's fifteen per-cell rows are individually in the ledger (C-376..C-414);
+the one red hidden suite in arm C is `slug_pair/C/3` at C-405.
+
+**Arm B reproduced v2's false accept** -- `slug_pair` again, arm B again, in
+one of its three repetitions. n=3 carries no rate; what it carries is that the finding was not
+a one-off.
+
+**Arm C reached no fixpoint at all.** Every one of its fifteen cells spent the
+nine on the primary node, met a red global gate, spawned a repair node, and
+had the repair refused for want of budget. v2's arm C closed five of five --
+with eighteen per cell, twice the declared resource. Under the rule the
+protocol actually writes down, this control plane does not close on these
+tasks.
+
+**So arm C's zero false accepts is not a correctness result**, and the
+distinction matters more than the number. A false accept requires an arm to
+claim it is finished and be wrong; arm C never claimed it. `slug_pair/C/3`
+shows it cleanly: hidden suite red, no claim of success -- a miss, not a false
+pass. Quoting `0` for arm C beside arm B's `1` compares *answered wrongly
+once* with *never answered*.
+
+**And arm A, at one dispatch per cell, passed everything.** Arm A is
+single-shot by construction (limit 17), so it spent a ninth of what the
+harnessed arms were allowed. More turns could only have helped it, which means
+this result is *robust* to the asymmetry rather than excused by it.
+
+### What `benchmark_v3 = PASS` means on the readiness board
+
+Exactly this: pre-registered, commit-bound, 45/45 runs complete,
+matched-budget-valid, raw data complete, and the analysis reproducible from
+the cell files by a second, independently written aggregation
+(`tests/test_v3_aggregation_agreement.py`, which never imports the reporter
+and must agree with it on every figure). The readiness row is C-259, and its
+own text carries the freeze's post-campaign drift rather than hiding it.
+
+It does **not** mean the harness beat the plain agent, was more efficient, or
+reached a fixpoint. On these five tasks it did none of those.
+
+### The other half, measured separately
+
+A ceiling that refuses too early is indistinguishable from one that refuses
+correctly, if the only case measured is the one where it binds. So the
+positive path has its own evidence, at a budget **measured from v2** (eighteen,
+what v2's arm C actually spent reaching closure) rather than chosen after a
+failure: the control plane reaches a real `CLOSED` fixpoint through a full
+repair cycle, unattended -- 18 of 18 declared dispatches, 9 on the primary
+node and 9 drawn by the one repair node from the remaining shared budget, and
+**0 human decisions** (C-255).
+
+The first attempt at that test failed, and the failure is kept beside the
+result: it halted with zero provider calls because the launcher had been built
+without an approval authority. The declared budget did not move between
+attempts, and both artifacts are on disk, because raising a ceiling until
+something closes and reporting that as a pass is the move the test exists to
+make impossible.
+
+## 13. What VeriHarness demonstrably does, and what that is worth
+
+The benchmark says what the harness did not do on five small tasks. This
+section says what it did do, with the same sourcing discipline: every item
+names the evidence, and nothing here is inferred from a design intention.
+
+### It makes "green" mean something, and it proves that by failing
+
+Five release-critical metrics carry a **falsifier**: a deliberately broken
+build that the instrument must catch, or the metric stays `NOT_RUN`
+(C-252, `tools/meta_evidence.py --falsify`). The dispatch-budget instrument
+runs eleven controls at three ceilings -- `[9, 8, 4]`, of which at least one
+must force the refusal *inside* an iteration or the tool refuses to run at all
+-- plus two falsifiers that delete the enforcement and must be detected
+(C-254).
+
+That ceiling rule exists because of a finding against an earlier version of
+the same instrument. At a ceiling of nine, with a fixture spending three
+dispatches per iteration, the run ends cleanly on an iteration boundary and
+the dispatch-level refusal is never reached: five of eight controls were
+reading the fixture's own loop guard rather than the product's refusal, and a
+build with the check in `_budget_oder_absage` removed passed **seven of
+eight** while the falsifier still reported "detected" (O147). Two independent
+reviewers were asked to refute the instrument before v3 was frozen; both
+returned "release: NO", and this is what they returned it for.
+
+That discipline is the product. Its value shows up as a list of things that
+would otherwise have shipped green, found by the harness on itself:
+
+* a benchmark whose reported cost was a **constant beside the result** rather
+  than a measurement (O140);
+* an enforced ceiling that was off by one -- `max_dispatches=9` bought eight
+  provider calls, because the counter incremented before the budget was
+  consulted (O144). The existing test passed against it, because it only
+  checked that *something* raised;
+* a dispatch log counted as one line per call, which is wrong **in both
+  directions**: a retried role writes one line for three calls, a refused role
+  writes one line for none (O144);
+* a budget a restart refunded, because the counter lived in a process (O144);
+* a capability witness that could be made to absorb a hostile write during a
+  retry (O147, found by an adversarial review that was asked to refute, not to
+  confirm);
+* a published claim that **told readers how to verify it** and did not survive
+  that verification: 167 of 329 failures in an export tree carried no
+  environment-gap marker where the document promised none would (O163);
+* three release gates that had no state in which they could fail, including
+  one that asked a remote the internal tree deliberately does not have, and
+  one that compared a tree against itself (O164);
+* an export-skip rule that would have turned a **lost public file** green by
+  skipping instead of red (O164).
+
+The internal ledger's findings are numbered to O167, and each carries its own
+heading in `DOGFOOD_LEDGER.md` with what was measured and what changed. This
+sentence deliberately does **not** freeze the heading count, and the reason is
+this section's own subject. The count moves every time a finding is recorded --
+including the finding that the command first printed here counted lines rather
+than distinct ids (O166), and the finding that this audit's new source columns
+named internal trees in a form the export's reference checker cannot see
+(O167). Writing either one down moved the number that was sitting beside it.
+So the paper prints the command instead of the answer:
+`grep -oE "^#{2,4} O[0-9]+" DOGFOOD_LEDGER.md | sed -E 's/^#+ //' | sort -u | wc -l`.
+`README.md` solves the same self-reference the other way, by naming the commit
+its attribution table was measured at; both moves are the same rule, which is
+that a measurement of a moving tree has to say which tree. `CLAIMS.json` does
+not cover that document, by its own declared scope (§0), so that count is a
+plain re-derivable tally and not a ledger claim -- which is exactly the
+distinction this paper refuses to blur. It is also not the same figure as the
+127 `README.md` reports: that one counts the findings of the release campaign
+`README.md`'s table describes, and this one counts every heading the ledger
+carries. Two scopes, both stated, neither rounded into the other. The
+individual findings cited above do have ledger claims where they reached a
+public document: the export-marker failure is C-452.
+
+### It refuses states that are conventionally rounded to a pass
+
+`NOT_RUN`, `NOT_DETERMINABLE`, `UNSUPPORTED_ENVIRONMENT` and `INVALIDATED` are
+separate states and none collapses into a pass (`src/hoh/assurance.py`). The
+public CI's sandbox job is green and its relevant **step** is skipped, because
+GitHub's runners cannot create the namespace; that is reported as
+`UNSUPPORTED_ENVIRONMENT` and never derived as a pass from the green job. A
+fresh depth-1 clone of the public export reports its passes and its
+environment-gap skips as two separate figures that are never summed, each
+skip naming the artifact withheld and why -- 1220 and 30 at the `v0.1.0` tag,
+against 1222 and 28 in a full clone, because two of the skips exist only when
+the history is shallow. The figure carries the clone it was taken in, for the
+same reason every other figure here carries its state. A skip is authorised
+only when the export manifest declares that path excluded for the reason the
+test expects: missing-and-included fails, missing-and-unclassified fails,
+missing-manifest fails, and wrong-reason fails. Five negative controls hold
+that rule in place, because the first version of it would have turned a
+**lost public file** green by skipping instead of red.
+
+### It binds acceptance to receipts it did not write
+
+Within the boundary §0 sets: a candidate is accepted only when a receipt the
+controller did not author supports every criterion, the criteria must
+demonstrate a difference from the predecessor state, and an iteration that
+changes nothing cannot be accepted (§3, §7). The planner's capability boundary
+is enforced by digest rather than requested in a prompt, and the instrument
+that measures it plants seven violations into throwaway copies and must catch
+each one -- **7 of 7** (C-203, `tools/confinement_evidence.py`).
+
+### It closes a real repair cycle without a human
+
+Given sufficient budget, the control plane detects a red global gate, writes a
+repair specification, dispatches it, merges, and reaches a fixpoint with zero
+human decisions -- measured, not designed (C-255, and §12's closure evidence
+for the budget's provenance).
+
+### Where that leaves the honest recommendation
+
+VeriHarness is an evidence and verification harness, and on the evidence it is
+good at that and expensive at the task level. On five small tasks a plain
+agent was cheaper and at least as correct. What the harness adds is a record
+that survives scrutiny -- including scrutiny by people looking for reasons to
+disbelieve it, which is the case it was built for and the case in which its
+cost is worth paying.
+
+## 14. What this paper does not claim
 
 This paper does not claim VeriHarness is production-ready, does not claim it
 solves evidence composition across merged runs (§1's structural gap stays
@@ -771,3 +1022,15 @@ project's own receipts, and the project has both kinds on record (§3); and
 that, within the documented evidence and gate boundaries this paper has named
 throughout, VeriHarness accepts a candidate only when a receipt it did not
 write supports every criterion -- nothing broader than that.
+
+The two sections added for the v0.1.0 release do not widen any of that, and
+one of them narrows it. §12 does not claim the harness performed better than a
+plain agent: on five small tasks it did not, its control plane reached no
+fixpoint under the budget the protocol declares, and the zero in arm C's
+false-accept column is the absence of an answer rather than a correct one.
+§13 does not claim that finding a defect in oneself is the same as not having
+had it, nor that a falsifier-checked instrument is a correct one -- only that
+an instrument nobody has tried to break is not evidence, and that this project
+now has the record of trying. Neither section says anything about tasks other
+than the five, agents other than the ones dispatched, or a horizon longer than
+the campaigns measured.

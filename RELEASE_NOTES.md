@@ -1,3 +1,168 @@
+# Release notes -- v0.1.0
+
+`v0.1.0` is the first stable tag. It supersedes `v0.1.0-rc3`; all three release
+candidates stay published, tagged and unmoved, because they are the record of
+what this project said about itself on the way here.
+
+**Read this first.** VeriHarness is a research preview of an evidence and
+verification harness. It is good at producing a record that survives scrutiny.
+It is expensive at the task level, and on the five tasks it has been measured
+against, a plain agent was cheaper and at least as correct. Both halves of that
+sentence are in this release because both are measured.
+
+## The headline: a baseline exists now, and it does not favour the harness
+
+For most of this project's life its own `docs/LIMITATIONS.md` limit 2 said
+there was **no baseline of any kind**. There are now three matched-budget
+campaigns against a plain agent, none of them edited in the light of another.
+
+Campaign **v3** was pre-registered in full -- 5 tasks x 3 arms x 3 repetitions,
+unconditionally -- and the registration's exact bytes were bound in a git
+commit **12.8 seconds before the first cell started**. That ordering is
+established from git objects in
+`docs/benchmarks/v3/PREREGISTRATION_PROVENANCE.json` and re-derived by
+`tests/test_prereg_provenance.py` on every suite run, not asserted.
+
+| arm | hidden suite | false accepts | what it produced | dispatches |
+|---|---|---|---|---|
+| A -- plain agent | 15/15 PASS | 0 | answered | 1 per cell |
+| B -- one `hoh run` | 14/15 PASS | **1** | 15/15 accepted | 6-7 |
+| C -- full control plane | 14/15 PASS | 0 | **15/15 `BUDGET_EXHAUSTED`, 0/15 `CLOSED`** | 9 |
+
+* **Arm A, the plain agent, passed everything** -- on one dispatch per cell, a
+  ninth of what the harnessed arms were allowed.
+* **Arm B produced the one false accept**: its own acceptance criteria green,
+  the hidden suite red, on a normalisation that dropped a character. It is the
+  defect class this benchmark exists to detect, and it **reproduced campaign
+  v2's** -- same task, same arm. Three repetitions carry no rate; they carry
+  that it was not a one-off.
+* **Arm C reached no fixpoint at all.** Every one of its fifteen cells spent
+  the nine dispatches on the primary node, met a red global gate, spawned a
+  repair node, and had the repair refused for want of budget. In v2 the same
+  arm closed five of five -- on eighteen dispatches per cell against a declared
+  nine, because each run drew its own ceiling. The budget is now enforced per
+  **cell** and shared with the repair nodes, and under the rule the protocol
+  actually writes down, this control plane does not close on these tasks.
+* **Arm C's zero false accepts is therefore not a correctness result.** A false
+  accept requires an arm to claim it is finished and be wrong; arm C never
+  claimed it. Quoting `0` for arm C beside arm B's `1` compares *answered
+  wrongly once* with *never answered*.
+
+`benchmark_v3 = PASS` on the readiness board means the campaign was
+pre-registered, commit-bound, complete at 45/45, matched-budget-valid, and
+reproducible from the raw cell files by a second, independently written
+aggregation that never imports the reporter. It does **not** mean the harness
+performed better. `docs/LIMITATIONS.md` section 19 says so in the document a
+reader is most likely to quote from.
+
+### The other half, measured separately
+
+A ceiling that refuses too early is indistinguishable from one that refuses
+correctly, if the only case you measure is the one where it binds. So the
+positive path has its own evidence, at a budget **taken from v2** -- eighteen,
+what v2's arm C actually spent reaching closure -- declared before the run and
+never raised after a failure: the control plane reaches a real `CLOSED`
+fixpoint through a full repair cycle, unattended. 18 of 18 declared dispatches,
+9 primary and 9 repair, one repair node, **zero human decisions**.
+
+The first attempt at that test failed with zero provider calls, because the
+launcher had been built without an approval authority. The declared budget did
+not move between attempts, and both artifacts are on disk.
+
+## What is new in the software since rc3
+
+* **The dispatch budget is enforced, not described.** `Budgets.max_dispatches`
+  is checked *before* the counter is charged, persisted to run state before the
+  provider call, shared by a node and its repair nodes, and survives a restart.
+  Exhaustion is its own verdict (`BUDGET_EXHAUSTED`), its own halt class, and
+  its own exception type -- never a generic failure.
+* **A capability witness that a retry cannot launder.** Re-witnessing after a
+  retry re-takes the baseline for named paths only, so a hostile write during
+  the retry window can no longer be absorbed into the baseline.
+* **Fail-closed environment-gap skips.** A test may skip for a missing artifact
+  only when `EXPORT_MANIFEST.json` declares that path excluded for the reason
+  the test expects. Missing-and-included fails. Missing-and-unclassified fails.
+  Missing manifest fails. Wrong reason fails. Five negative controls hold it.
+* **Telemetry that counts calls, not lines.** A retried role writes one log line
+  for three calls and a refused role writes one for none, so the dispatch count
+  now comes from a `provider_calls` field rather than from counting lines.
+
+## The findings this release is actually made of
+
+Each of these would have shipped green. The harness found them in itself.
+
+* A benchmark whose reported cost was a **constant written beside the result**
+  rather than a measurement.
+* An enforced ceiling **off by one**: `max_dispatches=9` bought eight provider
+  calls, because the counter incremented before the budget was consulted. The
+  existing test passed against it, because it only checked that *something*
+  raised.
+* A dispatch log counted one line per call -- wrong **in both directions**.
+* A budget a restart **refunded**, because the counter lived in a process.
+* A capability witness that could be made to **absorb a hostile write** during a
+  retry, found by an adversarial review tasked to refute rather than confirm.
+* A published claim that **told readers how to verify it** and did not survive
+  that verification: 167 of 329 failures in an export tree carried no
+  environment-gap marker where the document promised none would.
+* **Three release gates with no state in which they could fail** -- one asking a
+  remote the internal tree deliberately does not have, one comparing a tree
+  against itself.
+* An export-skip rule that would have turned a **lost public file** green by
+  skipping instead of red.
+* A sentence in the position paper that carried a correct number and **a
+  command beside it that computed something else** -- lines rather than
+  distinct ids -- so a reader following the printed recipe would not get the
+  printed figure.
+* The export's own reference checker harvesting paths only from backticked
+  spans and markdown links, so sixteen new audit rows naming internal evidence
+  trees in bare form **passed it green**. The one exemption that existed before
+  them had only ever been caught because the same path happened to appear
+  backticked elsewhere in its row. Fixed for the references at hand; the
+  detection gap is a tracked defect, not a patch written in the hour before a
+  tag.
+* And, before campaign v3 was frozen: an earlier version of the budget
+  instrument **passed seven of eight controls against a build with the
+  enforcement removed**. Five of its controls were reading the test fixture's
+  own loop guard rather than the product's refusal. Two reviewers tasked to
+  refute it found that, which is why the instrument now runs at three ceilings
+  of which at least one must force the refusal inside an iteration -- or it
+  refuses to run at all.
+
+## What has not changed
+
+* The positioning. This is a research preview, not a production system.
+* The four hurdles in `README.md`: a written specification, a running Herdr,
+  three agent dispatches per iteration, and JSON output.
+* `docs/LIMITATIONS.md` remains the document to read before deciding this is
+  ready for anything you care about. It has grown, not shrunk.
+* No measurement left this machine. The public repository is an export: every
+  file in it is `INCLUDE`-classified in `EXPORT_MANIFEST.json`, and the run
+  evidence, raw receipts and internal working documents deliberately stay out.
+  That is why a fresh clone reports explicit environment-gap skips, each naming
+  the withheld artifact and why -- counted separately from its passes, and
+  never summed with them. At this tag: **1220 passed, 30 skipped** in a
+  `--depth 1` clone, **1222 passed, 28 skipped** in a full one. Two of the
+  skips exist only when the history is shallow, so each figure is quoted with
+  the clone it was measured in.
+
+## Verifying this release yourself
+
+```sh
+git clone --depth 1 https://github.com/SKZL-AI/veriharness
+cd veriharness
+python3 -m pytest -q                        # passes and environment-gap skips, separately
+python3 tools/check_claims.py check all     # every number bound to a claim or a reason
+python3 tools/export_manifest.py check      # the export's own classification and leak scan
+ruff check --select F,E9 src tests tools
+```
+
+`docs/READINESS.md` is the board: every row, its verdict, and the exact command
+that re-derives it -- including the rows that are advisory and the one that is
+`UNSUPPORTED_ENVIRONMENT` because GitHub's runners cannot create the namespace
+it needs.
+
+---
+
 # Release notes -- v0.1.0-rc3
 
 `v0.1.0-rc3` supersedes `v0.1.0-rc2`, published the same day. Both earlier tags

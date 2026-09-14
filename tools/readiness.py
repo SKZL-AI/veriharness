@@ -144,7 +144,14 @@ def zeile_attribution() -> Zeile:
 def zeile_export() -> Zeile:
     befehl = "python3 tools/export_manifest.py check"
     rc, aus = _py("tools/export_manifest.py", "check")
-    u2b = len([z for z in aus.splitlines() if "U2b" in z])
+    # O165: this counted every line mentioning "U2b", which includes the
+    # check's own OK summary line ("passes U2b + the leak scan"). A green run
+    # therefore reported "1 dangling reference(s)" when it had found none, and
+    # said nothing about the acknowledged ones -- a number that meant
+    # something other than what it was labelled. Count the FAIL lines, which
+    # are the unacknowledged references and the only ones that are a finding.
+    u2b = len([z for z in aus.splitlines() if z.startswith("FAIL: U2b:")])
+    anerkannt = len([z for z in aus.splitlines() if z.startswith("ACKNOWLEDGED:")])
     veraltet = "disagrees with a fresh derivation" in aus
     rest = len([z for z in aus.splitlines()
                 if z.startswith("FAIL") and "U2b" not in z])
@@ -170,7 +177,8 @@ def zeile_export() -> Zeile:
     return Zeile(
         "export_manifest", zustand,
         (f"**{len(lecks)} leak(s)**, " if lecks else "no leaks, ")
-        + f"{u2b} dangling reference(s), {rest} other problem(s)", befehl,
+        + f"{u2b} unacknowledged dangling reference(s), "
+        + f"{anerkannt} acknowledged, {rest} other problem(s)", befehl,
         "the dangling references are limitation 12e: published documents "
         "citing internal ones. Advisory, because none of them is a false "
         "claim -- what a reader loses is the ability to follow a citation",

@@ -797,6 +797,23 @@ So: **0 unacknowledged, 9 acknowledged in 2 documents.** The count above is
 what the gate reported before this, and it is left standing rather than
 edited, because the entry is the record of what was found.
 
+### Recount on 2026-09-14, at the v0.1.0 tag
+
+The line above reads **0 unacknowledged, 9 acknowledged in 2 documents**. The
+gate now reports **0 unacknowledged, 12 acknowledged in 5 documents**, and
+neither number replaces the other: the first is what was true when that
+paragraph was written, and this is what is true now.
+
+Two of the three additions came with this release: `paper/AUDIT.md`'s source
+column names the two evidence trees section 12 and 13's figures were
+recomputed from, and neither is in the export (limit 12g says how they got
+past the gate in the first place, which is the more interesting half). The
+third was already there when the paragraph above was written and the paragraph
+missed it -- `paper/AUDIT.md -> runs/a03/receipts`, acknowledged for the same
+reason, in a third document. So the "9 in 2" was one document behind on the
+day it was written. That is recorded here rather than corrected in place, for
+the same reason the rest of this entry is.
+
 ## 13. An iteration budget is charged when an iteration begins, and a state written by an older version keeps what that version charged
 
 The iteration counter that budgets check against is incremented when an
@@ -1258,3 +1275,48 @@ digest per prompt-relevant variable -- so that a reader can *see* whether they
 moved. Seeing is what this offers; guaranteeing is not. A campaign whose
 result matters should be run in one sitting, and one that was not should say
 so.
+
+## 12g. The export's reference check only sees a path that is quoted
+
+Limit 12e is about references the gate *finds*. This one is about the ones it
+does not.
+
+`check_u2b` harvests path candidates from backtick spans, markdown links and
+include-like directives. That is a deliberate choice and the module says why:
+a bare word in prose is usually not a pointer, and treating every
+slash-shaped string as one would make the check unusable. The consequence is
+that **a path written into a table cell without backticks is invisible to
+it**, and a table cell is exactly where a provenance column lives.
+
+This was found while preparing v0.1.0 and is recorded as O167. Sixteen rows
+were added to `paper/AUDIT.md` whose source column names the evidence tree a
+number was recomputed from; two of those trees are not in the export; the gate
+ran green. Worse for the gate's credibility than the miss itself: the one
+acknowledged exception that existed before them, `paper/AUDIT.md ->
+runs/a03/receipts`, had only ever been caught because the same path also
+appears *backticked* in that row's detail column. The precedent was not
+evidence that the detection worked.
+
+Two gates also want different things from that one cell.
+`tools/audit_refs.py numbers-recomputed` requires the source column to be a
+real path it can `stat`, so backticks there would break it; `check_u2b` only
+sees the path if it is backticked. The references at hand are now named in the
+*detail* column in backticks, so the gate sees them, and both are
+acknowledged with reasons naming a published document a reader can follow
+instead. The acknowledgement rule was tightened rather than relaxed while
+doing it: an exemption used to have to mention `docs/EVIDENCE_INDEX.md` by
+name, which the two new ones cannot honestly do -- that file describes three
+other evidence trees, not these -- and now has to name **some** document the
+export actually carries, checked against the manifest.
+
+**What stays open, deliberately.** The detection itself is unchanged: a bare
+path in a table cell is still invisible, and the next person to add such a row
+will not be warned. Widening it means touching a gate with its own fixture
+suite, and the hour before a release tag is the worst possible time to do
+that -- a gate written then is a gate whose negative control nobody runs.
+Priority: high, for the release after this one. Second, smaller, open point:
+`docs/EVIDENCE_INDEX.md` does not describe the benchmark and closure evidence
+trees, so an acknowledgement for those two can only point a reader at the
+published result document, not at a description of the withheld tree.
+Priority: medium.
+

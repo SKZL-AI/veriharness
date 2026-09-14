@@ -111,6 +111,54 @@ def test_a_stale_export_manifest_is_not_reported_as_zero_references():
     assert "not measured" in quelle
 
 
+def test_the_dangling_reference_count_counts_findings_not_its_own_summary():
+    """O165: the row counted every output line mentioning "U2b".
+
+    `tools/export_manifest.py check` prints its own OK summary as "... passes
+    U2b + the leak scan", so a run that found nothing reported
+    "1 dangling reference(s)". The number was labelled as findings and was in
+    fact one line of prose about there being none -- the same shape as a
+    constant reported as a measurement (O140). A green export must report
+    zero.
+
+    Negative control: the pre-fix expression is applied to the same text and
+    must produce the wrong answer, so this test would have caught it.
+    """
+    gruen = (
+        "OK: EXPORT_MANIFEST.json matches a fresh derivation and passes U2b + "
+        "the leak scan (804 entries, 10 acknowledged reference(s) in 3 document(s))"
+    )
+    rot = (
+        "FAIL: U2b: paper/X.md references dogfood/Y.md -- target is EXCLUDE\n"
+        "ACKNOWLEDGED: paper/Z.md references dogfood/W.md -- target is EXCLUDE; reason\n"
+        + gruen
+    )
+
+    def jetzt(aus):
+        return len([z for z in aus.splitlines() if z.startswith("FAIL: U2b:")])
+
+    def vorher(aus):
+        return len([z for z in aus.splitlines() if "U2b" in z])
+
+    assert jetzt(gruen) == 0, "a green export must report no dangling references"
+    assert jetzt(rot) == 1, "one unacknowledged reference must be counted once"
+    assert vorher(gruen) == 1, (
+        "the negative control no longer reproduces the defect, so this test "
+        "would not have caught it"
+    )
+
+
+def test_the_acknowledged_references_are_reported_separately():
+    """A reference that was decided is a different state from one nobody
+    looked at, and the row must not collapse them into one number."""
+    import inspect
+
+    quelle = inspect.getsource(rd.zeile_export)
+    assert "ACKNOWLEDGED:" in quelle
+    assert "unacknowledged dangling reference(s)" in quelle
+    assert "acknowledged, " in quelle
+
+
 def test_the_written_document_carries_every_row_the_tool_produces():
     """A row that quietly stops being generated is a condition nobody checks.
 

@@ -177,9 +177,30 @@
         "b4d29362d8090dbb7d1bdcc130788ddb70a97a44",
         "ddc9b5d0c62fee35c709220735920a1164d74506",
         "6998759755f88b70584c31516b85a84bdfdc2b67",
-        "394473aafb892f5f2e347fbbf1affb4ab476b652"
+        "394473aafb892f5f2e347fbbf1affb4ab476b652",
+        "a5b504040114c2bb753734a4ca1eb6ca6315e99c"
       ],
       "why_not_the_product": "The campaign's own closure: its result, the classification of a defect in the frozen reporter, and the rule that decides when drift after a campaign is a repair rather than an escape. None of it could have gone through the product, for the reason the campaign itself measured -- under the budget the protocol declares, the control plane reached no fixpoint on any of the five benchmark tasks, so it is in no position to close work of this kind here either. That is the honest version of this field for this window: not 'the product was unsuitable for supervising its own instrument', which is also true, but 'the product does not currently close'. Extended as the closure continued: the telemetry evidence the campaign itself supplied, and the repair of a gate that failed its own next run."
+    },
+    {
+      "id": "v010-release-documentation",
+      "category": "MAIN_ORCHESTRATOR_DIRECT",
+      "is_development_node": true,
+      "commits": [
+        "c2a1aa17040dfef60abaac3d2c9a0b6abf824357",
+        "a071e8dc44ce99153b7e0f5ebc6011fa0b3542fe"
+      ],
+      "why_not_the_product": "The stable release's own documentation, written by the main session outside any run. Two reasons it could not have gone through the product, and neither is a preference. First, the work is *about* the product's own measurements -- the three benchmark campaigns, the arm table in which this control plane reaches no fixpoint, and three findings against this project's own gates (O165, O166, O167). A run writing the account of its own benchmark would be the circularity the benchmark exists to avoid. Second, it edits tools/readiness.py and tools/export_manifest.py -- the release gates themselves, and readiness.py is inside campaign v3's frozen set, where a repair has to be declared and accounted for rather than dispatched. The product's contribution to this release is the evidence the documents report, not the documents."
+    },
+    {
+      "id": "v010-attribution-and-o168",
+      "category": "MAIN_ORCHESTRATOR_DIRECT",
+      "is_development_node": false,
+      "commits": [
+        "42eda2116cb8ddbce44a57c52e8fd2e4d0be2b95",
+        "980a24875da24746ec148d8a530b8788ee433d98"
+      ],
+      "why_not_the_product": "Bookkeeping and one correction, both outside any run. The first commit is this ledger's own entry for the release documentation -- a ledger cannot be written by the thing it accounts for. The second is O168: three published documents quoted an export skip count that held for a shallow clone and not a full one, found by running the export's suite before pushing it. Correcting a statement this project makes about its own published artifact is orchestrator work by definition; a run would have had to be given the finding to write it up, which is the reporting step, not the finding."
     }
   ]
 }

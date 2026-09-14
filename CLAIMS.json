@@ -5234,6 +5234,115 @@
       "note": "Measured by materialising the INCLUDE set of EXPORT_MANIFEST.json into a clean checkout and running python3 tools/check_claims.py check all there, before and after the change to _ist_ausgeschlossen.",
       "local_only_resolution": "Resolved by the main orchestrator on 2026-09-14 by copying every INCLUDE path into a staging checkout, running check all in it, and counting FAIL lines with and without the environment-gap marker (docs/LIMITATIONS.md:1174).",
       "anchor_digest": "d830b03c1811b16110f43c8136c8ec77234c4354ec96de8347af9e88927afd3a"
+    },
+    {
+      "id": "C-455",
+      "text": "| A -- plain agent | 15/15 PASS | 0 | answered | 1 per cell |",
+      "where": "README.md:216",
+      "anchor_digest": "d1bcd5bfa099a212b522eaf15ba829300277323fb668a8333d74ada1f10dc7b4",
+      "anchor_context": "## Measured against a plain agent: the matched-budget benchmark",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:docs/BENCHMARK_RESULTS_v3.md:1",
+        "file:tools/benchmark.py:1"
+      ],
+      "note": "campaign v3, arm A: 15 of 15 hidden suites PASS, 0 false accepts, 1 dispatch per cell; the same row docs/BENCHMARK_RESULTS_v3.md carries and C-446 records from docs/LIMITATIONS.md"
+    },
+    {
+      "id": "C-456",
+      "text": "| B -- one `hoh run` | 14/15 PASS | **1** | 15/15 accepted | 6-7 |",
+      "where": "README.md:217",
+      "anchor_digest": "15bda96ed25dfb618397a53e21611c073a5fe8e8eb2943a28363727333aba47b",
+      "anchor_context": "## Measured against a plain agent: the matched-budget benchmark",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:docs/BENCHMARK_RESULTS_v3.md:1",
+        "file:tools/benchmark.py:1"
+      ],
+      "note": "campaign v3, arm B: 14 of 15 hidden suites PASS, 1 false accept, 15 of 15 cells accepted; the same row docs/BENCHMARK_RESULTS_v3.md carries and C-447 records from docs/LIMITATIONS.md"
+    },
+    {
+      "id": "C-457",
+      "text": "| C -- full control plane | 14/15 PASS | 0 | **15/15 `BUDGET_EXHAUSTED`, 0/15 `CLOSED`** | 9 |",
+      "where": "README.md:218",
+      "anchor_digest": "1a0fda211d2a0a2e36088c36d5eb328c6712ea72f6e17e48b29b3b901a2f5434",
+      "anchor_context": "## Measured against a plain agent: the matched-budget benchmark",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:docs/BENCHMARK_RESULTS_v3.md:1",
+        "file:tools/benchmark.py:1"
+      ],
+      "note": "campaign v3, arm C: 14 of 15 hidden suites PASS, 0 false accepts, 15 of 15 cells BUDGET_EXHAUSTED and 0 of 15 CLOSED; the same row docs/BENCHMARK_RESULTS_v3.md carries and C-448 records from docs/LIMITATIONS.md"
+    },
+    {
+      "id": "C-458",
+      "text": "cycle: 18 of 18 declared dispatches, 9 primary and 9 repair, one repair node,",
+      "where": "README.md:246",
+      "anchor_digest": "60206530dc6d8a7b6b86e9a2c380ef8addd8bd05e5007c48aaf6ce5ff92f7205",
+      "anchor_context": "## Measured against a plain agent: the matched-budget benchmark",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:tools/readiness.py:1"
+      ],
+      "note": "the post-O143 operational closure evidence: halt CLOSED, 18 of 18 declared dispatches (9 primary, 9 repair), 1 repair node, 0 human decisions -- the same figures the readiness row records at C-255, re-derived by tools/readiness.py from the recorded evidence file"
+    },
+    {
+      "id": "C-459",
+      "text": "instrument runs eleven controls at three ceilings (`[9, 8, 4]`, at least one",
+      "where": "README.md:258",
+      "anchor_digest": "53cd70b12b0af7d43211b91d8bf640814446ec3f89b9937d65f9e663d8ba5372",
+      "anchor_context": "## What it demonstrably does",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:tools/budget_evidence.py:1",
+        "file:tools/readiness.py:1"
+      ],
+      "note": "the dispatch-budget instrument runs eleven controls at the three ceilings [9, 8, 4] and refuses to run a ceiling set in which no ceiling forces a refusal inside an iteration; the ceilings and the refusal are in tools/budget_evidence.py and the resulting verdict is the readiness row at C-254"
+    },
+    {
+      "id": "C-460",
+      "text": "and its environment-gap skips as two separate numbers that are never summed,",
+      "where": "README.md:272",
+      "anchor_digest": "9bd69ee45a3a17b38ced47ac23475b2a37859dc6f6ee32c95a58e913f5e6f412",
+      "anchor_context": "## What it demonstrably does",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:tests/conftest.py:1",
+        "file:tools/export_manifest.py:1"
+      ],
+      "note": "a fresh clone of the public export reports its passes and its explicit environment-gap skips as two figures that are never summed, each naming the withheld artifact and why; measured at the v0.1.0 tag as 1220 passed / 30 skipped in a --depth 1 clone and 1222 / 28 in a full one, the difference being two skips that exist only when the history is shallow. The skip machinery and its manifest-bound, fail-closed authorisation are in tests/conftest.py",
+      "superseded": {
+        "on": "2026-09-14",
+        "previous_text": "and its 30 explicit environment-gap skips as two separate numbers that are",
+        "previous_where": "README.md:272",
+        "previous_anchor_digest": "71da2cd8bc66297710085dcb1e4f5e595a25f72959561af2b0cdf8623f37b2a0",
+        "why": "superseded 2026-09-14, before the v0.1.0 push: the earlier wording said \"a fresh clone\" reports 30 environment-gap skips. Measured on the export tree at this tag, a `--depth 1` clone reports 1220 passed and 30 skipped and a full clone reports 1222 passed and 28 skipped -- two of the skips exist only when the history is shallow. A figure that is right for one clone shape and wrong for the other, quoted without saying which, is the same defect as O163: a published number that does not survive the verification the document invites. Each figure now carries the clone it was taken in."
+      }
+    },
+    {
+      "id": "C-461",
+      "text": "seven violations into throwaway copies and must catch each one -- **7 of 7**.",
+      "where": "README.md:285",
+      "anchor_digest": "aec864b7fdbde61c562d379409d1f311e13bb7f68fc1a27147c899a8dee5ad66",
+      "anchor_context": "## What it demonstrably does",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:tools/confinement_evidence.py:1"
+      ],
+      "note": "the planner capability-boundary instrument plants seven violations into throwaway copies and detects each one: 7 of 7 -- the same control result C-203 records; the instrument itself is tools/confinement_evidence.py and its summary file is an internal working document excluded from this export"
+    },
+    {
+      "id": "C-462",
+      "text": "survive that verification (167 of 329 failures in an export tree carried no",
+      "where": "README.md:303",
+      "anchor_digest": "9e0cd2c3566ad574bb4b871f233204873f10c2ca97b16cdaff08a1fd745d258e",
+      "anchor_context": "## What it demonstrably does",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:tools/check_claims.py:1",
+        "file:tests/test_export_gap_guard.py:1"
+      ],
+      "note": "167 of 329 failures in an export tree carried no environment-gap marker where the published document promised none would -- the same figure C-452 records from docs/LIMITATIONS.md; the repair and its negative controls are in tools/check_claims.py and tests/test_export_gap_guard.py"
     }
   ],
   "not_claims": [
@@ -6039,10 +6148,17 @@
     },
     {
       "id": "N-115",
-      "text": "## Claim id citations (47 rows)",
+      "text": "## Claim id citations (118 rows)",
       "where": "paper/AUDIT.md:137",
-      "reason": "table heading naming this section's own row count (47 rows), matching the '47 claim ids cited' figure already addressed at paper/AUDIT.md:38; a structural section label, not an independent measurement",
-      "anchor_digest": "1d6a4d550be6c1a31959ed94a2ffaa7396f3bd0c0b5435adf9af048a65a637df"
+      "reason": "table heading naming this section's own row count (118 rows), matching the claim-id citation count already addressed at paper/AUDIT.md:38 and recounted by tools/audit_refs.py summary-consistency; a structural section label, not an independent measurement",
+      "anchor_digest": "c5c695b3f59a1bbdc2391e0dfc69c77963abca692692a4baa2ffea7af15a4802",
+      "superseded": {
+        "on": "2026-09-14",
+        "previous_text": "## Claim id citations (47 rows)",
+        "previous_where": "paper/AUDIT.md:137",
+        "previous_anchor_digest": "1d6a4d550be6c1a31959ed94a2ffaa7396f3bd0c0b5435adf9af048a65a637df",
+        "why": "superseded 2026-09-14: paper/POSITION_PAPER.md gained sections 12 and 13, which cite 71 further claim ids; this audit gained 71 rows and its counts were recounted. The statement this entry covers is the same structural statement in the same place -- a section row count, a summary-table cell, or the sentence that reads the summary table back -- so the entry is re-anchored to the recounted line rather than duplicated, and the superseded text and digest are kept here so the change is readable rather than silent."
+      }
     },
     {
       "id": "N-116",
@@ -6110,11 +6226,27 @@
     },
     {
       "id": "N-125",
-      "text": "| RESOLVED | 60 |",
-      "where": "paper/AUDIT.md:309",
+      "text": "| RESOLVED | 163 |",
+      "where": "paper/AUDIT.md:418",
       "reason": "self-tally: paper/AUDIT.md's own Summary table reports 58 RESOLVED verdicts among its rows; mechanically checked by tools/audit_refs.py's summary-consistency check, out of this run's scope to modify or independently re-verify here",
-      "anchor_digest": "efa35284042544e1e6dc90e74890e563c85a69973a64eca4b9b10900f7339275",
-      "note": "Re-anchored on 2026-09-14: the audit gained two rows (NUMBER 2 (C-050) recomputed from runs/a03/receipts, which turned out to be present, and the NUMBER 3 (C-050) denominator row the coverage check had been red about), so every count in the summary moved. The counts here are a recount by tools/audit_refs.py summary-consistency, not an edit."
+      "anchor_digest": "4ba6254a91dccd23dd82d77870e4b65d5e4e6586e5b31900233389b369a5d173",
+      "note": "Re-anchored on 2026-09-14: the audit gained two rows (NUMBER 2 (C-050) recomputed from runs/a03/receipts, which turned out to be present, and the NUMBER 3 (C-050) denominator row the coverage check had been red about), so every count in the summary moved. The counts here are a recount by tools/audit_refs.py summary-consistency, not an edit.",
+      "superseded": [
+        {
+          "on": "2026-09-14",
+          "previous_text": "| RESOLVED | 60 |",
+          "previous_where": "paper/AUDIT.md:309",
+          "previous_anchor_digest": "efa35284042544e1e6dc90e74890e563c85a69973a64eca4b9b10900f7339275",
+          "why": "superseded 2026-09-14: paper/POSITION_PAPER.md gained sections 12 and 13, which cite 71 further claim ids; this audit gained 71 rows and its counts were recounted. The statement this entry covers is the same structural statement in the same place -- a section row count, a summary-table cell, or the sentence that reads the summary table back -- so the entry is re-anchored to the recounted line rather than duplicated, and the superseded text and digest are kept here so the change is readable rather than silent."
+        },
+        {
+          "on": "2026-09-14",
+          "previous_text": "| RESOLVED | 131 |",
+          "previous_where": "paper/AUDIT.md:395",
+          "previous_anchor_digest": "193f669e8e92877e14dfed060184bda3b28c2cb75fda01c9fe791b148d3b3d0c",
+          "why": "superseded 2026-09-14 (second recount): paper/NUMBERS.md gained 47 rows for the numbers sections 12 and 13 of paper/POSITION_PAPER.md introduce, and this audit gained the 37 matching NUMBER rows, so its verdict counts were recounted again. The statement this entry covers is the same structural statement in the same place -- a summary-table cell, or the sentence that reads the summary table back -- so it is re-anchored rather than duplicated, and every superseded text and digest is kept here in order."
+        }
+      ]
     },
     {
       "id": "N-126",
@@ -6139,73 +6271,180 @@
     },
     {
       "id": "N-129",
-      "text": "| NOT_CHECKED | 34 |",
-      "where": "paper/AUDIT.md:313",
+      "text": "| NOT_CHECKED | 39 |",
+      "where": "paper/AUDIT.md:422",
       "reason": "self-tally: paper/AUDIT.md's own Summary table reports 35 NOT_CHECKED verdicts among its rows; mechanically checked by tools/audit_refs.py's summary-consistency check, out of this run's scope to modify or independently re-verify here",
-      "anchor_digest": "95ca58f0073763a8700ff83c06dc1f13b2c76b01a532616a646e367c756ff36e",
-      "note": "Re-anchored on 2026-09-14: the audit gained two rows (NUMBER 2 (C-050) recomputed from runs/a03/receipts, which turned out to be present, and the NUMBER 3 (C-050) denominator row the coverage check had been red about), so every count in the summary moved. The counts here are a recount by tools/audit_refs.py summary-consistency, not an edit."
+      "anchor_digest": "04389b3b6f2d01d64fafc1ea803ad439245ca0b8945295de3c0c58418a677f8c",
+      "note": "Re-anchored on 2026-09-14: the audit gained two rows (NUMBER 2 (C-050) recomputed from runs/a03/receipts, which turned out to be present, and the NUMBER 3 (C-050) denominator row the coverage check had been red about), so every count in the summary moved. The counts here are a recount by tools/audit_refs.py summary-consistency, not an edit.",
+      "superseded": [
+        {
+          "on": "2026-09-14",
+          "previous_text": "| NOT_CHECKED | 34 |",
+          "previous_where": "paper/AUDIT.md:313",
+          "previous_anchor_digest": "95ca58f0073763a8700ff83c06dc1f13b2c76b01a532616a646e367c756ff36e",
+          "why": "superseded 2026-09-14 (second recount): paper/NUMBERS.md gained 47 rows for the numbers sections 12 and 13 of paper/POSITION_PAPER.md introduce, and this audit gained the 37 matching NUMBER rows, so its verdict counts were recounted again. The statement this entry covers is the same structural statement in the same place -- a summary-table cell, or the sentence that reads the summary table back -- so it is re-anchored rather than duplicated, and every superseded text and digest is kept here in order."
+        }
+      ]
     },
     {
       "id": "N-130",
-      "text": "| **Total rows** | **95** |",
-      "where": "paper/AUDIT.md:314",
+      "text": "| **Total rows** | **203** |",
+      "where": "paper/AUDIT.md:423",
       "reason": "self-tally: paper/AUDIT.md's own Summary table reports 94 total rows; mechanically checked by tools/audit_refs.py's summary-consistency check, out of this run's scope to modify or independently re-verify here",
-      "anchor_digest": "f01e98e0137c6d59158219d77784082b58ef8124f1fdc4bc8641b68d64251cf7",
-      "note": "Re-anchored on 2026-09-14: the audit gained two rows (NUMBER 2 (C-050) recomputed from runs/a03/receipts, which turned out to be present, and the NUMBER 3 (C-050) denominator row the coverage check had been red about), so every count in the summary moved. The counts here are a recount by tools/audit_refs.py summary-consistency, not an edit."
+      "anchor_digest": "7b96280d28772234ec8e92d57abb996cdf6c265631e93eb4029976c5dc30b85d",
+      "note": "Re-anchored on 2026-09-14: the audit gained two rows (NUMBER 2 (C-050) recomputed from runs/a03/receipts, which turned out to be present, and the NUMBER 3 (C-050) denominator row the coverage check had been red about), so every count in the summary moved. The counts here are a recount by tools/audit_refs.py summary-consistency, not an edit.",
+      "superseded": [
+        {
+          "on": "2026-09-14",
+          "previous_text": "| **Total rows** | **95** |",
+          "previous_where": "paper/AUDIT.md:314",
+          "previous_anchor_digest": "f01e98e0137c6d59158219d77784082b58ef8124f1fdc4bc8641b68d64251cf7",
+          "why": "superseded 2026-09-14: paper/POSITION_PAPER.md gained sections 12 and 13, which cite 71 further claim ids; this audit gained 71 rows and its counts were recounted. The statement this entry covers is the same structural statement in the same place -- a section row count, a summary-table cell, or the sentence that reads the summary table back -- so the entry is re-anchored to the recounted line rather than duplicated, and the superseded text and digest are kept here so the change is readable rather than silent."
+        },
+        {
+          "on": "2026-09-14",
+          "previous_text": "| **Total rows** | **166** |",
+          "previous_where": "paper/AUDIT.md:400",
+          "previous_anchor_digest": "c1c29ce991603107cf3ace3577826effbac0ce1cc8c548532728019e73c14e2b",
+          "why": "superseded 2026-09-14 (second recount): paper/NUMBERS.md gained 47 rows for the numbers sections 12 and 13 of paper/POSITION_PAPER.md introduce, and this audit gained the 37 matching NUMBER rows, so its verdict counts were recounted again. The statement this entry covers is the same structural statement in the same place -- a summary-table cell, or the sentence that reads the summary table back -- so it is re-anchored rather than duplicated, and every superseded text and digest is kept here in order."
+        }
+      ]
     },
     {
       "id": "N-131",
-      "text": "60 rows resolved cleanly (47 claim-id lookups, all of them",
-      "where": "paper/AUDIT.md:316",
+      "text": "163 rows resolved cleanly (118 claim-id lookups -- 47 audited by hand and 71",
+      "where": "paper/AUDIT.md:425",
       "reason": "restates paper/AUDIT.md's own Summary-table figures (58 resolved, 47 claim-id lookups, 3 recomputed numbers, 5 a02 mentions) in prose; self-tally, see paper/AUDIT.md:308/313",
-      "anchor_digest": "28b6a4c73ab7c49decf65ac107da5b94898d6501f71836a77c71f7063b6529c0",
-      "note": "Re-anchored on 2026-09-14: the audit gained two rows (NUMBER 2 (C-050) recomputed from runs/a03/receipts, which turned out to be present, and the NUMBER 3 (C-050) denominator row the coverage check had been red about), so every count in the summary moved. The counts here are a recount by tools/audit_refs.py summary-consistency, not an edit."
+      "anchor_digest": "bb62a8656423e798e76a1aa373ee96e7cde16e48f0537d3cd220a2c5ba589719",
+      "note": "Re-anchored on 2026-09-14: the audit gained two rows (NUMBER 2 (C-050) recomputed from runs/a03/receipts, which turned out to be present, and the NUMBER 3 (C-050) denominator row the coverage check had been red about), so every count in the summary moved. The counts here are a recount by tools/audit_refs.py summary-consistency, not an edit.",
+      "superseded": [
+        {
+          "on": "2026-09-14",
+          "previous_text": "60 rows resolved cleanly (47 claim-id lookups, all of them",
+          "previous_where": "paper/AUDIT.md:316",
+          "previous_anchor_digest": "28b6a4c73ab7c49decf65ac107da5b94898d6501f71836a77c71f7063b6529c0",
+          "why": "superseded 2026-09-14: paper/POSITION_PAPER.md gained sections 12 and 13, which cite 71 further claim ids; this audit gained 71 rows and its counts were recounted. The statement this entry covers is the same structural statement in the same place -- a section row count, a summary-table cell, or the sentence that reads the summary table back -- so the entry is re-anchored to the recounted line rather than duplicated, and the superseded text and digest are kept here so the change is readable rather than silent."
+        },
+        {
+          "on": "2026-09-14",
+          "previous_text": "131 rows resolved cleanly (118 claim-id lookups -- 47 audited by hand and 71",
+          "previous_where": "paper/AUDIT.md:402",
+          "previous_anchor_digest": "b03ed49385877c2363fcafa0809a73b241a750e7f7b4ca714efd689a55bdaf1d",
+          "why": "superseded 2026-09-14 (second recount): paper/NUMBERS.md gained 47 rows for the numbers sections 12 and 13 of paper/POSITION_PAPER.md introduce, and this audit gained the 37 matching NUMBER rows, so its verdict counts were recounted again. The statement this entry covers is the same structural statement in the same place -- a summary-table cell, or the sentence that reads the summary table back -- so it is re-anchored rather than duplicated, and every superseded text and digest is kept here in order."
+        }
+      ]
     },
     {
       "id": "N-132",
-      "text": "test; 5 recomputed numbers; 5 `a02` mentions, all correctly marked",
-      "where": "paper/AUDIT.md:318",
+      "text": "code/docs where their evidence names a file or test; 37 recomputed numbers; 5",
+      "where": "paper/AUDIT.md:427",
       "reason": "restates paper/AUDIT.md's own Summary-table figures (3 recomputed numbers, 5 a02 mentions) in prose; self-tally, see paper/AUDIT.md:308/311-313",
-      "anchor_digest": "5eef5b87a61d45a0d962db20a5c403ee466f974faa6cc42486bbe04b83d30bb1",
-      "note": "Re-anchored on 2026-09-14: the audit gained two rows (NUMBER 2 (C-050) recomputed from runs/a03/receipts, which turned out to be present, and the NUMBER 3 (C-050) denominator row the coverage check had been red about), so every count in the summary moved. The counts here are a recount by tools/audit_refs.py summary-consistency, not an edit."
+      "anchor_digest": "86bad15389245fb713569a278ca8b93f856486fde4e40df795946d4251ff9c3f",
+      "note": "Re-anchored on 2026-09-14: the audit gained two rows (NUMBER 2 (C-050) recomputed from runs/a03/receipts, which turned out to be present, and the NUMBER 3 (C-050) denominator row the coverage check had been red about), so every count in the summary moved. The counts here are a recount by tools/audit_refs.py summary-consistency, not an edit.",
+      "superseded": [
+        {
+          "on": "2026-09-14",
+          "previous_text": "test; 5 recomputed numbers; 5 `a02` mentions, all correctly marked",
+          "previous_where": "paper/AUDIT.md:318",
+          "previous_anchor_digest": "5eef5b87a61d45a0d962db20a5c403ee466f974faa6cc42486bbe04b83d30bb1",
+          "why": "superseded 2026-09-14: paper/POSITION_PAPER.md gained sections 12 and 13, which cite 71 further claim ids; this audit gained 71 rows and its counts were recounted. The statement this entry covers is the same structural statement in the same place -- a section row count, a summary-table cell, or the sentence that reads the summary table back -- so the entry is re-anchored to the recounted line rather than duplicated, and the superseded text and digest are kept here so the change is readable rather than silent."
+        },
+        {
+          "on": "2026-09-14",
+          "previous_text": "code/docs where their evidence names a file or test; 5 recomputed numbers; 5",
+          "previous_where": "paper/AUDIT.md:404",
+          "previous_anchor_digest": "b336a92d3608e899dcc3e11ff905c8a6476f1bd14fecdfcf53344debceda213f",
+          "why": "superseded 2026-09-14 (second recount): paper/NUMBERS.md gained 47 rows for the numbers sections 12 and 13 of paper/POSITION_PAPER.md introduce, and this audit gained the 37 matching NUMBER rows, so its verdict counts were recounted again. The statement this entry covers is the same structural statement in the same place -- a summary-table cell, or the sentence that reads the summary table back -- so it is re-anchored rather than duplicated, and every superseded text and digest is kept here in order."
+        }
+      ]
     },
     {
       "id": "N-133",
-      "text": "invalidated; 3 overclaim-vocabulary hits, all hedged or quoted-and-negated).",
-      "where": "paper/AUDIT.md:318",
+      "text": "`a02` mentions, all correctly marked invalidated; 3 overclaim-vocabulary hits,",
+      "where": "paper/AUDIT.md:405",
       "reason": "restates paper/AUDIT.md's own Summary-table figure (3 overclaim-vocabulary hits) in prose; self-tally",
-      "anchor_digest": "6dcb6c1cca6c500b0a39afdf6906e7eff7313762bc76b62284832ba260ff3e8f"
+      "anchor_digest": "223828d5093fd65373c2ea403f4eb8a66ede3814d814fc57231c2ff7b4ebd551",
+      "superseded": {
+        "on": "2026-09-14",
+        "previous_text": "invalidated; 3 overclaim-vocabulary hits, all hedged or quoted-and-negated).",
+        "previous_where": "paper/AUDIT.md:318",
+        "previous_anchor_digest": "6dcb6c1cca6c500b0a39afdf6906e7eff7313762bc76b62284832ba260ff3e8f",
+        "why": "superseded 2026-09-14: paper/POSITION_PAPER.md gained sections 12 and 13, which cite 71 further claim ids; this audit gained 71 rows and its counts were recounted. The statement this entry covers is the same structural statement in the same place -- a section row count, a summary-table cell, or the sentence that reads the summary table back -- so the entry is re-anchored to the recounted line rather than duplicated, and the superseded text and digest are kept here so the change is readable rather than silent."
+      }
     },
     {
       "id": "N-134",
-      "text": "34 rows are honestly `NOT_CHECKED` -- every one of the 34 remaining",
-      "where": "paper/AUDIT.md:320",
+      "text": "39 rows are honestly `NOT_CHECKED` -- 34 of them because recomputing the",
+      "where": "paper/AUDIT.md:430",
       "reason": "restates paper/AUDIT.md's own Summary-table figure (35 NOT_CHECKED rows) in prose; self-tally, see paper/AUDIT.md:81/86/273's notes for the related discrepancy",
-      "anchor_digest": "9e24285559d444ccf6887797f584de480e4a954a1d7764c32321fabe5e366fd0",
-      "note": "Re-anchored on 2026-09-14: the audit gained two rows (NUMBER 2 (C-050) recomputed from runs/a03/receipts, which turned out to be present, and the NUMBER 3 (C-050) denominator row the coverage check had been red about), so every count in the summary moved. The counts here are a recount by tools/audit_refs.py summary-consistency, not an edit."
+      "anchor_digest": "dd7b3e9d0117f491f37cb9adb314518e152b034717c00f124abef1c43e26cb56",
+      "note": "Re-anchored on 2026-09-14: the audit gained two rows (NUMBER 2 (C-050) recomputed from runs/a03/receipts, which turned out to be present, and the NUMBER 3 (C-050) denominator row the coverage check had been red about), so every count in the summary moved. The counts here are a recount by tools/audit_refs.py summary-consistency, not an edit.",
+      "superseded": [
+        {
+          "on": "2026-09-14",
+          "previous_text": "34 rows are honestly `NOT_CHECKED` -- every one of the 34 remaining",
+          "previous_where": "paper/AUDIT.md:320",
+          "previous_anchor_digest": "9e24285559d444ccf6887797f584de480e4a954a1d7764c32321fabe5e366fd0",
+          "why": "superseded 2026-09-14 (second recount): paper/NUMBERS.md gained 47 rows for the numbers sections 12 and 13 of paper/POSITION_PAPER.md introduce, and this audit gained the 37 matching NUMBER rows, so its verdict counts were recounted again. The statement this entry covers is the same structural statement in the same place -- a summary-table cell, or the sentence that reads the summary table back -- so it is re-anchored rather than duplicated, and every superseded text and digest is kept here in order."
+        }
+      ]
     },
     {
       "id": "N-135",
-      "text": "which this checkout's own resolver touches. 1 row is `EXTERNAL` (the one",
-      "where": "paper/AUDIT.md:321",
+      "text": "while a measurement was taken. 1 row is `EXTERNAL` (the one",
+      "where": "paper/AUDIT.md:436",
       "reason": "restates paper/AUDIT.md's own Summary-table figure (1 EXTERNAL row) in prose; self-tally",
-      "anchor_digest": "ce8eeee6158db1b5f0a47d39828825253b2e5e7d22bd8092464470bc9f435e15"
+      "anchor_digest": "ba5fead2e11dbcdc03a0d0d8bda6b172e9b32d130ff571f0a68e11802b97f719",
+      "superseded": [
+        {
+          "on": "2026-09-14",
+          "previous_text": "which this checkout's own resolver touches. 1 row is `EXTERNAL` (the one",
+          "previous_where": "paper/AUDIT.md:321",
+          "previous_anchor_digest": "ce8eeee6158db1b5f0a47d39828825253b2e5e7d22bd8092464470bc9f435e15",
+          "why": "superseded 2026-09-14 (second recount): paper/NUMBERS.md gained 47 rows for the numbers sections 12 and 13 of paper/POSITION_PAPER.md introduce, and this audit gained the 37 matching NUMBER rows, so its verdict counts were recounted again. The statement this entry covers is the same structural statement in the same place -- a summary-table cell, or the sentence that reads the summary table back -- so it is re-anchored rather than duplicated, and every superseded text and digest is kept here in order."
+        }
+      ]
     },
     {
       "id": "N-136",
-      "text": "audit looked at all 95 citations it could extract and is reporting exactly",
-      "where": "paper/AUDIT.md:326",
+      "text": "audit looked at all 203 citations it could extract and is reporting exactly",
+      "where": "paper/AUDIT.md:440",
       "reason": "restates paper/AUDIT.md's own Summary-table figure (94 total citations) in prose; self-tally, see paper/AUDIT.md:313",
-      "anchor_digest": "a6e5886a8c2484a4fefb3140a1c58a0f81bca20d82556a50c3cf5dc2810df628",
-      "note": "Re-anchored on 2026-09-14: the audit gained two rows (NUMBER 2 (C-050) recomputed from runs/a03/receipts, which turned out to be present, and the NUMBER 3 (C-050) denominator row the coverage check had been red about), so every count in the summary moved. The counts here are a recount by tools/audit_refs.py summary-consistency, not an edit."
+      "anchor_digest": "22356e75ff56f43af30f47896395c517208f67199d9623a62d42640d04bd9c18",
+      "note": "Re-anchored on 2026-09-14: the audit gained two rows (NUMBER 2 (C-050) recomputed from runs/a03/receipts, which turned out to be present, and the NUMBER 3 (C-050) denominator row the coverage check had been red about), so every count in the summary moved. The counts here are a recount by tools/audit_refs.py summary-consistency, not an edit.",
+      "superseded": [
+        {
+          "on": "2026-09-14",
+          "previous_text": "audit looked at all 95 citations it could extract and is reporting exactly",
+          "previous_where": "paper/AUDIT.md:326",
+          "previous_anchor_digest": "a6e5886a8c2484a4fefb3140a1c58a0f81bca20d82556a50c3cf5dc2810df628",
+          "why": "superseded 2026-09-14: paper/POSITION_PAPER.md gained sections 12 and 13, which cite 71 further claim ids; this audit gained 71 rows and its counts were recounted. The statement this entry covers is the same structural statement in the same place -- a section row count, a summary-table cell, or the sentence that reads the summary table back -- so the entry is re-anchored to the recounted line rather than duplicated, and the superseded text and digest are kept here so the change is readable rather than silent."
+        },
+        {
+          "on": "2026-09-14",
+          "previous_text": "audit looked at all 166 citations it could extract and is reporting exactly",
+          "previous_where": "paper/AUDIT.md:413",
+          "previous_anchor_digest": "0670eeafe6ea4803f706b403a81a259ec27507b0cae72dd8b5049b5b73fd5015",
+          "why": "superseded 2026-09-14 (second recount): paper/NUMBERS.md gained 47 rows for the numbers sections 12 and 13 of paper/POSITION_PAPER.md introduce, and this audit gained the 37 matching NUMBER rows, so its verdict counts were recounted again. The statement this entry covers is the same structural statement in the same place -- a summary-table cell, or the sentence that reads the summary table back -- so it is re-anchored rather than duplicated, and every superseded text and digest is kept here in order."
+        }
+      ]
     },
     {
       "id": "N-137",
-      "text": "what came back, including the 34 it could not check and why.",
-      "where": "paper/AUDIT.md:327",
+      "text": "what came back, including the 39 it could not check and why.",
+      "where": "paper/AUDIT.md:441",
       "reason": "restates paper/AUDIT.md's own Summary-table figure (35 rows it could not check) in prose; self-tally, see paper/AUDIT.md:312",
-      "anchor_digest": "c29b346969ffe6df1717475f1b889105d934411ee5eb5e942ab2a9497c23a1a5",
-      "note": "Re-anchored on 2026-09-14: the audit gained two rows (NUMBER 2 (C-050) recomputed from runs/a03/receipts, which turned out to be present, and the NUMBER 3 (C-050) denominator row the coverage check had been red about), so every count in the summary moved. The counts here are a recount by tools/audit_refs.py summary-consistency, not an edit."
+      "anchor_digest": "4e94ee7963360bf36035ed746531a6ccf9aa567c035901fafe7c2e2134137d77",
+      "note": "Re-anchored on 2026-09-14: the audit gained two rows (NUMBER 2 (C-050) recomputed from runs/a03/receipts, which turned out to be present, and the NUMBER 3 (C-050) denominator row the coverage check had been red about), so every count in the summary moved. The counts here are a recount by tools/audit_refs.py summary-consistency, not an edit.",
+      "superseded": [
+        {
+          "on": "2026-09-14",
+          "previous_text": "what came back, including the 34 it could not check and why.",
+          "previous_where": "paper/AUDIT.md:327",
+          "previous_anchor_digest": "c29b346969ffe6df1717475f1b889105d934411ee5eb5e942ab2a9497c23a1a5",
+          "why": "superseded 2026-09-14 (second recount): paper/NUMBERS.md gained 47 rows for the numbers sections 12 and 13 of paper/POSITION_PAPER.md introduce, and this audit gained the 37 matching NUMBER rows, so its verdict counts were recounted again. The statement this entry covers is the same structural statement in the same place -- a summary-table cell, or the sentence that reads the summary table back -- so it is re-anchored rather than duplicated, and every superseded text and digest is kept here in order."
+        }
+      ]
     },
     {
       "id": "N-138",
@@ -10855,6 +11094,1309 @@
       "where": "docs/LIMITATIONS.md:1157",
       "reason": "states which check exits non-zero in a clone and what holds there instead; a rule about reading the tool's output, not a figure",
       "anchor_digest": "075ce46d22a7265ce0d5bfbd869e2cbe2b7b364ffefa480df93177bf53b9a41c"
+    },
+    {
+      "id": "N-800",
+      "text": "`docs/LIMITATIONS.md` limit 2 said from the first release that this project",
+      "where": "paper/POSITION_PAPER.md:761",
+      "reason": "restates docs/LIMITATIONS.md limit 2's own statement that this project had no baseline, citing the limit by its heading number; an internal cross-reference to another document's recorded limit, not a measurement",
+      "anchor_digest": "79ef642793dc895e47df744423965fdb329ef6889c2deb81305123acd07166c1"
+    },
+    {
+      "id": "N-801",
+      "text": "### v1 -- before the planner boundary was closed",
+      "where": "paper/POSITION_PAPER.md:780",
+      "reason": "a section heading in the paper's own campaign narrative; the version ordinal it carries (v1, v2, v3, or the readiness row name) is an identifier, and every figure the section reports is recorded under its own claim id in the body below it",
+      "anchor_digest": "4039c2243e1acbbc2e153f8380da63542efdf6c70cb13bcec7b1645b50e358db"
+    },
+    {
+      "id": "N-802",
+      "text": "waiting for a human approval (O127). That attribution is measured rather than",
+      "where": "paper/POSITION_PAPER.md:785",
+      "reason": "names internal finding id O127 from DOGFOOD_LEDGER.md and the count of arm-C cells that stopped for that reason; the per-cell reasons themselves are recorded at C-177..C-180, and DOGFOOD_LEDGER.md is outside CLAIMS.json's declared coverage (see this paper's section 0), which the passage says in its own words",
+      "anchor_digest": "6fb92b4933f3e32b5a4d0e610c2f1558b86463155deaf6a586ee35e6b7b5b464"
+    },
+    {
+      "id": "N-803",
+      "text": "inferred -- those four run trees still hold a valid plan of 5, 6, 4 and 3",
+      "where": "paper/POSITION_PAPER.md:786",
+      "reason": "restates the four acceptance-criteria counts (5, 6, 4, 3) that docs/BENCHMARK_RESULTS.md already records at C-239, quoted here as the evidence behind the O127 attribution rather than re-measured",
+      "anchor_digest": "7e85d261e14af28b6b8b76426289bd3d4b07806bef12fee8f34732917ed7826e"
+    },
+    {
+      "id": "N-804",
+      "text": "(C-239, and the per-cell reasons at C-177..C-180). Nothing was re-run and no",
+      "where": "paper/POSITION_PAPER.md:788",
+      "reason": "cites the CLAIMS.json claim ids that carry the figures in the surrounding sentences (C-239 for the criteria counts, C-177..C-180 for the per-cell reasons); a citation, not a second independent measurement",
+      "anchor_digest": "531ecbfabf451b3639ff72f4af49ff7e4c2c3ab563c2f29a7c0487832a019fcf"
+    },
+    {
+      "id": "N-805",
+      "text": "measured, and its own cost column is the one v2 later proved was asserted",
+      "where": "paper/POSITION_PAPER.md:790",
+      "reason": "states that campaign v1's dispatch column was asserted rather than counted and cites the claim ids that record it (C-218..C-232); a citation plus a statement about what an already-recorded column means, not a new figure",
+      "anchor_digest": "5ab13bdb090a3ff24b740d366858c3850d2dbeaec48cfbbb9df5844dc814133e"
+    },
+    {
+      "id": "N-806",
+      "text": "rather than counted (C-218..C-232).",
+      "where": "paper/POSITION_PAPER.md:791",
+      "reason": "states that campaign v1's dispatch column was asserted rather than counted and cites the claim ids that record it (C-218..C-232); a citation plus a statement about what an already-recorded column means, not a new figure",
+      "anchor_digest": "7fd488c30c73ce92e94d9ca30e221814488f90fbca861ad1e3b5285f3493ade3"
+    },
+    {
+      "id": "N-807",
+      "text": "### v2 -- the replication that found two things",
+      "where": "paper/POSITION_PAPER.md:793",
+      "reason": "a section heading in the paper's own campaign narrative; the version ordinal it carries (v1, v2, v3, or the readiness row name) is an identifier, and every figure the section reports is recorded under its own claim id in the body below it",
+      "anchor_digest": "dfe70cfb9033b2c5ccd2cbb30afeb0226da818eee512368ab40afdad88703298"
+    },
+    {
+      "id": "N-808",
+      "text": "character (C-313). That is the defect class this benchmark exists to detect,",
+      "where": "paper/POSITION_PAPER.md:797",
+      "reason": "cites C-313, the CLAIMS.json claim that records campaign v2's single false accept (slug_pair, arm B); a citation to the recorded measurement",
+      "anchor_digest": "faad427782e146f292d721507d3583fb0df82ce50e08437fc271a3374c9e6151"
+    },
+    {
+      "id": "N-809",
+      "text": "a count of anything -- discovered after cell 1 and declared in the protocol at",
+      "where": "paper/POSITION_PAPER.md:806",
+      "reason": "cites C-217, the CLAIMS.json claim that records the protocol's own declaration of the dispatch-counting fix made after v2's first cell; a citation plus the statement that the correction moved the figure against the harnessed arms",
+      "anchor_digest": "2d0e1c324945066968b63f55c8dab6a29f6f57ef6ce74dd522d05e8d117d56be"
+    },
+    {
+      "id": "N-810",
+      "text": "C-217, in the direction unfavourable to the harnessed arms. v2 keeps",
+      "where": "paper/POSITION_PAPER.md:807",
+      "reason": "cites C-217, the CLAIMS.json claim that records the protocol's own declaration of the dispatch-counting fix made after v2's first cell; a citation plus the statement that the correction moved the figure against the harnessed arms",
+      "anchor_digest": "b9ba13a7194e665b72721bf6c9d44547238a04db774858f54fb2ea76200e0a47"
+    },
+    {
+      "id": "N-811",
+      "text": "### v3 -- pre-registered in full, and commit-bound",
+      "where": "paper/POSITION_PAPER.md:811",
+      "reason": "a section heading in the paper's own campaign narrative; the version ordinal it carries (v1, v2, v3, or the readiness row name) is an identifier, and every figure the section reports is recorded under its own claim id in the body below it",
+      "anchor_digest": "a0226aacc8961de9cf32d6f59636c769b99521d89f3348875f24c93929fed9aa"
+    },
+    {
+      "id": "N-812",
+      "text": "Everything v2 exposed was fixed before v3 ran, and the campaign was",
+      "where": "paper/POSITION_PAPER.md:813",
+      "reason": "states that v2's findings were fixed before v3 ran and that v3 was pre-registered; the version ordinals are identifiers and the pre-registration itself is recorded at C-257, not measured here",
+      "anchor_digest": "189e96fd30a6fdf5e02c668b940c12706f52bc642290a5320cced544ee88db3f"
+    },
+    {
+      "id": "N-813",
+      "text": "pre-registered so the analysis could not be chosen afterwards: 5 tasks x 3",
+      "where": "paper/POSITION_PAPER.md:814",
+      "reason": "restates campaign v3's pre-registered shape -- 5 tasks, 3 arms, 3 repetitions, nine dispatches per cell -- from docs/BENCHMARK_PROTOCOL.md and docs/benchmarks/v3/PREREGISTRATION.json; a design parameter frozen before the campaign ran, not a result it produced",
+      "anchor_digest": "eb02e2889c535871f63252083e7fcfe6e536f2cca5a76ce002e33f45bf6276e7"
+    },
+    {
+      "id": "N-814",
+      "text": "arms x **3 repetitions**, unconditionally; nine dispatches per **cell**,",
+      "where": "paper/POSITION_PAPER.md:815",
+      "reason": "restates campaign v3's pre-registered shape -- 5 tasks, 3 arms, 3 repetitions, nine dispatches per cell -- from docs/BENCHMARK_PROTOCOL.md and docs/benchmarks/v3/PREREGISTRATION.json; a design parameter frozen before the campaign ran, not a result it produced",
+      "anchor_digest": "3d2274d0bd8f72708649f052f779646296013c1088ab2e6d9c4a5e8f5c7c09f5"
+    },
+    {
+      "id": "N-815",
+      "text": "the first cell started and 50 seconds before the earliest provider dispatch",
+      "where": "paper/POSITION_PAPER.md:821",
+      "reason": "the two timestamps and the interval between them come from docs/benchmarks/v3/PREREGISTRATION_PROVENANCE.json, a JSON evidence file outside CLAIMS.json's declared prose coverage; the paper names that file in the same passage and says the ledger does not carry the figure, and tests/test_prereg_provenance.py re-derives it from git objects on every suite run",
+      "anchor_digest": "a7ebe6b30e695cdf03bf071c638ba141dbea81cbfdd4df2e3344351f1307f398"
+    },
+    {
+      "id": "N-816",
+      "text": "recorded in any v3 run tree**. `docs/benchmarks/v3/PREREGISTRATION_PROVENANCE.json`",
+      "where": "paper/POSITION_PAPER.md:822",
+      "reason": "the two timestamps and the interval between them come from docs/benchmarks/v3/PREREGISTRATION_PROVENANCE.json, a JSON evidence file outside CLAIMS.json's declared prose coverage; the paper names that file in the same passage and says the ledger does not carry the figure, and tests/test_prereg_provenance.py re-derives it from git objects on every suite run",
+      "anchor_digest": "d2aef0a12e36b882038fad2db18bbf691d0ebf19f87b5343aab3a343ee1939ac"
+    },
+    {
+      "id": "N-817",
+      "text": "establishes that from git objects -- blob `f8bad644`, sha256 `a1c179c4…`,",
+      "where": "paper/POSITION_PAPER.md:823",
+      "reason": "quotes the registration's git blob id and sha256 prefix as identifiers of specific git objects, not as measurements; both are re-derivable with the commands docs/benchmarks/v3/PREREGISTRATION_PROVENANCE.json's own how_to_re_derive list prints",
+      "anchor_digest": "97ca084f59cb0882af8b10d706c274fec8de6dd6d3812c031a99579ee6745b7a"
+    },
+    {
+      "id": "N-818",
+      "text": "that carries this is C-257; the two timestamps themselves live in that",
+      "where": "paper/POSITION_PAPER.md:827",
+      "reason": "cites C-257, the readiness row that records the pre-registration verdict, and states that the two timestamps themselves live in a provenance file CLAIMS.json does not cover; a citation plus a statement about the ledger's scope",
+      "anchor_digest": "986fa7d238109b86fee60dcb10b5b705c081aa33595bd85d7b1c4feb9dad68d5"
+    },
+    {
+      "id": "N-819",
+      "text": "| A -- plain agent | 15/15 PASS | 0 | answered | C-446 |",
+      "where": "paper/POSITION_PAPER.md:832",
+      "reason": "one row of the paper's own copy of campaign v3's arm summary, reproduced from docs/LIMITATIONS.md and citing the claim id that records it (C-446, C-447, C-448 respectively); a citation to the recorded row, not a re-measurement",
+      "anchor_digest": "ad0956bc5b29176cbc3d6672eed28f35955398ea0cc7e08d9f3e1d77a906ee33"
+    },
+    {
+      "id": "N-820",
+      "text": "| B -- one `hoh run` | 14/15 PASS | 1 | 15/15 accepted | C-447 |",
+      "where": "paper/POSITION_PAPER.md:833",
+      "reason": "one row of the paper's own copy of campaign v3's arm summary, reproduced from docs/LIMITATIONS.md and citing the claim id that records it (C-446, C-447, C-448 respectively); a citation to the recorded row, not a re-measurement",
+      "anchor_digest": "eb3b11cdcf9d1dd8cd9b58527d50cacd3c5f89b9172b16dedd1fe2dd9fcacd41"
+    },
+    {
+      "id": "N-821",
+      "text": "| C -- full control plane | 14/15 PASS | 0 | 15/15 `BUDGET_EXHAUSTED`, 0/15 `CLOSED` | C-448 |",
+      "where": "paper/POSITION_PAPER.md:834",
+      "reason": "one row of the paper's own copy of campaign v3's arm summary, reproduced from docs/LIMITATIONS.md and citing the claim id that records it (C-446, C-447, C-448 respectively); a citation to the recorded row, not a re-measurement",
+      "anchor_digest": "ab790507f6c359d027e410982eda120976030a44aaf800691257a41114ced7a8"
+    },
+    {
+      "id": "N-822",
+      "text": "Arm C's fifteen per-cell rows are individually in the ledger (C-376..C-414);",
+      "where": "paper/POSITION_PAPER.md:836",
+      "reason": "cites the CLAIMS.json claim ids that carry campaign v3's fifteen arm-C cell rows (C-376..C-414) and the one red hidden suite among them (C-405); a citation, not a new figure",
+      "anchor_digest": "912f8967748421e9090b5c79cd018d7173aae31596ee7bbfa9d19f002782034c"
+    },
+    {
+      "id": "N-823",
+      "text": "the one red hidden suite in arm C is `slug_pair/C/3` at C-405.",
+      "where": "paper/POSITION_PAPER.md:837",
+      "reason": "cites the CLAIMS.json claim ids that carry campaign v3's fifteen arm-C cell rows (C-376..C-414) and the one red hidden suite among them (C-405); a citation, not a new figure",
+      "anchor_digest": "4ae08651d114cb771d50f415c8d0cefebe93c457b8e1ec525513cc66e2fed1e3"
+    },
+    {
+      "id": "N-824",
+      "text": "**Arm B reproduced v2's false accept** -- `slug_pair` again, arm B again, in",
+      "where": "paper/POSITION_PAPER.md:839",
+      "reason": "states that arm B's v3 false accept fell on the same task and arm as v2's; the two measurements are recorded at C-447 and C-313, and this sentence is the comparison between them",
+      "anchor_digest": "011a59d72f9d6f0fccbe9aa0cd81e3b7f27ecbfe6f9fd388127a8b0738a270f3",
+      "superseded": {
+        "on": "2026-09-14",
+        "previous_text": "**Arm B reproduced v2's false accept** -- same task, same arm, one of three",
+        "previous_where": "paper/POSITION_PAPER.md:839",
+        "previous_anchor_digest": "83102fccf348a6722ac0038c7d68df5664a51274016faa74425784e5dc6f3dbc",
+        "why": "superseded 2026-09-14 while the section was being copy-edited before the v0.1.0 tag: the same statement, reworded for clarity (naming the task and arm explicitly, and moving a parenthetical). Re-anchored rather than duplicated; the superseded text and digest are kept here."
+      }
+    },
+    {
+      "id": "N-825",
+      "text": "one of its three repetitions. n=3 carries no rate; what it carries is that the finding was not",
+      "where": "paper/POSITION_PAPER.md:840",
+      "reason": "states what n=3 does not license -- a restriction on how the campaign may be read, not a figure the campaign measured",
+      "anchor_digest": "332934e053c741263931f7acf70da36883d4d02d1a699484eefd434c07dfc801",
+      "superseded": {
+        "on": "2026-09-14",
+        "previous_text": "repetitions. n=3 carries no rate; what it carries is that the finding was not",
+        "previous_where": "paper/POSITION_PAPER.md:840",
+        "previous_anchor_digest": "644f8e3d6127d6264fe06043810052d7f8987825ac60049348c3260c9e5d6a56",
+        "why": "superseded 2026-09-14 while the section was being copy-edited before the v0.1.0 tag: the same statement, reworded for clarity (naming the task and arm explicitly, and moving a parenthetical). Re-anchored rather than duplicated; the superseded text and digest are kept here."
+      }
+    },
+    {
+      "id": "N-826",
+      "text": "had the repair refused for want of budget. v2's arm C closed five of five --",
+      "where": "paper/POSITION_PAPER.md:845",
+      "reason": "restates v2's arm C closure count (five of five) beside v3's zero as the comparison the paragraph exists to make; the v2 figure is in docs/BENCHMARK_RESULTS_v2.md and the budget defect that explains it is recorded at C-217",
+      "anchor_digest": "193eca029d55de6813f6b33e19be38e840406eb16528c0c167f8aef5d211a3b3"
+    },
+    {
+      "id": "N-827",
+      "text": "pass. Quoting `0` for arm C beside arm B's `1` compares *answered wrongly",
+      "where": "paper/POSITION_PAPER.md:854",
+      "reason": "warns against comparing arm C's 0 false accepts with arm B's 1, quoting both already-recorded figures (C-448, C-447) to say what such a comparison would and would not mean; a restriction on reporting",
+      "anchor_digest": "f0c3ce82b9fc74e9ba3c9aaba92ebbf7bb1e272d227a2fddac3490131f7294fe"
+    },
+    {
+      "id": "N-828",
+      "text": "single-shot by construction (limit 17), so it spent a ninth of what the",
+      "where": "paper/POSITION_PAPER.md:858",
+      "reason": "cites docs/LIMITATIONS.md limit 17 by its heading number and restates arm A's one dispatch per cell (recorded at C-446) to state the direction of the budget asymmetry; a cross-reference and an argument about how to read an already-recorded figure",
+      "anchor_digest": "f5a9e62c8d2d7e434d9defb23a397c62a59ef7474e681943b5b1cd1bee93b7fd"
+    },
+    {
+      "id": "N-829",
+      "text": "### What `benchmark_v3 = PASS` means on the readiness board",
+      "where": "paper/POSITION_PAPER.md:862",
+      "reason": "a section heading in the paper's own campaign narrative; the version ordinal it carries (v1, v2, v3, or the readiness row name) is an identifier, and every figure the section reports is recorded under its own claim id in the body below it",
+      "anchor_digest": "02fe5ae9bf68cf1e5d344edf07b568f342b0d9658eb23db5b9b8441898e2f6e4"
+    },
+    {
+      "id": "N-830",
+      "text": "and must agree with it on every figure). The readiness row is C-259, and its",
+      "where": "paper/POSITION_PAPER.md:868",
+      "reason": "cites C-259, the readiness row that records campaign v3's verdict together with its post-campaign freeze drift; a citation to the recorded row",
+      "anchor_digest": "72cffa0820dc48901c4816f7fc6a72b74ed4ddae010aed67483be1f3d3e6e0c8",
+      "superseded": {
+        "on": "2026-09-14",
+        "previous_text": "files by a second independently written aggregation -- C-259, whose own text",
+        "previous_where": "paper/POSITION_PAPER.md:866",
+        "previous_anchor_digest": "9faf72669638d1dbc6e92c5677cfdd943cf8518f274c4d07d28b2924015adafc",
+        "why": "superseded 2026-09-14 while the section was being copy-edited before the v0.1.0 tag: the same statement, reworded for clarity (naming the task and arm explicitly, and moving a parenthetical). Re-anchored rather than duplicated; the superseded text and digest are kept here."
+      }
+    },
+    {
+      "id": "N-831",
+      "text": "positive path has its own evidence, at a budget **measured from v2** (eighteen,",
+      "where": "paper/POSITION_PAPER.md:878",
+      "reason": "restates the budget the closure evidence declared (eighteen) and names where that magnitude came from -- what v2's arm C actually spent reaching closure, recorded in docs/BENCHMARK_RESULTS_v2.md -- to establish that it was measured beforehand rather than chosen after a failure",
+      "anchor_digest": "c14804f97050aaae6b8e29fd96868b2a242754873b8e9bb923dfcec172fccd7e"
+    },
+    {
+      "id": "N-832",
+      "text": "what v2's arm C actually spent reaching closure) rather than chosen after a",
+      "where": "paper/POSITION_PAPER.md:879",
+      "reason": "restates the budget the closure evidence declared (eighteen) and names where that magnitude came from -- what v2's arm C actually spent reaching closure, recorded in docs/BENCHMARK_RESULTS_v2.md -- to establish that it was measured beforehand rather than chosen after a failure",
+      "anchor_digest": "376babef5f0bf01308c7e745406f4f6ad842769f343f928763caf223e8f2aa19"
+    },
+    {
+      "id": "N-833",
+      "text": "repair cycle, unattended -- 18 of 18 declared dispatches, 9 on the primary",
+      "where": "paper/POSITION_PAPER.md:881",
+      "reason": "restates the closure run's recorded figures -- 18 of 18 declared dispatches, 9 primary and 9 repair, 1 repair node, 0 human decisions -- and cites C-255, the readiness row that records them",
+      "anchor_digest": "f7177e239e8e9586aa87f93d458fa413775732be37d75d1bf53726c1ab9a9692",
+      "superseded": {
+        "on": "2026-09-14",
+        "previous_text": "repair cycle, unattended -- 18 of 18 declared dispatches, 9 primary and 9",
+        "previous_where": "paper/POSITION_PAPER.md:881",
+        "previous_anchor_digest": "e3a78f04a5dd485ef96e1b6faeb05d42ea7095b16bbf995ade8dd42f3cf08a95",
+        "why": "superseded 2026-09-14 while the section was being copy-edited before the v0.1.0 tag: the same closure figures, reworded to say once rather than twice that there was one repair node. Re-anchored rather than duplicated; the superseded text and digest are kept here."
+      }
+    },
+    {
+      "id": "N-834",
+      "text": "node and 9 drawn by the one repair node from the remaining shared budget, and",
+      "where": "paper/POSITION_PAPER.md:882",
+      "reason": "restates the closure run's recorded figures -- 18 of 18 declared dispatches, 9 primary and 9 repair, 1 repair node, 0 human decisions -- and cites C-255, the readiness row that records them",
+      "anchor_digest": "f03ff3780e5b0b49fa27c78c18f5c6271e008a750a48a4084085068d2e8a35d5",
+      "superseded": {
+        "on": "2026-09-14",
+        "previous_text": "repair, the repair node drawing on the remaining shared budget, 1 repair node,",
+        "previous_where": "paper/POSITION_PAPER.md:882",
+        "previous_anchor_digest": "e651d630fea079f3e03bbe289b731a1d703b3ff3a9bba5ac194977f9c38ef0e0",
+        "why": "superseded 2026-09-14 while the section was being copy-edited before the v0.1.0 tag: the same closure figures, reworded to say once rather than twice that there was one repair node. Re-anchored rather than duplicated; the superseded text and digest are kept here."
+      }
+    },
+    {
+      "id": "N-835",
+      "text": "**0 human decisions** (C-255).",
+      "where": "paper/POSITION_PAPER.md:883",
+      "reason": "restates the closure run's recorded figures -- 18 of 18 declared dispatches, 9 primary and 9 repair, 1 repair node, 0 human decisions -- and cites C-255, the readiness row that records them",
+      "anchor_digest": "b55384c285b652dd87faefe18cef5b8b515d6aa4d41369acc0a5292607d5229a"
+    },
+    {
+      "id": "N-836",
+      "text": "(C-252, `tools/meta_evidence.py --falsify`). The dispatch-budget instrument",
+      "where": "paper/POSITION_PAPER.md:902",
+      "reason": "cites C-252, the readiness row that records the five falsifier-carrying metrics and the closure verdict; a citation to the recorded row",
+      "anchor_digest": "6a86ac26f652a75f02864c71c90705b11672ac05ae914083c93edc0a0cd4de5f"
+    },
+    {
+      "id": "N-837",
+      "text": "runs eleven controls at three ceilings -- `[9, 8, 4]`, of which at least one",
+      "where": "paper/POSITION_PAPER.md:903",
+      "reason": "restates the three ceilings the dispatch-budget instrument runs at ([9, 8, 4]) and the rule that at least one must force a refusal inside an iteration; a declared instrument parameter whose result is recorded at C-254",
+      "anchor_digest": "a2f988acbea652c5937e8f79c9497cacd96e5ca58fe11bb993b617c4b2983224"
+    },
+    {
+      "id": "N-838",
+      "text": "(C-254).",
+      "where": "paper/POSITION_PAPER.md:906",
+      "reason": "cites C-254, the readiness row that records the dispatch-budget instrument's ceilings, its refusals and its two falsifiers; a citation to the recorded row",
+      "anchor_digest": "d7bcc3eba3d2c7eb9c71ac345ebe46b19d646002d2c75a23ca4bcb01ee84bef5"
+    },
+    {
+      "id": "N-839",
+      "text": "eight** while the falsifier still reported \"detected\" (O147). Two independent",
+      "where": "paper/POSITION_PAPER.md:914",
+      "reason": "restates the seven-of-eight figure from finding O147 in DOGFOOD_LEDGER.md, which CLAIMS.json's declared coverage does not extend to (see this paper's section 0); the finding id is named in the same sentence so a reader can find it",
+      "anchor_digest": "f2e0dea3e24a30b40dac9333a1a2cb434f33812f55c5d35d93cf1279e8cfbb2f"
+    },
+    {
+      "id": "N-840",
+      "text": "reviewers were asked to refute the instrument before v3 was frozen; both",
+      "where": "paper/POSITION_PAPER.md:915",
+      "reason": "states how many independent reviewers were tasked to refute the budget instrument before v3 was frozen and what verdict they returned; a process fact recorded in DOGFOOD_LEDGER.md's O147 entry, outside CLAIMS.json's declared coverage",
+      "anchor_digest": "151b32a31923ddd3262d1e60843a71d570ebf535ef0c6fc4bf6d4a15a4175fc0"
+    },
+    {
+      "id": "N-841",
+      "text": "than a measurement (O140);",
+      "where": "paper/POSITION_PAPER.md:922",
+      "reason": "names internal finding id O140 from DOGFOOD_LEDGER.md, outside CLAIMS.json's declared coverage; the same correction is recorded in the ledger's covered documents at C-217",
+      "anchor_digest": "401df0e7a4e7b9b776188800f43c3e96cab5c0e8f664454a68b07c67edf16bdd"
+    },
+    {
+      "id": "N-842",
+      "text": "* an enforced ceiling that was off by one -- `max_dispatches=9` bought eight",
+      "where": "paper/POSITION_PAPER.md:923",
+      "reason": "restates finding O144's off-by-one -- a ceiling of 9 that bought 8 provider calls, because the counter incremented before the budget was consulted -- from DOGFOOD_LEDGER.md, outside CLAIMS.json's declared coverage; the finding id is named in the same bullet",
+      "anchor_digest": "026196ea3dc02f60da28fb40d99d71eac4d0ea1f68446d6d9ec34870513c8794"
+    },
+    {
+      "id": "N-843",
+      "text": "consulted (O144). The existing test passed against it, because it only",
+      "where": "paper/POSITION_PAPER.md:925",
+      "reason": "restates finding O144's off-by-one -- a ceiling of 9 that bought 8 provider calls, because the counter incremented before the budget was consulted -- from DOGFOOD_LEDGER.md, outside CLAIMS.json's declared coverage; the finding id is named in the same bullet",
+      "anchor_digest": "339bf2c359833ecaf7b62fa2e24b0fc166d4879721c35497d682ad6635ca14a5"
+    },
+    {
+      "id": "N-844",
+      "text": "writes one line for none (O144);",
+      "where": "paper/POSITION_PAPER.md:929",
+      "reason": "names internal finding id O144 from DOGFOOD_LEDGER.md and restates two further defects it records; outside CLAIMS.json's declared coverage, and named as such by the finding id in the same bullet",
+      "anchor_digest": "98e10e232d1d2fcb996b6f619a9820d8dc430409531fe836d108c9821c254ebd"
+    },
+    {
+      "id": "N-845",
+      "text": "* a budget a restart refunded, because the counter lived in a process (O144);",
+      "where": "paper/POSITION_PAPER.md:930",
+      "reason": "names internal finding id O144 from DOGFOOD_LEDGER.md and restates two further defects it records; outside CLAIMS.json's declared coverage, and named as such by the finding id in the same bullet",
+      "anchor_digest": "2adfb493aa09090b33d40ff5342bb847b8000405fadc1992eeaf2655f92cbf25"
+    },
+    {
+      "id": "N-846",
+      "text": "retry (O147, found by an adversarial review that was asked to refute, not to",
+      "where": "paper/POSITION_PAPER.md:932",
+      "reason": "names internal finding id O147 from DOGFOOD_LEDGER.md and states how it was found (an adversarial review tasked to refute); outside CLAIMS.json's declared coverage",
+      "anchor_digest": "31768bb2f0268c42e995419d1e5117c865cbc7e5feb68355cac1d5d428acdacd"
+    },
+    {
+      "id": "N-847",
+      "text": "that verification: 167 of 329 failures in an export tree carried no",
+      "where": "paper/POSITION_PAPER.md:935",
+      "reason": "restates the export-marker failure -- 167 of 329 failures carrying no environment-gap marker -- which is recorded at C-452; the finding id O163 is named beside it so a reader can reach the ledger entry that narrates it",
+      "anchor_digest": "79483a031f3631c11f2024d216d891fcdb85fb950f1ecf3532ef23b8ea68f286"
+    },
+    {
+      "id": "N-848",
+      "text": "environment-gap marker where the document promised none would (O163);",
+      "where": "paper/POSITION_PAPER.md:936",
+      "reason": "restates the export-marker failure -- 167 of 329 failures carrying no environment-gap marker -- which is recorded at C-452; the finding id O163 is named beside it so a reader can reach the ledger entry that narrates it",
+      "anchor_digest": "7c9a6a98dc0c3133ebe4740e72d0bf6b66c5fed757a3b6312d7d5e089a478e6b"
+    },
+    {
+      "id": "N-849",
+      "text": "one that compared a tree against itself (O164);",
+      "where": "paper/POSITION_PAPER.md:939",
+      "reason": "names internal finding id O164 from DOGFOOD_LEDGER.md and restates two of the defects it records; outside CLAIMS.json's declared coverage, and named as such in the same bullet",
+      "anchor_digest": "3168a5887909357ba8b131d68fe49bae2353f2051bf09e30781c1de558c6fab6"
+    },
+    {
+      "id": "N-850",
+      "text": "skipping instead of red (O164).",
+      "where": "paper/POSITION_PAPER.md:941",
+      "reason": "names internal finding id O164 from DOGFOOD_LEDGER.md and restates two of the defects it records; outside CLAIMS.json's declared coverage, and named as such in the same bullet",
+      "anchor_digest": "4d74d3061745bd969433cd75b15bd297d8b1a89a45e96a74c3d4a5e3b10b9dbb"
+    },
+    {
+      "id": "N-851",
+      "text": "The internal ledger's findings are numbered to O167, and each carries its own",
+      "where": "paper/POSITION_PAPER.md:943",
+      "reason": "names internal finding ids from DOGFOOD_LEDGER.md, an internal working document this ledger's declared coverage does not extend to (see this paper's section 0), and states why this passage prints the command that recomputes the heading count instead of freezing the answer; a statement about a moving measurement, not a figure",
+      "anchor_digest": "64a18e1b8c371e127fed070b4a9b6987cb398df8b89dd5da0638e446249ce94d",
+      "superseded": [
+        {
+          "on": "2026-09-14",
+          "previous_text": "The internal ledger's findings are numbered to O164 and **142** of them carry",
+          "previous_where": "paper/POSITION_PAPER.md:943",
+          "previous_anchor_digest": "76d5912f7fde41419c5fce9d63240f9985aacf8d7eccb35f3e7a8d5d6e4b834e",
+          "why": "superseded 2026-09-14, and this one is a correction rather than a copy-edit: the earlier line said 142 findings numbered to O164 and printed `grep -cE ...` as the command that recomputes it. That command counts lines, not distinct ids, and a finding with sub-headings is counted more than once -- it returns 163, not 142. The figure itself had been derived with a distinct-id count, so the number was right and the command beside it was not, which is the same defect this project records as O140 in the other direction. The line now prints the distinct-id command and the count that command actually returns (143, after finding O165 was added the same day)."
+        },
+        {
+          "on": "2026-09-14",
+          "previous_text": "The internal ledger's findings are numbered to O165 and **143** of them carry",
+          "previous_where": "paper/POSITION_PAPER.md:943",
+          "previous_anchor_digest": "d0f4a873c4d451f7db86306bbdffc978d6436787d0e9cb5105458fb6a8c68bca",
+          "why": "superseded again the same day: recording finding O166 (the wrong command beside a right number) added a ledger entry, which moved the very count the sentence reports. The line now names the state the figure was taken at -- the v0.1.0 tag -- for the same reason README.md's attribution table names a commit, and says plainly that this sentence has already moved the number twice."
+        },
+        {
+          "on": "2026-09-14",
+          "previous_text": "The internal ledger's findings are numbered to O166 and, **at the v0.1.0 tag**,",
+          "previous_where": "paper/POSITION_PAPER.md:943",
+          "previous_anchor_digest": "d7a416ffaf9e7e873edabdc49443e95d0370f29c11b344bc505486d03fc79b13",
+          "why": "superseded 2026-09-14, third and last time on this sentence: the count it carried moved every time a finding was recorded, including the two findings about this very sentence (O166, O167). The line now prints the command instead of freezing an answer, and says why -- which makes it stable rather than stale. Every earlier text and digest is kept here in order."
+        }
+      ]
+    },
+    {
+      "id": "N-852",
+      "text": "not cover that document, by its own declared scope (§0), so that count is a",
+      "where": "paper/POSITION_PAPER.md:946",
+      "reason": "states which document CLAIMS.json's declared coverage does not extend to, and that the count beside it is therefore a re-derivable tally rather than a ledger claim; a statement about the ledger's scope",
+      "anchor_digest": "65d90650aff547c8562b0e746d8da44abed113f38a6f7cefe0672783307ad83b"
+    },
+    {
+      "id": "N-853",
+      "text": "public document: the export-marker failure is C-452.",
+      "where": "paper/POSITION_PAPER.md:953",
+      "reason": "cites C-452, the CLAIMS.json claim that records the export-marker failure named in the bullet above; a citation",
+      "anchor_digest": "4323e50b20b4409d850729ea16e4fd48ce7217c199ff2205889f8464d5092a0a",
+      "superseded": {
+        "on": "2026-09-14",
+        "previous_text": "failure is C-452.",
+        "previous_where": "paper/POSITION_PAPER.md:950",
+        "previous_anchor_digest": "37f1b4b72a378fc6aa0d7aacb77897d7fe8d7627f7c00715689f60062672c226",
+        "why": "superseded 2026-09-14: the sentence moved three lines down when a clarification was inserted above it distinguishing this ledger-wide finding tally from README.md's campaign-scoped count. Same statement, re-anchored; the superseded text and digest are kept here."
+      }
+    },
+    {
+      "id": "N-854",
+      "text": "fresh depth-1 clone of the public export reports its passes and its",
+      "where": "paper/POSITION_PAPER.md:959",
+      "reason": "restates the two figures a fresh export clone reports -- its passes and its 30 explicit environment-gap skips -- together with the rule that they are never summed and that no skip counts as a pass; a restriction on reporting, with the internal suite's own count recorded at C-248",
+      "anchor_digest": "04e178d3fc6c7a8245616396a0d863beda940107b782e1cebffb699708246cba"
+    },
+    {
+      "id": "N-855",
+      "text": "skip naming the artifact withheld and why -- 1220 and 30 at the `v0.1.0` tag,",
+      "where": "paper/POSITION_PAPER.md:974",
+      "reason": "restates the two figures a fresh export clone reports -- its passes and its 30 explicit environment-gap skips -- together with the rule that they are never summed and that no skip counts as a pass; a restriction on reporting, with the internal suite's own count recorded at C-248",
+      "anchor_digest": "d6e443030c413c4b7ff7802773649d2606503be8f1aff1034c2989a4c0aed0a1",
+      "superseded": {
+        "on": "2026-09-14",
+        "previous_text": "30 explicit environment-gap skips as two separate figures that are never",
+        "previous_where": "paper/POSITION_PAPER.md:960",
+        "previous_anchor_digest": "993c82ec7bfc6d7f3d4c45f896657d98c0fda5066ff7f935c1aa7e092b4f3dd0",
+        "why": "superseded 2026-09-14, before the v0.1.0 push: the earlier wording said \"a fresh clone\" reports 30 environment-gap skips. Measured on the export tree at this tag, a `--depth 1` clone reports 1220 passed and 30 skipped and a full clone reports 1222 passed and 28 skipped -- two of the skips exist only when the history is shallow. A figure that is right for one clone shape and wrong for the other, quoted without saying which, is the same defect as O163: a published number that does not survive the verification the document invites. Each figure now carries the clone it was taken in."
+      }
+    },
+    {
+      "id": "N-856",
+      "text": "Within the boundary §0 sets: a candidate is accepted only when a receipt the",
+      "where": "paper/POSITION_PAPER.md:970",
+      "reason": "restates the acceptance rule this paper's own sections 3 and 7 establish, citing those sections by number; an internal cross-reference, not a figure",
+      "anchor_digest": "4b2bc2a92244e5c76bc1f7a8c44f70d45267a32ebed382308eb33395a6f973ec"
+    },
+    {
+      "id": "N-857",
+      "text": "changes nothing cannot be accepted (§3, §7). The planner's capability boundary",
+      "where": "paper/POSITION_PAPER.md:973",
+      "reason": "restates the acceptance rule this paper's own sections 3 and 7 establish, citing those sections by number; an internal cross-reference, not a figure",
+      "anchor_digest": "9b9a126ff8843263c9d42cf605972dca12a5b49e168eb6b07aa886b0ef22cf86"
+    },
+    {
+      "id": "N-858",
+      "text": "each one -- **7 of 7** (C-203, `tools/confinement_evidence.py`).",
+      "where": "paper/POSITION_PAPER.md:976",
+      "reason": "cites C-203, the CLAIMS.json claim that records the capability-boundary instrument's 7-of-7 control result; a citation to the recorded measurement",
+      "anchor_digest": "78fa6ed1424ca8906d0cce3b18a44ebfbfcc788cada1a5b5c0e5297ad84bd204"
+    },
+    {
+      "id": "N-859",
+      "text": "human decisions -- measured, not designed (C-255, and §12's closure evidence",
+      "where": "paper/POSITION_PAPER.md:982",
+      "reason": "cites C-255, the readiness row that records the unattended closure, and cross-references this paper's own section 12 for the budget's provenance; a citation plus an internal cross-reference",
+      "anchor_digest": "3ab1ca3aa8ca87d04ae6ab76fcbfca874986b330d2559089ef914eb7eff91355"
+    },
+    {
+      "id": "N-860",
+      "text": "**Updated 2026-09-14, second entry.** `POSITION_PAPER.md` gained sections 12",
+      "where": "paper/AUDIT.md:427",
+      "reason": "part of this audit's own dated update note, which records that sections 12 and 13 of paper/POSITION_PAPER.md added 71 claim-id citations, that the coverage check went red on exactly that, and that the new rows were added beside the 47 hand-audited ones rather than replacing them; bookkeeping about this document's own revision, not a measurement about HoH",
+      "anchor_digest": "5f5e4747b23e24413a554b5159bb6a49dc2cb76d9b9b363d4589472e3d3943bd"
+    },
+    {
+      "id": "N-861",
+      "text": "and 13 -- the three benchmark campaigns, and what the harness demonstrably",
+      "where": "paper/AUDIT.md:428",
+      "reason": "part of this audit's own dated update note, which records that sections 12 and 13 of paper/POSITION_PAPER.md added 71 claim-id citations, that the coverage check went red on exactly that, and that the new rows were added beside the 47 hand-audited ones rather than replacing them; bookkeeping about this document's own revision, not a measurement about HoH",
+      "anchor_digest": "e83db055d09209181d1eda4a83bfae7dae2c048f57ba8f12a1bede16b96dc5bd"
+    },
+    {
+      "id": "N-862",
+      "text": "does -- and with them 71 claim-id citations this audit had no rows for.",
+      "where": "paper/AUDIT.md:429",
+      "reason": "part of this audit's own dated update note, which records that sections 12 and 13 of paper/POSITION_PAPER.md added 71 claim-id citations, that the coverage check went red on exactly that, and that the new rows were added beside the 47 hand-audited ones rather than replacing them; bookkeeping about this document's own revision, not a measurement about HoH",
+      "anchor_digest": "864e83c217dd109be8485c1da1bc086cfa032e9340d38fddbb6468d20a295319"
+    },
+    {
+      "id": "N-863",
+      "text": "`coverage` went red on exactly that, which is what it is for. The 71 rows are",
+      "where": "paper/AUDIT.md:430",
+      "reason": "part of this audit's own dated update note, which records that sections 12 and 13 of paper/POSITION_PAPER.md added 71 claim-id citations, that the coverage check went red on exactly that, and that the new rows were added beside the 47 hand-audited ones rather than replacing them; bookkeeping about this document's own revision, not a measurement about HoH",
+      "anchor_digest": "59750a6029f5000348afe8c5b0da6d34f0a1e6b9f9fe286c704a179a6313b4c1"
+    },
+    {
+      "id": "N-864",
+      "text": "added above rather than replacing anything: the earlier 47 hand-audited rows",
+      "where": "paper/AUDIT.md:431",
+      "reason": "part of this audit's own dated update note, which records that sections 12 and 13 of paper/POSITION_PAPER.md added 71 claim-id citations, that the coverage check went red on exactly that, and that the new rows were added beside the 47 hand-audited ones rather than replacing them; bookkeeping about this document's own revision, not a measurement about HoH",
+      "anchor_digest": "fd2f77cf4c18032a824dd83e7f5ff03a43adc252753f3bf32af5df984bebd53d"
+    },
+    {
+      "id": "N-865",
+      "text": "For most of this project's life `docs/LIMITATIONS.md` limit 2 said there was",
+      "where": "README.md:193",
+      "anchor_digest": "333c599147a83ed86c232d35c52dd5332633d18497f481f113d54f338d26ffce",
+      "anchor_context": "## Measured against a plain agent: the matched-budget benchmark",
+      "reason": "restates docs/LIMITATIONS.md limit 2's own statement that this project had no baseline, citing the limit by its heading number; an internal cross-reference to another document's recorded limit, not a measurement"
+    },
+    {
+      "id": "N-866",
+      "text": "Campaign v3 was pre-registered in full -- 5 tasks x 3 arms x 3 repetitions,",
+      "where": "README.md:207",
+      "anchor_digest": "ed529c21f972c8efc4a78ecf2007b75c960ecbc6e9587a201c1ea5b56128aa0a",
+      "anchor_context": "## Measured against a plain agent: the matched-budget benchmark",
+      "reason": "restates campaign v3's pre-registered shape -- 5 tasks, 3 arms, 3 repetitions -- from docs/BENCHMARK_PROTOCOL.md and docs/benchmarks/v3/PREREGISTRATION.json, together with the interval between the binding commit and the first cell recorded in docs/benchmarks/v3/PREREGISTRATION_PROVENANCE.json; a design parameter frozen before the campaign ran and a timestamp interval that lives in a JSON evidence file outside this ledger's declared prose coverage, with both files named in the same passage"
+    },
+    {
+      "id": "N-867",
+      "text": "repair refused for want of budget, fifteen times out of fifteen. In v2 the",
+      "where": "README.md:225",
+      "anchor_digest": "6841e94cd9140342a530b59b55328400b653257c0827e9ea7f38ad28fbf0f981",
+      "anchor_context": "## Measured against a plain agent: the matched-budget benchmark",
+      "reason": "restates campaign v3's arm C outcome (fifteen of fifteen) beside campaign v2's (five of five closed on eighteen dispatches against a declared nine); both figures are recorded -- v3's at C-448 and the v2 budget defect at C-217 -- and this sentence is the comparison between them"
+    },
+    {
+      "id": "N-868",
+      "text": "it **reproduced v2's**: the same task, the same arm, a normalisation that",
+      "where": "README.md:231",
+      "anchor_digest": "a462a36a68f88ecbc29c669309ba54c346d7a6173e3f9b139ed350366e80c35d",
+      "anchor_context": "## Measured against a plain agent: the matched-budget benchmark",
+      "reason": "states that campaign v3's arm B false accept fell on the same task and arm as campaign v2's; the two measurements are recorded at C-447 and C-313, and this sentence is the comparison between them"
+    },
+    {
+      "id": "N-869",
+      "text": "`benchmark_v3 = PASS` on the readiness board means the campaign was",
+      "where": "README.md:235",
+      "anchor_digest": "5a04f9e891755de95e61837779bb9ff53f1be6803aa6e9062e4abc2bbb406b6e",
+      "anchor_context": "## Measured against a plain agent: the matched-budget benchmark",
+      "reason": "states what the benchmark_v3 = PASS row does and does not license; a restriction on how an already-recorded verdict (C-259) may be read, not a measurement"
+    },
+    {
+      "id": "N-870",
+      "text": "measure the case where it binds. At a budget taken from what v2's arm C",
+      "where": "README.md:243",
+      "anchor_digest": "4746a3ca8cb95fbdab3b810642ca65699eb381a698289795e2e81cba500f39af",
+      "anchor_context": "## Measured against a plain agent: the matched-budget benchmark",
+      "reason": "restates the budget the closure evidence declared (eighteen) and names where that magnitude came from -- what campaign v2's arm C actually spent reaching closure, recorded in docs/BENCHMARK_RESULTS_v2.md -- to establish that it was measured beforehand rather than chosen after a failure"
+    },
+    {
+      "id": "N-871",
+      "text": "Two reviewers tasked to refute it found that before campaign v3 was frozen.",
+      "where": "README.md:264",
+      "anchor_digest": "6454f362325708721d4f39aeb553aa6978148559c44b7f43f5ed5eaf9fda0f47",
+      "anchor_context": "## What it demonstrably does",
+      "reason": "states how many independent reviewers were tasked to refute the budget instrument before campaign v3 was frozen; a process fact recorded in DOGFOOD_LEDGER.md's O147 entry, an internal working document outside this ledger's declared coverage"
+    },
+    {
+      "id": "N-872",
+      "text": "or to an explicit `not_claims` entry with a reason. `python3",
+      "where": "README.md:289",
+      "anchor_digest": "e0017602b9f32ab0b7f864a67399a7c160cac318ecf3cba3c2914d0a5c6ee16e",
+      "anchor_context": "## What it demonstrably does",
+      "reason": "describes what tools/check_claims.py fails on -- an unbound sentence, a changed anchor, two claims sharing one resolution sentence -- and names the command; a description of a tool's behaviour, checkable by running it, not a figure about HoH's runtime"
+    },
+    {
+      "id": "N-873",
+      "text": "`max_dispatches=9` bought eight provider calls because the counter incremented",
+      "where": "README.md:297",
+      "anchor_digest": "ab6e295f4458508f20983f02e4c56f62b5662efae5127e97c625bb941f91a680",
+      "anchor_context": "## What it demonstrably does",
+      "reason": "restates finding O144's off-by-one -- a ceiling of 9 that bought 8 provider calls because the counter incremented before the budget was consulted -- from DOGFOOD_LEDGER.md, an internal working document outside this ledger's declared coverage; the enforcement that replaced it is recorded at C-254"
+    },
+    {
+      "id": "N-874",
+      "text": "**How the 71 new rows were produced.** The 71 rows added to the claim-id",
+      "where": "paper/AUDIT.md:423",
+      "reason": "part of this audit's own dated note explaining how the 71 claim-id rows added on 2026-09-14 were produced and how a mechanical resolution differs from the 47 rows audited by hand; bookkeeping about this document's own method and revision, not a measurement about HoH",
+      "anchor_digest": "fb833d2b8fc282914978e887a570fffed7eacba369012cd4716fc4719e944688"
+    },
+    {
+      "id": "N-875",
+      "text": "citation table on 2026-09-14 are the claim ids sections 12 and 13 cite.",
+      "where": "paper/AUDIT.md:424",
+      "reason": "part of this audit's own dated note explaining how the 71 claim-id rows added on 2026-09-14 were produced and how a mechanical resolution differs from the 47 rows audited by hand; bookkeeping about this document's own method and revision, not a measurement about HoH",
+      "anchor_digest": "90ef563d38cb9dd62b7825670018ba38045fc415ea8fc3f674263cddb4a585f6"
+    },
+    {
+      "id": "N-876",
+      "text": "They differ from the 47 rows before them in how they",
+      "where": "paper/AUDIT.md:425",
+      "reason": "part of this audit's own dated note explaining how the 71 claim-id rows added on 2026-09-14 were produced and how a mechanical resolution differs from the 47 rows audited by hand; bookkeeping about this document's own method and revision, not a measurement about HoH",
+      "anchor_digest": "d736a2f4d777816586523235f28bc0d724245972977fc5576b6cf20413a0eaf5"
+    },
+    {
+      "id": "N-877",
+      "text": "were produced, and that difference is stated rather than hidden: the first 47",
+      "where": "paper/AUDIT.md:426",
+      "reason": "part of this audit's own dated note explaining how the 71 claim-id rows added on 2026-09-14 were produced and how a mechanical resolution differs from the 47 rows audited by hand; bookkeeping about this document's own method and revision, not a measurement about HoH",
+      "anchor_digest": "f09c69e02729df8f3f635069a890d4fb2432bbdff640cfa1e77c1a16169c5199"
+    },
+    {
+      "id": "N-878",
+      "text": "were audited by hand, one at a time. These 71 were resolved mechanically by",
+      "where": "paper/AUDIT.md:427",
+      "reason": "part of this audit's own dated note explaining how the 71 claim-id rows added on 2026-09-14 were produced and how a mechanical resolution differs from the 47 rows audited by hand; bookkeeping about this document's own method and revision, not a measurement about HoH",
+      "anchor_digest": "ae2446bc668fb9fc0bdf0970c38d4c3cd0fbf3ab28b743070c4c8347495dcab9"
+    },
+    {
+      "id": "N-879",
+      "text": "## Sections 12 and 13, added 2026-09-14",
+      "where": "paper/NUMBERS.md:62",
+      "reason": "a section heading in this document's own cross-reference table, naming which sections of paper/POSITION_PAPER.md the rows below it cover; a structural label, not a measurement",
+      "anchor_digest": "15c8696d842deb7f082a6700fa719e2f15e534bbe9a83b29b21f625ce5a3e690"
+    },
+    {
+      "id": "N-880",
+      "text": "`CLAIMS.json` does not cover, as `POSITION_PAPER.md` section 0 states), and the",
+      "where": "paper/NUMBERS.md:73",
+      "reason": "names the document this ledger's declared coverage does not extend to and cites paper/POSITION_PAPER.md section 0 for that rule; a statement about the ledger's scope and an internal cross-reference, not a measurement",
+      "anchor_digest": "f37c0485fcfe336db16d593034b29fe093fffb3f3159a1c0e03485afc5d9113e"
+    },
+    {
+      "id": "N-881",
+      "text": "| 5 | `docs/benchmarks/v3/PREREGISTRATION.json` | tasks per campaign, frozen before campaign v3's first cell ran. |",
+      "where": "paper/NUMBERS.md:78",
+      "reason": "table row naming a plain source for a number this ledger does not carry a claim for -- the honest gap paper/NUMBERS.md's own opening paragraphs describe -- rather than asserting an independent new measurement",
+      "anchor_digest": "a85e203cdefe8288d6b6b1c7e8562deaaea13f045d88903de2455305d51b4cd7"
+    },
+    {
+      "id": "N-882",
+      "text": "| 3 | `docs/benchmarks/v3/PREREGISTRATION.json` | arms per campaign (A plain agent, B one `hoh run`, C the full control plane). |",
+      "where": "paper/NUMBERS.md:79",
+      "reason": "table row naming a plain source for a number this ledger does not carry a claim for -- the honest gap paper/NUMBERS.md's own opening paragraphs describe -- rather than asserting an independent new measurement",
+      "anchor_digest": "e807681da619bba84c2f38ed4d8c80ba66a62333c03d4b7390ef1be7d27f6e4e"
+    },
+    {
+      "id": "N-883",
+      "text": "| 3 | pre-registered repetition count, `docs/BENCHMARK_PROTOCOL.md` | repetitions per cell, declared unconditionally before the campaign ran. |",
+      "where": "paper/NUMBERS.md:80",
+      "reason": "table row naming a plain source for a number this ledger does not carry a claim for -- the honest gap paper/NUMBERS.md's own opening paragraphs describe -- rather than asserting an independent new measurement",
+      "anchor_digest": "00f8ddf709aa736a5826c9f336ee98a3f2757bee6543befda9295f6a003eea8a"
+    },
+    {
+      "id": "N-884",
+      "text": "| 45 | C-259 | campaign v3: 45 of 45 runs complete (15 cells x 3 repetitions), COMPLETE, matched_budget_valid = YES. |",
+      "where": "paper/NUMBERS.md:81",
+      "reason": "table row cross-referencing claim C-259, already recorded in CLAIMS.json; this table indexes existing claims by number rather than asserting an independent new measurement",
+      "anchor_digest": "0607852c1126101fb0aedcc5dbd01a0c893754e1fef392914cb85fb7f9a5b48f"
+    },
+    {
+      "id": "N-885",
+      "text": "| 9 | `docs/BENCHMARK_PROTOCOL.md` | dispatches per **cell** in campaign v3, shared by a node and its repair nodes rather than granted per run. |",
+      "where": "paper/NUMBERS.md:82",
+      "reason": "table row naming a plain source for a number this ledger does not carry a claim for -- the honest gap paper/NUMBERS.md's own opening paragraphs describe -- rather than asserting an independent new measurement",
+      "anchor_digest": "0e4d790a99c5ae4c54866c735e913355632816a383392884687a479e133bfd5f"
+    },
+    {
+      "id": "N-886",
+      "text": "| 12.8 | `docs/benchmarks/v3/PREREGISTRATION_PROVENANCE.json` | seconds between the commit binding the registration's exact bytes and the first v3 cell. The ledger does not cover this JSON evidence file; `tests/test_prereg_provenance.py` re-derives the figure from git objects on every suite run. |",
+      "where": "paper/NUMBERS.md:83",
+      "reason": "table row naming a plain source for a number this ledger does not carry a claim for -- the honest gap paper/NUMBERS.md's own opening paragraphs describe -- rather than asserting an independent new measurement",
+      "anchor_digest": "413034042a34bc71152503ac1d2b963e779fa4f51a7eeec63b64eed5eed760b7"
+    },
+    {
+      "id": "N-887",
+      "text": "| 50 | `docs/benchmarks/v3/PREREGISTRATION_PROVENANCE.json` | seconds between that same commit and the earliest provider dispatch recorded in any v3 run tree. Same honest gap as the row above. |",
+      "where": "paper/NUMBERS.md:84",
+      "reason": "table row naming a plain source for a number this ledger does not carry a claim for -- the honest gap paper/NUMBERS.md's own opening paragraphs describe -- rather than asserting an independent new measurement",
+      "anchor_digest": "d719177db839509a177e7f0c001c712322d712b8ea2648c5f347c2a2b2d719c2"
+    },
+    {
+      "id": "N-888",
+      "text": "| 15 | C-455 | campaign v3, arm A: 15 of 15 hidden suites PASS. |",
+      "where": "paper/NUMBERS.md:85",
+      "reason": "table row cross-referencing claim C-455, already recorded in CLAIMS.json; this table indexes existing claims by number rather than asserting an independent new measurement",
+      "anchor_digest": "3a0415a0965e891697425da5f601863e7c1cd678a94a87a01fd811b46166eb5e"
+    },
+    {
+      "id": "N-889",
+      "text": "| 0 | C-455 | campaign v3, arm A: 0 false accepts. |",
+      "where": "paper/NUMBERS.md:86",
+      "reason": "table row cross-referencing claim C-455, already recorded in CLAIMS.json; this table indexes existing claims by number rather than asserting an independent new measurement",
+      "anchor_digest": "0604fa07ab02e4187dffc53965cf9b3b19b59475ba2a47bc0bf531c1c5f276a3"
+    },
+    {
+      "id": "N-890",
+      "text": "| 1 | C-455 | campaign v3, arm A: 1 dispatch per cell. |",
+      "where": "paper/NUMBERS.md:87",
+      "reason": "table row cross-referencing claim C-455, already recorded in CLAIMS.json; this table indexes existing claims by number rather than asserting an independent new measurement",
+      "anchor_digest": "c492ffe18e7d4857a22c32d111850d4b3a7eef2ef452be12ffe6413abb2cbe66"
+    },
+    {
+      "id": "N-891",
+      "text": "| 14 | C-456 | campaign v3, arm B: 14 of 15 hidden suites PASS. |",
+      "where": "paper/NUMBERS.md:88",
+      "reason": "table row cross-referencing claim C-456, already recorded in CLAIMS.json; this table indexes existing claims by number rather than asserting an independent new measurement",
+      "anchor_digest": "30f3aca13b1fdbd991e2009e332b4e27bb05b106bb5beedf66e76a19b5a0c96c"
+    },
+    {
+      "id": "N-892",
+      "text": "| 1 | C-456 | campaign v3, arm B: 1 false accept -- `slug_pair`, the metric the benchmark exists to produce. |",
+      "where": "paper/NUMBERS.md:89",
+      "reason": "table row cross-referencing claim C-456, already recorded in CLAIMS.json; this table indexes existing claims by number rather than asserting an independent new measurement",
+      "anchor_digest": "4308a324de3921aeaa916de32aa6264faea426c9c1bf0e8c312eef1e3b0f72dd"
+    },
+    {
+      "id": "N-893",
+      "text": "| 14 | C-457 | campaign v3, arm C: 14 of 15 hidden suites PASS. |",
+      "where": "paper/NUMBERS.md:90",
+      "reason": "table row cross-referencing claim C-457, already recorded in CLAIMS.json; this table indexes existing claims by number rather than asserting an independent new measurement",
+      "anchor_digest": "06c50a647eb8d180fd607bef2091485ae82a59e7913c53a6d78b7379d25b699d"
+    },
+    {
+      "id": "N-894",
+      "text": "| 0 | C-457 | campaign v3, arm C: 0 false accepts -- and the paper states in the same passage why that is not a correctness result. |",
+      "where": "paper/NUMBERS.md:91",
+      "reason": "table row cross-referencing claim C-457, already recorded in CLAIMS.json; this table indexes existing claims by number rather than asserting an independent new measurement",
+      "anchor_digest": "016b46139f4cf24f9a662d80d5ca20e936647c2d1c5b18e7972ac7ba36739d80"
+    },
+    {
+      "id": "N-895",
+      "text": "| 15 | C-457 | campaign v3, arm C: 15 of 15 cells ended `BUDGET_EXHAUSTED`. |",
+      "where": "paper/NUMBERS.md:92",
+      "reason": "table row cross-referencing claim C-457, already recorded in CLAIMS.json; this table indexes existing claims by number rather than asserting an independent new measurement",
+      "anchor_digest": "36a571a201975f309c1e54c45ec98984df15ddfc9eb0766dde8174d42f89ffba"
+    },
+    {
+      "id": "N-896",
+      "text": "| 18 | C-217 | campaign v2: an arm C cell spent 18 dispatches against a declared 9, because a node and its repair node each drew a full ceiling. |",
+      "where": "paper/NUMBERS.md:93",
+      "reason": "table row cross-referencing claim C-217, already recorded in CLAIMS.json; this table indexes existing claims by number rather than asserting an independent new measurement",
+      "anchor_digest": "f552f6bb47d3b4bdb086b3115972c6a98c4b80aa944bf823845107c7738311e9"
+    },
+    {
+      "id": "N-897",
+      "text": "| 5 | `docs/BENCHMARK_RESULTS_v2.md` | campaign v2: arm C closed 5 of 5 cells -- on the doubled budget the row above records. |",
+      "where": "paper/NUMBERS.md:94",
+      "reason": "table row naming a plain source for a number this ledger does not carry a claim for -- the honest gap paper/NUMBERS.md's own opening paragraphs describe -- rather than asserting an independent new measurement",
+      "anchor_digest": "0baa1c4ede9d6dc4cd2360b97f0285abe54859450dfd80b5e78f4dadcaaa789a"
+    },
+    {
+      "id": "N-898",
+      "text": "| 1 | `docs/BENCHMARK_RESULTS.md` | campaign v1: arm C produced a final state in 1 cell of 5. |",
+      "where": "paper/NUMBERS.md:95",
+      "reason": "table row naming a plain source for a number this ledger does not carry a claim for -- the honest gap paper/NUMBERS.md's own opening paragraphs describe -- rather than asserting an independent new measurement",
+      "anchor_digest": "bdc9dcf7e8a6031de6efd7c7655ff2ac4e91a5d4baba5243a286dcb606a7af62"
+    },
+    {
+      "id": "N-899",
+      "text": "| 4 | `docs/BENCHMARK_RESULTS.md` | campaign v1: 4 of the 5 arm C cells stopped for the same reason, O127 -- a finished planner pane read as waiting for a human approval. |",
+      "where": "paper/NUMBERS.md:96",
+      "reason": "table row naming a plain source for a number this ledger does not carry a claim for -- the honest gap paper/NUMBERS.md's own opening paragraphs describe -- rather than asserting an independent new measurement",
+      "anchor_digest": "0a8af3221e006c4c66668ff701235d42dacaf6fecf51e288ed560ea3b3e1b5ac"
+    },
+    {
+      "id": "N-900",
+      "text": "| 6 | C-239 | campaign v1: one of the four acceptance-criteria counts (5, 6, 4, 3) still held in the run trees of the cells O127 stopped. |",
+      "where": "paper/NUMBERS.md:97",
+      "reason": "table row cross-referencing claim C-239, already recorded in CLAIMS.json; this table indexes existing claims by number rather than asserting an independent new measurement",
+      "anchor_digest": "ca46cc2c36870ca0299aad44da8e039f55585e3a4e54ba569b93a6e841e36b2a"
+    },
+    {
+      "id": "N-901",
+      "text": "| 5 | C-239 | campaign v1: the first of those four acceptance-criteria counts. |",
+      "where": "paper/NUMBERS.md:98",
+      "reason": "table row cross-referencing claim C-239, already recorded in CLAIMS.json; this table indexes existing claims by number rather than asserting an independent new measurement",
+      "anchor_digest": "6c1c220d0e0095c3236ae2dcb49329dd8f7a55d64713d3bd1a8289715418d55f"
+    },
+    {
+      "id": "N-902",
+      "text": "| 4 | C-239 | campaign v1: the third of those four acceptance-criteria counts. |",
+      "where": "paper/NUMBERS.md:99",
+      "reason": "table row cross-referencing claim C-239, already recorded in CLAIMS.json; this table indexes existing claims by number rather than asserting an independent new measurement",
+      "anchor_digest": "6afa951ec7dab4fe38d3c55b473f4a8b5055ac10673dff546c7fc7f50f8de5b2"
+    },
+    {
+      "id": "N-903",
+      "text": "| 3 | C-239 | campaign v1: the fourth of those four acceptance-criteria counts. |",
+      "where": "paper/NUMBERS.md:100",
+      "reason": "table row cross-referencing claim C-239, already recorded in CLAIMS.json; this table indexes existing claims by number rather than asserting an independent new measurement",
+      "anchor_digest": "97481b82edaa71afd845a36fc1606f8e745b1ad824c3e21d009d36194e9368e1"
+    },
+    {
+      "id": "N-904",
+      "text": "| 18 | C-458 | post-O143 operational closure: 18 of 18 declared dispatches spent, the budget taken from what v2's arm C actually spent and never raised after a failure. |",
+      "where": "paper/NUMBERS.md:101",
+      "reason": "table row cross-referencing claim C-458, already recorded in CLAIMS.json; this table indexes existing claims by number rather than asserting an independent new measurement",
+      "anchor_digest": "9d8ed0ed29226644523a2fd31f58b82cf65de7238f5c36408b0bd30396f44f59"
+    },
+    {
+      "id": "N-905",
+      "text": "| 9 | C-458 | post-O143 operational closure: 9 primary and 9 repair dispatches. |",
+      "where": "paper/NUMBERS.md:102",
+      "reason": "table row cross-referencing claim C-458, already recorded in CLAIMS.json; this table indexes existing claims by number rather than asserting an independent new measurement",
+      "anchor_digest": "b409f8b2dbd55b706685b7067a7ae7601d0e1cd594addc2b2a7da0b289d14e1d"
+    },
+    {
+      "id": "N-906",
+      "text": "| 1 | C-458 | post-O143 operational closure: 1 repair node. |",
+      "where": "paper/NUMBERS.md:103",
+      "reason": "table row cross-referencing claim C-458, already recorded in CLAIMS.json; this table indexes existing claims by number rather than asserting an independent new measurement",
+      "anchor_digest": "94801153fca6081e27d5928afbb71eb0224d2d9d80013abcb0fc742afb0ec003"
+    },
+    {
+      "id": "N-907",
+      "text": "| 0 | C-458 | post-O143 operational closure: 0 human decisions. |",
+      "where": "paper/NUMBERS.md:104",
+      "reason": "table row cross-referencing claim C-458, already recorded in CLAIMS.json; this table indexes existing claims by number rather than asserting an independent new measurement",
+      "anchor_digest": "f7ecd96c028bd2bf6cbf508444f2e91a6d91017822ce05dc28271a2615cb3cde"
+    },
+    {
+      "id": "N-908",
+      "text": "| 2 | structural: `docs/LIMITATIONS.md` limit heading number (limit 2, the missing baseline) | Not itself a measurement; the limit's own text is the recorded statement. |",
+      "where": "paper/NUMBERS.md:105",
+      "reason": "table row naming a plain source for a number this ledger does not carry a claim for -- the honest gap paper/NUMBERS.md's own opening paragraphs describe -- rather than asserting an independent new measurement",
+      "anchor_digest": "9808c609584c268d7cd6d84ce7e39c3799baab076f1d63dc7cd6c60196f4a100"
+    },
+    {
+      "id": "N-909",
+      "text": "| 17 | structural: `docs/LIMITATIONS.md` limit heading number (limit 17, arm A is single-shot by construction) | Not itself a measurement. |",
+      "where": "paper/NUMBERS.md:106",
+      "reason": "table row naming a plain source for a number this ledger does not carry a claim for -- the honest gap paper/NUMBERS.md's own opening paragraphs describe -- rather than asserting an independent new measurement",
+      "anchor_digest": "2aec87665126e94a6c21bc831a625799b3fd52dd6ea7cf62645f7ffdbe47a958"
+    },
+    {
+      "id": "N-910",
+      "text": "| 5 | C-252 | 5 release-critical metrics carry a falsifier; without it the metric stays `NOT_RUN`. |",
+      "where": "paper/NUMBERS.md:107",
+      "reason": "table row cross-referencing claim C-252, already recorded in CLAIMS.json; this table indexes existing claims by number rather than asserting an independent new measurement",
+      "anchor_digest": "51e0f873367704a86b24dc5ca7d9aba11465ff972bbac2e70af8d78360af21d9"
+    },
+    {
+      "id": "N-911",
+      "text": "| 11 | C-459 | 11 controls in the dispatch-budget instrument. |",
+      "where": "paper/NUMBERS.md:108",
+      "reason": "table row cross-referencing claim C-459, already recorded in CLAIMS.json; this table indexes existing claims by number rather than asserting an independent new measurement",
+      "anchor_digest": "17931ba00a81d4e8031ae88ab86f1157fbb6b550ef85be4dbed05a56c3196a3a"
+    },
+    {
+      "id": "N-912",
+      "text": "| 9 | C-459 | the first of the instrument's three ceilings. |",
+      "where": "paper/NUMBERS.md:109",
+      "reason": "table row cross-referencing claim C-459, already recorded in CLAIMS.json; this table indexes existing claims by number rather than asserting an independent new measurement",
+      "anchor_digest": "d44148c6d968306717cbfd353b89abe385b67d2f66ad0e419aa9f5df6cc3ee05"
+    },
+    {
+      "id": "N-913",
+      "text": "| 8 | C-459 | the second of the instrument's three ceilings -- and the one that forces the refusal inside an iteration. |",
+      "where": "paper/NUMBERS.md:110",
+      "reason": "table row cross-referencing claim C-459, already recorded in CLAIMS.json; this table indexes existing claims by number rather than asserting an independent new measurement",
+      "anchor_digest": "ff3a0333425b2e907584a1acecbec4f12f12ad15a44e466e5617a5dcde4acd0e"
+    },
+    {
+      "id": "N-914",
+      "text": "| 4 | C-459 | the third of the instrument's three ceilings. |",
+      "where": "paper/NUMBERS.md:111",
+      "reason": "table row cross-referencing claim C-459, already recorded in CLAIMS.json; this table indexes existing claims by number rather than asserting an independent new measurement",
+      "anchor_digest": "15ffb8edaeb9e22689f02fed068826a925e5be4406f1835de4d2c1cd3eca6a24"
+    },
+    {
+      "id": "N-915",
+      "text": "| 2 | C-254 | 2 falsifiers, each deleting the enforcement, both required to be detected. |",
+      "where": "paper/NUMBERS.md:112",
+      "reason": "table row cross-referencing claim C-254, already recorded in CLAIMS.json; this table indexes existing claims by number rather than asserting an independent new measurement",
+      "anchor_digest": "2d66da44a758ac4fac05edbe62cc75b84275eb88e338af983bc16300d72f376a"
+    },
+    {
+      "id": "N-916",
+      "text": "| 7 | `DOGFOOD_LEDGER.md` finding O147 -- an internal working document this ledger does not cover | an earlier version of the budget instrument passed 7 of 8 controls against a build with the enforcement removed. The paper names the finding id in the same sentence. |",
+      "where": "paper/NUMBERS.md:113",
+      "reason": "table row naming a plain source for a number this ledger does not carry a claim for -- the honest gap paper/NUMBERS.md's own opening paragraphs describe -- rather than asserting an independent new measurement",
+      "anchor_digest": "6bbcfdedcda190a33a65a88d31da5b8322d86d6241f181912f12ceed43ec2049"
+    },
+    {
+      "id": "N-917",
+      "text": "| 8 | `DOGFOOD_LEDGER.md` finding O147 -- an internal working document this ledger does not cover | the denominator of that 7 of 8. |",
+      "where": "paper/NUMBERS.md:114",
+      "reason": "table row naming a plain source for a number this ledger does not carry a claim for -- the honest gap paper/NUMBERS.md's own opening paragraphs describe -- rather than asserting an independent new measurement",
+      "anchor_digest": "87714175c4bbb3f3e23ef2935c1be0acb7a13decdb50f25e1c5bc778725aa713"
+    },
+    {
+      "id": "N-918",
+      "text": "| 5 | `DOGFOOD_LEDGER.md` finding O147 -- an internal working document this ledger does not cover | 5 of those 8 controls were reading the test fixture's own loop guard rather than the product's refusal. |",
+      "where": "paper/NUMBERS.md:115",
+      "reason": "table row naming a plain source for a number this ledger does not carry a claim for -- the honest gap paper/NUMBERS.md's own opening paragraphs describe -- rather than asserting an independent new measurement",
+      "anchor_digest": "975a7f9e80b7c7702dd61c2d5a3516ffc83af82bba8ed3ca6a2c4e1d16992b16"
+    },
+    {
+      "id": "N-919",
+      "text": "| 2 | `DOGFOOD_LEDGER.md` finding O147 -- an internal working document this ledger does not cover | 2 independent reviewers were tasked to refute the instrument before campaign v3 was frozen; both returned release: NO. |",
+      "where": "paper/NUMBERS.md:116",
+      "reason": "table row naming a plain source for a number this ledger does not carry a claim for -- the honest gap paper/NUMBERS.md's own opening paragraphs describe -- rather than asserting an independent new measurement",
+      "anchor_digest": "8d6682fa604d99313cc36557cdd1779ba85dc1492d812be070781cb5e7c2eae1"
+    },
+    {
+      "id": "N-920",
+      "text": "| 9 | `DOGFOOD_LEDGER.md` finding O144 -- an internal working document this ledger does not cover | `max_dispatches=9`, the ceiling that bought eight provider calls before the off-by-one was found. |",
+      "where": "paper/NUMBERS.md:117",
+      "reason": "table row naming a plain source for a number this ledger does not carry a claim for -- the honest gap paper/NUMBERS.md's own opening paragraphs describe -- rather than asserting an independent new measurement",
+      "anchor_digest": "d67c98e8e088ebe2e0907428d6b27f20e57df3a557e16aac0f75e9246e69a34c"
+    },
+    {
+      "id": "N-921",
+      "text": "| 8 | `DOGFOOD_LEDGER.md` finding O144 -- an internal working document this ledger does not cover | the eight provider calls that ceiling actually bought. |",
+      "where": "paper/NUMBERS.md:118",
+      "reason": "table row naming a plain source for a number this ledger does not carry a claim for -- the honest gap paper/NUMBERS.md's own opening paragraphs describe -- rather than asserting an independent new measurement",
+      "anchor_digest": "4caea6a0f47a47b50a1336137f9860af6acae0fbf34374436b438bde8df2ff9f"
+    },
+    {
+      "id": "N-922",
+      "text": "| 167 | C-462 | failures in an export tree that carried no environment-gap marker where the published document promised none would. |",
+      "where": "paper/NUMBERS.md:119",
+      "reason": "table row cross-referencing claim C-462, already recorded in CLAIMS.json; this table indexes existing claims by number rather than asserting an independent new measurement",
+      "anchor_digest": "6c5c67268112eb365d7b659202c4011ade0aa3f1a96d14782eaa9626d1959dd0"
+    },
+    {
+      "id": "N-923",
+      "text": "| 329 | C-462 | the denominator of that ratio. |",
+      "where": "paper/NUMBERS.md:120",
+      "reason": "table row cross-referencing claim C-462, already recorded in CLAIMS.json; this table indexes existing claims by number rather than asserting an independent new measurement",
+      "anchor_digest": "a1658ebeb0216239a5264cff7b20bf933d4d45f7fb041b02239fc6d307f83473"
+    },
+    {
+      "id": "N-924",
+      "text": "| 142 | `DOGFOOD_LEDGER.md` | **Superseded the day it was written, and kept to show why.** An earlier draft of section 13 froze the count of findings carrying their own heading in the internal ledger at 142, with a line-counting command beside it that did not reproduce it (finding O166). Recording that finding moved the count; recording the next one (O167) moved it again. Section 13 now prints the recomputation command and no answer, so the paper carries no such figure. |",
+      "where": "paper/NUMBERS.md:121",
+      "reason": "table row recording that an earlier draft's figure was superseded and why; the paper carries no such number any more, so this row is a history entry in this document's own cross-reference table rather than a claim about HoH",
+      "anchor_digest": "c3a9b2584c1396ac525fe56f5f803ef052d077865c21ab6cc00b11135f0c8cfd",
+      "superseded": {
+        "on": "2026-09-14",
+        "previous_text": "| 142 | `DOGFOOD_LEDGER.md`, re-derivable with `grep -cE '^#{2,4} O[0-9]+' DOGFOOD_LEDGER.md` | findings carrying their own heading in the internal ledger. Not a ledger claim: this ledger's declared coverage does not extend to that document, and the paper says so in the same breath. |",
+        "previous_where": "paper/NUMBERS.md:121",
+        "previous_anchor_digest": "933941590a2b7d055bfacf7c15b3785f0083483326d689d821fb694cd76852ee",
+        "why": "superseded 2026-09-14: the row it covers was rewritten the same day. The paper's section 13 no longer freezes a heading tally over the internal ledger -- findings O166 and O167 each moved the count, and recording them moved it again -- so the row now records that history instead of a live figure. Kept rather than removed."
+      }
+    },
+    {
+      "id": "N-925",
+      "text": "| 30 | C-460 | explicit environment-gap skips a fresh clone of the public export reports, never summed with its passes. |",
+      "where": "paper/NUMBERS.md:122",
+      "reason": "table row cross-referencing claim C-460, already recorded in CLAIMS.json; this table indexes existing claims by number rather than asserting an independent new measurement",
+      "anchor_digest": "0fb1e3ab0d2e8f679ccb29fc9450d6e2f2853864c23c91bfb4a5db166a1b8b80"
+    },
+    {
+      "id": "N-926",
+      "text": "| 7 | C-461 | violations planted into throwaway copies by the capability-boundary instrument, each detected on its own: 7 of 7. |",
+      "where": "paper/NUMBERS.md:123",
+      "reason": "table row cross-referencing claim C-461, already recorded in CLAIMS.json; this table indexes existing claims by number rather than asserting an independent new measurement",
+      "anchor_digest": "5cab728ddaca5c58990ceba69f0020645445dc2a1bcfcac8f19565cee081a6ac"
+    },
+    {
+      "id": "N-927",
+      "text": "| 5 | `tests/test_export_gap_guard.py` | negative controls holding the manifest-bound, fail-closed export-skip rule in place. |",
+      "where": "paper/NUMBERS.md:124",
+      "reason": "table row naming a plain source for a number this ledger does not carry a claim for -- the honest gap paper/NUMBERS.md's own opening paragraphs describe -- rather than asserting an independent new measurement",
+      "anchor_digest": "d4d851b1dbbf0ed9624025016f03c93f435f60aafc337f7fd00d9f872fea691d"
+    },
+    {
+      "id": "N-928",
+      "text": "resolver touches, and 5 added on 2026-09-14 because recomputing them needs",
+      "where": "paper/AUDIT.md:432",
+      "reason": "part of this audit's own summary, recounted on 2026-09-14 after paper/NUMBERS.md gained the rows for sections 12 and 13; the figures are a recount of this document's own table, re-derived by tools/audit_refs.py summary-consistency, not measurements about HoH",
+      "anchor_digest": "65e35eb864b64566a4bcdbe5e9cc561729372f26f933bb0c9823524430006823"
+    },
+    {
+      "id": "N-929",
+      "text": "  of another. v2 is kept with `matched_budget_valid = NO`, which cannot be",
+      "where": "CHANGELOG.md:18",
+      "reason": "restates that campaign v2 is kept with matched_budget_valid = NO; the verdict itself is recorded in docs/BENCHMARK_RESULTS_v2.md and the defect that caused it at C-217, and this line is a changelog entry pointing at them",
+      "anchor_digest": "58447d2cbb617cc8c8db1ca964a81bb963bbfefad6672dc796aaaf74ffc59206"
+    },
+    {
+      "id": "N-930",
+      "text": "  v2 rather than chosen after a failure.",
+      "where": "CHANGELOG.md:39",
+      "reason": "names the campaign the closure evidence's budget magnitude was taken from; a changelog entry restating the budget provenance recorded at C-458 and in dogfood/closure-e2e/CLOSURE_E2E.json",
+      "anchor_digest": "11c8b4d3b8a1d83b31c672385b559d90498227f44316790ed5ff6ef91cb89307"
+    },
+    {
+      "id": "N-931",
+      "text": "`v0.1.0` is the first stable tag. It supersedes `v0.1.0-rc3`; all three release",
+      "where": "RELEASE_NOTES.md:3",
+      "reason": "names this tag and the release candidates it supersedes, and states that all three stay published and unmoved; version identifiers and a statement about what was not done to them, not a measurement",
+      "anchor_digest": "a6287999b659d44f448e06f5af50f5a79fef655e41714543ac860e37f62f2e3b"
+    },
+    {
+      "id": "N-932",
+      "text": "For most of this project's life its own `docs/LIMITATIONS.md` limit 2 said",
+      "where": "RELEASE_NOTES.md:15",
+      "reason": "restates docs/LIMITATIONS.md limit 2's own statement that this project had no baseline, citing the limit by its heading number; an internal cross-reference to another document's recorded limit",
+      "anchor_digest": "5e3c93eb5c1ad56d40f33f3fa09dee25b0e79b930e3a3b150bd450f91c7ed6a9"
+    },
+    {
+      "id": "N-933",
+      "text": "Campaign **v3** was pre-registered in full -- 5 tasks x 3 arms x 3 repetitions,",
+      "where": "RELEASE_NOTES.md:19",
+      "reason": "restates campaign v3's pre-registered shape -- 5 tasks, 3 arms, 3 repetitions -- and the interval before the first cell, from docs/benchmarks/v3/PREREGISTRATION.json and PREREGISTRATION_PROVENANCE.json; a design parameter frozen before the campaign ran and a timestamp interval that lives in a JSON evidence file outside this ledger's declared prose coverage, with both files named in the same passage",
+      "anchor_digest": "6f26734750e410bdb65fa115b3bda139c5d85f28ba837ba9d1bcb22acd3d056d"
+    },
+    {
+      "id": "N-934",
+      "text": "| A -- plain agent | 15/15 PASS | 0 | answered | 1 per cell |",
+      "where": "RELEASE_NOTES.md:28",
+      "reason": "one row of campaign v3's arm summary, the same row docs/BENCHMARK_RESULTS_v3.md carries and C-446/C-455 record; a restatement in the release notes, not a re-measurement",
+      "anchor_digest": "d1bcd5bfa099a212b522eaf15ba829300277323fb668a8333d74ada1f10dc7b4"
+    },
+    {
+      "id": "N-935",
+      "text": "| B -- one `hoh run` | 14/15 PASS | **1** | 15/15 accepted | 6-7 |",
+      "where": "RELEASE_NOTES.md:29",
+      "reason": "one row of campaign v3's arm summary, the same row docs/BENCHMARK_RESULTS_v3.md carries and C-447/C-456 record; a restatement in the release notes, not a re-measurement",
+      "anchor_digest": "15bda96ed25dfb618397a53e21611c073a5fe8e8eb2943a28363727333aba47b"
+    },
+    {
+      "id": "N-936",
+      "text": "| C -- full control plane | 14/15 PASS | 0 | **15/15 `BUDGET_EXHAUSTED`, 0/15 `CLOSED`** | 9 |",
+      "where": "RELEASE_NOTES.md:30",
+      "reason": "one row of campaign v3's arm summary, the same row docs/BENCHMARK_RESULTS_v3.md carries and C-448/C-457 record; a restatement in the release notes, not a re-measurement",
+      "anchor_digest": "1a0fda211d2a0a2e36088c36d5eb328c6712ea72f6e17e48b29b3b901a2f5434"
+    },
+    {
+      "id": "N-937",
+      "text": "  v2's** -- same task, same arm. Three repetitions carry no rate; they carry",
+      "where": "RELEASE_NOTES.md:37",
+      "reason": "states that campaign v3's arm B false accept fell on the same task and arm as campaign v2's, and what three repetitions do not license; a comparison between two already-recorded measurements (C-447 and C-313) plus a restriction on reading them",
+      "anchor_digest": "19cb8529974c7d89a66eaec1055b6267d9e84e310ed21a59dbae97afb28d7bb1"
+    },
+    {
+      "id": "N-938",
+      "text": "  repair node, and had the repair refused for want of budget. In v2 the same",
+      "where": "RELEASE_NOTES.md:41",
+      "reason": "restates campaign v3's arm C outcome beside campaign v2's; both figures are recorded -- v3's at C-448 and the v2 budget defect at C-217 -- and this sentence is the comparison between them",
+      "anchor_digest": "784c567c9067aba6de08c5cfd2772e3dd09c0a2419bb767c5be83f18191c6a70"
+    },
+    {
+      "id": "N-939",
+      "text": "  claimed it. Quoting `0` for arm C beside arm B's `1` compares *answered",
+      "where": "RELEASE_NOTES.md:48",
+      "reason": "warns against comparing arm C's 0 false accepts with arm B's 1, quoting both already-recorded figures (C-448, C-447) to say what the comparison would mean; a restriction on reporting",
+      "anchor_digest": "4579147898bd740801c3f369bc3355d3df0ff5281d1472b11922675fa8f84108"
+    },
+    {
+      "id": "N-940",
+      "text": "`benchmark_v3 = PASS` on the readiness board means the campaign was",
+      "where": "RELEASE_NOTES.md:51",
+      "reason": "states what the benchmark_v3 = PASS row does and does not license; a restriction on how an already-recorded verdict (C-259) may be read",
+      "anchor_digest": "5a04f9e891755de95e61837779bb9ff53f1be6803aa6e9062e4abc2bbb406b6e"
+    },
+    {
+      "id": "N-941",
+      "text": "performed better. `docs/LIMITATIONS.md` section 19 says so in the document a",
+      "where": "RELEASE_NOTES.md:55",
+      "reason": "cross-references docs/LIMITATIONS.md section 19 by its heading number for the same restriction; an internal cross-reference, not a figure",
+      "anchor_digest": "edd0bf194d47ee7bd681249d652d41fea5ad612a7b7ce93ca51fc0906aba8811"
+    },
+    {
+      "id": "N-942",
+      "text": "positive path has its own evidence, at a budget **taken from v2** -- eighteen,",
+      "where": "RELEASE_NOTES.md:62",
+      "reason": "restates the budget the closure evidence declared (eighteen) and names where that magnitude came from -- what campaign v2's arm C actually spent reaching closure, recorded in docs/BENCHMARK_RESULTS_v2.md",
+      "anchor_digest": "16a4292682a3863df029f633d1eefd093d03dd052c633f03e8fda3f9e4cf6df6"
+    },
+    {
+      "id": "N-943",
+      "text": "what v2's arm C actually spent reaching closure -- declared before the run and",
+      "where": "RELEASE_NOTES.md:63",
+      "reason": "restates that the declared budget came from campaign v2 and was not raised after a failure; a statement about the procedure, with the run's own figures recorded at C-458",
+      "anchor_digest": "a7580ef20c29f28ab7167ad5aeff643fa1eaa6484f255ce3b6ba2ba035e1023d"
+    },
+    {
+      "id": "N-944",
+      "text": "fixpoint through a full repair cycle, unattended. 18 of 18 declared dispatches,",
+      "where": "RELEASE_NOTES.md:65",
+      "reason": "restates the closure run's recorded figures -- 18 of 18 declared dispatches -- which C-458 and dogfood/closure-e2e/CLOSURE_E2E.json carry",
+      "anchor_digest": "ae57819117e59760da890c22c256e01910257b6803e04a79604e33cb7f364e08"
+    },
+    {
+      "id": "N-945",
+      "text": "9 primary and 9 repair, one repair node, **zero human decisions**.",
+      "where": "RELEASE_NOTES.md:66",
+      "reason": "restates the closure run's recorded figures -- 9 primary and 9 repair dispatches, one repair node, zero human decisions -- which C-458 carries",
+      "anchor_digest": "827db3db58917c5361983986f0cc9ff2f36a280febab8690c581a1e62965c974"
+    },
+    {
+      "id": "N-946",
+      "text": "## What is new in the software since rc3",
+      "where": "RELEASE_NOTES.md:72",
+      "reason": "a section heading naming the release candidate this tag supersedes; a version identifier, not a measurement",
+      "anchor_digest": "3cd78fa6151b2c26e09c15f9340f8fe0584a869c75948438aa6d1e9d9ce31be0"
+    },
+    {
+      "id": "N-947",
+      "text": "* An enforced ceiling **off by one**: `max_dispatches=9` bought eight provider",
+      "where": "RELEASE_NOTES.md:96",
+      "reason": "restates finding O144's off-by-one -- a ceiling of 9 that bought eight provider calls -- from DOGFOOD_LEDGER.md, an internal working document outside this ledger's declared coverage; the enforcement that replaced it is recorded at C-254",
+      "anchor_digest": "63b9243f2189040878384f3a3134747b4e7b73a2ae536012720c306f7f61fa71"
+    },
+    {
+      "id": "N-948",
+      "text": "  that verification: 167 of 329 failures in an export tree carried no",
+      "where": "RELEASE_NOTES.md:105",
+      "reason": "restates the export-marker failure -- 167 of 329 failures carrying no environment-gap marker -- which C-452 and C-462 record",
+      "anchor_digest": "79483a031f3631c11f2024d216d891fcdb85fb950f1ecf3532ef23b8ea68f286"
+    },
+    {
+      "id": "N-949",
+      "text": "* And, before campaign v3 was frozen: an earlier version of the budget",
+      "where": "RELEASE_NOTES.md:112",
+      "reason": "restates the seven-of-eight figure from finding O147 in DOGFOOD_LEDGER.md, an internal working document outside this ledger's declared coverage; the instrument that replaced it is recorded at C-254",
+      "anchor_digest": "38458d61346404a5b4a0778bdd27a17c527c7d29203ce67c76aa267f8c4388b3"
+    },
+    {
+      "id": "N-950",
+      "text": "  never summed with them. At this tag: **1220 passed, 30 skipped** in a",
+      "where": "RELEASE_NOTES.md:143",
+      "reason": "restates the 30 explicit environment-gap skips a fresh clone reports, recorded at C-460, together with the rule that they are never summed with the passes",
+      "anchor_digest": "d73b3bc8ee17a8adb534351616aca83e5de6dd15bacb6a348f091373ee918059",
+      "superseded": {
+        "on": "2026-09-14",
+        "previous_text": "  That is why a fresh clone reports **30 explicit environment-gap skips**, each",
+        "previous_where": "RELEASE_NOTES.md:130",
+        "previous_anchor_digest": "bd3614f109acd6d35468425af44efd2eba964e830b743e0c881726ca36fa0656",
+        "why": "superseded 2026-09-14, before the v0.1.0 push: the earlier wording said \"a fresh clone\" reports 30 environment-gap skips. Measured on the export tree at this tag, a `--depth 1` clone reports 1220 passed and 30 skipped and a full clone reports 1222 passed and 28 skipped -- two of the skips exist only when the history is shallow. A figure that is right for one clone shape and wrong for the other, quoted without saying which, is the same defect as O163: a published number that does not survive the verification the document invites. Each figure now carries the clone it was taken in."
+      }
+    },
+    {
+      "id": "N-951",
+      "text": "127 `README.md` reports: that one counts the findings of the release campaign",
+      "where": "paper/POSITION_PAPER.md:949",
+      "reason": "distinguishes this section's ledger-wide finding tally from the campaign-scoped count of 127 that README.md's own table reports; a statement about which scope each figure covers, with the README figure recorded in that document's own table rather than re-measured here",
+      "anchor_digest": "61075874af62664a47d7afc7504e9abbf343327f3aad6c9f41ae814b8412e446"
+    },
+    {
+      "id": "N-952",
+      "text": "than distinct ids (O166), and the finding that this audit's new source columns",
+      "where": "paper/POSITION_PAPER.md:948",
+      "reason": "names internal finding ids from DOGFOOD_LEDGER.md, an internal working document this ledger's declared coverage does not extend to (see this paper's section 0), and states why this passage prints the command that recomputes the heading count instead of freezing the answer; a statement about a moving measurement, not a figure",
+      "anchor_digest": "7f9cbfa9631503f1d733df6a0e19f0086936b8700eac48bd5192395e5327d36f",
+      "superseded": [
+        {
+          "on": "2026-09-14",
+          "previous_text": "**144** of them carry their own heading in `DOGFOOD_LEDGER.md`, each with what",
+          "previous_where": "paper/POSITION_PAPER.md:944",
+          "previous_anchor_digest": "201ce32f1f44c9b2dad3fccde68ced650dbae85784cb80b4882148dcd575c7c8",
+          "why": "superseded 2026-09-14, third and last time on this sentence: the count it carried moved every time a finding was recorded, including the two findings about this very sentence (O166, O167). The line now prints the command instead of freezing an answer, and says why -- which makes it stable rather than stale. Every earlier text and digest is kept here in order."
+        }
+      ]
+    },
+    {
+      "id": "N-953",
+      "text": "(O167). Writing either one down moved the number that was sitting beside it.",
+      "where": "paper/POSITION_PAPER.md:950",
+      "reason": "names internal finding ids from DOGFOOD_LEDGER.md, an internal working document this ledger's declared coverage does not extend to (see this paper's section 0), and states why this passage prints the command that recomputes the heading count instead of freezing the answer; a statement about a moving measurement, not a figure",
+      "anchor_digest": "420401925495051a9edde32534c1d19354e7aedfb4dcf39ce33579ee5fef060a",
+      "superseded": [
+        {
+          "on": "2026-09-14",
+          "previous_text": "line-counting command beside it turned out to count the wrong thing (O166),",
+          "previous_where": "paper/POSITION_PAPER.md:951",
+          "previous_anchor_digest": "534d82fec68f1d726c0adfcf44fc27bd19d856344e64b98ef442965803bccfbb",
+          "why": "superseded 2026-09-14, third and last time on this sentence: the count it carried moved every time a finding was recorded, including the two findings about this very sentence (O166, O167). The line now prints the command instead of freezing an answer, and says why -- which makes it stable rather than stale. Every earlier text and digest is kept here in order."
+        }
+      ]
+    },
+    {
+      "id": "N-954",
+      "text": "one of them narrows it. §12 does not claim the harness performed better than a",
+      "where": "paper/POSITION_PAPER.md:1024",
+      "reason": "states what the two sections added for the v0.1.0 release do not claim, citing this paper's own section numbers; a restriction on reading them and an internal cross-reference, not a measurement",
+      "anchor_digest": "164ae9d247c0b21feb70971e204b1730a88e91856cf2cc7f6a5c31d7dde8cbd2"
+    },
+    {
+      "id": "N-955",
+      "text": "§13 does not claim that finding a defect in oneself is the same as not having",
+      "where": "paper/POSITION_PAPER.md:1028",
+      "reason": "states what the two sections added for the v0.1.0 release do not claim, citing this paper's own section numbers; a restriction on reading them and an internal cross-reference, not a measurement",
+      "anchor_digest": "fafc7efd67e8a6063e2aff2c2baa333addddbf675ec35765f59abe5ca55ab818"
+    },
+    {
+      "id": "N-956",
+      "text": "## 12g. The export's reference check only sees a path that is quoted",
+      "where": "docs/LIMITATIONS.md:1262",
+      "reason": "a limit heading naming its own ordinal (12g) and the limit it continues (12e); a structural section label, not a measurement",
+      "anchor_digest": "7ec92ffd9037d232b78f35977a0133fa75f4cd2802b74f68b2381805a308c97b"
+    },
+    {
+      "id": "N-957",
+      "text": "Limit 12e is about references the gate *finds*. This one is about the ones it",
+      "where": "docs/LIMITATIONS.md:1264",
+      "reason": "an internal cross-reference to limit 12e of this same document, saying what this limit covers that the other does not",
+      "anchor_digest": "9449569cf7e7a90305a7397b5a37fcdee7ff7771a51834c3aedb2736372dc228"
+    },
+    {
+      "id": "N-958",
+      "text": "`check_u2b` harvests path candidates from backtick spans, markdown links and",
+      "where": "docs/LIMITATIONS.md:1267",
+      "reason": "describes which forms tools/export_manifest.py's check_u2b harvests path candidates from; a description of a published tool's behaviour, checkable by reading or running it, not a figure about HoH's runtime",
+      "anchor_digest": "ef1439f4b93cdbbb02fafc289581dfcabd06884e9d34c37bf29c00ceb5521be7"
+    },
+    {
+      "id": "N-959",
+      "text": "This was found while preparing v0.1.0 and is recorded as O167. Sixteen rows",
+      "where": "docs/LIMITATIONS.md:1274",
+      "reason": "names internal finding id O167 from DOGFOOD_LEDGER.md, an internal working document this ledger's declared coverage does not extend to, and restates how many audit rows the gate missed; the rows themselves are in paper/AUDIT.md and countable there",
+      "anchor_digest": "598036b417d08f5a88e2862c6c292aa0fd7a5fa114fb116d245b5b24a497f862"
+    },
+    {
+      "id": "N-960",
+      "text": "real path it can `stat`, so backticks there would break it; `check_u2b` only",
+      "where": "docs/LIMITATIONS.md:1285",
+      "reason": "describes what tools/audit_refs.py numbers-recomputed requires of the source column and what check_u2b sees; a description of two published tools' behaviour, not a measurement",
+      "anchor_digest": "a5e328368cfbd2e33bd297bc319449d1cb4f6c873a15ddbdb022906c83d726b7"
+    },
+    {
+      "id": "N-961",
+      "text": "The line above reads **0 unacknowledged, 9 acknowledged in 2 documents**. The",
+      "where": "docs/LIMITATIONS.md:802",
+      "reason": "part of this entry's dated recount of its own acknowledged-reference figures; the live count is what `python3 tools/export_manifest.py check` prints on every run, and both the earlier figure and this one are kept rather than one replacing the other",
+      "anchor_digest": "2dff1ef2b839f3e11fe55ac33906954d9809478c760e44938c9fc6b43af0d46c"
+    },
+    {
+      "id": "N-962",
+      "text": "gate now reports **0 unacknowledged, 12 acknowledged in 5 documents**, and",
+      "where": "docs/LIMITATIONS.md:803",
+      "reason": "part of this entry's dated recount of its own acknowledged-reference figures; the live count is what `python3 tools/export_manifest.py check` prints on every run, and both the earlier figure and this one are kept rather than one replacing the other",
+      "anchor_digest": "c4918af840f6f60dcafd82d65941d9ec78984dcbd2d3e74b2166cf84b08b132a"
+    },
+    {
+      "id": "N-963",
+      "text": "column names the two evidence trees section 12 and 13's figures were",
+      "where": "docs/LIMITATIONS.md:808",
+      "reason": "part of this entry's dated recount of its own acknowledged-reference figures; the live count is what `python3 tools/export_manifest.py check` prints on every run, and both the earlier figure and this one are kept rather than one replacing the other",
+      "anchor_digest": "4c91a25bf7f9548668a9247d7c7b2939c03d413cf911f24779cc06de271fbc2f"
+    },
+    {
+      "id": "N-964",
+      "text": "recomputed from, and neither is in the export (limit 12g says how they got",
+      "where": "docs/LIMITATIONS.md:809",
+      "reason": "part of this entry's dated recount of its own acknowledged-reference figures; the live count is what `python3 tools/export_manifest.py check` prints on every run, and both the earlier figure and this one are kept rather than one replacing the other",
+      "anchor_digest": "a272b0b51abc46af00dd0f7ffa5ac35876b7102437f5650e0583f110ad513304"
+    },
+    {
+      "id": "N-965",
+      "text": "reason, in a third document. So the \"9 in 2\" was one document behind on the",
+      "where": "docs/LIMITATIONS.md:813",
+      "reason": "part of this entry's dated recount of its own acknowledged-reference figures; the live count is what `python3 tools/export_manifest.py check` prints on every run, and both the earlier figure and this one are kept rather than one replacing the other",
+      "anchor_digest": "d72a67874c8911a884ac027e5e4a5baa57ac05f33717f3d10188d49fb70db7a7"
+    },
+    {
+      "id": "N-966",
+      "text": "**1220 passed and 30 skipped** in a `--depth 1` clone, which is what CI makes,",
+      "where": "README.md:274",
+      "reason": "continues the sentence above it, giving the pass and skip counts a fresh clone of the export reports together with the clone shape each was measured in; the figures are recorded at C-460 and the rule that they are never summed is what the passage is for",
+      "anchor_digest": "6df71a9b1d90be8165acbff1240f79162183be86b1fcd026599d516d5e697ef1"
+    },
+    {
+      "id": "N-967",
+      "text": "and **1222 passed and 28 skipped** in a full one -- two of the skips exist",
+      "where": "README.md:275",
+      "reason": "continues the sentence above it, giving the pass and skip counts a fresh clone of the export reports together with the clone shape each was measured in; the figures are recorded at C-460 and the rule that they are never summed is what the passage is for",
+      "anchor_digest": "ad60e90b052b6eb5a4ba7f98be87a06433b03d522e85f001635e078d15995d1e"
+    },
+    {
+      "id": "N-968",
+      "text": "  `--depth 1` clone, **1222 passed, 28 skipped** in a full one. Two of the",
+      "where": "RELEASE_NOTES.md:144",
+      "reason": "continues the sentence above it, giving the pass and skip counts a fresh clone of the export reports together with the clone shape each was measured in; the figures are recorded at C-460 and the rule that they are never summed is what the passage is for",
+      "anchor_digest": "9533f4c0dea5a57b428ee6a2679dda46c58e5f96832a7bb13e1fde23c50ecc46"
+    },
+    {
+      "id": "N-969",
+      "text": "against 1222 and 28 in a full clone, because two of the skips exist only when",
+      "where": "paper/POSITION_PAPER.md:975",
+      "reason": "continues the sentence above it, giving the pass and skip counts a fresh clone of the export reports together with the clone shape each was measured in; the figures are recorded at C-460 and the rule that they are never summed is what the passage is for",
+      "anchor_digest": "451156176af545b13af151d5af550d46302501055fac0208a72613c7771f9a27"
     }
   ],
   "claim_surfaces": [

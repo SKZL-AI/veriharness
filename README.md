@@ -188,6 +188,145 @@ accounting, and this README does not claim otherwise. All of it is a
 considerably weaker claim than "the system repaired itself", and that is the
 point of stating it this way.
 
+## Measured against a plain agent: the matched-budget benchmark
+
+For most of this project's life `docs/LIMITATIONS.md` limit 2 said there was
+**no baseline of any kind**, so every claim about what the harness was worth
+was a claim about its own internals. There are now three campaigns, and none
+was edited in the light of another. The full protocol is
+`docs/BENCHMARK_PROTOCOL.md`, frozen before the first cell ran; the results
+are `docs/BENCHMARK_RESULTS.md`, `_v2.md` and `_v3.md`.
+
+Five small tasks, three arms -- **A** a plain agent with no harness, **B** one
+`hoh run`, **C** the full control plane with global gates and repair nodes --
+a hidden test suite per task that decides the verdict and that no arm sees,
+and a budget matched on the scarce resource, role dispatches. The headline
+metric is the **false accept**: the arm's own checks green, the hidden suite
+red.
+
+Campaign v3 was pre-registered in full -- 5 tasks x 3 arms x 3 repetitions,
+unconditionally -- and the registration's exact bytes were bound in a git
+commit 12.8 seconds before the first cell started. That is established from
+git objects in `docs/benchmarks/v3/PREREGISTRATION_PROVENANCE.json` and
+re-derived by `tests/test_prereg_provenance.py` on every suite run, rather
+than asserted.
+
+| arm | hidden suite | false accepts | what it produced | dispatches |
+|---|---|---|---|---|
+| A -- plain agent | 15/15 PASS | 0 | answered | 1 per cell |
+| B -- one `hoh run` | 14/15 PASS | **1** | 15/15 accepted | 6-7 |
+| C -- full control plane | 14/15 PASS | 0 | **15/15 `BUDGET_EXHAUSTED`, 0/15 `CLOSED`** | 9 |
+
+**Read this the unflattering way, because it is the correct way.** On these
+five tasks the plain agent was cheaper and at least as correct. Arm C's zero
+false accepts is not a correctness result: a false accept requires an arm to
+claim it is finished and be wrong, and arm C never claimed it -- it spent its
+nine dispatches, met a red global gate, spawned a repair node, and had the
+repair refused for want of budget, fifteen times out of fifteen. In v2 the
+same arm closed five of five, on eighteen dispatches per cell against a
+declared nine; the budget is now enforced per cell and shared with the repair
+nodes, and under that rule this control plane does not close on these tasks.
+
+Arm B's one false accept is the finding the benchmark exists to produce -- and
+it **reproduced v2's**: the same task, the same arm, a normalisation that
+dropped a character. Three repetitions carry no rate; what they carry is that
+it was not a one-off.
+
+`benchmark_v3 = PASS` on the readiness board means the campaign was
+pre-registered, commit-bound, complete at 45/45, matched-budget-valid, and
+reproducible from the raw cell files by a second, independently written
+aggregation that never imports the reporter. It does **not** mean the harness
+performed better.
+
+The positive path is measured separately, because a ceiling that refuses too
+early is indistinguishable from one that refuses correctly if you only ever
+measure the case where it binds. At a budget taken from what v2's arm C
+actually spent -- eighteen, decided before the run, never raised afterwards --
+the control plane reaches a real `CLOSED` fixpoint through a full repair
+cycle: 18 of 18 declared dispatches, 9 primary and 9 repair, one repair node,
+**zero human decisions**. The first attempt at that test failed with zero
+provider calls, and that artifact is kept beside the result.
+
+## What it demonstrably does
+
+The benchmark says what the harness did not do. This is what it did, each item
+bound to something you can re-run.
+
+**It makes "green" mean something, and proves it by failing on purpose.** Five
+release-critical metrics carry a falsifier -- a deliberately broken build the
+instrument must catch, or the metric stays `NOT_RUN`. The dispatch-budget
+instrument runs eleven controls at three ceilings (`[9, 8, 4]`, at least one
+of which must force the refusal *inside* an iteration, or the tool refuses to
+run) plus two falsifiers that delete the enforcement. That rule exists because
+an earlier version of the same instrument passed **seven of eight** controls
+against a build with the enforcement removed: five of its controls were
+reading the test fixture's own loop guard rather than the product's refusal.
+Two reviewers tasked to refute it found that before campaign v3 was frozen.
+
+**It refuses states that are conventionally rounded up to a pass.** `NOT_RUN`,
+`NOT_DETERMINABLE`, `UNSUPPORTED_ENVIRONMENT` and `INVALIDATED` are separate
+states, and none of them collapses into a pass. The public CI's sandbox job is
+green with its relevant step skipped, because GitHub's runners cannot create
+the namespace -- reported as `UNSUPPORTED_ENVIRONMENT`, never derived as a
+pass from the green job. A fresh clone of this repository reports its passes
+and its environment-gap skips as two separate numbers that are never summed,
+each skip naming the withheld artifact and why. At the `v0.1.0` tag that is
+**1220 passed and 30 skipped** in a `--depth 1` clone, which is what CI makes,
+and **1222 passed and 28 skipped** in a full one -- two of the skips exist
+only when the history is shallow, so the number is quoted with the clone it
+was measured in rather than on its own. A skip is
+authorised only when `EXPORT_MANIFEST.json` declares that path excluded for
+the reason the test expects; missing-and-included fails, missing-and-
+unclassified fails, missing-manifest fails, wrong-reason fails. Five negative
+controls hold that rule in place, because the first version of it would have
+turned a **lost public file** green by skipping instead of red.
+
+**It binds acceptance to receipts it did not write.** A candidate is accepted
+only when a receipt a deterministic runner produced supports every criterion,
+and only when at least one criterion is proven to have been red on the state
+before the change. The planner's capability boundary is enforced by digest
+rather than requested in a prompt, and the instrument that measures it plants
+seven violations into throwaway copies and must catch each one -- **7 of 7**.
+
+**Every number in the public documents is anchored.** `CLAIMS.json` binds each
+number-bearing sentence in `README.md` and `docs/**` to a claim with evidence,
+or to an explicit `not_claims` entry with a reason. `python3
+tools/check_claims.py check all` fails on an unbound sentence, on an anchor
+whose content changed, and on two claims that share one resolution sentence.
+This paragraph is itself subject to it.
+
+**And it found these things in itself.** The list is the product more than the
+software is: a benchmark whose reported cost was a constant written beside the
+result rather than a measurement; an enforced ceiling off by one, where
+`max_dispatches=9` bought eight provider calls because the counter incremented
+before the budget was consulted, with an existing test that passed against it
+because it only checked that *something* raised; a dispatch log counted one
+line per call, wrong in both directions; a budget a restart refunded; a
+capability witness that could be made to absorb a hostile write during a
+retry; a published claim that told readers how to verify it and did not
+survive that verification (167 of 329 failures in an export tree carried no
+environment-gap marker where the document promised none would); and three
+release gates that had no state in which they could fail -- one of them asking
+a remote the internal tree deliberately does not have, another comparing a
+tree against itself.
+
+Two more were found while writing this release, and they are here for the same
+reason the others are. A sentence in the position paper carried a correct count
+with a **command beside it that computed something else** -- lines rather than
+distinct ids -- so the figure could not be reproduced the way the paper told a
+reader to reproduce it. And the export's reference checker, which is supposed
+to catch a published document pointing at a file the export does not carry,
+harvests paths only from backticked spans and markdown links: sixteen new table
+rows naming internal evidence trees in bare form passed it **green**, and the
+one exemption that existed before them had only ever been caught because the
+same path happened to appear backticked elsewhere in its row. The first is
+fixed; the second is fixed for the references at hand and its detection gap is
+recorded as a tracked defect rather than patched in the hour before a tag.
+
+The full board of what is verified, what is advisory and what is
+`UNSUPPORTED_ENVIRONMENT`, with the exact command that re-derives each row, is
+`docs/READINESS.md`.
+
 ## The four real hurdles to using this
 
 Adopting HoH is not free, and pretending otherwise would undercut the whole

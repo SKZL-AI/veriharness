@@ -1208,21 +1208,47 @@ def test_the_acknowledged_reference_list_is_short_and_every_entry_says_why():
 
     This pins that decision. A third document appearing here has to change
     this test, which is the point.
+
+    Updated 2026-09-14 for the v0.1.0 tag. Two further single references were
+    acknowledged, both in `paper/AUDIT.md`'s source column and both for the
+    same reason as the one that was already there: sections 12 and 13 of the
+    paper recompute their figures from raw evidence trees, and naming the
+    published result document instead would say the number was recomputed
+    from the reporter's own output. The "says where to look instead" rule was
+    tightened rather than relaxed while doing it: an acknowledgement used to
+    have to mention `docs/EVIDENCE_INDEX.md` by name, which the two new
+    entries cannot honestly do -- that file describes three other trees, not
+    these. It now has to name **some** document the export actually carries,
+    checked against the manifest, which the original three satisfy too.
     """
     import tools.export_manifest as em  # noqa: PLC0415
 
     assert set(em.U2B_ANERKANNT) == {
         "paper/REVIEW_A.md",
         "paper/REVIEW_B.md",
-        # A single reference, not the document: the audit's source column has
-        # to name where a number was recomputed from, and that place is an
-        # evidence tree the export does not carry.
+        # Single references, not the document: the audit's source column has
+        # to name where a number was recomputed from, and those places are
+        # evidence trees the export does not carry.
         "paper/AUDIT.md -> runs/a03/receipts",
+        "paper/AUDIT.md -> dogfood/benchmark/results-v3",
+        "paper/AUDIT.md -> dogfood/closure-e2e/CLOSURE_E2E.json",
     }
+
+    wurzel = Path(__file__).resolve().parent.parent
+    manifest = json.loads((wurzel / "EXPORT_MANIFEST.json").read_text())
+    eintraege = manifest["entries"] if isinstance(manifest, dict) and "entries" in manifest else manifest
+    veroeffentlicht = {
+        e["path"] for e in eintraege
+        if (e.get("classification") or e.get("decision")) == "INCLUDE"
+    }
+
     for pfad, grund in em.U2B_ANERKANNT.items():
         assert len(grund) > 80, f"{pfad} is acknowledged without a reason"
-        assert "docs/EVIDENCE_INDEX.md" in grund, (
-            f"{pfad} does not say where a reader can look instead")
+        genannt = {k for k in re.findall(r"[\w.-]+(?:/[\w.-]+)*\.(?:md|json|py|cff|toml)", grund)}
+        assert genannt & veroeffentlicht, (
+            f"{pfad} does not name a document the export actually carries, so "
+            f"it does not say where a reader can look instead (named: "
+            f"{sorted(genannt)})")
 
 
 def test_an_acknowledged_reference_is_not_a_finding_and_is_still_printed():
