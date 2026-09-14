@@ -241,7 +241,7 @@ def test_stale_ci_evidence_is_refused_unless_only_the_gates_reports_moved(
     sys.modules["readiness"] = rd
     spec.loader.exec_module(rd)
 
-    quelle = inspect_source = __import__("inspect").getsource(rd.zeile_ci)
+    quelle = __import__("inspect").getsource(rd.zeile_ci)
     assert '"docs/READINESS.md", "CLAIMS.md", "CLAIMS.json"' in quelle, (
         "the tolerated set is not the gate's own reports any more")
     assert "path_digests" in quelle, (

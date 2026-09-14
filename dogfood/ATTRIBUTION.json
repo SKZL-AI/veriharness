@@ -175,7 +175,8 @@
         "c56bd59dae653b2d7774eb2cc29adcb64e504e9c",
         "f8c303879c2206172cad02fc510fd3c9d85602c9",
         "b4d29362d8090dbb7d1bdcc130788ddb70a97a44",
-        "ddc9b5d0c62fee35c709220735920a1164d74506"
+        "ddc9b5d0c62fee35c709220735920a1164d74506",
+        "6998759755f88b70584c31516b85a84bdfdc2b67"
       ],
       "why_not_the_product": "The campaign's own closure: its result, the classification of a defect in the frozen reporter, and the rule that decides when drift after a campaign is a repair rather than an escape. None of it could have gone through the product, for the reason the campaign itself measured -- under the budget the protocol declares, the control plane reached no fixpoint on any of the five benchmark tasks, so it is in no position to close work of this kind here either. That is the honest version of this field for this window: not 'the product was unsuitable for supervising its own instrument', which is also true, but 'the product does not currently close'. Extended as the closure continued: the telemetry evidence the campaign itself supplied, and the repair of a gate that failed its own next run."
     }
