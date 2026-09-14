@@ -170,5 +170,7 @@ def test_todays_work_is_not_attributed_to_the_product():
 
 def test_two_unattributed_commits_are_still_a_gap():
     """One is the price of a closed range. Two is the thing being prevented."""
+    if _fremde_historie():
+        pytest.skip("this clone does not contain the history the ledger describes")
     bericht = at.pruefe(WURZEL, {"anchor": "HEAD~3", "entries": []})
     assert any("belong to no entry" in p for p in bericht["problems"])

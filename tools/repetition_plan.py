@@ -57,6 +57,31 @@ KAMPAGNEN_DIR = {
 _GEPARKT = re.compile(r"\.(v\d{8}T\d{6}Z|attempt\d+\.v\d{8}T\d{6}Z)\.json$")
 
 
+class HistorieUnvollstaendig(RuntimeError):
+    """The history needed to answer is not in this repository.
+
+    `git log --diff-filter=A` answers "which commit introduced this file" by
+    walking history. In a **shallow** clone -- which is what
+    `actions/checkout` produces by default -- it walks one commit and answers
+    confidently with the wrong one: the newest, whose protocol text is the
+    current one rather than the frozen one. The exact-head CI reported a
+    frozen requirement as `DETERMINABLE` for that reason while the real frozen
+    text says the opposite.
+
+    A truncated history cannot answer the question, and answering it anyway is
+    the convenient-weaker-source failure this project keeps finding in itself.
+    So it refuses, and the caller decides what to do about not knowing.
+    """
+
+
+def historie_vollstaendig() -> bool:
+    """Is this a full clone -- deep enough for a history question?"""
+    p = subprocess.run(["git", "-C", str(HOH), "rev-parse",
+                        "--is-shallow-repository"],
+                       capture_output=True, text=True, check=False)
+    return p.returncode == 0 and p.stdout.strip() == "false"
+
+
 def frozen_protocol_commit(kampagne: str = "v2") -> str:
     """The commit whose protocol text governs this campaign.
 
@@ -82,6 +107,13 @@ def frozen_protocol_commit(kampagne: str = "v2") -> str:
             wert = str(daten.get(schluessel) or "").strip()
             if wert:
                 return wert
+    if not historie_vollstaendig():
+        raise HistorieUnvollstaendig(
+            "this repository is a shallow clone, so the commit that "
+            "introduced the protocol cannot be identified: `git log "
+            "--diff-filter=A` would name the newest commit it can see and "
+            "that is not the frozen one. A campaign that pins its commit in a "
+            "pre-registration is readable here; one that does not is not.")
     p = subprocess.run(
         ["git", "-C", str(HOH), "log", "--format=%H", "--diff-filter=A", "--",
          PROTOKOLL_PFAD],
@@ -91,9 +123,21 @@ def frozen_protocol_commit(kampagne: str = "v2") -> str:
 
 
 def frozen_text(commit: str) -> str:
+    """The protocol as it stood at `commit`.
+
+    Refuses rather than returning an empty string when the commit is not in
+    this repository. An empty protocol reads as "defines no budget and no
+    repetition rule", which is a confident wrong answer about a campaign that
+    may define both.
+    """
     p = subprocess.run(
         ["git", "-C", str(HOH), "show", f"{commit}:{PROTOKOLL_PFAD}"],
         capture_output=True, text=True, check=False)
+    if p.returncode != 0:
+        raise HistorieUnvollstaendig(
+            f"{commit[:12]} is not in this repository, so the protocol text "
+            f"it froze cannot be read here. An empty text would read as a "
+            f"protocol that defines nothing, which is a different claim.")
     return p.stdout
 
 

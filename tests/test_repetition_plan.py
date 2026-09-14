@@ -18,6 +18,8 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
+
 from conftest import (
     HIDDEN_FIXTURES,
     braucht_evidenz,
@@ -72,10 +74,15 @@ def test_a_protocol_that_names_a_campaign_budget_is_determinable():
 
 def test_the_real_protocol_does_not_decide_the_requirement():
     """Measured against the frozen commit, not against the working tree."""
+    if not rp.historie_vollstaendig():
+        pytest.skip(
+            "this clone is shallow, so the commit that introduced the "
+            "protocol cannot be identified -- `git log --diff-filter=A` "
+            "would name the newest commit it can see, which is not the "
+            "frozen one. The question is about the repository that "
+            "produced the campaigns.")
     commit = rp.frozen_protocol_commit()
     if not commit:
-        import pytest
-
         pytest.skip("not a git checkout")
     a = rp.repetition_requirement(rp.frozen_text(commit))
     assert a["verdict"] == "NOT_DETERMINABLE"
@@ -404,6 +411,13 @@ def test_a_campaign_without_a_registration_falls_back_to_the_adding_commit():
     tautology that could not fail -- and it was the only test covering the
     fallback path. Caught by an adversarial review.
     """
+    if not rp.historie_vollstaendig():
+        pytest.skip(
+            "this clone is shallow, so the commit that introduced the "
+            "protocol cannot be identified -- `git log --diff-filter=A` "
+            "would name the newest commit it can see, which is not the "
+            "frozen one. The question is about the repository that "
+            "produced the campaigns.")
     hinzugefuegt = rp.frozen_protocol_commit("v2")
     assert len(hinzugefuegt) == 40, "not a commit id"
     # The fallback really is the commit that *added* the protocol, and that
