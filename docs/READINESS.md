@@ -5,13 +5,15 @@ command that produced it, and the verdict is the conjunction of the
 rows rather than a judgement typed above them. A row this tool cannot
 evaluate is `NOT_RUN`, which is never a pass.
 
-Measured at `394473a` on 2026-09-14.
+Measured at `7f5c26f` on 2026-09-14.
 
-    TECHNICALLY_STABLE_READY = yes
+    TECHNICALLY_STABLE_READY = no
+
+Open, and each one blocking: external_ci.
 
 | condition | state | measured | command |
 |---|---|---|---|
-| `tests` | PASS | 1248 passed | `python3 -m pytest -q` |
+| `tests` | PASS | 1250 passed | `python3 -m pytest -q` |
 | `lint` | PASS | clean | `ruff check --select F,E9 src tests tools` |
 | `claims` | PASS | OK: all checks passed | `python3 tools/check_claims.py check all` |
 | `union_invariants` | PASS | U1-U5 pass | `python3 tools/union_gate.py` |
@@ -23,12 +25,12 @@ Measured at `394473a` on 2026-09-14.
 | `benchmark_v3_preregistration` | PASS | DRIFTED, 51 file(s) frozen at d22fc1536f43 -- moved after the campaign, accounted for: tools/benchmark.py, tools/readiness.py, tools/repetition_plan.py | `python3 tools/prereg.py check --campaign v3` |
 | `benchmark_v2_historical` | FAIL (advisory) | HISTORICAL_COMPLETE; matched_budget_valid = NO; budget_rule violated: 2 cell(s) ran past the dispatch budget without being stopped | `python3 tools/repetition_plan.py --campaign v2` |
 | `benchmark_v3` | PASS | 15 of 15 cells; COMPLETE; matched_budget_valid = YES; freeze DRIFTED (post-campaign repair, accounted for) | `python3 tools/prereg.py check --campaign v3 && python3 tools/repetition_plan.py --campaign v3` |
-| `export_manifest` | FAIL (advisory) | no leaks, 1 dangling reference(s), 0 other problem(s) | `python3 tools/export_manifest.py check` |
+| `export_manifest` | PASS | no leaks, 0 unacknowledged dangling reference(s), 12 acknowledged, 0 other problem(s) | `python3 tools/export_manifest.py check` |
 | `clean_install` | PASS | 0 red step(s) | `python3 tools/clean_install_check.py` |
-| `attribution` | PASS | 1 of 10 nodes through the product | `python3 tools/attribution.py` |
+| `attribution` | PASS | 1 of 11 nodes through the product | `python3 tools/attribution.py` |
 | `evidence_index` | PASS | EVIDENCE_INDEX.md matches the trees it describes | `python3 tools/evidence_index.py` |
 | `paper_audit` | PASS | 8 of 8 checks | `python3 tools/audit_refs.py <each check>` |
-| `external_ci` | PASS | success on 27cdbf8bcc99 (6 job(s)); sandbox_external_env = UNSUPPORTED_ENVIRONMENT | `python3 tools/exact_head_ci.py --run-id ID --export-commit SHA` |
+| `external_ci` | FAIL | the recorded run tested a different export: 1 path(s) differ beyond this gate's own reports (dogfood/ATTRIBUTION.json). Re-export, re-run CI, record it again. | `python3 tools/exact_head_ci.py --run-id ID --export-commit SHA` |
 | `routing` | PASS | DEFERRED_ON_EVIDENCE | `read docs/ROUTING.md` |
 
 ## Why some rows are advisory
@@ -42,7 +44,7 @@ Measured at `394473a` on 2026-09-14.
 * **`export_manifest`** — the dangling references are limitation 12e: published documents citing internal ones. Advisory, because none of them is a false claim -- what a reader loses is the ability to follow a citation.
 * **`attribution`** — the ratio is not a gate -- it is reported so that nobody has to take the phase's own description of itself on trust.
 * **`paper_audit`** — `coverage` is red on a maintenance item paper/AUDIT.md itself flags and explains: paper/NUMBERS.md catalogues the 2 of a '2 of 3' ratio and not the 3. It is a documented, deliberately deferred operator item, not an unexamined failure.
-* **`external_ci`** — the sandbox line is read from its step, not its job: a green job whose relevant step was skipped has measured nothing, and UNSUPPORTED_ENVIRONMENT is that state rather than a pass.
+* **`external_ci`** — a CI result is evidence about a set of bytes, not about a branch name; reusing it after the export changed would be citing a measurement of something else.
 * **`routing`** — a disposition, not an open question: the condition for revisiting it is named and was checked.
 
 ## What this does not decide

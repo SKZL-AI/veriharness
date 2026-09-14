@@ -201,6 +201,16 @@
         "980a24875da24746ec148d8a530b8788ee433d98"
       ],
       "why_not_the_product": "Bookkeeping and one correction, both outside any run. The first commit is this ledger's own entry for the release documentation -- a ledger cannot be written by the thing it accounts for. The second is O168: three published documents quoted an export skip count that held for a shallow clone and not a full one, found by running the export's suite before pushing it. Correcting a statement this project makes about its own published artifact is orchestrator work by definition; a run would have had to be given the finding to write it up, which is the reporting step, not the finding."
+    },
+    {
+      "id": "v010-release-notes-completion",
+      "category": "MAIN_ORCHESTRATOR_DIRECT",
+      "is_development_node": false,
+      "commits": [
+        "49baa11e083fe67ee97f19b51953881b34c7a88b",
+        "7f5c26f968198ae5fc9a7c0011b5a9d32d229f40"
+      ],
+      "why_not_the_product": "The previous attribution entry, and the release notes' own findings list gaining the two entries it had left out. Neither could go through a run: a ledger cannot be written by the thing it accounts for, and the second is the same class -- deciding what this release says about its own defects is the orchestrator's judgement, and a run would have had to be handed the judgement to write it down."
     }
   ]
 }
