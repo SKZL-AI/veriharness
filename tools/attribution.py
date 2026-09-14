@@ -113,6 +113,24 @@ def _shas(repo: Path, eintrag: dict, probleme: list[str]) -> list[str]:
     return text.splitlines()
 
 
+def _nur_das_ledger(repo: Path, sha: str) -> bool:
+    """Did this commit touch `dogfood/ATTRIBUTION.json` and nothing else?
+
+    A commit that changed only this ledger is the ledger recording earlier
+    commits. It cannot itself be unaccounted development work, because it
+    changed no code, no document and no evidence -- which is a stronger
+    statement than "its message says it is bookkeeping", and is why this asks
+    git rather than reading the message.
+
+    A merge commit is deliberately not special-cased: `git show --name-only`
+    on a merge lists nothing, so this returns False and the commit stays a gap
+    that an entry has to claim.
+    """
+    text = _git(repo, "show", "--name-only", "--format=", sha)
+    pfade = {z.strip() for z in text.splitlines() if z.strip()}
+    return pfade == {"dogfood/ATTRIBUTION.json"}
+
+
 def _anker_vorhanden(repo: Path, anker: str) -> bool:
     """Does this repository contain the anchor commit at all?
 
@@ -224,8 +242,29 @@ def pruefe(repo: Path, ledger: dict) -> dict:
     # its own sha, so the entry describing a commit is written in the next one.
     # That is the price of closing the ranges, and it is one commit, bounded.
     # Two unattributed commits is a gap, which is what this check is for.
-    if nicht_zugeordnet and alle and nicht_zugeordnet[-1] == alle[-1]:
-        nicht_zugeordnet = nicht_zugeordnet[:-1]
+    #
+    # O169 widened that by one shape, because with only the tip tolerated this
+    # check has **no reachable green state** once a release needs both an
+    # attribution commit and a commit after it. The attribution commit is the
+    # tip and is tolerated; the next commit displaces it and it becomes a gap;
+    # writing an entry for it needs another commit, which is then the tip, and
+    # so on. So a trailing commit that touches *only* `dogfood/ATTRIBUTION.json`
+    # is tolerated as well. It is the ledger writing itself, by construction:
+    # a commit that changed nothing else cannot be work this ledger is failing
+    # to account for. A trailing commit that touches anything besides the
+    # ledger is still a gap, and a gap anywhere but at the end is still a gap
+    # -- the walk stops at the first commit that does not qualify rather than
+    # filtering the whole list, so an unattributed commit in the middle cannot
+    # be excused by a tidy tail.
+    offen = set(nicht_zugeordnet)
+    for sha in reversed(alle):
+        if sha not in offen:
+            break
+        if sha == alle[-1] or _nur_das_ledger(repo, sha):
+            offen.discard(sha)
+            continue
+        break
+    nicht_zugeordnet = [c for c in nicht_zugeordnet if c in offen]
     if nicht_zugeordnet:
         probleme.append(
             f"{len(nicht_zugeordnet)} commit(s) after the anchor belong to no "

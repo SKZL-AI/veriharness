@@ -220,6 +220,17 @@
         "c54b8e5322df9ab6538df3103e9d223e127c88f4"
       ],
       "why_not_the_product": "The readiness board and the external-CI evidence that binds it to the export CI actually tested. Running the gates and recording what they returned is the orchestrator's own act by construction: a run cannot be the thing that certifies the release it is part of, and the evidence file names a GitHub run id, which the product has no way to reach."
+    },
+    {
+      "id": "v010-tag-bookkeeping-and-o169",
+      "category": "MAIN_ORCHESTRATOR_DIRECT",
+      "is_development_node": false,
+      "commits": [
+        "3570d19226f9d2b6bdae5e9cd1409c1b204ed06e",
+        "738ab358b57de8a261e26c4588167e443d9cc656",
+        "bfa64658c5370a2efec7c2a6559159492d8c0265"
+      ],
+      "why_not_the_product": "The last three commits before the v0.1.0 tag: an attribution entry, the readiness board recorded at the export CI actually tested, and O169 -- the finding that this very check had no reachable green state, together with its fix and the negative control that keeps the fix from swallowing the check. None of it could go through a run. Two of the three are this ledger and that board writing themselves, which is the orchestrator's act by construction, and the third changes the gate that decides whether the ledger is complete. A run repairing the check that certifies it would be the circularity every other entry here is written to avoid."
     }
   ]
 }

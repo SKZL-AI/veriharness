@@ -174,3 +174,73 @@ def test_two_unattributed_commits_are_still_a_gap():
         pytest.skip("this clone does not contain the history the ledger describes")
     bericht = at.pruefe(WURZEL, {"anchor": "HEAD~3", "entries": []})
     assert any("belong to no entry" in p for p in bericht["problems"])
+
+def test_a_trailing_ledger_only_commit_is_tolerated_and_anything_else_is_not():
+    """O169: with only the tip tolerated, this check had no reachable green.
+
+    The commit that writes an entry cannot name its own sha, so it is written
+    in the next commit. That commit is the tip and is tolerated -- until a
+    further commit displaces it, at which point it is a gap, and closing it
+    needs another commit, which is then the tip. A release that needs both an
+    attribution commit and a commit after it can therefore never be green.
+
+    The widening is exactly one shape: a trailing commit that touched
+    `dogfood/ATTRIBUTION.json` and nothing else. That is the ledger recording
+    itself, checked against git rather than against a commit message, because
+    a commit that changed no code, no document and no evidence cannot be work
+    this ledger is failing to account for.
+
+    Both halves are pinned here. The negative control is the one that matters:
+    a trailing commit touching anything besides the ledger must still be a gap
+    once it is no longer the tip, or the widening swallowed the check.
+    """
+    import subprocess as _sp
+    import tempfile as _tf
+    from pathlib import Path as _P
+
+    with _tf.TemporaryDirectory() as tmp:
+        repo = _P(tmp) / "r"
+        repo.mkdir()
+
+        def g(*a):
+            return _sp.run(["git", "-C", str(repo), *a], capture_output=True,
+                           text=True, check=True).stdout.strip()
+
+        g("init", "-q", "-b", "main")
+        g("config", "user.email", "t@example.invalid")
+        g("config", "user.name", "t")
+        (repo / "a.txt").write_text("1\n")
+        g("add", "-A"); g("commit", "-q", "-m", "anchor")
+        anker = g("rev-parse", "HEAD")
+
+        led = repo / "dogfood" / "ATTRIBUTION.json"
+        led.parent.mkdir(parents=True)
+        led.write_text("{}\n")
+        (repo / "a.txt").write_text("2\n")
+        g("add", "-A"); g("commit", "-q", "-m", "work plus ledger")
+        arbeit = g("rev-parse", "HEAD")
+
+        led.write_text('{"x": 1}\n')
+        g("add", "-A"); g("commit", "-q", "-m", "ledger only")
+
+        (repo / "a.txt").write_text("3\n")
+        g("add", "-A"); g("commit", "-q", "-m", "more work")
+
+        ledger = {"anchor": anker, "entries": [
+            {"id": "e", "category": "MAIN_ORCHESTRATOR_DIRECT",
+             "is_development_node": False, "commits": [arbeit],
+             "why_not_the_product": "fixture"},
+        ]}
+        bericht = at.pruefe(repo, ledger)
+        # `more work` is the tip and tolerated; the ledger-only commit before
+        # it is tolerated by the new rule; `work plus ledger` is named.
+        assert not any("belong to no entry" in p for p in bericht["problems"]), (
+            bericht["problems"])
+
+        # Negative control: leave `work plus ledger` unnamed. It touched a.txt
+        # as well, so the widening must not reach it and this must be a gap.
+        bericht = at.pruefe(repo, {"anchor": anker, "entries": []})
+        assert any("belong to no entry" in p for p in bericht["problems"]), (
+            "a trailing commit that touched more than the ledger was excused, "
+            "so the widening swallowed the check it was supposed to narrow"
+        )
