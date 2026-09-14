@@ -5,13 +5,13 @@ command that produced it, and the verdict is the conjunction of the
 rows rather than a judgement typed above them. A row this tool cannot
 evaluate is `NOT_RUN`, which is never a pass.
 
-Measured at `3570d19` on 2026-09-14.
+Measured at `c76f7a1` on 2026-09-14.
 
     TECHNICALLY_STABLE_READY = yes
 
 | condition | state | measured | command |
 |---|---|---|---|
-| `tests` | PASS | 1250 passed | `python3 -m pytest -q` |
+| `tests` | PASS | 1251 passed | `python3 -m pytest -q` |
 | `lint` | PASS | clean | `ruff check --select F,E9 src tests tools` |
 | `claims` | PASS | OK: all checks passed | `python3 tools/check_claims.py check all` |
 | `union_invariants` | PASS | U1-U5 pass | `python3 tools/union_gate.py` |
@@ -28,7 +28,7 @@ Measured at `3570d19` on 2026-09-14.
 | `attribution` | PASS | 1 of 11 nodes through the product | `python3 tools/attribution.py` |
 | `evidence_index` | PASS | EVIDENCE_INDEX.md matches the trees it describes | `python3 tools/evidence_index.py` |
 | `paper_audit` | PASS | 8 of 8 checks | `python3 tools/audit_refs.py <each check>` |
-| `external_ci` | PASS | success on 7a9249da574f (6 job(s)); sandbox_external_env = UNSUPPORTED_ENVIRONMENT | `python3 tools/exact_head_ci.py --run-id ID --export-commit SHA` |
+| `external_ci` | PASS | success on 213c406d250e (6 job(s)); sandbox_external_env = UNSUPPORTED_ENVIRONMENT | `python3 tools/exact_head_ci.py --run-id ID --export-commit SHA` |
 | `routing` | PASS | DEFERRED_ON_EVIDENCE | `read docs/ROUTING.md` |
 
 ## Why some rows are advisory
