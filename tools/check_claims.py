@@ -322,6 +322,47 @@ def _runs_root_missing() -> bool:
     return not (REPO_ROOT / "runs").is_dir()
 
 
+def _ist_ausgeschlossen(path_str: str) -> bool:
+    """Does the export manifest classify this path as not shipped?
+
+    Read from `EXPORT_MANIFEST.json` rather than guessed from the path, and
+    read at most once. A tree with no manifest answers `False`: absent
+    evidence is then an ordinary defect, which is the safe direction.
+    """
+    global _AUSGESCHLOSSEN
+    if _AUSGESCHLOSSEN is None:
+        _AUSGESCHLOSSEN = set()
+        pfad = REPO_ROOT / "EXPORT_MANIFEST.json"
+        try:
+            daten = json.loads(pfad.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return False
+        eintraege = daten.get("entries") if isinstance(daten, dict) else daten
+        for e in eintraege or []:
+            if isinstance(e, dict) and e.get("decision") == "EXCLUDE":
+                _AUSGESCHLOSSEN.add(e.get("path", ""))
+                # A pruned subtree is recorded with a trailing slash and
+                # stands for everything under it.
+                if str(e.get("path", "")).endswith("/"):
+                    _AUSGESCHLOSSEN.add(str(e["path"]).rstrip("/"))
+    if path_str in _AUSGESCHLOSSEN:
+        return True
+    return any(path_str.startswith(p) for p in _AUSGESCHLOSSEN
+               if p.endswith("/"))
+
+
+#: Filled on first use by `_ist_ausgeschlossen`; `None` means "not yet read".
+_AUSGESCHLOSSEN: set[str] | None = None
+
+
+def _export_gap_failure(ref: str, path_str: str) -> tuple[bool, str]:
+    return False, (
+        f"{ref}: {ENVIRONMENT_GAP_MARKER} -- {path_str} is classified EXCLUDE "
+        "by EXPORT_MANIFEST.json and is therefore absent from a published "
+        "clone by design; this is not a content defect in the ledger"
+    )
+
+
 def _environment_gap_failure(ref: str, form: str) -> tuple[bool, str]:
     return False, (
         f"{ref}: {ENVIRONMENT_GAP_MARKER} -- this check directory has no top-level "
@@ -377,6 +418,17 @@ def resolve_evidence(ref: str, *, pytest_nodeids: set[str] | None) -> tuple[bool
         if full is None:
             return False, f"{ref}: path must be relative and inside the repository"
         if not full.is_file():
+            # An absent file is two different findings and they were reported
+            # as one. In the repository that produced the ledger it is a
+            # content defect: a claim cites evidence that is not there. In a
+            # published clone it is the export doing its job -- the path is
+            # classified EXCLUDE, so it was never shipped, and the claim is
+            # fine. `docs/LIMITATIONS.md` tells a reader that every failure in
+            # a clone carries the environment-gap marker and invites them to
+            # check it; 163 of these did not, which made that invitation
+            # wrong. The manifest is what knows the difference, so it is asked.
+            if _ist_ausgeschlossen(path_str):
+                return _export_gap_failure(ref, path_str)
             return False, f"{ref}: file does not exist"
         line_no = int(line_str)
         try:

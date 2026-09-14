@@ -11,7 +11,7 @@ instruction for that case.
 
 `CLAIMS.json`'s own coverage is `README.md` and `docs/**`, plus the mandatory
 `a02` invalidation entries and a fixed set of unflattering measured findings
-(see `POSITION_PAPER.md` §0). Numbers sourced to `dogfood/ABSCHLUSSBERICHT.md`
+(see `POSITION_PAPER.md` §0). Numbers sourced to the internal *Abschlussbericht*
 or `DOGFOOD_LEDGER.md` below therefore carry a plain-text source, not a claim
 id, because the ledger does not cover those documents -- listing them this
 way, rather than inventing a claim id for them, is the honest gap the

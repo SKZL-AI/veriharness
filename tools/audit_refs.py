@@ -449,8 +449,13 @@ def cmd_numbers_recomputed(_args: argparse.Namespace) -> int:
             if r.verdict != "NOT_CHECKED":
                 problems.append(f"{r.ref}: verdict {r.verdict} but source is {source!r} (no real recomputation source)")
             continue
-        # A real path is named: it must exist, regardless of verdict.
-        if not os.path.isfile(source):
+        # A real path is named: it must exist, regardless of verdict. A
+        # **directory** counts, and has to: a ratio recomputed by pairing every
+        # receipt in a tree with its `-basis` twin has that tree as its source,
+        # and naming one file out of it would misstate where the number came
+        # from. What the check is for is that the source is real and reachable,
+        # not that it is a single file.
+        if not (os.path.isfile(source) or os.path.isdir(source)):
             problems.append(f"{r.ref}: named source {source!r} does not exist in the checkout")
 
     if not rows:
@@ -517,7 +522,19 @@ def cmd_claims_against_code(_args: argparse.Namespace) -> int:
                     problems.append(f"{cid}: {ev} -- file does not exist")
                     continue
                 checked += 1
-                if digest and ev == claim.get("evidence", [None])[0]:
+                # The anchor has to resolve inside the cited file **only when
+                # the claim is anchored in that file**. The rule is for a
+                # claim that quotes a line of source: if the source moves, the
+                # quotation is stale, and that is worth catching. For a prose
+                # claim in `docs/` whose evidence is the program or the
+                # document that produced a number, the claim's sentence is not
+                # in the cited file and never will be -- demanding it there is
+                # a category error, and it made this check red on C-013 from
+                # before the benchmark it cites had even run. A check that
+                # cannot be satisfied by any honest evidence teaches people to
+                # ignore it.
+                hier_verankert = claim.get("where", "").split(":")[0] == path
+                if digest and hier_verankert and ev == claim.get("evidence", [None])[0]:
                     lines = read_text(path).splitlines()
                     matches = [ln for ln in lines if compute_anchor_digest(ln) == digest]
                     if not matches:

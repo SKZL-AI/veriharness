@@ -93,6 +93,17 @@ class FailureClass(StrEnum):
     #: The persisted state cannot be read or contradicts itself. Stop. A
     #: retry on a corrupt state is how one bad write becomes several.
     CORRUPT_STATE = "CORRUPT_STATE"
+    #: The run's own budget is spent -- iterations, dispatches, wallclock. Not
+    #: a provider problem and not a product verdict: a policy limit this
+    #: project set for itself, reached. It was classified UNKNOWN, which sends
+    #: a reader looking for a defect instead of a decision about a ceiling.
+    BUDGET_EXHAUSTED = "BUDGET_EXHAUSTED"
+    #: A role touched a tree its policy protects. The state is perfectly
+    #: readable -- which is why this is **not** CORRUPT_STATE, where it briefly
+    #: lived: the defect is a boundary crossing, not a bad write, and filing it
+    #: under the state's own integrity would make two different situations
+    #: share one word in the ledger.
+    CAPABILITY_VIOLATION = "CAPABILITY_VIOLATION"
     #: Could not be classified from the evidence available. A real state with
     #: a real policy, not a synonym for "probably transient".
     UNKNOWN = "UNKNOWN"
@@ -265,6 +276,25 @@ POLICY: dict[FailureClass, Disposition] = {
         rationale="a retry on a corrupt state is how one bad write becomes "
                   "several. Stop, keep everything, let someone look",
     ),
+    FailureClass.BUDGET_EXHAUSTED: Disposition(
+        failure_class=FailureClass.BUDGET_EXHAUSTED,
+        max_retries=0, budget=BudgetScope.NONE,
+        auto_resume=False, human_gate=True,
+        required_evidence="the budget that was reached and the usage against "
+                          "it, both from the run's own state",
+        rationale="a retry cannot create budget, and raising one is a decision "
+                  "about how much this work is worth -- which is a person's",
+    ),
+    FailureClass.CAPABILITY_VIOLATION: Disposition(
+        failure_class=FailureClass.CAPABILITY_VIOLATION,
+        max_retries=0, budget=BudgetScope.NONE,
+        auto_resume=False, human_gate=True,
+        required_evidence="the protected tree that changed, with the digest "
+                          "before and after, as the witness recorded it",
+        rationale="the measurement was interfered with, so a retry would "
+                  "produce a second verdict about the same disturbed state. "
+                  "A person has to decide whether the run is salvageable",
+    ),
     FailureClass.UNKNOWN: Disposition(
         failure_class=FailureClass.UNKNOWN,
         max_retries=0, budget=BudgetScope.NONE,
@@ -316,6 +346,72 @@ def backoff_for(fc: FailureClass, attempt: int) -> int:
     if d.max_retries == 0 or d.backoff_seconds == 0 or attempt < 1:
         return 0
     return min(d.backoff_seconds * (2 ** (attempt - 1)), d.backoff_ceiling)
+
+
+def classify_failure(exc: BaseException | None, *, detail: str = "") -> FailureClass:
+    """The class of a dispatch failure, from the exception that ended it.
+
+    Never returns `None`: a dispatch that failed has a class, and `UNKNOWN` is
+    a real one with a real policy ("stop rather than hope"). A record left
+    without a class is worse than one classified as unknown -- it reads as a
+    failure nobody looked at, which is what the dispatch log was full of until
+    `tools/telemetry_audit.py` counted them.
+
+    Classification is by **type first**, and only then by the message. The
+    types are this project's own and are reliable; the message is the
+    provider's and is not. Where neither settles it, the answer is UNKNOWN
+    rather than a plausible guess -- a mislabelled rate limit and a
+    mislabelled quota have different remedies.
+    """
+    # --- by type, which is this project's own and is reliable ------------- #
+    for k in type(exc).__mro__ if exc is not None else ():
+        nach_typ = {
+            "CapabilityViolation": FailureClass.CAPABILITY_VIOLATION,
+            "WaitingForApproval": FailureClass.NEEDS_APPROVAL,
+            "RoleOutputError": FailureClass.CONTRACT_INVALID,
+            "StoreError": FailureClass.CORRUPT_STATE,
+            "FreezeError": FailureClass.CORRUPT_STATE,
+        }.get(k.__name__)
+        if nach_typ is not None:
+            return nach_typ
+    if getattr(exc, "transient", False):
+        # `DispatchError.transient` is set where the failure happened, by the
+        # code that saw it. Nothing in a message beats that.
+        return FailureClass.PROVIDER_TRANSIENT
+
+    # --- only then by the message, and only its first line ----------------- #
+    # A dispatch failure's detail carries the agent's own terminal output --
+    # forty lines of whatever it was doing. Searching all of it for "approval"
+    # or "contract" classifies a network timeout by what happened to be on
+    # screen, and this project dogfoods on a tree full of files called
+    # `approval.py`, `contracts.py` and `trust.py`. Only the first line is the
+    # failure's own sentence.
+    erste = (detail or str(exc or "")).strip().splitlines()
+    text = erste[0].lower() if erste else ""
+    for muster, klasse in (
+        ("capability violation", FailureClass.CAPABILITY_VIOLATION),
+        ("dispatch refused", FailureClass.BUDGET_EXHAUSTED),
+        ("budget exhausted", FailureClass.BUDGET_EXHAUSTED),
+        ("waits for an approval", FailureClass.NEEDS_APPROVAL),
+        ("needs approval", FailureClass.NEEDS_APPROVAL),
+        # Quota before rate limit: a message naming both is about the ceiling,
+        # not the pace, and the two wait times differ by an order of magnitude.
+        ("quota", FailureClass.PROVIDER_QUOTA),
+        ("usage limit", FailureClass.PROVIDER_QUOTA),
+        ("rate limit", FailureClass.PROVIDER_RATE_LIMIT),
+        ("429", FailureClass.PROVIDER_RATE_LIMIT),
+        ("output contract", FailureClass.CONTRACT_INVALID),
+        ("schema repair", FailureClass.CONTRACT_INVALID),
+        ("credential", FailureClass.PROVIDER_AUTH),
+        ("unauthor", FailureClass.PROVIDER_AUTH),
+        ("401", FailureClass.PROVIDER_AUTH),
+        ("timed out", FailureClass.PROVIDER_TRANSIENT),
+        ("timeout", FailureClass.PROVIDER_TRANSIENT),
+        ("connection", FailureClass.PROVIDER_TRANSIENT),
+    ):
+        if muster in text:
+            return klasse
+    return FailureClass.UNKNOWN
 
 
 def classify_exit(code: int) -> FailureClass:

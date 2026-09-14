@@ -154,3 +154,131 @@ def test_records_are_one_json_object_per_line(tmp_path):
     assert len(zeilen) == 3
     for z in zeilen:
         assert DispatchRecord.model_validate(json.loads(z))
+
+
+# --------------------------------------------------------------------------- #
+# O128: the fields that were well-typed blanks on real dispatches
+# --------------------------------------------------------------------------- #
+
+
+def test_a_record_names_the_provider_it_actually_ran_under(tmp_path):
+    """It was empty on all four records of a real three-agent run."""
+    from hoh.contracts import Role
+    from hoh.controller import Controller
+    from hoh.store import RunStore
+
+    class Versender:
+        profiles = {Role.PLANNER: "claude"}
+
+    store = RunStore(tmp_path / "root", "r")
+    store.dir.mkdir(parents=True, exist_ok=True)
+    c = Controller.__new__(Controller)
+    c.store = store
+    c.dispatcher = Versender()
+
+    c.note_dispatch(role="planner", run_id="r", iteration=1, attempt=0,
+                    started_at="2026-09-11T10:00:00Z",
+                    ended_at="2026-09-11T10:00:04Z", backend="herdr", usage={})
+    (satz,) = c.telemetry().read()
+    assert satz.provider == "claude"
+
+
+def test_an_unreportable_model_says_so_instead_of_staying_empty(tmp_path):
+    """An agent in a pane picks its own model and this process never learns it.
+
+    `NOT_AVAILABLE` is that answer. An empty string is the absence of an
+    answer, and a log full of the second wearing the first is what the audit
+    was written to find.
+    """
+    from hoh.controller import Controller
+    from hoh.store import RunStore
+    from hoh.telemetry import NOT_AVAILABLE
+
+    store = RunStore(tmp_path / "root", "r")
+    store.dir.mkdir(parents=True, exist_ok=True)
+    c = Controller.__new__(Controller)
+    c.store = store
+    c.dispatcher = object()
+
+    c.note_dispatch(role="planner", run_id="r", iteration=1, attempt=0,
+                    started_at="2026-09-11T10:00:00Z",
+                    ended_at="2026-09-11T10:00:04Z", usage={})
+    (satz,) = c.telemetry().read()
+    assert satz.model == NOT_AVAILABLE
+
+
+def test_a_failed_dispatch_always_carries_a_class(tmp_path):
+    """`None` on a failed record reads as a failure nobody looked at."""
+    from hoh.controller import Controller
+    from hoh.store import RunStore
+    from hoh.taxonomy import FailureClass
+
+    store = RunStore(tmp_path / "root", "r")
+    store.dir.mkdir(parents=True, exist_ok=True)
+    c = Controller.__new__(Controller)
+    c.store = store
+    c.dispatcher = object()
+
+    c.note_dispatch(role="planner", run_id="r", iteration=1, attempt=0,
+                    started_at="2026-09-11T10:00:00Z",
+                    ended_at="2026-09-11T10:00:04Z", outcome="failed",
+                    detail="planner waits for an approval in pane w1:p2", usage={})
+    (satz,) = c.telemetry().read()
+    assert satz.failure_class is FailureClass.NEEDS_APPROVAL
+
+
+def test_a_failure_nothing_identifies_is_unknown_and_not_absent(tmp_path):
+    from hoh.controller import Controller
+    from hoh.store import RunStore
+    from hoh.taxonomy import FailureClass
+
+    store = RunStore(tmp_path / "root", "r")
+    store.dir.mkdir(parents=True, exist_ok=True)
+    c = Controller.__new__(Controller)
+    c.store = store
+    c.dispatcher = object()
+
+    c.note_dispatch(role="planner", run_id="r", iteration=1, attempt=0,
+                    started_at="2026-09-11T10:00:00Z",
+                    ended_at="2026-09-11T10:00:04Z", outcome="failed",
+                    detail="something happened", usage={})
+    (satz,) = c.telemetry().read()
+    assert satz.failure_class is FailureClass.UNKNOWN
+
+
+def test_a_successful_dispatch_carries_no_class(tmp_path):
+    from hoh.controller import Controller
+    from hoh.store import RunStore
+
+    store = RunStore(tmp_path / "root", "r")
+    store.dir.mkdir(parents=True, exist_ok=True)
+    c = Controller.__new__(Controller)
+    c.store = store
+    c.dispatcher = object()
+
+    c.note_dispatch(role="planner", run_id="r", iteration=1, attempt=0,
+                    started_at="2026-09-11T10:00:00Z",
+                    ended_at="2026-09-11T10:00:04Z", usage={})
+    (satz,) = c.telemetry().read()
+    assert satz.failure_class is None
+
+
+def test_the_verification_record_carries_the_receipts_it_produced(tmp_path, repo_fixture=None):
+    """0 receipts on a QA record of a run that wrote two is the fourth false
+    green's shape, one field wide."""
+    from hoh.controller import Controller
+    from hoh.store import RunStore
+
+    store = RunStore(tmp_path / "root", "r")
+    store.dir.mkdir(parents=True, exist_ok=True)
+    c = Controller.__new__(Controller)
+    c.store = store
+    c.dispatcher = object()
+
+    c.note_dispatch(role="qa", run_id="r", iteration=1, attempt=1,
+                    started_at="2026-09-11T10:00:00Z",
+                    ended_at="2026-09-11T10:00:04Z", usage={},
+                    receipts=2, discriminating=1, artefactual=0)
+    (satz,) = c.telemetry().read()
+    assert satz.receipts == 2
+    assert satz.discriminating == 1

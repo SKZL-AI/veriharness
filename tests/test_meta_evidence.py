@@ -247,14 +247,78 @@ def test_without_the_negative_controls_the_gate_cannot_go_green():
 
 def test_the_closure_requires_all_four_metrics():
     schluss = me.sammeln(WURZEL, falsify=False)
+    # Each metric carries its authority class as a prefix, so
+    # `assurance.AUTHORITIES` decides which source may answer it. That is what
+    # makes the policies load-bearing on the metrics a release rests on rather
+    # than a table nothing consults.
     assert set(schluss.required) == {
-        "unattended_interventions",
-        "unattended_fixpoint",
-        "unattended_no_duplicate_merge",
-        "strict_real_agent_e2e",
+        "node_lifecycle:unattended_interventions",
+        "node_lifecycle:unattended_fixpoint",
+        "landed_commit:unattended_no_duplicate_merge",
+        "check_executed_under_isolation:strict_real_agent_e2e",
     }
     # A required metric that produced no record at all is reported as missing
     # rather than quietly absent from the report.
     vorhanden = {r.metric_id for r in schluss.records}
     for verlangt in schluss.required:
         assert verlangt in vorhanden or verlangt in schluss.problems()
+
+
+# --------------------------------------------------------------------------- #
+# The planner capability boundary as a release-critical metric
+# --------------------------------------------------------------------------- #
+
+
+def test_the_confinement_metric_reads_the_counters_not_only_the_verdict():
+    """A summary is a verdict somebody's tool wrote.
+
+    The record carries the counters and the open findings beside it, so a
+    summary claiming VERIFIED with a non-zero counter shows the contradiction
+    rather than passing on the word.
+    """
+    from pathlib import Path
+
+    wurzel = WURZEL / "dogfood" / "planner-confinement"
+    if not (wurzel / "SUMMARY.json").is_file():
+        import pytest
+
+        pytest.skip("no confinement evidence in this checkout")
+    zustand, detail = me._falsifiziere_eingrenzung(Path(wurzel))
+    assert zustand.value == "KILLED", detail
+    assert "still said VERIFIED" in detail
+
+
+def test_the_boundary_metric_is_in_the_closure_and_carries_its_source():
+    schluss = me.sammeln(WURZEL, falsify=False)
+    passend = [r for r in schluss.records
+               if r.metric_id.startswith("planner_capability_boundary")]
+    assert passend, [r.metric_id for r in schluss.records]
+    (r,) = passend
+    assert r.source.kind.value in ("run_state", "absent")
+    if r.source.kind.value == "run_state":
+        assert r.cross_check is not None
+        assert r.cross_check.kind.value == "receipt"
+        assert "planner_repo_mutations" in r.measured
+
+
+def test_a_repository_may_not_answer_whether_a_planner_stayed_inside():
+    """A clean history is exactly what a planner writing into the working tree
+    leaves behind."""
+    from hoh.assurance import authority_for
+
+    politik = authority_for("planner_capability_boundary:real_agent_run")
+    assert politik is not None
+    erlaubt = {k.value for k in politik.allowed}
+    assert "repository" not in erlaubt
+    assert "digest" not in erlaubt
+    assert erlaubt == {"run_state", "receipt"}
+
+
+def test_the_boundary_metric_requires_a_second_source():
+    """The run's own record is the thing most in reach of the roles it
+    describes, so it does not stand alone."""
+    from hoh.assurance import authority_for
+
+    politik = authority_for("planner_capability_boundary:real_agent_run")
+    assert politik.requires_cross_check is not None
+    assert politik.requires_cross_check.value == "receipt"

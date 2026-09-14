@@ -512,3 +512,87 @@ def test_ohne_isolation_bleibt_alles_wie_bisher(arena):
     # No isolation note: the historical path leaves no such mark, which is how
     # a reader tells the two regimes apart in a receipt.
     assert "executed under" not in transcript
+
+
+def test_a_sandboxed_check_does_not_read_a_user_site_directory(tmp_path):
+    """The hole the unsandboxed path had closed and this one did not.
+
+    A reviewer planted a `usercustomize.py` in the scratch directory -- whose
+    name is derivable from the run's own state -- and it executed **inside
+    bubblewrap**, before the command's first line, under a receipt reporting
+    `verified_from_inside`. The strongest-looking receipt was the vulnerable
+    one.
+    """
+    from hoh.sandbox import SandboxSpec, _env_for
+
+    spec = SandboxSpec(candidate=tmp_path / "cand", scratch=tmp_path / "s",
+                       timeout=5)
+    env = _env_for(spec)
+    assert env["HOME"] == str(tmp_path / "s")
+    assert env["PYTHONNOUSERSITE"] == "1"
+    assert env["PYTHONDONTWRITEBYTECODE"] == "1"
+
+
+def test_a_sandbox_scratch_directory_found_in_place_is_parked(tmp_path):
+    """Both regimes create their scratch through the same helper now."""
+    from hoh.runner import _EIGENE_SCRATCHES, _frisches_scratch
+
+    ziel = tmp_path / ".hoh-scratch-r-i1-a1-K1"
+    (ziel / "lib").mkdir(parents=True)
+    (ziel / "lib" / "usercustomize.py").write_text("raise SystemExit('planted')\n")
+    _EIGENE_SCRATCHES.pop(str(ziel), None)
+
+    frisch = _frisches_scratch(ziel)
+
+    assert frisch == ziel
+    assert not (frisch / "lib").exists()
+    geparkt = [p for p in tmp_path.iterdir()
+               if p.name.startswith(".hoh-scratch-r-i1-a1-K1.v")]
+    assert geparkt, "the planted directory was removed rather than parked"
+    assert (geparkt[0] / "lib" / "usercustomize.py").is_file()
+
+
+def test_a_scratch_directory_this_process_made_is_reused(tmp_path):
+    """Parking every call would cost one directory per check.
+
+    All the checks of one candidate share an arena and therefore a scratch
+    name; measured at up to 118 MB each on this project's own runs, and it
+    would throw away the pip and pytest caches between two checks of the same
+    candidate.
+    """
+    from hoh.runner import _EIGENE_SCRATCHES, _frisches_scratch
+
+    ziel = tmp_path / ".hoh-scratch-r-i1-a1-K2"
+    _EIGENE_SCRATCHES.pop(str(ziel), None)
+
+    _frisches_scratch(ziel)
+    (ziel / "cache").mkdir()
+    _frisches_scratch(ziel)
+
+    assert (ziel / "cache").is_dir(), "the second check lost the first's cache"
+    assert not [p for p in tmp_path.iterdir() if ".v" in p.name]
+
+
+def test_a_scratch_directory_replaced_behind_our_back_is_parked_again(tmp_path):
+    """The registry outlives the directory, so the path alone is not identity.
+
+    A reviewer planted a `usercustomize.py` between two checks of the same
+    candidate -- same path, different directory -- and it survived, which is
+    exactly the pre-plant the parking exists to stop. The inode is checked too.
+    """
+    import shutil
+
+    from hoh.runner import _EIGENE_SCRATCHES, _frisches_scratch
+
+    ziel = tmp_path / ".hoh-scratch-r-i1-a1-K3"
+    _EIGENE_SCRATCHES.pop(str(ziel), None)
+    _frisches_scratch(ziel)
+
+    # something else replaces the directory at the same path
+    shutil.move(str(ziel), str(tmp_path / "weggeraeumt"))
+    (ziel / "lib").mkdir(parents=True)
+    (ziel / "lib" / "usercustomize.py").write_text("raise SystemExit('planted')\n")
+
+    _frisches_scratch(ziel)
+
+    assert not (ziel / "lib").exists(), "the replacement was adopted as ours"

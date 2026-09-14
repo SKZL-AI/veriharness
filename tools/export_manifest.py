@@ -275,6 +275,25 @@ _PRUNE_AT_ROOT_DIRNAMES = frozenset({"runs", "build"})
 #: `ATTRIBUTION.json` stays: it names commits and categories, and no paths.
 _EVIDENCE_PREFIXES = (
     ("dogfood/ATTRIBUTION.json", "INCLUDE", "published-evidence"),
+    # A campaign's own pre-registration and the evidence about it. Published
+    # because the results document is worth nothing without them: a reader who
+    # cannot see which commit the design was bound to, or the digests the raw
+    # results hashed to before and after the reporter was repaired, is being
+    # asked to take the campaign's central promise on trust. Each was scanned
+    # for home paths before being listed; they carry digests, commit ids and a
+    # platform string, and no machine-local path.
+    #
+    # The parked predecessor (`PREREGISTRATION.json.v<stamp>`) is deliberately
+    # **not** here. It is superseded, no published document points at it as a
+    # path, and the provenance artifact's claim -- that two commits carry two
+    # different registration blobs -- is checkable from git without it.
+    ("docs/benchmarks/v3/PREREGISTRATION.json", "INCLUDE", "published-evidence"),
+    ("docs/benchmarks/v3/PREREGISTRATION_PROVENANCE.json", "INCLUDE",
+     "published-evidence"),
+    ("docs/benchmarks/v3/RAW_RESULT_DIGESTS.json", "INCLUDE",
+     "published-evidence"),
+    ("docs/benchmarks/v3/O154_ANALYSIS_ONLY.json", "INCLUDE",
+     "published-evidence"),
 )
 
 _DIRECTORY_RULE_BY_NAME = {name: (decision, rule) for name, decision, rule in _DIRECTORY_RULES}
@@ -971,6 +990,69 @@ def _looks_like_repo_reference(s: str, top_level_names: set[str]) -> bool:
 _U2B_EXCLUDED_EXTENSIONS = frozenset({".py", ".json"})
 
 
+#: References a published document makes that a reader cannot follow, and
+#: that are **not** going to be removed, each with the reason. Data rather
+#: than a branch in the code, for the same reason `CLAIMS.json` keeps its
+#: surface exclusions as data: a decision that can be read, reviewed and
+#: counted is a different thing from a special case inside a function.
+#:
+#: The bar for an entry here is high and only one situation has met it so
+#: far: a document that is a **record of what someone else wrote**. Editing a
+#: reviewer's report so that its citations resolve would make the report say
+#: something the reviewer did not write, which is a worse defect than a
+#: pointer a reader cannot follow. Every other published document had its
+#: citations rewritten to name the internal document without a path
+#: (`docs/EVIDENCE_INDEX.md` lists them and says where their substance is
+#: published).
+#:
+#: Acknowledged is not invisible: every entry is printed on every run, and
+#: `tests/test_export_manifest.py` pins this list so that it cannot grow
+#: without a test changing with it.
+U2B_ANERKANNT: dict[str, str] = {
+    "paper/REVIEW_A.md":
+        "an independent reviewer's report, published as written. Its "
+        "citations are what the reviewer read; rewriting them would make the "
+        "report say something they did not write. The documents are named in "
+        "docs/EVIDENCE_INDEX.md",
+    "paper/REVIEW_B.md":
+        "an independent reviewer's report, published as written -- and one of "
+        "its findings (B-03) is *about* these very references, so its paths "
+        "are the subject of the finding rather than pointers it offers a "
+        "reader. The documents are named in docs/EVIDENCE_INDEX.md",
+    "paper/AUDIT.md -> runs/a03/receipts":
+        "the audit's source column names where a number was **recomputed "
+        "from**, and `tools/audit_refs.py numbers-recomputed` requires that "
+        "path to exist. For this row the place is the a03 run's receipt tree, "
+        "which the export deliberately does not carry (limit 12e): its "
+        "receipts record the absolute paths the checks ran at. Naming "
+        "anything else in that column would misstate where the figure came "
+        "from, and naming nothing would make the row unverifiable. What the "
+        "tree contains, and where its substance is published, is described in "
+        "docs/EVIDENCE_INDEX.md. Only this one reference is acknowledged; "
+        "every other reference AUDIT.md makes still has to resolve",
+}
+
+
+def teile_u2b(findings: list[dict]) -> tuple[list[dict], list[dict]]:
+    """(findings that stand, findings whose reference is acknowledged).
+
+    A key is either a whole document -- everything it cites -- or a single
+    `from -> to` pair. The pair form exists because acknowledging a whole
+    document to excuse one reference is how an exemption list stops meaning
+    anything: `paper/AUDIT.md` has one reference that cannot be removed, and
+    all its others must keep failing if they ever break.
+    """
+    offen, anerkannt = [], []
+    for f in findings:
+        grund = (U2B_ANERKANNT.get(f"{f.get('from')} -> {f.get('to')}")
+                 or U2B_ANERKANNT.get(f.get("from")))
+        if grund:
+            anerkannt.append({**f, "acknowledged": grund})
+        else:
+            offen.append(f)
+    return offen, anerkannt
+
+
 def check_u2b(entries: list[dict], root: Path) -> list[dict]:
     """For every INCLUDE entry, resolves its extracted references against
     the manifest. Reports a finding for each reference whose target is
@@ -1202,9 +1284,17 @@ def cmd_check(args: argparse.Namespace) -> int:
         return 1
 
     findings = 0
-    for f in check_u2b(on_disk_entries, root):
+    offen, anerkannt = teile_u2b(check_u2b(on_disk_entries, root))
+    for f in offen:
         findings += 1
         print(f"FAIL: U2b: {f['from']} references {f['to']} -- {f['reason']}")
+    # Printed on every run, never counted as a finding. A reference that has
+    # been thought about and decided is a different state from one nobody has
+    # looked at, and the difference is only worth anything if the decision
+    # stays in front of the reader.
+    for f in anerkannt:
+        print(f"ACKNOWLEDGED: {f['from']} references {f['to']} "
+              f"-- {f['reason']}; {f['acknowledged']}")
     for f in scan_include_for_leaks(on_disk_entries, root):
         findings += 1
         print(f"FAIL: {f['type']} found in INCLUDE-classified {f['path']}")
@@ -1213,7 +1303,10 @@ def cmd_check(args: argparse.Namespace) -> int:
         print(f"{findings} problem(s).")
         return 1
 
-    print(f"OK: {manifest_path} matches a fresh derivation and passes U2b + the leak scan ({len(on_disk_entries)} entries)")
+    print(f"OK: {manifest_path} matches a fresh derivation and passes U2b + "
+          f"the leak scan ({len(on_disk_entries)} entries, "
+          f"{len(anerkannt)} acknowledged reference(s) in "
+          f"{len(U2B_ANERKANNT)} document(s))")
     return 0
 
 

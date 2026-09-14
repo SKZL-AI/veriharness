@@ -546,6 +546,17 @@ class RunState(Strict):
     budgets: Budgets = Field(default_factory=Budgets)
     usage: Usage = Field(default_factory=Usage)
 
+    #: How many amendments this run has seen. Kept on the state because the
+    #: chain itself is one file in a directory: renaming it aside would
+    #: otherwise erase the obligation it created, and a thinner chain would be
+    #: indistinguishable from no chain at all.
+    amendments_seen: int = 0
+    #: Criteria an amendment reopened and that a later iteration has already
+    #: answered. Recorded rather than recomputed: `revalidation_needed()` reads
+    #: the whole chain every time, so without this the obligation never
+    #: cleared and a criterion re-measured in iteration 2 was demanded again in
+    #: iteration 3, and forever.
+    revalidated: list[str] = Field(default_factory=list)
     evidence_ref: str | None = Field(
         default=None,
         description="Pointer to the most recently validated evidence.json "

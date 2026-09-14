@@ -87,11 +87,33 @@ def _register_trust(store, root) -> str | None:
     try:
         from . import trust
 
-        # What gets registered is where the roles actually sit: the arena
-        # root. The run directory is deliberately **no longer** handed to them
-        # as a working directory -- that is where the evidence lives.
+        # What gets registered is where the roles actually sit. The arena root
+        # for the developer and QA; the run directory is deliberately **no
+        # longer** handed to them as a working directory -- that is where the
+        # evidence lives.
+        #
+        # And the planner's own root, which O125 separated out. It has to be
+        # registered here rather than left to be discovered: a directory the
+        # harness has never seen stops the agent at a dialog nobody in a pane
+        # can answer, and moving the planner somewhere safer would otherwise
+        # have cost every run its first iteration. Created now, because
+        # registering a path that does not exist registers nothing.
+        planner_root = store.arenas_dir / "planner"
+        planner_root.mkdir(parents=True, exist_ok=True)
+        # The **answers directory**, not the run directory -- and this is a
+        # tidiness change, not a control. A reviewer read the harness's own
+        # resolution: trust is searched from a session's working directory
+        # **upwards**, so registering a child of a directory nobody works in
+        # grants nothing, and removing the parent takes nothing away either.
+        # Every role has a shell, which the policy says of itself
+        # (`declared_but_unenforced`), so `checks.json` was never out of reach.
+        # What actually stops a write there is the witness in `capability.py`,
+        # which fails the run closed. This narrows what HoH asks for to what
+        # its roles need: a place to put their answer.
+        antworten = store.dir / "answers"
+        antworten.mkdir(parents=True, exist_ok=True)
         registered = [
-            path for path in (store.arenas_dir, store.dir)
+            path for path in (store.arenas_dir, planner_root, antworten)
             if trust.register(path, owned_root=root)
         ]
         if registered:
@@ -292,7 +314,8 @@ def cmd_start(args) -> int:
         repo_path=args.repo,
         project_name=args.project or Path(args.repo).name,
         spec_path=args.spec,
-        budgets=Budgets(max_iterations=args.max_iterations),
+        budgets=Budgets(max_iterations=args.max_iterations,
+                        max_dispatches=getattr(args, "max_dispatches", None)),
         delivery_mode=args.mode,
     )
     with store.lock():
@@ -532,6 +555,66 @@ def cmd_unblock(args) -> int:
         print(str(exc), file=sys.stderr)
         return 2
     print(f"Block on {args.run_id} lifted: {args.reason}")
+    return 0
+
+
+def cmd_amend(args) -> int:
+    """Record a change to a running specification, with what it costs.
+
+    Limit 15 said a specification is immutable for the life of a run and there
+    is no supported path to amend one. That was a safe default and a real
+    obstruction: requirements are discovered by working on them, and a run
+    that cannot absorb a correction has to be thrown away, losing its
+    evidence, its budget and the history of why the correction was needed.
+
+    This is the supported path, and it is deliberately not a shortcut. The old
+    text is parked and stays readable; the new text is a version beside it; an
+    acceptance-affecting amendment names the criteria it touches, and the
+    controller then refuses to accept a candidate until each of them has been
+    planned and measured again. Nothing here judges whether an amendment is
+    honest -- it makes the shape, the author, the reason and the cost visible
+    in one place so that a reader can.
+    """
+    from .amendment import AmendmentKind, AmendmentLedger, park_and_amend, text_digest
+
+    store = _store(args)
+    neuer_text = Path(args.spec_file).expanduser().read_text(encoding="utf-8")
+    try:
+        with store.lock():
+            state = store.read_state()
+            kette = store.read_amendments(origin_digest=state.spec_digest)
+            if not kette.amendments and kette.origin_digest != state.spec_digest:
+                kette = AmendmentLedger(run_id=state.run_id,
+                                        origin_digest=state.spec_digest)
+            betroffen = [c.strip() for c in (args.affects or "").split(",") if c.strip()]
+            nach_annahme = state.last_accepted_candidate is not None
+            amendment = park_and_amend(
+                state.spec_path, neuer_text,
+                run_id=state.run_id, amendment_id=args.amendment_id,
+                kind=AmendmentKind(args.kind), actor=args.actor,
+                reason=args.reason, affected_criteria=betroffen,
+                evidence=[e for e in (args.evidence or "").split(",") if e],
+                after_acceptance=nach_annahme, write_seq=state.write_seq,
+            )
+            # Built before the chain is written, so a duplicate id or a
+            # broken chain is refused with nothing changed. The amendment
+            # itself already validated before the specification moved.
+            kette = AmendmentLedger(
+                run_id=kette.run_id, origin_digest=kette.origin_digest,
+                amendments=[*kette.amendments, amendment],
+            )
+            store.write_amendments(kette)
+            state.note(f"specification amended: {amendment.summary()}")
+            state.spec_digest = text_digest(neuer_text)
+            store.write_state(state)
+    except (StoreError, LockBusy, ValueError, OSError) as exc:
+        print(f"refused: {exc}", file=sys.stderr)
+        return 2
+    print(kette.report())
+    noetig = kette.revalidation_needed()
+    if noetig:
+        print(f"\nAcceptance is withheld until {', '.join(sorted(noetig))} "
+              "has been planned and measured against the new text.")
     return 0
 
 
@@ -1176,6 +1259,13 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--run-id", help="own run id instead of a generated one")
     s.add_argument("--max-iterations", type=int, default=10)
     s.add_argument(
+        "--max-dispatches", type=int, default=None,
+        help="ceiling on role dispatches for this run. The field existed and "
+             "nothing could set it, so a project that wanted to hold a node "
+             "and its repair runs to one shared budget had no way to say so -- "
+             "which is how a matched-budget benchmark came to give one arm "
+             "twice the resource")
+    s.add_argument(
         "--mode",
         choices=["no-mistakes", "direct-PR", "local-only"],
         default="local-only",
@@ -1248,6 +1338,26 @@ def build_parser() -> argparse.ArgumentParser:
                      "checked that nothing is running any more",
             )
         c.set_defaults(func=fn)
+
+    am = sub.add_parser(
+        "amend", help="Change a running specification, on the record")
+    am.add_argument("run_id")
+    am.add_argument("--spec-file", required=True,
+                    help="the new text. The old one is parked, never replaced")
+    am.add_argument("--amendment-id", required=True)
+    am.add_argument("--kind", required=True,
+                    choices=["clarify", "narrow", "widen", "correct"],
+                    help="clarify claims not to change what would pass, and is "
+                         "held to that claim; the other three do")
+    am.add_argument("--actor", required=True, help="who is amending, by name")
+    am.add_argument("--reason", required=True)
+    am.add_argument("--affects", default="",
+                    help="comma-separated check ids this amendment touches. "
+                         "Their evidence stops counting and they have to be "
+                         "measured again before a candidate can be accepted")
+    am.add_argument("--evidence", default="",
+                    help="comma-separated references that prompted this")
+    am.set_defaults(func=cmd_amend)
 
     gl = sub.add_parser("goal", help="Goalbook spanning run boundaries")
     gs = gl.add_subparsers(dest="goal_command", required=True)

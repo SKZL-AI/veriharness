@@ -73,6 +73,11 @@ class HaltClass(StrEnum):
     CORRUPT_STATE = "CORRUPT_STATE"
     #: Round or repair ceiling reached without a fixpoint. Not an endless spin.
     ROUND_LIMIT = "ROUND_LIMIT"
+    #: A node reached the dispatch budget the project set for it. A result,
+    #: not a failure of the work -- and the protocol of this project's own
+    #: benchmark requires it be recorded as its own outcome rather than folded
+    #: into "did not pass".
+    BUDGET_EXHAUSTED = "BUDGET_EXHAUSTED"
     #: A dry run: nothing was executed, so nothing was established. Never a
     #: fixpoint -- the prototype's first version returned 0 from un-run gates
     #: and reported success, which is NOT_RUN counted as passed.
@@ -90,6 +95,22 @@ class HaltClass(StrEnum):
     #: A state or verdict the controller cannot classify. The defect class:
     #: each one is a place where a human would have to step in.
     AMBIGUOUS = "AMBIGUOUS"
+
+
+class BudgetExhausted(RuntimeError):
+    """A node cannot be started because the shared budget is spent.
+
+    Raised by a launcher's `prepare`, and a **type** rather than a reason
+    string because the orchestrator has to tell it apart from every other
+    reason a node will not start. It could not: the launcher handed the CLI
+    `--max-dispatches 0`, `Budgets` refuses a ceiling below one, the resulting
+    validation error came back as "could not start run ...", and the node was
+    booked `BLOCKED_DEPENDENCY` -- "a dependency that names a node which does
+    not exist". A reader sent looking for a missing dependency at the exact
+    moment the budget bound is the ambiguous halt this class exists to
+    prevent, and it appeared only in the one case the shared budget was built
+    for: a repair node arriving at a spent ceiling.
+    """
 
 
 #: Halt classes that mean "a person is needed", as opposed to "finished".
@@ -128,6 +149,11 @@ class RunVerdict(StrEnum):
     NEEDS_APPROVAL = "NEEDS_APPROVAL"
     #: A dry run performed no dispatch.
     NOT_RUN = "NOT_RUN"
+    #: The run reached a ceiling this project set for itself -- iterations,
+    #: dispatches, wallclock. Distinct from PROVIDER_UNAVAILABLE, which is
+    #: somebody else's downtime: waiting fixes that one and cannot fix this
+    #: one, and only a person can decide the work is worth more budget.
+    BUDGET_EXHAUSTED = "BUDGET_EXHAUSTED"
 
 
 @dataclass
@@ -449,7 +475,17 @@ class ProjectController:
             # A node with no run behind it -- a repair node, typically -- has to
             # be made runnable first. If the launcher cannot, it blocks: a
             # dispatch into nothing produces a verdict about nothing.
-            hindernis = self.launcher.prepare(knoten)
+            try:
+                hindernis = self.launcher.prepare(knoten)
+            except BudgetExhausted as leer:
+                knoten.lifecycle = Lifecycle.BLOCKED
+                knoten.note = str(leer)
+                state = self._persist(state)
+                grund = f"node {knoten.id} has no budget left: {leer}"
+                schritte.append(
+                    Step(runde, HaltClass.BUDGET_EXHAUSTED, knoten.id, grund))
+                return Result(HaltClass.BUDGET_EXHAUSTED, grund, schritte,
+                              runde, reparaturen)
             if hindernis:
                 knoten.lifecycle = Lifecycle.BLOCKED
                 knoten.note = hindernis
@@ -545,6 +581,14 @@ class ProjectController:
             schritte.append(Step(runde, HaltClass.BLOCKED_EXTERNAL, node_id, grund))
             return Result(HaltClass.BLOCKED_EXTERNAL, grund)
 
+        if ausgang.verdict is RunVerdict.BUDGET_EXHAUSTED:
+            knoten.lifecycle = Lifecycle.BLOCKED
+            knoten.note = ausgang.detail
+            self._persist(state)
+            grund = f"node {node_id} spent its budget: {ausgang.detail}"
+            schritte.append(Step(runde, HaltClass.BUDGET_EXHAUSTED, node_id, grund))
+            return Result(HaltClass.BUDGET_EXHAUSTED, grund)
+
         if ausgang.verdict is RunVerdict.NOT_RUN:
             knoten.lifecycle = Lifecycle.READY
             self._persist(state)
@@ -606,7 +650,17 @@ class ProjectController:
                 schritte.append(Step(runde, "REJECTED", node_id, f"attempt {knoten.rejections}"))
             return self._persist(state)
 
-        grund = f"node {node_id}: unclassifiable verdict {ausgang.verdict!r}"
+        # The detail is carried. It was dropped here and nowhere else, so the
+        # one branch that by definition cannot explain itself was also the one
+        # that threw away the launcher's explanation -- a benchmark cell halted
+        # AMBIGUOUS and the project state said only "unclassifiable", with the
+        # reason sitting unused in `ausgang.detail`.
+        grund = (
+            f"node {node_id}: unclassifiable verdict "
+            f"{ausgang.verdict.value}"
+            + (f" -- {ausgang.detail}" if ausgang.detail else
+               " (and the launcher gave no detail)")
+        )
         knoten.lifecycle = Lifecycle.BLOCKED
         knoten.note = grund
         self._persist(state)

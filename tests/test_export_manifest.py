@@ -1193,3 +1193,108 @@ def test_the_unsupported_forms_are_still_refused():
     for muster in ("a**b", "a?b", "a[0-9]b", "/anchored", "a*b*c"):
         with pytest.raises(em.UnsupportedGitignorePattern):
             em._compile_gitignore_rule(muster)
+
+
+def test_the_acknowledged_reference_list_is_short_and_every_entry_says_why():
+    """An exemption list that grows quietly is how a gate stops being one.
+
+    Twenty-one published references pointed at documents the export does not
+    carry. Twelve were rewritten to name the internal document without a path
+    (`docs/EVIDENCE_INDEX.md` says where their substance is published). The
+    nine that remain are all in two independent reviewers' reports, which are
+    published **as written**: editing a report so its citations resolve would
+    make it say something the reviewer did not write, which is a worse defect
+    than a pointer a reader cannot follow.
+
+    This pins that decision. A third document appearing here has to change
+    this test, which is the point.
+    """
+    import tools.export_manifest as em  # noqa: PLC0415
+
+    assert set(em.U2B_ANERKANNT) == {
+        "paper/REVIEW_A.md",
+        "paper/REVIEW_B.md",
+        # A single reference, not the document: the audit's source column has
+        # to name where a number was recomputed from, and that place is an
+        # evidence tree the export does not carry.
+        "paper/AUDIT.md -> runs/a03/receipts",
+    }
+    for pfad, grund in em.U2B_ANERKANNT.items():
+        assert len(grund) > 80, f"{pfad} is acknowledged without a reason"
+        assert "docs/EVIDENCE_INDEX.md" in grund, (
+            f"{pfad} does not say where a reader can look instead")
+
+
+def test_an_acknowledged_reference_is_not_a_finding_and_is_still_printed():
+    """Acknowledged is not invisible. A decision only counts for anything
+    while it stays in front of the reader."""
+    import tools.export_manifest as em  # noqa: PLC0415
+
+    findings = [
+        {"type": "u2b_dangling_reference", "from": "paper/REVIEW_B.md",
+         "to": "dogfood/ABSCHLUSSBERICHT.md", "reason": "target is EXCLUDE"},
+        {"type": "u2b_dangling_reference", "from": "README.md",
+         "to": "dogfood/ABSCHLUSSBERICHT.md", "reason": "target is EXCLUDE"},
+    ]
+    offen, anerkannt = em.teile_u2b(findings)
+
+    assert [f["from"] for f in offen] == ["README.md"], (
+        "a document nobody exempted must still fail")
+    assert [f["from"] for f in anerkannt] == ["paper/REVIEW_B.md"]
+    assert anerkannt[0]["acknowledged"], "the reason travels with the finding"
+
+
+def test_a_single_reference_can_be_acknowledged_without_excusing_a_document():
+    """Acknowledging a whole document to excuse one reference is how an
+    exemption list stops meaning anything.
+
+    `paper/AUDIT.md` has exactly one reference that cannot be removed: the
+    audit's source column names where a number was recomputed from, and that
+    place is an evidence tree the export does not carry. Every other reference
+    that document makes still has to resolve.
+    """
+    import tools.export_manifest as em  # noqa: PLC0415
+
+    findings = [
+        {"from": "paper/AUDIT.md", "to": "runs/a03/receipts", "reason": "x"},
+        {"from": "paper/AUDIT.md", "to": "dogfood/whatever.md", "reason": "x"},
+    ]
+    offen, anerkannt = em.teile_u2b(findings)
+
+    assert [f["to"] for f in anerkannt] == ["runs/a03/receipts"]
+    assert [f["to"] for f in offen] == ["dogfood/whatever.md"], (
+        "acknowledging one pair must not excuse the document's other "
+        "references")
+
+
+def test_the_campaigns_own_declaration_and_evidence_are_published():
+    """A results document is worth nothing without them.
+
+    A reader who cannot see which commit the design was bound to, or the
+    digests the raw results hashed to before and after the reporter was
+    repaired, is being asked to take the campaign's central promise on trust.
+    """
+    import json  # noqa: PLC0415
+    from pathlib import Path  # noqa: PLC0415
+
+    import tools.export_manifest as em  # noqa: PLC0415
+
+    manifest = json.loads(
+        (Path(em.__file__).resolve().parent.parent / "EXPORT_MANIFEST.json")
+        .read_text())
+    eintraege = {e["path"]: e for e in manifest["entries"]}
+    for pfad in ("docs/benchmarks/v3/PREREGISTRATION.json",
+                 "docs/benchmarks/v3/PREREGISTRATION_PROVENANCE.json",
+                 "docs/benchmarks/v3/RAW_RESULT_DIGESTS.json",
+                 "docs/benchmarks/v3/O154_ANALYSIS_ONLY.json"):
+        assert pfad in eintraege, f"{pfad} is not in the manifest at all"
+        assert eintraege[pfad]["decision"] == "INCLUDE", pfad
+        assert eintraege[pfad]["rule"] == "published-evidence", pfad
+
+    geparkt = [p for p in eintraege
+               if p.startswith("docs/benchmarks/v3/PREREGISTRATION.json.v")]
+    for p in geparkt:
+        assert eintraege[p]["decision"] == "EXCLUDE", (
+            "the superseded registration is not published: it is superseded, "
+            "nothing points at it as a path, and the claim it supports is "
+            "checkable from git without it")

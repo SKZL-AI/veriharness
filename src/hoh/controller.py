@@ -55,8 +55,9 @@ from .runner import (
     verify_log,
     verify_receipt,
 )
+from .capability import CapabilityViolation
 from .store import RunStore
-from .telemetry import TelemetryLog, record_from_role
+from .telemetry import NOT_AVAILABLE, TelemetryLog, record_from_role
 from .workspace import commit_candidate, materialize, snapshot, unchanged
 
 
@@ -200,7 +201,18 @@ class Controller:
         RunState.write_seq and RunStore.write_state.
         """
         with self.store.lock():
-            return self._run_iteration_locked(state)
+            try:
+                return self._run_iteration_locked(state)
+            except CapabilityViolation as exc:
+                # Fail closed, and as a *result* rather than as a crash. A
+                # violation is not an outage and must not be re-read as a
+                # missing verdict -- that path would let the loop treat it as
+                # an ordinary rejection and carry on. It blocks the run, keeps
+                # the reason, and leaves the evidence where it is.
+                stages.block(state, f"capability violation: {exc}")
+                self.store.write_state(state)
+                return LoopOutcome(state.iteration, False,
+                                   state.blocked_reason or str(exc))
 
     def _run_iteration_locked(self, state: RunState) -> LoopOutcome:
         if state.started_at_wall is None:
@@ -217,6 +229,39 @@ class Controller:
 
         evidence = self.store.read_evidence(expect_digest=state.evidence_digest)
         spec_text = roles.read_spec(self.spec_path)
+
+        # An amendment is the one way the text may move, and it moves the
+        # run's own digest with it. Read before the drift check rather than
+        # after: the chain is what tells a silent edit apart from a recorded
+        # one, and without it every amendment would look like drift.
+        kette = self._amendment_chain(state)
+        gesehen = len(kette.amendments) if kette is not None else 0
+        if gesehen < state.amendments_seen:
+            # The chain got shorter. Whatever did that -- a rename, a prune, a
+            # hand -- the obligation an amendment created does not evaporate
+            # with the file that recorded it.
+            stages.block(
+                state,
+                f"the amendment chain has {gesehen} entries and this run has "
+                f"seen {state.amendments_seen}; the record of what was amended "
+                "is incomplete"
+            )
+            self.store.write_state(state)
+            return LoopOutcome(state.iteration, False,
+                               state.blocked_reason or "amendment chain shrank")
+        if gesehen > state.amendments_seen:
+            state.amendments_seen = gesehen
+            self.store.write_state(state)
+        if kette is not None and kette.current_digest() == digest(spec_text):
+            if state.spec_digest != kette.current_digest():
+                state.note(
+                    f"specification amended: {state.spec_digest} -> "
+                    f"{kette.current_digest()} through "
+                    f"{len(kette.amendments)} amendment(s)"
+                )
+                state.spec_digest = kette.current_digest()
+                self.store.write_state(state)
+            self._reopen_amended_criteria(kette, state)
 
         # The specification must not change silently underneath a running run
         # -- otherwise two iterations plan and verify against different truths.
@@ -249,7 +294,18 @@ class Controller:
         # prompt is not enforcement when a shell is freely available." If it
         # writes anyway, it hits the copy -- the artifact stays untouched, and
         # the developer remains the only writer.
-        read_copy = self._arena(state, suffix="planner")
+        # O125: the planner's copy gets a parent of its own.
+        #
+        # It used to sit directly under the arena root, which made the
+        # **candidate arena of every iteration and attempt** its sibling --
+        # the trees the acceptance checks run in. The placement had a reason
+        # (one directory up, the harness asks for trust once per run instead
+        # of once per iteration) and the cost of it was never written next to
+        # the reason. Now the planner sees its copy and nothing else, and the
+        # trust question is still asked once, for this directory.
+        planner_root = self.store.arenas_dir / "planner"
+        planner_root.mkdir(parents=True, exist_ok=True)
+        read_copy = self._arena(state, suffix="planner", base=planner_root)
         # Reset before the attempt, not only on success. Until 2026-09-08 this
         # attribute was set inside the `try` and never cleared: if the copy
         # succeeded in iteration 1 and failed in iteration 2, the state
@@ -272,8 +328,8 @@ class Controller:
                 # that is, with write access to the very evidence it is about
                 # to judge. A prompt forbids that; handoff §5 says explicitly
                 # that a prompt is not enforcement.
-                self.dispatcher.role_cwd[Role.PLANNER] = str(self.store.arenas_dir)
-                self._planner_relpath = str(read_copy.relative_to(self.store.arenas_dir))
+                self.dispatcher.role_cwd[Role.PLANNER] = str(planner_root)
+                self._planner_relpath = str(read_copy.relative_to(planner_root))
         except Exception as exc:
             state.note(f"planner read copy not creatable, falling back to live path: {exc}")
 
@@ -329,7 +385,37 @@ class Controller:
         self.store.write_state(state)
 
         # --- Acceptance or rejection ---------------------------------------- #
+        # An acceptance-affecting amendment invalidates the evidence that
+        # rested on the old text. Checked here, on the acceptance itself,
+        # because that is the decision it changes: a criterion the amendment
+        # renamed the meaning of has been measured against a question that no
+        # longer exists, and a verdict carrying it forward would be an
+        # acceptance nobody re-earned.
+        offen = self._revalidation_offen(kette, state, plan, result)
+        if offen and result.summary.startswith(NO_QA_VERDICT):
+            # A QA outage is a missing verdict, not stalled substance. Reporting
+            # it as "the amendment's criterion was not measured" would book a
+            # quota problem as a failure to do the work -- the distinction
+            # `reject_candidate` exists to keep.
+            offen = set()
+        if offen:
+            grund = ("acceptance withheld: the specification was amended and "
+                     + ", ".join(sorted(offen))
+                     + " has not been measured against the new text")
+            state.note(grund)
+            stages.reject_candidate(state, grund)
+            self.store.write_state(state)
+            return LoopOutcome(iteration, False, grund, candidate.candidate_id,
+                               result.verdicts)
+
         if result.accepted():
+            # The obligation an amendment created is discharged here, once,
+            # and recorded. Recomputing it from the chain every iteration meant
+            # a criterion re-measured in iteration 2 was demanded again in
+            # iteration 3 -- and forever.
+            erledigt = set(kette.revalidation_needed()) if kette is not None else set()
+            if erledigt:
+                state.revalidated = sorted(set(state.revalidated) | erledigt)
             self._record_preserved(self._checks_for(plan, state), result.verdicts)
             # Make the accepted state durable before the run state records it
             # as accepted. Without this the checkpoint lived only as a dirty
@@ -420,7 +506,9 @@ class Controller:
             base_candidate_id=base.candidate_id,
             spec_digest=state.spec_digest,
             run_id=state.run_id,
+            reopened=getattr(self, "_wieder_offen", None),
         )
+        self._beginne_zaehlung()
         started_at = utcnow()
         # 'ok' is earned only once the plan has answered, schema-parsed, AND
         # bound correctly to this run/iteration/spec/base -- a plan that
@@ -436,7 +524,7 @@ class Controller:
                 role=Role.PLANNER.value, run_id=state.run_id, iteration=state.iteration,
                 attempt=state.attempt, started_at=started_at, ended_at=utcnow(),
                 backend=type(self.dispatcher).__name__, outcome="failed",
-                detail=str(exc), usage={}, state=state,
+                detail=str(exc), usage={}, state=state, exc=exc,
             )
             raise
         self.note_dispatch(
@@ -489,6 +577,7 @@ class Controller:
             warm_start=state.last_accepted_candidate is not None,
             evidence=evidence,
         )
+        self._beginne_zaehlung()
         started_at = utcnow()
         try:
             self._dispatch(Role.DEVELOPER, prompt, state)
@@ -497,7 +586,7 @@ class Controller:
                 role=Role.DEVELOPER.value, run_id=state.run_id, iteration=state.iteration,
                 attempt=state.attempt, started_at=started_at, ended_at=utcnow(),
                 backend=type(self.dispatcher).__name__, outcome="failed",
-                detail=str(exc), usage={}, state=state,
+                detail=str(exc), usage={}, state=state, exc=exc,
             )
             raise
         self.note_dispatch(
@@ -581,6 +670,11 @@ class Controller:
         if hasattr(self.dispatcher, "role_cwd"):
             # See the planner: the arena root, not the evidence directory.
             self.dispatcher.role_cwd[Role.QA] = str(self.store.arenas_dir)
+        # QA's working directory is the arena root, so every other arena is a
+        # sibling it can reach by name -- the shape O125 objected to for the
+        # planner. Naming the one it is reviewing lets the policy protect all
+        # the others instead of hoping.
+        self._qa_arena = arena
 
         prompt = roles.qa_prompt(
             iteration=state.iteration,
@@ -595,6 +689,8 @@ class Controller:
         # provides for one schema repair per role output, without exempting
         # any role.
         outage = ""
+        qa_exc: Exception | None = None
+        self._beginne_zaehlung()
         started_at = utcnow()
         try:
             raw = self._dispatch_with_repair(Role.QA, prompt, state)
@@ -618,13 +714,20 @@ class Controller:
             # happened.
             raw = ""
             outage = str(exc)
+            qa_exc = exc
 
+        # What the verification produced belongs on the verification's own
+        # record. It was left at 0 -- a missing measurement wearing a number,
+        # on a run that had written two receipts (O128).
         self.note_dispatch(
             role=Role.QA.value, run_id=state.run_id, iteration=state.iteration,
             attempt=state.attempt, started_at=started_at, ended_at=utcnow(),
             backend=type(self.dispatcher).__name__,
             outcome="failed" if outage else "ok",
-            detail=outage, usage={}, state=state,
+            detail=outage, usage={}, state=state, exc=qa_exc,
+            receipts=self._quittungen_geschrieben(state),
+            discriminating=len(discriminating),
+            artefactual=len(getattr(self, "_artefactual", set()) & set(discriminating)),
         )
 
         verdicts, gaps, summary = self._parse_qa(
@@ -787,6 +890,11 @@ class Controller:
                 "artefactual discrimination: "
                 + "; ".join(f"{k}: {v}" for k, v in sorted(artefactual.items()))
             )
+        # Kept for the dispatch record. Counting artefactual discrimination as
+        # ordinary discrimination overstates what an iteration demonstrated
+        # (O112), and a telemetry record that cannot tell them apart cannot
+        # report a campaign's convergence honestly.
+        self._artefactual = set(artefactual)
         return discriminating, blind
 
     def _refusal_receipt(
@@ -960,7 +1068,8 @@ class Controller:
             )
         return None
 
-    def _arena(self, state: RunState, *, suffix: str = "") -> Path:
+    def _arena(self, state: RunState, *, suffix: str = "",
+               base: Path | None = None) -> Path:
         """A separate verification directory per iteration and attempt.
 
         The arena lies **next to** the run directory, not inside it.
@@ -976,7 +1085,7 @@ class Controller:
         instead of closing it pattern by pattern. Above an arena there are now
         only other arenas.
         """
-        base = self.scratch_dir or (self.store.arenas_dir)
+        base = base or self.scratch_dir or (self.store.arenas_dir)
         # The directory name does **not** reveal whether this is the candidate
         # or the control state. Previously it was called "iN-aM-basis", and a
         # criterion could key on that:
@@ -1231,12 +1340,87 @@ class Controller:
         detail: str = "",
         usage: dict | None = None,
         state: RunState | None = None,
+        exc: BaseException | None = None,
         **rest,
     ) -> None:
         """Records one role dispatch. Never raises: telemetry is a record of
         the work, not a precondition for it (see `telemetry.py`). A write
-        failure is noted on `state`, when one was given, and swallowed."""
+        failure is noted on `state`, when one was given, and swallowed.
+
+        Three fields are filled here rather than left at their defaults, all
+        for the same reason: a record model that refuses to lie, wired to a
+        caller that passes it nothing, produces a log of well-typed blanks
+        (O128). `provider` is the harness profile the role actually ran under;
+        `model` is `NOT_AVAILABLE` when the backend cannot report one, which
+        is an answer, where an empty string was not; and a failed dispatch
+        gets a class from the taxonomy instead of a `None` that reads as a
+        failure nobody looked at.
+        """
         try:
+            from .taxonomy import classify_failure
+
+            versender = getattr(self, "dispatcher", None)
+            try:
+                schluessel = role if isinstance(role, Role) else Role(role)
+            except ValueError:
+                # "gate", "merge", "closure" are documented roles of this
+                # record and are not dispatch roles. They keep their string
+                # key rather than losing their identity: writing
+                # NOT_AVAILABLE while the answer sits in the same object is
+                # the false statement this whole block exists to remove.
+                schluessel = role
+            # The dispatcher was *given* these -- `cli.py` fills them from
+            # --role-model and --role-effort and hands them to the agent CLI.
+            # Writing NOT_AVAILABLE while the answer sits in the same object
+            # is not an unknown, it is a false statement.
+            def _konfiguriert(name: str) -> str:
+                tabelle = getattr(versender, name, None)
+                if not isinstance(tabelle, dict):
+                    return ""
+                return tabelle.get(schluessel) or ""
+            rest.setdefault("provider",
+                            _konfiguriert("profiles") or NOT_AVAILABLE)
+            rest.setdefault("model", _konfiguriert("models") or NOT_AVAILABLE)
+            rest.setdefault("effort", _konfiguriert("efforts") or NOT_AVAILABLE)
+            if outcome != "ok":
+                rest.setdefault("failure_class",
+                                classify_failure(exc, detail=detail))
+            umfang = getattr(self, "_zeuge_umfang", None)
+            if umfang is not None:
+                rest.setdefault("witnessed_trees", umfang[0])
+                rest.setdefault("witnessed_listings", umfang[1])
+            # Retries were counted in `state.usage` and nowhere else, so every
+            # record read `retries: 0` on a run that had retried twice -- and
+            # the log's stated purpose is "how much did that take".
+            rest.setdefault("retries", getattr(self, "_letzte_retries", 0))
+            # The number this record contributes to "what did this run cost".
+            # Not derivable from the line's existence in either direction.
+            #
+            # Only for the three dispatch roles. "gate", "merge" and "closure"
+            # are documented roles of this record that reach no provider, and
+            # they do not reset the counter either -- so filling it for them
+            # would attach the *previous* role's calls to a line that made
+            # none, and the sum over the log would count those calls twice.
+            if isinstance(schluessel, Role):
+                rest.setdefault("provider_calls",
+                                getattr(self, "_letzte_aufrufe", 0))
+            else:
+                rest.setdefault("provider_calls", 0)
+            # `DispatchRecord` forbids extra fields, and `rest` was passed
+            # straight through -- so one plausible-but-wrong keyword name made
+            # the whole line disappear, silently when no `state` was given. A
+            # record lost to a typo is the same defect as a well-typed blank.
+            from .telemetry import DispatchRecord
+
+            bekannt = set(DispatchRecord.model_fields)
+            fremd = sorted(k for k in rest if k not in bekannt)
+            for k in fremd:
+                rest.pop(k)
+            if fremd and state is not None:
+                state.note(
+                    f"telemetry: {role} dispatch record does not carry "
+                    + ", ".join(fremd) + " -- no such field, dropped"
+                )
             record = record_from_role(
                 role=role, run_id=run_id, iteration=iteration, attempt=attempt,
                 started_at=started_at, ended_at=ended_at, backend=backend,
@@ -1278,29 +1462,358 @@ class Controller:
         state.active_tasks = [t for t in state.active_tasks if t.attempt_key != ref.attempt_key]
         self.store.write_state(state)
 
+    def _quittungen_geschrieben(self, state: RunState) -> int:
+        """Receipt files this iteration and attempt actually produced.
+
+        Counted on disk rather than from the candidate loop's own list. That
+        list holds only the candidate's receipts; the baseline receipts
+        `_discriminates` writes and any refusal receipt are written during the
+        same verification and were not counted -- a run with two receipt files
+        reported one, which is the same shape as reporting zero, one step
+        smaller.
+        """
+        verzeichnis = self.store.dir / "receipts"
+        if not verzeichnis.is_dir():
+            return 0
+        praefix = f"{state.run_id}-i{state.iteration}-a{state.attempt}-"
+        return sum(1 for f in verzeichnis.glob("*.json")
+                   if f.name.startswith(praefix))
+
+    def _amendment_chain(self, state: RunState):
+        """The run's amendment chain, or `None` if it does not belong to it.
+
+        Provenance is checked, not assumed. The chain is an unsigned file in a
+        directory the roles can reach, and it decides both what the run is
+        measured against and whether an acceptance may stand -- so a chain
+        naming a different run, or one whose parked predecessor is missing or
+        does not hash to what it claims, is not this run's chain and is
+        ignored with a note rather than applied.
+        """
+        from .amendment import text_digest
+
+        try:
+            kette = self.store.read_amendments(origin_digest=state.spec_digest)
+        except Exception as exc:                 # noqa: BLE001 - a chain
+            # that cannot be read must not stop a run; it must not be applied
+            # either, and the note is how a reader finds out which happened.
+            state.note(f"amendment chain unreadable, ignored: {exc}")
+            return None
+        if not kette.amendments:
+            return None
+        if kette.run_id != state.run_id:
+            state.note(
+                f"amendment chain names run {kette.run_id!r}, not "
+                f"{state.run_id!r} -- ignored"
+            )
+            return None
+        for a in kette.amendments:
+            alt = Path(a.from_path) if a.from_path else None
+            if alt is None or not alt.is_file():
+                state.note(
+                    f"{a.amendment_id}: the superseded text it names is not "
+                    f"there ({a.from_path or 'unnamed'}) -- chain ignored"
+                )
+                return None
+            if text_digest(alt.read_text(encoding="utf-8")) != a.from_digest:
+                state.note(
+                    f"{a.amendment_id}: the parked text does not hash to "
+                    f"{a.from_digest} -- chain ignored"
+                )
+                return None
+        return kette
+
+    def _reopen_amended_criteria(self, kette, state: RunState) -> None:
+        """Drop the criteria an amendment reopened from the preservation suite.
+
+        Without this the gate is satisfiable only by the *old* measurement.
+        `_checks_for` freezes a preserved criterion against redefinition -- for
+        good reason, it is how a plan is stopped from watering one down -- and
+        an amendment's affected criteria are by construction ones that already
+        passed, so they are all preserved. The planner would re-plan the
+        criterion with the new command, the frozen version would silently
+        apply, and the receipt would record the pre-amendment command. An
+        adversarial reviewer rode exactly that to an acceptance in which the
+        new requirement was never checked.
+
+        Reopening means the criterion goes back to being a *fresh* one: it has
+        to discriminate again, and its new definition is the one that counts.
+        """
+        noetig = set(kette.revalidation_needed()) - set(state.revalidated)
+        if not noetig:
+            # Cleared, not left standing: the planner prompt would otherwise
+            # keep naming criteria that have already been answered, and a
+            # prompt that asks for work already done is a prompt a role has to
+            # guess its way past.
+            self._wieder_offen = None
+            return
+        suite = self.store.read_checks()
+        entfernt = sorted(noetig & set(suite))
+        if not entfernt:
+            return
+        for cid in entfernt:
+            del suite[cid]
+        self.store.write_checks(suite)
+        state.note(
+            "reopened by amendment, removed from the preservation suite so the "
+            "new text can be measured: " + ", ".join(entfernt)
+        )
+        self._wieder_offen = sorted(noetig)
+
+    def _revalidation_offen(self, kette, state: RunState,
+                            plan: DevelopmentPlan, result) -> set[str]:
+        """Criteria an amendment reopened that this iteration has not answered.
+
+        A criterion counts as answered when this iteration both **planned** it
+        and produced a verdict for it. Measuring it is not enough on its own:
+        a plan that quietly drops the criterion would otherwise satisfy the
+        requirement by never asking, which is the shape of the missing
+        preservation suite that O129 rode to a false checkpoint.
+        """
+        noetig = set(kette.revalidation_needed()) if kette is not None else set()
+        noetig -= set(state.revalidated)
+        if not noetig:
+            return set()
+        geplant = {c.check_id for c in plan.acceptance_checks}
+        beantwortet = {v.check_id for v in result.verdicts
+                       if v.outcome.value in ("PASS", "FAIL")}
+        return {c for c in noetig if c not in geplant or c not in beantwortet}
+
+    def _beginne_zaehlung(self) -> None:
+        """Start counting this role's provider calls at zero.
+
+        Called by the role methods rather than by `_dispatch`, because one role
+        attempt can be several dispatches: a schema repair is a second call for
+        the same answer, and resetting inside `_dispatch` would throw the first
+        one away. Reset rather than left standing, so a role that never reaches
+        a dispatch does not report the previous role's number.
+        """
+        self._letzte_retries = 0
+        # How many calls actually reached the provider for this role. Recorded
+        # because the telemetry log was being *counted* elsewhere as one line
+        # per dispatch, and a line is neither: a role that retried twice wrote
+        # one line for three calls, and a role refused at the budget wrote one
+        # line for none. The benchmark's cost figure was read off those lines.
+        self._letzte_aufrufe = 0
+        # Cleared with it: a dispatch refused at the budget check never takes a
+        # witness, and the record then carried the *previous* dispatch's
+        # coverage. A fabricated measurement in the evidence log is the class
+        # of defect the log exists to remove.
+        self._zeuge_umfang = None
+
+    def _antwortdatei(self, role: Role, state: RunState) -> Path:
+        """The one file this role's answer may come from, for this attempt.
+
+        Asked of the dispatcher where it can answer, because the dispatcher is
+        what writes it; the fallback reproduces the same name rather than
+        falling back to a directory. A policy whose `output_channel` names a
+        file that never exists -- which is what `answers/{role}.json` was --
+        cannot decide anything, and `_answered()` relies on it.
+        """
+        holen = getattr(self.dispatcher, "_answer_path", None)
+        if callable(holen):
+            return Path(holen(role, state))
+        return (self.store.dir / "answers"
+                / f"i{state.iteration}-a{state.attempt}-{role.value}.json")
+
+    def _policy_for(self, role: Role, state: RunState):
+        """The capability policy this role runs under, fail-closed by default.
+
+        A role with no entry here gets `denied_policy`: no writes, no
+        capabilities, and every protected tree still verified. Adding a role
+        without deciding what it may do therefore stops the run rather than
+        inheriting whatever the last role was allowed.
+        """
+        from . import capability as cap
+
+        antwort = self._antwortdatei(role, state)
+        arenen = self.store.arenas_dir
+        lauf = self.store.dir
+
+        # The run's own evidence. Two independent reviews found the same hole
+        # here: only `receipts/` was protected, so a planner that emptied
+        # `checks.json` during its own dispatch removed the preservation suite
+        # and a genuine regression was accepted as a checkpoint -- reproduced
+        # end to end, with zero violations noted. `answers/` is excluded
+        # because it is how roles answer, and `telemetry.jsonl` because it is
+        # appended after the witness is checked.
+        # Listed whether or not they exist yet. `tree_digest` returns the
+        # empty string for an absent path, and "absent -> present" is a
+        # difference the witness reports -- which is the whole point here: a
+        # role that *creates* `amendments.json` has written itself a
+        # specification change, and filtering by existence let it do exactly
+        # that on any run that had never been amended.
+        evidenz = (
+            lauf / "state.json", lauf / "checks.json", lauf / "evidence.json",
+            lauf / "amendments.json",
+            lauf / "receipts", lauf / "results", lauf / "logs",
+        )
+        # The arena root gains a child every iteration, so it cannot be
+        # digested whole around a dispatch -- but nothing legitimate creates
+        # one *while* a role runs, and a staging directory made then and moved
+        # in afterwards is the attack a full digest is designed to miss.
+        flach = (arenen,) if arenen.is_dir() else ()
+        repo = Path(state.repo_path)
+
+        def andere_arenen(ausser: Path | None = None) -> tuple[Path, ...]:
+            if not arenen.is_dir():
+                return ()
+            return tuple(
+                d for d in sorted(arenen.glob("*"))
+                if d.is_dir() and d.name != "planner"
+                # The scratch siblings are the check commands' `$HOME` and
+                # `$TMPDIR` -- pip and pytest caches, measured at up to 118 MB
+                # each. They are not evidence about anything, and digesting
+                # them twice per dispatch is most of what a witness costs.
+                and ".scratch" not in d.name
+                and not d.name.startswith(".hoh-scratch-")
+                and (ausser is None or d.resolve() != ausser.resolve())
+            )
+
+        if role is Role.PLANNER:
+            # The repository belongs here and did not before: `snapshot()`
+            # binds the **working tree**, so a file the planner wrote there
+            # during its dispatch landed inside the accepted candidate.
+            return cap.planner_policy(
+                read_copy=arenen / "planner", answer=antwort,
+                protected=andere_arenen() + evidenz + (repo,),
+                shallow=flach,
+            )
+        if role is Role.DEVELOPER:
+            # The repository is the developer's workspace, so it is the one
+            # role for which it is not protected. The arenas of iterations
+            # already measured still are.
+            return cap.developer_policy(
+                arena=repo, answer=antwort,
+                protected=andere_arenen() + evidenz,
+                shallow=flach,
+            )
+        if role is Role.QA:
+            eigene = getattr(self, "_qa_arena", None)
+            # No shallow watch on the arena root for QA, and the reason is that
+            # the arena root **is** QA's working directory. A reviewer ran
+            # `pytest` against the candidate from there -- which is the work QA
+            # is sitting there to do -- and `.pytest_cache` appearing beside
+            # the arenas failed the iteration. Watching the listing of a role's
+            # own cwd is a check that fires on the role doing its job, and the
+            # alternative, a list of tool names to ignore, is the growing
+            # exclusion list this project rejects elsewhere. Every existing
+            # arena except QA's own is still protected in full; what is given
+            # up is noticing a *new* directory created during QA's dispatch.
+            # Tracked as limit 12d.
+            return cap.qa_policy(
+                arena=arenen, answer=antwort,
+                protected=andere_arenen(eigene) + evidenz + (repo,),
+            )
+        return cap.denied_policy(
+            role.value, protected=andere_arenen() + evidenz + (repo,))
+
+    def _budget_oder_absage(self, state: RunState) -> None:
+        """Charges one provider call against the budget, or refuses it.
+
+        The order is the whole content of this method, and it was wrong. It
+        incremented first and asked afterwards, so `max_dispatches=9` bought
+        **eight** calls: the ninth raised its own counter to 9, read `9/9`,
+        and refused the call it had just charged for. The advisor's wording is
+        the test -- "on spending dispatch 9 there is no tenth" -- so the
+        question has to be asked about the state *before* the call: am I
+        already at the ceiling? Found by `tools/budget_evidence.py` on a
+        fixture that wanted more dispatches than it could have.
+
+        The charge is written to disk before the provider is called. A count
+        that only reaches disk on a clean return is a count a crash refunds:
+        kill the process mid-dispatch and the next one reads the old number
+        and calls again. The budget is enforced across processes out of this
+        file, so this file has to know about a call that was *started*.
+        """
+        erschoepft = state.budget_exhausted()
+        if erschoepft:
+            raise DispatchError(f"dispatch refused: {erschoepft}")
+        state.usage.dispatches += 1
+        self._letzte_aufrufe = getattr(self, "_letzte_aufrufe", 0) + 1
+        self.store.write_state(state)
+
     def _dispatch(self, role: Role, prompt: str, state: RunState) -> str:
         # Handoff §8: "Check budget and deadline before every dispatch; count
         # retries and supervision in." Previously it was counted only once per
         # iteration and checked only at the start of the iteration.
-        state.usage.dispatches += 1
-        exhausted = state.budget_exhausted()
-        if exhausted:
-            raise DispatchError(f"dispatch refused: {exhausted}")
+        self._budget_oder_absage(state)
 
         ref = self._register_intent(role, state)
+        # O125: what the role may touch, witnessed before it runs. A prompt
+        # that says "edit nothing" is a request; this is the part a machine
+        # checks afterwards.
+        from .capability import CapabilityViolation, CapabilityWitness
+
+        policy = self._policy_for(role, state)
+        zeuge = CapabilityWitness.take(policy)
+        # What the witness actually covered, on the record. The protected set
+        # is built from what exists when the dispatch starts, so it is a
+        # property of this dispatch and not of the source.
+        self._zeuge_umfang = (len(policy.protected), len(policy.protected_shallow))
         attempts = 0
         while True:
             try:
                 answer = self.dispatcher.dispatch(role, prompt, state=state)
+                verletzt = zeuge.violations()
+                if verletzt:
+                    # Fail closed, and loudly. A run whose planner wrote into
+                    # the tree its acceptance checks measure has not produced
+                    # a verdict about the product; continuing would attach a
+                    # result to a measurement that was interfered with.
+                    state.note(
+                        f"capability violation by {role.value}: "
+                        + "; ".join(verletzt)
+                    )
+                    raise CapabilityViolation(
+                        f"{policy.summary()} -- " + "; ".join(verletzt)
+                    )
                 self._retire_task(
                     ref, state, endpoint=self.dispatcher.endpoint_evidence(role)
                 )
                 return answer
             except DispatchError as exc:
                 if exc.transient and attempts < state.budgets.max_transient_retries:
+                    # Checked here, before the controller writes anything of
+                    # its own, and for two reasons. It closes the window the
+                    # persist below would otherwise open -- a role that wrote
+                    # into a protected tree and *then* failed transiently
+                    # would have that write folded into the fresh witness --
+                    # and it fails closed one attempt earlier than waiting
+                    # for the last one to return.
+                    vorher_verletzt = zeuge.violations()
+                    if vorher_verletzt:
+                        state.note(
+                            f"capability violation by {role.value} on a failed "
+                            f"attempt: " + "; ".join(vorher_verletzt))
+                        raise CapabilityViolation(
+                            f"{policy.summary()} -- " + "; ".join(vorher_verletzt)
+                        ) from exc
                     attempts += 1
+                    self._letzte_retries = attempts
                     state.usage.transient_retries += 1
+                    # A retry calls the provider again, so it spends a
+                    # dispatch. It did not: the counter sat outside this loop,
+                    # and a run could re-call the provider past a budget that
+                    # had already refused it. Charged through the same gate as
+                    # the first call, which is what "count retries in" means.
+                    try:
+                        self._budget_oder_absage(state)
+                    except DispatchError as absage:
+                        state.note(
+                            f"transient error on {role.value}, and the budget "
+                            f"is spent: {absage}")
+                        raise absage from exc
                     state.note(f"transient error on {role.value}, attempt {attempts}: {exc}")
+                    # Only `state.json`, which this process just wrote. A
+                    # fresh witness over *everything* was the first version
+                    # and an adversarial review broke it: a role that wrote
+                    # into `checks.json` during the same window had that
+                    # write folded into the new baseline, the run continued
+                    # with a hijacked acceptance suite, and nothing was
+                    # recorded. Every other protected tree keeps the baseline
+                    # it was taken with, so a write anywhere else is still
+                    # caught when this attempt returns.
+                    zeuge.neu_bezeugen([self.store.state_path])
                     continue
                 raise
 
@@ -1337,6 +1850,10 @@ class Controller:
                 ) from exc
             repairs_this_output += 1
             state.usage.schema_repairs += 1
+            # The repair is a second provider call for the same answer. The
+            # record covered one dispatch and reported one attempt, so the log
+            # under-counted the calls it exists to count.
+            self._letzte_retries = getattr(self, "_letzte_retries", 0) + 1
             state.note(f"schema repair for {role.value}: {exc}")
             repaired = self._dispatch(role, roles.repair_prompt(role, str(exc), raw), state)
 

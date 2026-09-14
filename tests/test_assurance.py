@@ -170,19 +170,22 @@ def test_the_weaker_source_rule_applies_to_every_kind_not_only_to_logs():
     assert any("run_state while repository" in g for g in r.weaknesses())
 
 
-def test_naming_a_weaker_alternative_is_rejected_as_a_mistake():
-    with pytest.raises(ValidationError, match="is not stronger than"):
-        git(stronger_source_available=SourceKind.TRANSIENT_LOG)
+def test_naming_the_source_that_was_used_is_rejected_as_a_mistake():
+    """The field names a source that *should* have been used instead. Naming
+    the one that was is a slip, not a weakness."""
+    with pytest.raises(ValidationError, match="is the source that was used"):
+        git(stronger_source_available=SourceKind.REPOSITORY)
 
 
-def test_the_strength_order_exists_in_code_and_not_only_in_prose():
-    assert SourceKind.REPOSITORY.strength() > SourceKind.TRANSIENT_LOG.strength()
-    assert SourceKind.RECEIPT.strength() > SourceKind.PROJECT_STATE.strength()
-    assert SourceKind.ABSENT.strength() == 0
-    # Every kind has a rank; a new one without one fails loudly rather than
-    # silently comparing as equal.
+def test_durability_is_an_ordering_and_not_a_ranking_of_worth():
+    """It used to be `strength()` and decided which source may authorise a
+    metric. That is wrong in a way that is easy to miss because it is usually
+    right -- see the authority tests at the bottom of this file."""
+    assert SourceKind.REPOSITORY.durability() > SourceKind.TRANSIENT_LOG.durability()
+    assert SourceKind.RECEIPT.durability() > SourceKind.PROJECT_STATE.durability()
+    assert SourceKind.ABSENT.durability() == 0
     for k in SourceKind:
-        assert isinstance(k.strength(), int)
+        assert isinstance(k.durability(), int)
 
 
 def test_a_critical_log_read_is_refused_even_with_no_stronger_source_named():
@@ -723,3 +726,131 @@ def test_false_green_5_a_green_job_whose_step_was_skipped():
     )
     assert not r.authoritative()
     assert any("not a pass" in g for g in r.weaknesses())
+
+
+# --------------------------------------------------------------------------- #
+# Authority belongs to the question, not to the medium
+# --------------------------------------------------------------------------- #
+
+
+def _rec(metric_id, kind, *, head=HEAD, falsifier=FalsifierState.KILLED,
+         cross=None, **kw):
+    felder = dict(
+        metric_id=metric_id,
+        source=EvidenceSource(kind=kind, identity="x", subject_head=head),
+        derivation="d", measured=1, state=ResultState.VERIFIED,
+        falsifier=falsifier, falsifier_detail="d",
+        provenance=Provenance.MEASURED, cross_check=cross,
+    )
+    felder.update(kw)
+    return AssuranceRecord(**felder)
+
+
+def test_git_is_the_authority_for_a_landed_commit():
+    from hoh.assurance import authority_for
+
+    assert authority_for("landed_commit").preferred is SourceKind.REPOSITORY
+    assert _rec("landed_commit", SourceKind.REPOSITORY).authoritative(
+        subject_head=HEAD)
+
+
+def test_git_does_not_get_to_answer_what_stage_a_run_is_in():
+    """The whole reason a single ordering of sources was wrong. Git is the
+    most durable source this project has and it cannot see a run's stage."""
+    gruende = _rec("node_lifecycle", SourceKind.REPOSITORY).weaknesses(
+        subject_head=HEAD)
+    assert any("cannot answer node_lifecycle" in g for g in gruende)
+    assert _rec("node_lifecycle", SourceKind.PROJECT_STATE).authoritative(
+        subject_head=HEAD)
+
+
+def test_run_state_does_not_get_to_answer_where_a_commit_landed():
+    """The converse, and it has to be tested separately: a state file saying
+    a node is MERGED records an intention to merge."""
+    gruende = _rec("landed_commit", SourceKind.RUN_STATE).weaknesses(
+        subject_head=HEAD)
+    assert any("cannot answer landed_commit" in g for g in gruende)
+
+
+def test_a_digest_alone_authorises_no_derived_metric():
+    """A digest proves two byte sequences are the same. It says nothing about
+    what they mean, so it is in no policy's allowed set."""
+    for metric in ("landed_commit", "node_lifecycle", "run_accepted_candidate",
+                   "check_executed_under_isolation"):
+        gruende = _rec(metric, SourceKind.DIGEST).weaknesses(subject_head=HEAD)
+        assert any("cannot answer" in g for g in gruende), metric
+
+
+def test_a_receipt_does_not_replace_the_project_states_lifecycle():
+    gruende = _rec("node_lifecycle", SourceKind.RECEIPT).weaknesses(
+        subject_head=HEAD)
+    assert any("cannot answer node_lifecycle" in g for g in gruende)
+
+
+def test_only_the_receipt_may_say_a_check_ran_isolated():
+    """O113: configuration says what was asked for. The receipt carries what
+    the runner measured from inside."""
+    assert _rec("check_executed_under_isolation", SourceKind.RECEIPT).authoritative(
+        subject_head=HEAD)
+    for k in (SourceKind.PROJECT_STATE, SourceKind.RUN_STATE,
+              SourceKind.REPOSITORY, SourceKind.TRANSIENT_LOG):
+        gruende = _rec("check_executed_under_isolation", k).weaknesses(
+            subject_head=HEAD)
+        assert any("cannot answer" in g for g in gruende), k.value
+
+
+def test_a_ci_job_does_not_stand_in_for_the_named_step():
+    from hoh.assurance import authority_for
+
+    p = authority_for("external_ci_step")
+    assert p.allowed == frozenset({SourceKind.EXTERNAL_CI_STEP})
+    assert not p.requires_binding, (
+        "a CI step's conclusion is not a property of a commit in this tree"
+    )
+
+
+def test_a_metric_class_prefix_shares_one_policy():
+    from hoh.assurance import authority_for
+
+    assert authority_for("check_executed_under_isolation:strictroman4") is (
+        authority_for("check_executed_under_isolation"))
+    assert authority_for("something_nobody_declared") is None
+
+
+def test_a_metric_with_no_policy_is_judged_by_the_general_rules_only():
+    """Absence of a policy must not become a licence. The general weaknesses
+    still apply; what is absent is only the question-specific ownership."""
+    r = _rec("something_nobody_declared", SourceKind.PROJECT_STATE)
+    assert r.authoritative(subject_head=HEAD)
+    schwach = _rec("something_nobody_declared", SourceKind.PROJECT_STATE,
+                   falsifier=FalsifierState.NOT_RUN, falsifier_detail="")
+    assert not schwach.authoritative(subject_head=HEAD)
+
+
+def test_an_authoritative_source_still_needs_its_binding_and_falsifier():
+    ohne_head = _rec("landed_commit", SourceKind.REPOSITORY, head=None)
+    assert any("requires the commit it was measured at" in g
+               for g in ohne_head.weaknesses(subject_head=HEAD))
+    ohne_kontrolle = _rec("landed_commit", SourceKind.REPOSITORY,
+                          falsifier=FalsifierState.NOT_RUN, falsifier_detail="")
+    assert any("negative control" in g
+               for g in ohne_kontrolle.weaknesses(subject_head=HEAD))
+
+
+def test_durability_says_only_how_long_a_source_lasts():
+    """It used to be called strength and decided who may answer. Now it is a
+    technical property with no say in authority."""
+    assert SourceKind.REPOSITORY.durability() > SourceKind.TRANSIENT_LOG.durability()
+    assert not hasattr(SourceKind.REPOSITORY, "strength")
+    # And durability does not rescue a source the policy excludes.
+    gruende = _rec("node_lifecycle", SourceKind.REPOSITORY).weaknesses(
+        subject_head=HEAD)
+    assert gruende, "the most durable source answered a question it does not own"
+
+
+def test_every_declared_policy_states_why():
+    from hoh.assurance import AUTHORITIES
+
+    for name, p in AUTHORITIES.items():
+        assert p.rationale, f"{name} restricts sources and does not say why"
+        assert p.allowed, name

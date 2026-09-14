@@ -44,6 +44,12 @@ from .taxonomy import FailureClass, disposition
 
 TELEMETRY_SCHEMA_VERSION = 1
 
+#: What an identity field says when the backend genuinely cannot report it.
+#: An empty string does not distinguish "the harness does not tell us" from
+#: "nobody asked", and a log full of the second wearing the first is what
+#: `tools/telemetry_audit.py` was written to find.
+NOT_AVAILABLE = "NOT_AVAILABLE"
+
 
 class DispatchRecord(Strict):
     """One role dispatch, or one orchestration step that cost something."""
@@ -66,9 +72,11 @@ class DispatchRecord(Strict):
     backend: str = ""
     #: The provider behind it, where one is named.
     provider: str = ""
-    #: The model, where one is named. Empty is a real answer -- "whatever the
-    #: harness defaults to" is a genuine and unhelpful state, and a run record
-    #: that hides it cannot be compared with another.
+    #: The model, where one is named. `NOT_AVAILABLE` where the backend
+    #: cannot report one -- an agent in a pane chooses its own, and this
+    #: process never learns which. Empty means nobody filled the field in, and
+    #: the audit treats the two differently on purpose: "whatever the harness
+    #: defaults to" is a genuine and unhelpful state, but it is a *stated* one.
     model: str = ""
     effort: str = ""
 
@@ -84,6 +92,13 @@ class DispatchRecord(Strict):
     detail: str = ""
     #: Retries already spent on this dispatch when the record was written.
     retries: int = 0
+    #: Calls that actually reached the provider for this record. One line is
+    #: not one call in either direction: a retried dispatch is one line and
+    #: several calls, and a dispatch refused at the budget is one line and
+    #: none. `None` means the record predates the field -- which is why the
+    #: counter that reads it reports how many lines could not answer instead
+    #: of quietly scoring them as one.
+    provider_calls: int | None = None
     waited_seconds: int = 0
 
     # -- what it cost ------------------------------------------------------- #
@@ -95,6 +110,18 @@ class DispatchRecord(Strict):
     #: A monotone stand-in where tokens are unavailable, with its unit named.
     quota_proxy: float | None = None
     quota_proxy_kind: str = ""
+
+    # -- what was watched while it ran --------------------------------------- #
+    #: How many trees the capability witness digested around this dispatch,
+    #: and how many directory listings it watched. Recorded rather than
+    #: derived: the protected set is built from the directories that exist at
+    #: dispatch time, so it differs per dispatch, and a reader who has to
+    #: reconstruct it from the controller's source is reading the wrong thing
+    #: -- twice now a property of a run was inferred from what the code does
+    #: today rather than from what that run recorded. `None` means the record
+    #: predates this field, which is not the same as zero.
+    witnessed_trees: int | None = None
+    witnessed_listings: int | None = None
 
     # -- what it produced --------------------------------------------------- #
     receipts: int = 0

@@ -306,3 +306,63 @@ def test_a_record_serialises_to_one_line(tmp_path):
     r = _rec(detail="line one\nline two")
     assert "\n" not in r.model_dump_json()
     assert json.loads(r.model_dump_json())["detail"] == "line one\nline two"
+
+
+def test_a_spent_budget_is_not_an_unknown_failure():
+    """It was UNKNOWN, which sends a reader looking for a defect.
+
+    A budget is a policy limit this project set for itself, reached. The
+    decision it asks for is about a ceiling, not about a bug.
+    """
+    from hoh.taxonomy import FailureClass, classify_failure, disposition
+
+    fc = classify_failure(None, detail="dispatch refused: dispatch budget exhausted (4/4)")
+    assert fc is FailureClass.BUDGET_EXHAUSTED
+
+    d = disposition(fc)
+    assert d.max_retries == 0, "a retry cannot create budget"
+    assert d.human_gate is True
+    assert not d.auto_resume
+
+
+def test_a_capability_violation_is_not_a_corrupt_state():
+    """The state is perfectly readable; a role crossed a write boundary.
+
+    Filing the two under one word would make the ledger say the same thing
+    about two different situations.
+    """
+    from hoh.taxonomy import FailureClass, classify_failure
+
+    class CapabilityViolation(RuntimeError):
+        pass
+
+    fc = classify_failure(CapabilityViolation("a protected tree changed"))
+    assert fc is FailureClass.CAPABILITY_VIOLATION
+    assert fc is not FailureClass.CORRUPT_STATE
+
+
+def test_the_type_beats_the_message_where_they_disagree():
+    """The message is the provider's; the type is this project's own.
+
+    A dispatch failure's detail carries the agent's terminal output, and this
+    project dogfoods on a tree full of files called `approval.py` and
+    `contracts.py`.
+    """
+    from hoh.controller import DispatchError
+    from hoh.taxonomy import FailureClass, classify_failure
+
+    exc = DispatchError("the connection dropped", transient=True)
+    fc = classify_failure(
+        exc, detail="the connection dropped\n  $ grep -rn approval src/\n")
+    assert fc is FailureClass.PROVIDER_TRANSIENT
+
+
+def test_only_the_first_line_of_a_detail_is_read():
+    """Forty lines of pane output must not decide a retry policy."""
+    from hoh.taxonomy import FailureClass, classify_failure
+
+    fc = classify_failure(
+        None,
+        detail="the provider returned 500\n" + "\n".join(
+            ["  $ pytest tests/test_contracts.py"] * 40))
+    assert fc is not FailureClass.CONTRACT_INVALID

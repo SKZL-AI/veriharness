@@ -105,6 +105,46 @@ class _Base:
     def _answer_path(self, role: Role, state: RunState) -> Path:
         return self.answers_dir / f"i{state.iteration}-a{state.attempt}-{role.value}.json"
 
+    #: Panes left blocked by a role that had already delivered. Kept so the
+    #: situation stays visible rather than becoming invisible once it stops
+    #: failing the run.
+    _note_blocked_but_answered: dict = {}
+
+    def _answered(self, path: Path, role: Role) -> bool:
+        """Did the role deliver through its declared output channel?
+
+        A structured role answers through exactly one file. Whether it answered
+        is therefore a question about that file, and not about what its pane
+        looks like afterwards.
+        """
+        if role not in STRUCTURED_ROLES:
+            return False
+        try:
+            return bool(path.exists() and path.read_text(encoding="utf-8").strip())
+        except OSError:
+            return False
+
+    def _delivered(self, role: Role, before: str | None) -> bool:
+        """Did an unstructured role deliver the thing it delivers?
+
+        The developer's answer is not a file in the answers directory -- it is
+        the artifact in the arena. So the question "did it deliver" is answered
+        the same way as for the structured roles, by looking at the declared
+        output rather than at the pane: did the working tree change.
+
+        Measured on a real confinement run. The developer wrote `fib.py`,
+        checked its own hash against the acceptance criterion, said *"Done --
+        artifact left in the working tree for QA to execute independently"* and
+        left its pane at a prompt. Herdr reports such a pane as `blocked`, and
+        the run stopped on a dialog that was not there.
+        """
+        if role in STRUCTURED_ROLES or before is None:
+            return False
+        from .capability import tree_digest
+
+        ziel = self.role_cwd.get(role) or getattr(self, "cwd", None)
+        return bool(ziel) and tree_digest(Path(ziel)) != before
+
     def _read_answer(self, path: Path, role: Role) -> str:
         if not path.exists():
             raise DispatchError(
@@ -570,6 +610,16 @@ class HerdrDispatcher(_Base):
             _answer_instruction(answer_path) if role in STRUCTURED_ROLES else ""
         )
 
+        # Witnessed before the dispatch, so an unstructured role's delivery can
+        # be measured rather than read off its pane. Cheap: a digest over the
+        # arena, which is the tree the role is expected to change.
+        vorher = None
+        if role not in STRUCTURED_ROLES:
+            from .capability import tree_digest
+
+            ziel = self.role_cwd.get(role) or getattr(self, "cwd", None)
+            if ziel:
+                vorher = tree_digest(Path(ziel))
         try:
             data = self._cli(
                 ["herdr", "agent", "prompt", target, full, "--wait",
@@ -597,7 +647,10 @@ class HerdrDispatcher(_Base):
         ).evidence()
 
         status = str(agent.get("agent_status", ""))
-        if status == "blocked":
+        geliefert = (
+            self._answered(answer_path, role) or self._delivered(role, vorher)
+        )
+        if status == "blocked" and not geliefert:
             # **Read** the dialog before anything is cleaned up. Twice a run
             # came to a halt at an approval, and both times it was afterwards
             # not determinable which one -- the pane was gone. A blocker
@@ -609,6 +662,17 @@ class HerdrDispatcher(_Base):
                 "A blocked dialog is not answered automatically.\n"
                 f"{self._pane_view(target)}"
             )
+        if status == "blocked":
+            # The pane is blocked and the role has **already answered**. A
+            # planner that wrote its plan and then left its pane at an input
+            # prompt is finished; the pane's state is a diagnosis, not a
+            # verdict. Measured on a real confinement run: the plan file was
+            # written, the transcript said so, and the run blocked anyway.
+            #
+            # This is what `RoleExecutionPolicy.output_channel` is for. A role
+            # answers through exactly one file, so that is where the question
+            # "did it answer" is decided -- not in a screen scrape.
+            self._note_blocked_but_answered[role] = str(agent.get("pane_id"))
 
         if role not in STRUCTURED_ROLES:
             return f"developer run finished (status {status})"

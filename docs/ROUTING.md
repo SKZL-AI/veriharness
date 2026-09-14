@@ -74,3 +74,16 @@ This is a disposition, not an open question left lying: the thing that has to
 happen before it can be decided is named, the mechanism for it exists, and the
 two assumptions a reader would otherwise expect to see adopted are refused in
 writing.
+
+**Checked on 2026-09-13, and still deferred.** The mechanism has now run on
+real dispatches, and `tools/telemetry_audit.py` says what it produced: every
+identity field filled -- provider, model, effort, wallclock, attempt, outcome,
+the witness coverage, the receipt count -- and, for the revisit condition,
+nothing. Tokens are `NOT_DETERMINABLE` on every record, because the backend
+does not report them; no dispatch failed and none retried, so there is no
+failure-class distribution to route on either. `revisit_when` asks for
+per-role **cost and failure-class** data, and neither exists yet.
+
+What changed is that the condition is now checkable rather than merely
+written down: the audit prints the shapes that are missing, by name, and
+refuses to call an uneventful campaign a validated one.

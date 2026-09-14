@@ -134,6 +134,29 @@ def _spec_block(spec_text: str) -> str:
 from .runner import ARENA_PLACEHOLDER as _ARENA  # noqa: E402
 
 
+def _amendment_block(reopened: list[str] | None) -> str:
+    """What an amendment reopened, said to the role that has to answer it.
+
+    Nothing told the planner. The gate keys on the plan containing the
+    criterion, so a planner that did not know had to guess -- and the one
+    thing it could not guess is that the criterion's *old* definition no
+    longer applies and it is expected to write a new one against the new text.
+    """
+    if not reopened:
+        return ""
+    namen = ", ".join(sorted(reopened))
+    return f"""
+/reopened-by-an-amendment
+The specification was amended, and {namen} must be planned and measured again
+against the **new** text. Their earlier evidence no longer supports an
+acceptance, and their earlier definitions no longer apply: write each of them
+afresh, as a criterion that would be red on the current state and green once
+the amended requirement is met. A plan that leaves one of them out cannot be
+accepted, and one that merely repeats the old command answers a question the
+specification no longer asks.
+"""
+
+
 def planner_prompt(
     *,
     iteration: int,
@@ -143,6 +166,7 @@ def planner_prompt(
     base_candidate_id: str,
     spec_digest: str,
     run_id: str,
+    reopened: list[str] | None = None,
 ) -> str:
     """(S, E_{t-1}) -> D_t"""
     # K1: the **stable** part comes first, the run metadata last. An earlier
@@ -173,7 +197,7 @@ From here on come the details that change from run to run.
 
 /run
 Iteration: {iteration} · project directory: {repo_path}
-
+{_amendment_block(reopened)}
 {_spec_block(spec_text)}
 /previous-iteration-evidence
 {evidence.packet()}

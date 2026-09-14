@@ -113,14 +113,59 @@ def test_andere_blockade_wird_nicht_als_ablehnung_geraten(starter, tmp_path):
 
 
 def test_erschoepftes_budget_mitten_im_lauf_ist_kein_fehlschlag(starter, tmp_path):
+    """And it is not the provider being unavailable either.
+
+    It was reported as `PROVIDER_UNAVAILABLE`, which put a ceiling this
+    project set for itself and somebody else's downtime under one word. They
+    want opposite responses: waiting fixes an outage and cannot fix a budget,
+    where only a person can decide the work is worth more.
+    """
     st = zustand(
         tmp_path, stage=Stage.DEVELOPING,
         budgets=Budgets(max_iterations=1),
         usage=Usage(iterations=1),
     )
     ergebnis = starter._verdict(st, None, Leer())
-    assert ergebnis.verdict is RunVerdict.PROVIDER_UNAVAILABLE
+    assert ergebnis.verdict is RunVerdict.BUDGET_EXHAUSTED
+    assert ergebnis.verdict is not RunVerdict.PROVIDER_UNAVAILABLE
     assert "budget" in ergebnis.detail.lower()
+
+
+def test_ein_erschoepftes_budget_haelt_das_projekt_mit_eigener_klasse_an(tmp_path):
+    """The protocol of this project's own benchmark requires it be recorded as
+    its own outcome rather than folded into "did not pass"."""
+    from hoh.orchestrator import (
+        GateRunner, HaltClass, ProjectController, RunLauncher,
+    )
+    from hoh.project import GateOutcome, GateResult, ProjectState
+    from hoh.projectstore import ProjectStore
+
+    class Erschoepft(RunLauncher):
+        def action_class(self, node): return ActionClass.INTERNAL
+        def depends_on(self, a, b): return False
+        def prepare(self, node): return None
+        def accepted_baseline(self, node): return None
+        def evaluate(self, node): return RunOutcome(RunVerdict.UNDETERMINED, "")
+        def launch(self, node):
+            return RunOutcome(RunVerdict.BUDGET_EXHAUSTED,
+                              "budget exhausted in DEVELOPING: "
+                              "dispatch budget exhausted (9/9)")
+
+    class Gruen(GateRunner):
+        def subject(self): return "abc1234"
+        def run(self, subject):
+            return [GateResult(name="g", outcome=GateOutcome.GREEN, subject=subject)]
+
+    s = ProjectStore(tmp_path, "p")
+    st = ProjectState(project_id="p", repo_path=str(tmp_path))
+    st.nodes = [TaskNode(id="a")]
+    s.create(st)
+
+    ergebnis = ProjectController(s, Erschoepft(), Gruen()).run()
+
+    assert ergebnis.halt is HaltClass.BUDGET_EXHAUSTED
+    assert "spent its budget" in ergebnis.reason
+    assert "9/9" in ergebnis.reason
 
 
 def test_unfertiger_lauf_ohne_budgetgrenze_ist_eine_ablehnung(starter, tmp_path):
@@ -501,3 +546,234 @@ def test_a_run_still_planning_with_nothing_accepted_is_rejected(tmp_path):
     out = l._verdict(z, None, None)
     assert out.verdict is RunVerdict.REJECTED
     assert "without a checkpoint" in out.detail
+
+
+def test_an_unclassifiable_verdict_carries_the_reason_it_was_given(tmp_path):
+    """The one branch that cannot explain itself threw away the explanation.
+
+    Every other branch puts `ausgang.detail` in the halt reason. This one did
+    not, so a project halted with "unclassifiable verdict UNDETERMINED" and the
+    launcher's own sentence -- which said what state the run was in -- was
+    discarded. Measured on a benchmark cell that could not be diagnosed
+    afterwards, because the project state held nothing to diagnose it with.
+    """
+    from hoh.orchestrator import (
+        GateRunner, HaltClass, ProjectController, RunLauncher,
+    )
+    from hoh.project import GateOutcome, GateResult, ProjectState
+    from hoh.projectstore import ProjectStore
+
+    class Unklar(RunLauncher):
+        def action_class(self, node): return ActionClass.INTERNAL
+        def depends_on(self, a, b): return False
+        def prepare(self, node): return None
+        def accepted_baseline(self, node): return None
+        def evaluate(self, node): return RunOutcome(RunVerdict.UNDETERMINED, "")
+        def launch(self, node):
+            return RunOutcome(
+                RunVerdict.UNDETERMINED,
+                "run checkpointed with no accepted candidate recorded")
+
+    class Gruen(GateRunner):
+        def subject(self): return "abc1234"
+        def run(self, subject):
+            return [GateResult(name="g", outcome=GateOutcome.GREEN, subject=subject)]
+
+    s = ProjectStore(tmp_path, "p")
+    st = ProjectState(project_id="p", repo_path=str(tmp_path))
+    st.nodes = [TaskNode(id="a")]
+    s.create(st)
+
+    ergebnis = ProjectController(s, Unklar(), Gruen()).run()
+
+    assert ergebnis.halt is HaltClass.AMBIGUOUS
+    assert "UNDETERMINED" in ergebnis.reason
+    assert "no accepted candidate recorded" in ergebnis.reason
+    assert s.read_state().node("a").note == ergebnis.reason
+
+
+def test_an_unclassifiable_verdict_without_a_detail_says_so(tmp_path):
+    """Silence from the launcher is itself worth recording."""
+    from hoh.orchestrator import (
+        GateRunner, HaltClass, ProjectController, RunLauncher,
+    )
+    from hoh.project import GateOutcome, GateResult, ProjectState
+    from hoh.projectstore import ProjectStore
+
+    class Stumm(RunLauncher):
+        def action_class(self, node): return ActionClass.INTERNAL
+        def depends_on(self, a, b): return False
+        def prepare(self, node): return None
+        def accepted_baseline(self, node): return None
+        def evaluate(self, node): return RunOutcome(RunVerdict.UNDETERMINED, "")
+        def launch(self, node): return RunOutcome(RunVerdict.UNDETERMINED, "")
+
+    class Gruen(GateRunner):
+        def subject(self): return "abc1234"
+        def run(self, subject):
+            return [GateResult(name="g", outcome=GateOutcome.GREEN, subject=subject)]
+
+    s = ProjectStore(tmp_path, "p")
+    st = ProjectState(project_id="p", repo_path=str(tmp_path))
+    st.nodes = [TaskNode(id="a")]
+    s.create(st)
+
+    ergebnis = ProjectController(s, Stumm(), Gruen()).run()
+
+    assert ergebnis.halt is HaltClass.AMBIGUOUS
+    assert "gave no detail" in ergebnis.reason
+
+
+def test_the_launcher_shares_one_dispatch_budget_across_a_node_and_its_repairs(
+        tmp_path):
+    """The protocol said it, the product could not do it.
+
+    "C's dispatches include those its repair nodes make" -- but every run got
+    its own ceiling, so a node that spawned one repair spent twice what a
+    single run may. That is how a benchmark whose premise is a matched budget
+    handed one arm double the resource.
+    """
+    from hoh.launcher import HohRunLauncher
+
+    root = tmp_path / "root"
+    starter = HohRunLauncher(root, tmp_path / "repo", dispatch_budget=9)
+    assert starter.dispatch_budget == 9
+    assert starter.verbrauchtes_budget() == 0
+    assert starter.verbleibendes_budget() == 9
+
+    _lauf(root, "n1", 7)
+    assert starter.verbrauchtes_budget() == 7
+    assert starter.verbleibendes_budget() == 2, (
+        "the second run must get the remainder, not a fresh 9")
+
+    _lauf(root, "n1r1", 5)
+    assert starter.verbrauchtes_budget() == 12
+    assert starter.verbleibendes_budget() == 0, "an overrun does not go negative"
+
+
+def _lauf(root, run_id: str, dispatches: int) -> None:
+    """Writes a run state the way the controller leaves one behind."""
+    import json
+
+    d = root / run_id
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "state.json").write_text(
+        json.dumps({"run_id": run_id, "usage": {"dispatches": dispatches}}),
+        encoding="utf-8")
+
+
+def test_a_new_launcher_process_cannot_reset_the_shared_budget(tmp_path):
+    """The counter used to live in the object, so a restart refunded it.
+
+    Advisor's falsification list for the budget instrument, and it was a real
+    hole: kill the orchestrator after eight dispatches, start it again, and
+    the next run was handed a fresh nine. A second `HohRunLauncher` over the
+    same root stands in for that restart -- it shares nothing with the first
+    but the directory the runs wrote into.
+    """
+    from hoh.launcher import HohRunLauncher
+
+    root = tmp_path / "root"
+    erste = HohRunLauncher(root, tmp_path / "repo", dispatch_budget=9)
+    _lauf(root, "n1", 8)
+    assert erste.verbleibendes_budget() == 1
+
+    zweite = HohRunLauncher(root, tmp_path / "repo", dispatch_budget=9)
+    assert zweite.verbrauchtes_budget() == 8, (
+        "a fresh process read the spend from the runs, not from memory")
+    assert zweite.verbleibendes_budget() == 1
+
+
+def test_the_shared_budget_is_read_from_the_current_state_not_a_parked_one(
+        tmp_path):
+    """Parked states are history; counting them would double-charge a run.
+
+    `RunStore` never overwrites a state, it parks the old one beside it. Had
+    the launcher globbed `state.json*` it would have added every intermediate
+    count of the same run to the total -- a run that reached 9 in nine writes
+    would have read as 45.
+    """
+    from hoh.launcher import HohRunLauncher
+    import json
+
+    root = tmp_path / "root"
+    _lauf(root, "n1", 9)
+    for i, n in enumerate((1, 3, 6)):
+        (root / "n1" / f"state.json.v2026-09-13T0{i}-00-00Z").write_text(
+            json.dumps({"run_id": "n1", "usage": {"dispatches": n}}),
+            encoding="utf-8")
+
+    starter = HohRunLauncher(root, tmp_path / "repo", dispatch_budget=9)
+    assert starter.verbrauchtes_budget() == 9
+    assert starter.verbleibendes_budget() == 0
+
+
+def test_without_a_budget_the_launcher_sets_no_ceiling(tmp_path):
+    """The old behaviour stays the default: a ceiling nobody asked for is a
+    ceiling that stops somebody's run for a reason they did not choose."""
+    from hoh.launcher import HohRunLauncher
+
+    starter = HohRunLauncher(tmp_path / "root", tmp_path / "repo")
+    assert starter.dispatch_budget is None
+
+
+def test_a_run_one_directory_deeper_still_counts_against_the_budget(tmp_path):
+    """A one-level glob saw only runs sitting directly under the root.
+
+    Nothing in the launcher forbids a deeper layout, and a run it could not
+    see had spent dispatches the next run was then handed again.
+    """
+    from hoh.launcher import HohRunLauncher
+
+    root = tmp_path / "root"
+    _lauf(root, "n1", 4)
+    _lauf(root / "nested", "n2", 3)
+
+    starter = HohRunLauncher(root, tmp_path / "repo", dispatch_budget=9)
+    assert starter.verbrauchtes_budget() == 7
+    assert starter.verbleibendes_budget() == 2
+
+
+def test_an_unreadable_state_stops_the_budget_rather_than_counting_zero(tmp_path):
+    """The one run whose record cannot be read is the one that may have spent it.
+
+    Skipping it counted it as zero, which is the most dangerous possible
+    reading of an unreadable file.
+    """
+    import pytest
+
+    from hoh.launcher import HohRunLauncher
+    from hoh.orchestrator import BudgetExhausted
+
+    root = tmp_path / "root"
+    _lauf(root, "n1", 4)
+    (root / "n1" / "state.json").write_text("{not json", encoding="utf-8")
+
+    starter = HohRunLauncher(root, tmp_path / "repo", dispatch_budget=9)
+    with pytest.raises(BudgetExhausted, match="cannot be computed"):
+        starter.verbrauchtes_budget()
+
+
+def test_a_spent_shared_budget_is_refused_as_a_budget_not_as_a_broken_start(
+        tmp_path):
+    """`--max-dispatches 0` is not a budget, it is a stop.
+
+    `Budgets` refuses a ceiling below one, so the run failed to start with a
+    validation error, the launcher reported "could not start run ...", and
+    the orchestrator booked the node BLOCKED_DEPENDENCY -- "a dependency that
+    names a node which does not exist" -- at the exact moment the shared
+    budget bound. That is the ambiguous halt the budget verdict exists to
+    prevent, in the one case the shared budget was built for.
+    """
+    import pytest
+
+    from hoh.launcher import HohRunLauncher
+    from hoh.orchestrator import BudgetExhausted
+
+    root = tmp_path / "root"
+    _lauf(root, "n1", 9)
+    starter = HohRunLauncher(root, tmp_path / "repo", dispatch_budget=9)
+
+    assert starter.verbleibendes_budget() == 0
+    with pytest.raises(BudgetExhausted, match="9/9"):
+        starter.budget_argumente()

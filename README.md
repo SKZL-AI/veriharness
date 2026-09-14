@@ -114,12 +114,12 @@ figures are stated here rather than linked:
 | Iterations that produced receipts | **100** (98 of them criterion receipts) |
 | Distinct specifications | **51** |
 | Merges into the mainline | **45** |
-| Recorded findings | **125** |
+| Recorded findings | **127** |
 | Human governance decisions | **7** |
 | Wall-clock | five calendar days; 3.5 days elapsed |
 
 The findings are the point of that table more than the run count is. A
-campaign that produces 125 recorded findings against its own harness is not a
+campaign that produces 127 recorded findings against its own harness is not a
 campaign that went smoothly. The findings themselves live in the development
 repository's working ledger, which does not ship; what ships is the subset
 that became a standing limit, written out in full in `docs/LIMITATIONS.md`

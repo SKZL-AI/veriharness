@@ -499,15 +499,62 @@ class RunStore:
             # has no suffix, so three of them reduced a `keep_arenas=3` to
             # zero and filed every real arena into `attic/`. Nothing was lost,
             # but "keep the last three arenas" was not what happened.
+            # `.suffix` was the test and it broke again the moment a parked
+            # scratch directory gained a timestamp: for
+            # `cand.scratch.v20260913T145602Z` the suffix is the timestamp, so
+            # three of those reduced a `keep_arenas=3` to zero all over again
+            # and filed every real arena into `attic/`. The name is the test now.
             arena_runs = sorted(
                 (
                     d for d in arena.iterdir()
                     if d.is_dir()
-                    and d.suffix != ".scratch"
+                    and ".scratch" not in d.name
                     and not d.name.startswith(".hoh-scratch-")
+                    # The planner's read copies live under `planner/`, one
+                    # directory that exists for the whole run. Counting it as
+                    # an arena let `prune` file the planner's own root into
+                    # the attic and take the next dispatch's read copy with it.
+                    and d.name != "planner"
                 ),
                 key=lambda d: d.stat().st_mtime,
             )
+            # A sandbox scratch directory is named after the **receipt**
+            # (`.hoh-scratch-<run>-i<n>-a<m>-<check>`), which shares nothing
+            # with an arena's `digest(...)[:12]` name -- so the glob that tried
+            # to file them alongside their arena could never match, and they
+            # accumulated forever. They are filed on their own age instead,
+            # keeping as many as there are arenas.
+            sandkasten = sorted(
+                (d for d in arena.iterdir()
+                 if d.is_dir() and d.name.startswith(".hoh-scratch-")),
+                key=lambda d: d.stat().st_mtime,
+            )
+            # `run_check` writes one of these beside the arena per check, and
+            # nothing ever removed them: the loop below only considers
+            # directories. They are transcripts, they are small, and they are
+            # kept -- but they are kept in the attic, not in the tree the next
+            # run's roles work in.
+            protokolle = sorted(
+                (f for f in arena.glob(".hoh-out-*.log") if f.is_file()),
+                key=lambda f: f.stat().st_mtime,
+            )
+            if len(protokolle) > keep_arenas:
+                target = attic / "arenas"
+                target.mkdir(parents=True, exist_ok=True)
+                for f in protokolle[: len(protokolle) - keep_arenas]:
+                    ziel = target / f.name
+                    if not ziel.exists():
+                        f.rename(ziel)
+                        moved["arenas"].append(f.name)
+            if len(sandkasten) > keep_arenas:
+                target = attic / "arenas"
+                target.mkdir(parents=True, exist_ok=True)
+                for d in sandkasten[: len(sandkasten) - keep_arenas]:
+                    ziel = target / d.name
+                    if not ziel.exists():
+                        d.rename(ziel)
+                        moved["arenas"].append(d.name)
+
             if len(arena_runs) > keep_arenas:
                 target = attic / "arenas"
                 target.mkdir(parents=True, exist_ok=True)
@@ -518,7 +565,7 @@ class RunStore:
                         moved["arenas"].append(d.name)
                         for scratch in (
                             d.with_name(d.name + ".scratch"),
-                            *arena.glob(f".hoh-scratch-*{d.name}*"),
+                            *arena.glob(f"{d.name}.scratch.v*"),
                         ):
                             if not scratch.is_dir():
                                 continue
@@ -623,6 +670,38 @@ class RunStore:
             {cid: c.model_dump() for cid, c in sorted(checks.items())}, indent=2
         )
         _atomic_write(self.checks_path, payload)
+
+    # -- Amendments --------------------------------------------------------- #
+
+    @property
+    def amendments_path(self) -> Path:
+        return self.dir / "amendments.json"
+
+    def write_amendments(self, ledger) -> None:
+        """The run's amendment chain, parked before every rewrite.
+
+        Kept beside the state rather than inside it: an amendment outlives the
+        iteration that prompted it, and a reader asking "what did this run
+        promise when iteration 3 was accepted" needs the chain, not a field
+        that only holds the latest value.
+        """
+        self.ensure()
+        self._park(self.amendments_path)
+        _atomic_write(self.amendments_path, ledger.model_dump_json(indent=2))
+
+    def read_amendments(self, *, origin_digest: str = ""):
+        """The chain, or an empty one anchored at `origin_digest`."""
+        from .amendment import AmendmentLedger
+
+        if not self.amendments_path.exists():
+            return AmendmentLedger(run_id=self.run_id, origin_digest=origin_digest)
+        try:
+            raw = self.amendments_path.read_text(encoding="utf-8")
+        except OSError as exc:
+            raise StoreError(
+                f"amendment chain of run {self.run_id} unreadable: {exc}"
+            ) from exc
+        return AmendmentLedger.model_validate_json(raw)
 
     def read_checks(self) -> dict[str, AcceptanceCheck]:
         if not self.checks_path.exists():

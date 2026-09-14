@@ -47,6 +47,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from . import sandbox as sandbox_mod
 
+import datetime
 import os
 import platform
 import re
@@ -675,7 +676,19 @@ def _scratch_dir(workdir: Path) -> Path:
     """
     scratch = workdir.with_name(workdir.name + ".scratch")
     try:
-        scratch.mkdir(parents=True, exist_ok=True)
+        # A scratch directory this process did not create is **parked**, not
+        # reused. Its name is derivable from the run's own state, and `HOME`
+        # points at it: a directory planted there before the check starts can
+        # carry a `usercustomize.py`, which Python imports before the
+        # command's first line runs. The arena does the same thing for the
+        # same reason; this was the half that did not.
+        #
+        # Parked *once* rather than per check. All the checks of one candidate
+        # share an arena and therefore a scratch name, so parking on every call
+        # would leave one directory per check -- measured at up to 118 MB each
+        # on this project's own runs -- and would throw away the pip and pytest
+        # caches between two checks of the same candidate.
+        _frisches_scratch(scratch)
     except OSError:
         # Falling back to the old behaviour is worse than a sibling and better
         # than failing the run: a check that cannot start produces no verdict
@@ -685,6 +698,37 @@ def _scratch_dir(workdir: Path) -> Path:
     return scratch
 
 
+def _frisches_scratch(scratch: Path) -> Path:
+    """Create a scratch directory this process owns, parking any it finds.
+
+    Shared by both regimes. The sandboxed path had this hole open after the
+    unsandboxed one was closed, which is the half-fixed shape this project
+    keeps finding in its own work.
+    """
+    # Keyed on the path **and its inode**. The registry outlives the
+    # directory, so a path we created once and something else replaced in the
+    # meantime was adopted as ours -- a reviewer planted a `usercustomize.py`
+    # between two checks of the same candidate and it survived, which is
+    # exactly the pre-plant the parking exists to stop.
+    unser = _EIGENE_SCRATCHES.get(str(scratch))
+    jetzt = scratch.stat().st_ino if scratch.exists() else None
+    if unser is None or jetzt != unser:
+        if scratch.exists():
+            stempel = datetime.datetime.now(
+                datetime.UTC).strftime("%Y%m%dT%H%M%S%fZ")
+            scratch.rename(scratch.with_name(f"{scratch.name}.v{stempel}"))
+        scratch.mkdir(parents=True)
+        _EIGENE_SCRATCHES[str(scratch)] = scratch.stat().st_ino
+    return scratch
+
+
+#: Scratch directories this process created, path -> inode. A directory in
+#: here was made by this runner and is safe to reuse; one that is not, or one
+#: whose inode no longer matches, was put there by something else -- which is
+#: the situation the parking exists for.
+_EIGENE_SCRATCHES: dict[str, int] = {}
+
+
 def _env(workdir: Path, extra: dict[str, str] | None) -> dict[str, str]:
     env = {k: os.environ[k] for k in ENV_ALLOWLIST if k in os.environ}
     env.setdefault("PATH", "/usr/local/bin:/usr/bin:/bin")
@@ -692,6 +736,10 @@ def _env(workdir: Path, extra: dict[str, str] | None) -> dict[str, str]:
     env["HOME"] = str(scratch)
     env["TMPDIR"] = str(scratch)
     env["PYTHONDONTWRITEBYTECODE"] = "1"
+    # `HOME` points at the scratch directory, and a user site directory under
+    # it would be imported before the command runs. Parking an existing
+    # scratch directory closes the pre-plant; this closes the route itself.
+    env["PYTHONNOUSERSITE"] = "1"
     # O30: a frozen candidate is materialized with `git archive` and therefore
     # has **no `.git` of its own**. Without this, git's discovery walk climbs
     # out of the arena and binds silently to the ancestor repository -- and
@@ -932,8 +980,15 @@ def run_check(
             beweis_zeilen: list[str] = []
             gestartet = False
             try:
-                scratch = sink.parent / f".hoh-scratch-{receipt_id}"
-                scratch.mkdir(parents=True, exist_ok=True)
+                # Parked exactly as the unsandboxed path's scratch is, and
+                # for a reason a reviewer demonstrated rather than argued: the
+                # name is derivable from the run's own state, this directory is
+                # the check's `$HOME`, and a `usercustomize.py` planted there
+                # beforehand executed **inside bubblewrap**, before the
+                # command's first line, under a receipt that says "verified
+                # from inside". The strongest-looking receipt was the
+                # vulnerable one.
+                scratch = _frisches_scratch(sink.parent / f".hoh-scratch-{receipt_id}")
                 # The proof travels out over a pipe this process holds. It used
                 # to be a file in the scratch directory -- which is
                 # bind-mounted read-write and is also the check's $HOME and

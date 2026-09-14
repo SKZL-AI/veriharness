@@ -69,6 +69,7 @@ from __future__ import annotations
 import hashlib
 import json
 import subprocess
+from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 
@@ -80,10 +81,20 @@ from .contracts import Strict
 class SourceKind(StrEnum):
     """Where a number came from.
 
-    `strength()` turns the intuition "some sources outlive others" into a
-    number the rules can actually use. An earlier version of this file
-    asserted the ordering in prose and never compared two kinds anywhere --
-    which a reviewer pointed out is the same defect the module is about.
+    `durability()` says how long a source survives, and **that is all it
+    says**. It is not a ranking of how much a source is worth.
+
+    An earlier version had `strength()`, a single ordering with `REPOSITORY`
+    at the top, and used it to decide which source may authorise a metric.
+    That is wrong in a way that is easy to miss because it is usually right:
+    git *is* the authority for "did this candidate land on the mainline", and
+    it is **not** the authority for "what stage is this run in" -- the run
+    state is, and no amount of durability changes that. Authority is a
+    property of the question, not of the medium.
+
+    So the ordering that survives is the narrow, checkable one -- how likely a
+    source is to still be readable later -- and `AuthorityPolicy` decides who
+    may answer what.
     """
 
     #: Git objects: commits, trees, blobs. Content-addressed and immutable.
@@ -109,13 +120,18 @@ class SourceKind(StrEnum):
     #: representable rather than merely intended.
     ABSENT = "absent"
 
-    def strength(self) -> int:
-        """How much weight this kind carries. Higher wins.
+    def durability(self) -> int:
+        """How long this kind of source survives. Higher lasts longer.
 
-        Git is above the rest because it is content-addressed and independent
-        of this project's own code: a state file can be rewritten by the thing
-        that writes state files, a commit cannot be rewritten without changing
-        its name.
+        A technical property and nothing else. Git objects are
+        content-addressed and immutable; a state file is rewritten in place by
+        the thing that writes state files; a console log does not outlive its
+        process. That ordering is real and it is the only thing this method
+        claims.
+
+        It does **not** say which source may authorise a metric. `landed_commit`
+        is git's to answer and `current_run_stage` is the run state's, and
+        durability has no opinion about either. See `AuthorityPolicy`.
         """
         return {
             SourceKind.REPOSITORY: 5,
@@ -151,6 +167,167 @@ HEAD_BOUND: frozenset[SourceKind] = frozenset(
     {SourceKind.REPOSITORY, SourceKind.PROJECT_STATE, SourceKind.RUN_STATE,
      SourceKind.RECEIPT}
 )
+
+
+@dataclass(frozen=True)
+class AuthorityPolicy:
+    """Which source may answer one question, and what else that answer needs.
+
+    This replaces a single ranking of sources, which was wrong in a way that
+    is easy to miss because it is usually right. Git is the authority for
+    *did this candidate land on the mainline*; it is not the authority for
+    *what stage is this run in*, and no amount of durability makes it one.
+    Authority belongs to the question.
+
+    The five cases below are the ones this project actually decides on, and
+    each names its own authority rather than inheriting a global order:
+
+    * a commit landing on a branch -- the repository, and nothing else;
+    * a node's lifecycle -- the project state, which is where lifecycle lives;
+    * a run's accepted candidate -- the run state and its bound evidence;
+    * a check having executed under an isolation regime -- the receipt, with
+      the isolation the runner measured rather than the one it was asked for;
+    * an external CI step -- that named step's conclusion at the bound head,
+      never the job's.
+
+    A digest is deliberately not authoritative for any of them. It proves two
+    byte sequences are the same; it says nothing about what they mean.
+    """
+
+    metric_id: str
+    #: Sources that may answer this question at all. A record whose source is
+    #: not in here is not authoritative, however durable that source is.
+    allowed: frozenset[SourceKind]
+    #: The source that *should* answer it, where one clearly should. A record
+    #: from an allowed-but-not-preferred source is accepted and says so.
+    preferred: SourceKind | None = None
+    #: Must the record name the commit it was measured at?
+    requires_binding: bool = True
+    #: Must a negative control have run and caught something?
+    requires_falsifier: bool = True
+    #: A second, independent source that must agree. None where one suffices.
+    requires_cross_check: SourceKind | None = None
+    #: Why these sources and not others, in a sentence. Kept in the data so a
+    #: policy cannot be widened without someone writing down why.
+    rationale: str = ""
+
+    def objections(self, record: AssuranceRecord) -> list[str]:
+        raus: list[str] = []
+        if record.source.kind not in self.allowed:
+            erlaubt = ", ".join(sorted(k.value for k in self.allowed))
+            raus.append(
+                f"{record.source.kind.value} cannot answer {self.metric_id}; "
+                f"only {erlaubt} can. {self.rationale}"
+            )
+        elif self.preferred and record.source.kind is not self.preferred:
+            raus.append(
+                f"answered from {record.source.kind.value} where "
+                f"{self.preferred.value} is the authority for {self.metric_id}"
+            )
+        if self.requires_binding and not record.source.subject_head:
+            raus.append(
+                f"{self.metric_id} requires the commit it was measured at, and "
+                "the record names none"
+            )
+        if self.requires_falsifier and record.falsifier is not FalsifierState.KILLED:
+            raus.append(
+                f"{self.metric_id} requires a negative control that caught "
+                f"something; this one is {record.falsifier.value}"
+            )
+        if self.requires_cross_check is not None:
+            cc = record.cross_check
+            if cc is None or cc.kind is not self.requires_cross_check:
+                raus.append(
+                    f"{self.metric_id} requires an independent "
+                    f"{self.requires_cross_check.value} cross-check"
+                )
+        return raus
+
+
+#: The policies this project decides releases on. Absent from here means: no
+#: metric-specific rule, and the record is judged by the general weaknesses
+#: alone. Present means the question has an owner.
+AUTHORITIES: dict[str, AuthorityPolicy] = {
+    "landed_commit": AuthorityPolicy(
+        metric_id="landed_commit",
+        allowed=frozenset({SourceKind.REPOSITORY}),
+        preferred=SourceKind.REPOSITORY,
+        rationale=(
+            "whether a commit is on a branch is a fact about the repository. "
+            "A state file saying a node is MERGED is a record of an intention "
+            "to merge"
+        ),
+    ),
+    "node_lifecycle": AuthorityPolicy(
+        metric_id="node_lifecycle",
+        allowed=frozenset({SourceKind.PROJECT_STATE}),
+        preferred=SourceKind.PROJECT_STATE,
+        rationale=(
+            "lifecycle exists only in the project state. Git cannot say "
+            "whether a node was ABANDONED with a reason or never started"
+        ),
+    ),
+    "run_accepted_candidate": AuthorityPolicy(
+        metric_id="run_accepted_candidate",
+        allowed=frozenset({SourceKind.RUN_STATE, SourceKind.RECEIPT}),
+        preferred=SourceKind.RUN_STATE,
+        rationale=(
+            "acceptance is recorded on the run, bound to a candidate. A "
+            "commit on a branch does not say which run accepted it or whether "
+            "any did"
+        ),
+    ),
+    "check_executed_under_isolation": AuthorityPolicy(
+        metric_id="check_executed_under_isolation",
+        allowed=frozenset({SourceKind.RECEIPT}),
+        preferred=SourceKind.RECEIPT,
+        rationale=(
+            "the receipt carries what the runner measured from inside the "
+            "sandbox. Configuration says what was asked for, which is the "
+            "inference O113 was recorded for"
+        ),
+    ),
+    "planner_capability_boundary": AuthorityPolicy(
+        metric_id="planner_capability_boundary",
+        allowed=frozenset({SourceKind.RUN_STATE, SourceKind.RECEIPT}),
+        preferred=SourceKind.RUN_STATE,
+        requires_cross_check=SourceKind.RECEIPT,
+        rationale=(
+            "whether a role stayed inside its boundary is a property of one "
+            "run, and the run's own artifacts are what record it: the dispatch "
+            "log says what the witness covered, the state says whether it "
+            "fired, the receipts say what was measured. A repository cannot "
+            "answer it -- a clean history is exactly what a planner writing "
+            "into the working tree leaves behind -- and a digest cannot, "
+            "because the question is semantic. The cross-check is required "
+            "because the run's own record is the thing most in reach of the "
+            "roles it describes"
+        ),
+    ),
+    "external_ci_step": AuthorityPolicy(
+        metric_id="external_ci_step",
+        allowed=frozenset({SourceKind.EXTERNAL_CI_STEP}),
+        preferred=SourceKind.EXTERNAL_CI_STEP,
+        requires_binding=False,
+        rationale=(
+            "the conclusion of the named step at the bound head. A job stays "
+            "green while the step that mattered is skipped, which is how "
+            "false green number five happened"
+        ),
+    ),
+}
+
+
+def authority_for(metric_id: str) -> AuthorityPolicy | None:
+    """The policy for a metric, matched on its id or its `class:` prefix.
+
+    A metric may declare its class with `check_executed_under_isolation:run42`
+    so that many concrete metrics share one policy without repeating it.
+    """
+    if metric_id in AUTHORITIES:
+        return AUTHORITIES[metric_id]
+    klasse = metric_id.split(":", 1)[0]
+    return AUTHORITIES.get(klasse)
 
 
 class Provenance(StrEnum):
@@ -298,10 +475,11 @@ class AssuranceRecord(Strict):
     #: separately which metrics it *requires*, so lowering this flag cannot
     #: make a required metric disappear.
     critical: bool = True
-    #: A stronger source that exists for this question but was not used.
-    #: Naming it is what turns "I used the log" into a visible weakness --
-    #: and the comparison is by `SourceKind.strength()`, so naming a *weaker*
-    #: alternative is not a weakness and is rejected as a mistake.
+    #: A source that is authoritative for this question and was not used.
+    #: Naming it is what turns "I used the log" into a visible weakness. The
+    #: comparison is no longer against a universal ranking: a source is better
+    #: here if the metric's `AuthorityPolicy` names it and not the one that was
+    #: used, or -- with no policy -- if it simply lasts longer.
     stronger_source_available: SourceKind | None = None
     #: Whether this module read the source or was told about it. The builders
     #: set MEASURED; anything hand-assembled is DECLARED.
@@ -336,11 +514,10 @@ class AssuranceRecord(Strict):
                 "claim about nothing"
             )
         stronger = self.stronger_source_available
-        if stronger is not None and stronger.strength() <= self.source.kind.strength():
+        if stronger is not None and stronger is self.source.kind:
             raise ValueError(
-                f"{self.metric_id}: {stronger.value} is not stronger than "
-                f"{self.source.kind.value}; this field names a source that "
-                "should have been used instead"
+                f"{self.metric_id}: {stronger.value} is the source that was "
+                "used; this field names one that should have been used instead"
             )
         return self
 
@@ -417,6 +594,13 @@ class AssuranceRecord(Strict):
                     f"a {self.source.kind.value} value that does not say which "
                     "commit it was measured at cannot be checked for staleness"
                 )
+
+        # The metric's own authority, where it has one. Checked before the
+        # general rules, because "git is durable" is no answer to "git cannot
+        # tell you what stage a run is in".
+        politik = authority_for(self.metric_id)
+        if politik is not None:
+            offen.extend(politik.objections(self))
 
         # A source outside the trusted base needs a cross-check to stand.
         if self.critical and self.source.kind not in TRUSTED_BASE:

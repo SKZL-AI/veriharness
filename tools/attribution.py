@@ -16,6 +16,12 @@ here:
   names a commit range; the ranges must tile the history with no gap and no
   overlap. Nothing can be quietly left out of the denominator, which is the
   only way this number could be flattered.
+* **no range ends at `HEAD`.** That was allowed, for a real reason -- an entry
+  describing a merge cannot name its own sha. It is also how an entry claiming
+  `VERIHARNESS_RUN` came to swallow four later commits the product had nothing
+  to do with, and the tiling check could not see it, because the range still
+  tiled. The self-reference is answered by a second commit that closes the
+  range, which costs one commit and cannot grow.
 * **an entry claiming `VERIHARNESS_RUN` must name a project state that
   exists** and whose node reached `MERGED`. Claiming the product did it is
   free; pointing at the state it left is not.
@@ -115,6 +121,14 @@ def pruefe(repo: Path, ledger: dict) -> dict:
     probleme: list[str] = []
 
     for eintrag in ledger["entries"]:
+        bereich = eintrag.get("range") or {}
+        if str(bereich.get("to", "")).upper() in ("HEAD", "@"):
+            probleme.append(
+                f"{eintrag['id']}: its range ends at HEAD. An open range grows "
+                "with the history and silently claims work the entry knows "
+                "nothing about; close it and describe the rest in a second "
+                "entry"
+            )
         if eintrag["category"] not in KATEGORIEN:
             probleme.append(
                 f"{eintrag['id']}: unknown category {eintrag['category']!r}"
@@ -160,6 +174,12 @@ def pruefe(repo: Path, ledger: dict) -> dict:
                     probleme.append(f"{eintrag['id']}: {zustand} unreadable: {exc}")
 
     nicht_zugeordnet = [c for c in alle if c not in gesehen]
+    # `HEAD` itself may be unattributed, and exactly it: a commit cannot name
+    # its own sha, so the entry describing a commit is written in the next one.
+    # That is the price of closing the ranges, and it is one commit, bounded.
+    # Two unattributed commits is a gap, which is what this check is for.
+    if nicht_zugeordnet and alle and nicht_zugeordnet[-1] == alle[-1]:
+        nicht_zugeordnet = nicht_zugeordnet[:-1]
     if nicht_zugeordnet:
         probleme.append(
             f"{len(nicht_zugeordnet)} commit(s) after the anchor belong to no "

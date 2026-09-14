@@ -454,3 +454,43 @@ def test_o48_scratch_falls_back_to_the_arena_rather_than_failing_the_run(tmp_pat
     assert runner._scratch_dir(arena) == arena, (
         "on OSError the runner falls back to the arena instead of raising"
     )
+
+
+def test_a_pre_existing_scratch_directory_is_parked_not_reused(tmp_path):
+    """`HOME` points at it, and Python imports `usercustomize` before the
+    command's first line.
+
+    The scratch directory's name is derivable from the run's own state, so a
+    directory planted there before the check starts would be read as the
+    check's home. The arena has parked an existing directory since it was
+    moved out of the run tree; this was the half that did not.
+    """
+    from hoh.runner import _scratch_dir
+
+    arena = tmp_path / "aaaa1111"
+    arena.mkdir()
+    vorher = arena.with_name("aaaa1111.scratch")
+    (vorher / "lib" / "python3.13" / "site-packages").mkdir(parents=True)
+    (vorher / "lib" / "python3.13" / "site-packages" / "usercustomize.py").write_text(
+        "raise SystemExit('planted')\n")
+
+    frisch = _scratch_dir(arena)
+
+    assert frisch == vorher
+    assert not (frisch / "lib").exists(), "the planted tree is still in the way"
+    geparkt = [p for p in arena.parent.iterdir()
+               if p.name.startswith("aaaa1111.scratch.v")]
+    assert geparkt, "the old directory was removed rather than parked"
+    assert (geparkt[0] / "lib" / "python3.13" / "site-packages"
+            / "usercustomize.py").is_file(), "parked means kept, not deleted"
+
+
+def test_a_check_does_not_read_a_user_site_directory(tmp_path):
+    """`PYTHONNOUSERSITE` closes the route the parking only clears once."""
+    from hoh.runner import _env
+
+    arena = tmp_path / "aaaa1111"
+    arena.mkdir()
+    env = _env(arena, None)
+    assert env["PYTHONNOUSERSITE"] == "1"
+    assert env["HOME"] == str(arena.with_name("aaaa1111.scratch"))

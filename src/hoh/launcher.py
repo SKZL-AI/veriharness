@@ -38,7 +38,8 @@ from pathlib import Path
 from .approval import Approval, ApprovalProvider, NoApprovalProvider
 from .contracts import Condition, Stage
 from .orchestrator import (
-    MergeFailure, MergeResult, RunLauncher, RunOutcome, RunVerdict,
+    BudgetExhausted, MergeFailure, MergeResult, RunLauncher, RunOutcome,
+    RunVerdict,
 )
 from .project import ActionClass, TaskNode
 from .store import RunStore, StoreError
@@ -79,11 +80,19 @@ class HohRunLauncher(RunLauncher):
         dry_run: bool = False,
         approvals: "ApprovalProvider | None" = None,
         isolation: str = "none",
+        dispatch_budget: int | None = None,
     ) -> None:
         self.root = Path(root).expanduser().resolve()
         self.repo_path = Path(repo_path).expanduser().resolve()
         self.mainline = mainline
         self.iterations = iterations
+        #: A ceiling on role dispatches shared by **every run this launcher
+        #: starts**, node and repair nodes alike. Without it each run got its
+        #: own ceiling, so a node that spawned one repair spent twice what a
+        #: single run may -- which is how a benchmark whose premise is a
+        #: matched budget handed one arm double the resource. `None` keeps the
+        #: old behaviour: no ceiling at all.
+        self.dispatch_budget = dispatch_budget
         # Named explicitly, never defaulted. `hoh run --qa` defaults to a
         # harness whose credential expired here, and the resulting run produced
         # no QA verdict at all while looking like an ordinary dispatch.
@@ -165,6 +174,11 @@ class HohRunLauncher(RunLauncher):
         """
         if self.dry_run:
             return "dry run: nothing is prepared"
+        # Asked before anything is created. `budget_argumente` raises this
+        # too, but by then a worktree exists and a trust approval has been
+        # granted for a run that will never start -- side effects for work
+        # that was refused.
+        self.budget_argumente()
         run_id = node.run_id or node.id
         zweig = node.branch or f"hoh-{run_id}"
         store = RunStore(self.root, run_id)
@@ -217,16 +231,83 @@ class HohRunLauncher(RunLauncher):
         if not freigabe.granted:
             return freigabe.as_reason()
 
-        st = self._run_cli([
+        argumente = [
             "python3", "-m", "hoh.cli", "--root", str(self.root), "start",
             "--repo", str(worktree), "--spec", str(spec_pfad), "--run-id", run_id,
-        ])
+        ]
+        argumente += self.budget_argumente()
+        st = self._run_cli(argumente)
         if st.exit_code != 0:
             return f"could not start run {run_id}: {(st.stderr or st.stdout)[-200:]}"
         node.branch = zweig
         node.run_id = run_id
         node.spec_path = str(spec_pfad)
         return None
+
+    def verbrauchtes_budget(self) -> int:
+        """Dispatches every run under this root has already spent.
+
+        Read from the **persisted run states**, not from a counter in this
+        process. A counter in memory is reset by a restart, and a budget a
+        restart resets is not a budget: a node that crashed after eight
+        dispatches would come back with nine more. The runs count their own
+        dispatches and write them down, so the number survives the process
+        that produced it and cannot be lowered by starting a new one.
+        """
+        gesamt = 0
+        if not self.root.is_dir():
+            return 0
+        # `rglob`, not `glob`. A one-level glob sees only runs sitting
+        # directly under the root, and a run one directory deeper -- which
+        # nothing in this file forbids -- would have spent dispatches that
+        # the next run was then handed again.
+        for zustand in sorted(self.root.rglob("state.json")):
+            try:
+                daten = json.loads(zustand.read_text(encoding="utf-8"))
+            except (OSError, ValueError) as exc:
+                # Fails **closed**. Skipping an unreadable state counted it as
+                # zero, which is the most dangerous possible reading: the one
+                # run whose record cannot be read is exactly the one that may
+                # have spent the budget. A budget that cannot be computed is
+                # not a budget, so nothing more is handed out.
+                raise BudgetExhausted(
+                    f"the shared dispatch budget cannot be computed: "
+                    f"{zustand} is unreadable ({exc}). Nothing further is "
+                    f"started, because a spend that cannot be read is not a "
+                    f"spend of zero") from exc
+            gesamt += int((daten.get("usage") or {}).get("dispatches", 0) or 0)
+        return gesamt
+
+    def verbleibendes_budget(self) -> int:
+        """What a run started now may still spend. Never negative."""
+        if self.dispatch_budget is None:           # pragma: no cover - guarded
+            return 0
+        return max(self.dispatch_budget - self.verbrauchtes_budget(), 0)
+
+    def budget_argumente(self) -> list[str]:
+        """The ceiling the next run is started with, as CLI arguments.
+
+        A named method rather than two lines inside `prepare` so that the
+        instrument control can measure the *wiring* and not only the
+        arithmetic: `verbleibendes_budget` returning the right number proves
+        nothing if `prepare` passes a constant.
+
+        Raises `BudgetExhausted` when nothing is left. It used to return
+        `--max-dispatches 0`, which `Budgets` refuses (a ceiling of zero is
+        not a budget, it is a stop), and the run then failed to start with a
+        validation error that the orchestrator booked as a missing
+        dependency. That is the ambiguous halt at precisely the moment the
+        shared budget binds -- the case the shared budget was built for.
+        """
+        if self.dispatch_budget is None:
+            return []
+        uebrig = self.verbleibendes_budget()
+        if uebrig <= 0:
+            raise BudgetExhausted(
+                f"the shared dispatch budget is spent: "
+                f"{self.verbrauchtes_budget()}/{self.dispatch_budget} used by "
+                f"the runs under {self.root}")
+        return ["--max-dispatches", str(uebrig)]
 
     def _ensure_runnable(self, run_id: str, zweig: str, store: "RunStore") -> str | None:
         """Clears what an earlier attempt left in the way, or says what remains.
@@ -480,8 +561,14 @@ class HohRunLauncher(RunLauncher):
 
         if state.stage in (Stage.PLANNING, Stage.DEVELOPING, Stage.VERIFYING):
             if state.budget_exhausted():
-                return RunOutcome(RunVerdict.PROVIDER_UNAVAILABLE,
-                                  f"budget exhausted in {state.stage.value}")
+                # A budget this project set for itself is not the provider
+                # being unavailable. Reporting it as one put a policy ceiling
+                # and somebody else's downtime under the same word, and the
+                # two want opposite responses: wait, or decide whether the
+                # work is worth more budget.
+                return RunOutcome(RunVerdict.BUDGET_EXHAUSTED,
+                                  f"budget exhausted in {state.stage.value}: "
+                                  f"{state.budget_exhausted()}")
             return RunOutcome(
                 RunVerdict.REJECTED,
                 f"iterations spent without a checkpoint (stage {state.stage.value})",

@@ -169,7 +169,7 @@ otherwise would undercut an evidence-first project's own point:
   orchestrating agent session working outside a run, not by a person typing
   and not by an HoH developer role -- under a narrow, declared exception to
   the rule that the loop may not touch `src/hoh/` or `tests/`; the full
-  accounting, defect by defect, is `dogfood/ABSCHLUSSBERICHT.md`
+  accounting, defect by defect, is the internal *Abschlussbericht*
   point D. Outside that declared exception, the loop never touched HoH's own
   production code to produce this project's evidence about itself.
   **[corrected in rc2.** rc1 wrote "by the operator" here, which reads as a

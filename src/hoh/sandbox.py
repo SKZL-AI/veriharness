@@ -313,6 +313,14 @@ def _env_for(spec: SandboxSpec) -> dict[str, str]:
     env.update({str(k): str(v) for k, v in spec.extra_env.items()})
     env["HOME"] = str(spec.scratch)
     env["TMPDIR"] = str(spec.scratch)
+    # `HOME` is a writable bind mount, so a user site directory under it would
+    # be imported before the command runs. The unsandboxed path has set this
+    # since the pre-plant was found; this path had the hole open, and a
+    # reviewer executed a planted `usercustomize.py` inside bubblewrap under a
+    # receipt reporting verified isolation. Stronger isolation must not mean
+    # weaker hygiene -- the same argument O107 made about the rlimits.
+    env["PYTHONNOUSERSITE"] = "1"
+    env["PYTHONDONTWRITEBYTECODE"] = "1"
     if spec.proof_fd is not None:
         # Passed as variables rather than interpolated into the prologue. A
         # candidate path containing `$(...)` or a backtick was expanded by the

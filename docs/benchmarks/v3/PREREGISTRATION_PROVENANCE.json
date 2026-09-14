@@ -1,0 +1,39 @@
+{
+  "question": "were the exact bytes of the registration the campaign ran under already bound in a git commit before the first v3 dispatch?",
+  "registration_path": "docs/benchmarks/v3/PREREGISTRATION.json",
+  "registration_sha256": "a1c179c4d42f12dfddb75c8e5e22759bda54d0bb925d2ff9343c68ee68d9cb49",
+  "registration_git_blob": "f8bad64466e13d52ff07907470dab6218133864a",
+  "registration_working_tree_modified": false,
+  "commits_touching_the_path": [
+    {
+      "commit": "d22fc1536f43dafc0159397ecc41be99e18e3ecc",
+      "committed_at": "2026-09-14T00:56:56+03:00",
+      "subject": "Pre-register campaign v3: freeze the protocol and the instrument",
+      "blob": "dca96f7d572b97763e55bf53ec239e89e13381e4",
+      "carries_the_exact_bytes": false
+    },
+    {
+      "commit": "d6ae7cdd407eeb6fb4456af4846d74ca57aa75e0",
+      "committed_at": "2026-09-14T00:57:09+03:00",
+      "subject": "Re-freeze v3 in the environment the campaign actually runs in",
+      "blob": "f8bad64466e13d52ff07907470dab6218133864a",
+      "carries_the_exact_bytes": true
+    }
+  ],
+  "binding_commit": "d6ae7cdd407eeb6fb4456af4846d74ca57aa75e0",
+  "binding_commit_committed_at_utc": "2026-09-13T21:57:09Z",
+  "binding_commit_is_ancestor_of_head": true,
+  "first_v3_cell_started_at_utc": "2026-09-13T21:57:21Z",
+  "first_provider_dispatch_in_a_v3_run_tree_utc": "2026-09-13T21:57:59Z",
+  "seconds_between_commit_and_first_cell": 12.8,
+  "registration_exact_digest_committed_before_first_dispatch": "YES",
+  "PREREGISTRATION_COMMIT_BOUND": "VERIFIED",
+  "how_to_re_derive": [
+    "sha256sum docs/benchmarks/v3/PREREGISTRATION.json",
+    "git rev-parse d6ae7cdd407eeb6fb4456af4846d74ca57aa75e0:docs/benchmarks/v3/PREREGISTRATION.json",
+    "git log -1 --format=%cI d6ae7cdd407eeb6fb4456af4846d74ca57aa75e0",
+    "python3 -c \"import json,glob;print(min(json.load(open(f))['started_at'] for f in glob.glob('dogfood/benchmark/results-v3/*.json')))\"",
+    "python3 -m pytest tests/test_prereg_provenance.py -q"
+  ],
+  "note": "The earlier registration (d22fc15) carries a different blob and is parked beside this one; it recorded the interactive shell's environment rather than the campaign's and no v3 cell ran under it. Arm A dispatches through a dispatcher that writes no telemetry, so the first *cell* start is the conservative bound on the first dispatch; the earliest telemetry record inside a v3 run tree is later still."
+}

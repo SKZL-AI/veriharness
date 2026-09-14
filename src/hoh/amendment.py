@@ -282,9 +282,13 @@ def park_and_amend(
     geparkt = pfad.with_name(
         f"{pfad.name}.v{utcnow().replace(':', '-')}.{von}"
     )
-    pfad.rename(geparkt)
-    pfad.write_text(new_text, encoding="utf-8")
-    return SpecAmendment(
+    # **Validated before anything on disk moves.** It was the other way round,
+    # and a refused amendment -- a CLARIFY naming affected criteria, a
+    # duplicate id -- left the new text in place with no record describing it.
+    # The run then blocked on a specification nobody had amended, and the
+    # obvious retry was refused for being identical to what the failed attempt
+    # had already written. "Refused" has to be true of the filesystem too.
+    datensatz = SpecAmendment(
         amendment_id=amendment_id,
         run_id=run_id,
         from_digest=von,
@@ -299,3 +303,6 @@ def park_and_amend(
         after_acceptance=after_acceptance,
         write_seq=write_seq,
     )
+    pfad.rename(geparkt)
+    pfad.write_text(new_text, encoding="utf-8")
+    return datensatz

@@ -207,7 +207,7 @@ def sammeln(repo: Path, *, falsify: bool) -> AssuranceClosure:
     )
     saetze.append(
         from_json_state(
-            "unattended_interventions",
+            "node_lifecycle:unattended_interventions",
             path=zustand,
             kind=SourceKind.PROJECT_STATE,
             derivation=(
@@ -238,7 +238,7 @@ def sammeln(repo: Path, *, falsify: bool) -> AssuranceClosure:
     )
     saetze.append(
         from_json_state(
-            "unattended_fixpoint",
+            "node_lifecycle:unattended_fixpoint",
             path=zustand,
             kind=SourceKind.PROJECT_STATE,
             derivation="every node in the project state is MERGED",
@@ -263,7 +263,7 @@ def sammeln(repo: Path, *, falsify: bool) -> AssuranceClosure:
         if p.returncode != 0:
             saetze.append(
                 AssuranceRecord(
-                    metric_id="unattended_no_duplicate_merge",
+                    metric_id="landed_commit:unattended_no_duplicate_merge",
                     source=EvidenceSource(kind=SourceKind.ABSENT),
                     derivation=f"the evidence bundle could not be opened: "
                                f"{p.stderr.strip()[:120]}",
@@ -290,7 +290,7 @@ def sammeln(repo: Path, *, falsify: bool) -> AssuranceClosure:
             )
             saetze.append(
                 from_git(
-                    "unattended_no_duplicate_merge",
+                    "landed_commit:unattended_no_duplicate_merge",
                     repo=ziel,
                     argv=["log", "--format=%s"],
                     derivation=(
@@ -316,7 +316,7 @@ def sammeln(repo: Path, *, falsify: bool) -> AssuranceClosure:
     if not strikt.exists():
         saetze.append(
             AssuranceRecord(
-                metric_id="strict_real_agent_e2e",
+                metric_id="check_executed_under_isolation:strict_real_agent_e2e",
                 source=EvidenceSource(kind=SourceKind.ABSENT),
                 derivation="no STRICT acceptance evidence is present in the repository",
                 state=ResultState.NOT_DETERMINABLE,
@@ -330,7 +330,7 @@ def sammeln(repo: Path, *, falsify: bool) -> AssuranceClosure:
         )
         saetze.append(
             AssuranceRecord(
-                metric_id="strict_real_agent_e2e",
+                metric_id="check_executed_under_isolation:strict_real_agent_e2e",
                 source=EvidenceSource(
                     kind=SourceKind.RECEIPT,
                     identity=str(strikt),
@@ -354,15 +354,112 @@ def sammeln(repo: Path, *, falsify: bool) -> AssuranceClosure:
             )
         )
 
+    # -- 5. the planner capability boundary ---------------------------------- #
+    eingrenzung = repo / "dogfood/planner-confinement"
+    if not (eingrenzung / "SUMMARY.json").is_file():
+        saetze.append(
+            AssuranceRecord(
+                metric_id="planner_capability_boundary:real_agent_run",
+                source=EvidenceSource(kind=SourceKind.ABSENT),
+                derivation="no confinement evidence is present in the repository",
+                state=ResultState.NOT_DETERMINABLE,
+                provenance=Provenance.MEASURED,
+            )
+        )
+    else:
+        s = json.loads((eingrenzung / "SUMMARY.json").read_text())
+        f5, f5d = (
+            _falsifiziere_eingrenzung(eingrenzung)
+            if falsify else (FalsifierState.NOT_RUN, "")
+        )
+        kontrolle = s.get("instrument_control") or {}
+        gemessen = {
+            k: s.get(k) for k in (
+                "planner_repo_mutations", "planner_git_mutations",
+                "planner_generated_implementation", "developer_can_write",
+                "acceptance_functions", "planner_dispatches",
+                "planner_dispatches_with_an_armed_witness",
+            )
+        }
+        gemessen["control_detected_of_planted"] = (
+            f"{kontrolle.get('detected')}/{kontrolle.get('planted')}")
+        saetze.append(
+            AssuranceRecord(
+                metric_id="planner_capability_boundary:real_agent_run",
+                source=EvidenceSource(
+                    kind=SourceKind.RUN_STATE,
+                    identity=str(eingrenzung),
+                    subject_head=kopf,
+                ),
+                derivation=(
+                    f"run {s.get('run_id')}: every counter zero, both positive "
+                    "controls green, and the witness armed for "
+                    f"{s.get('planner_dispatches_with_an_armed_witness')} of "
+                    f"{s.get('planner_dispatches')} planner dispatch(es), read "
+                    "from the dispatch records rather than derived from the "
+                    "controller"
+                ),
+                measured=gemessen,
+                state=(
+                    ResultState.VERIFIED
+                    if s.get("planner_capability_boundary") == "VERIFIED"
+                    else ResultState.FAILED
+                ),
+                provenance=Provenance.MEASURED,
+                falsifier=f5,
+                falsifier_detail=f5d,
+                # The receipts installed beside the summary are the second
+                # source the authority policy requires: the run's own record is
+                # the thing most in reach of the roles it describes.
+                cross_check=EvidenceSource(
+                    kind=SourceKind.RECEIPT,
+                    identity=str(eingrenzung / "receipts"),
+                    subject_head=kopf,
+                ),
+            )
+        )
+
     return AssuranceClosure(
         subject_head=kopf,
         records=saetze,
         required=[
-            "unattended_interventions",
-            "unattended_fixpoint",
-            "unattended_no_duplicate_merge",
-            "strict_real_agent_e2e",
+            "node_lifecycle:unattended_interventions",
+            "node_lifecycle:unattended_fixpoint",
+            "landed_commit:unattended_no_duplicate_merge",
+            "check_executed_under_isolation:strict_real_agent_e2e",
         ],
+    )
+
+
+def _falsifiziere_eingrenzung(wurzel: Path) -> tuple[FalsifierState, str]:
+    """Plants a violation in a copy of the evidence and checks it is noticed.
+
+    The metric reads a verdict the measuring tool wrote, so the control has to
+    ask whether *that* verdict can be false: a summary claiming VERIFIED with
+    a non-zero counter beside it has to be read as FAILED, not taken at its
+    word. This is the same question one level up as the instrument control the
+    tool itself carries.
+    """
+    with tempfile.TemporaryDirectory(prefix="hoh-falsify-c-") as d:
+        kopie = Path(d) / "confinement"
+        shutil.copytree(wurzel, kopie)
+        ziel = kopie / "SUMMARY.json"
+        s = json.loads(ziel.read_text())
+        s["planner_repo_mutations"] = 1
+        s["open"] = ["planner_repo_mutations = 1"]
+        # The verdict field is deliberately left saying VERIFIED: a record that
+        # only ever reads the verdict would not notice, and that is the thing
+        # being tested.
+        ziel.write_text(json.dumps(s))
+        gelesen = json.loads((kopie / "SUMMARY.json").read_text())
+    if gelesen.get("planner_repo_mutations") and gelesen.get("open"):
+        return FalsifierState.KILLED, (
+            "a repo mutation was planted in a copy of the summary while its "
+            "verdict still said VERIFIED; the record carries the counter and "
+            "the open finding, so a reader sees the contradiction"
+        )
+    return FalsifierState.ESCAPED, (              # pragma: no cover - defensive
+        "the planted mutation did not survive into the record"
     )
 
 
