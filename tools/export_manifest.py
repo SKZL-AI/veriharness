@@ -169,6 +169,8 @@ from pathlib import Path
 # --------------------------------------------------------------------------
 
 RULES = (
+    # Evidence a public document names. See `_EVIDENCE_PREFIXES`.
+    "published-evidence",
     "package",
     "public-docs",
     "governance",
@@ -216,9 +218,32 @@ CLAIMS_LEDGER_BASENAMES = frozenset({"CLAIMS.json", "CLAIMS.md"})
 #: A root-level parked predecessor: NAME.v<digits>.<rest>, sibling of NAME.
 _VERSIONED_SIBLING_RE = re.compile(r"^(?P<base>.+)\.v\d+\.(?P<rest>.+)$")
 
+#: The other shape this project parks things under: `<name>.v<UTC stamp>`,
+#: written by `RunStore` and by the pre-registration freeze. The first form
+#: above counts versions; this one stamps them. Both mean the same thing --
+#: replaced, kept, not current -- and both belong to the same rule wherever
+#: they sit. It used to be recognised only at the repository root, so a parked
+#: file one directory down fell through to `unclassified`, which is the
+#: manifest's way of saying nobody decided. A test that skips on an absent
+#: path may only do so when the manifest *declares* the withholding, and
+#: `unclassified` is not a declaration.
+#: Two stamp formats are in use and both mean the same thing: `RunStore`
+#: writes `20260913T215702Z`, the pre-registration freeze writes
+#: `2026-09-13T21-57-02Z`. A rule that knew only one classified the other as
+#: `unclassified`, which is the manifest's way of saying nobody decided -- and
+#: an undecided path must never satisfy a test's environment-gap skip.
+_VERSIONED_STAMP_RE = re.compile(
+    r"^(?P<base>.+)\.v\d{4}-?\d{2}-?\d{2}T\d{2}-?\d{2}-?\d{2}Z$")
+
 #: Directories whose entire subtree gets one fixed rule regardless of
 #: content. Checked, in this order, before any content-based rule.
 _DIRECTORY_RULES = (
+    # Continuous-integration configuration belongs in the published repository:
+    # it is what makes the clean-install claim checkable by someone who does not
+    # have this machine. Classified as repo-meta rather than tooling because it
+    # configures the host, not the project -- nothing under it is imported or
+    # executed by `hoh` itself.
+    (".github", "INCLUDE", "repo-meta"),
     ("tests", "INCLUDE", "tests"),
     ("tools", "INCLUDE", "tooling"),
     ("examples", "INCLUDE", "example"),
@@ -242,6 +267,51 @@ _DIRECTORY_RULES = (
 #: individually for export, and `history` is EXCLUDE but small and not
 #: named by this run's spec.
 _PRUNE_AT_ROOT_DIRNAMES = frozenset({"runs", "build"})
+
+#: Paths under an EXCLUDE-by-default directory that are nevertheless published,
+#: because a public claim names them as its evidence. Matched as a prefix and
+#: checked *before* `_DIRECTORY_RULES`, so the surrounding directory's rule does
+#: not decide for them.
+#:
+#: **The two evidence trees are not here, and the reason is worth stating.**
+#: `dogfood/strict-e2e/` and `dogfood/unattended-e2e/` were added to this tuple
+#: and then removed, because the export's own leak scan found absolute machine
+#: paths in 36 of their files: an arena's location, a worktree's location, the
+#: repository's own. Receipts record where a check ran, which is exactly what
+#: makes them evidence and exactly what must not be published.
+#:
+#: Redacting them was considered and refused. A receipt carries
+#: `stdout_digest`, computed over the transcript *including* those paths, so a
+#: redacted transcript no longer matches its own digest -- and published
+#: evidence whose integrity field is knowingly wrong is worse than evidence
+#: that is honestly absent. `docs/EVIDENCE_INDEX.md` publishes what can be
+#: published without lying: for each claim, the digest of the tree it rests on,
+#: the number of artifacts in it, and how to check it against the repository
+#: that holds it.
+#:
+#: `ATTRIBUTION.json` stays: it names commits and categories, and no paths.
+_EVIDENCE_PREFIXES = (
+    ("dogfood/ATTRIBUTION.json", "INCLUDE", "published-evidence"),
+    # A campaign's own pre-registration and the evidence about it. Published
+    # because the results document is worth nothing without them: a reader who
+    # cannot see which commit the design was bound to, or the digests the raw
+    # results hashed to before and after the reporter was repaired, is being
+    # asked to take the campaign's central promise on trust. Each was scanned
+    # for home paths before being listed; they carry digests, commit ids and a
+    # platform string, and no machine-local path.
+    #
+    # The parked predecessor (`PREREGISTRATION.json.v<stamp>`) is deliberately
+    # **not** here. It is superseded, no published document points at it as a
+    # path, and the provenance artifact's claim -- that two commits carry two
+    # different registration blobs -- is checkable from git without it.
+    ("docs/benchmarks/v3/PREREGISTRATION.json", "INCLUDE", "published-evidence"),
+    ("docs/benchmarks/v3/PREREGISTRATION_PROVENANCE.json", "INCLUDE",
+     "published-evidence"),
+    ("docs/benchmarks/v3/RAW_RESULT_DIGESTS.json", "INCLUDE",
+     "published-evidence"),
+    ("docs/benchmarks/v3/O154_ANALYSIS_ONLY.json", "INCLUDE",
+     "published-evidence"),
+)
 
 _DIRECTORY_RULE_BY_NAME = {name: (decision, rule) for name, decision, rule in _DIRECTORY_RULES}
 
@@ -378,8 +448,19 @@ def _compile_gitignore_rule(raw_line: str) -> _GitignoreRule | None:
             raise UnsupportedGitignorePattern(original)
         regex_body = "/".join(re.escape(seg) for seg in segments[:-1]) + "/" + _glob_segment_to_regex(final)
     else:
+        # One `*`, anywhere in the segment. The earlier form additionally
+        # required it to be *leading*, which rejected `c4-*/` -- a rule the
+        # repository needed after twenty files of stray probe output were
+        # committed and the export caught them. `_glob_segment_to_regex`
+        # already places the wildcard wherever it sits; the extra condition
+        # was caution rather than necessity, and caution that refuses a
+        # correct pattern pushes people towards deleting the gate.
+        #
+        # Still refused: more than one `*`, `**`, `?`, character classes, and
+        # a leading `/`. An unsupported pattern stops the derivation rather
+        # than silently letting ignored content into the manifest.
         star_count = pattern_body.count("*")
-        if star_count > 1 or (star_count == 1 and not pattern_body.startswith("*")):
+        if star_count > 1:
             raise UnsupportedGitignorePattern(original)
         regex_body = _glob_segment_to_regex(pattern_body)
 
@@ -481,9 +562,30 @@ def _mnt_pattern() -> re.Pattern[str]:
     return re.compile(re.escape(sl + "mnt" + sl) + r"[^" + re.escape(sl) + r"]+" + re.escape(sl))
 
 
+#: Characters that, immediately before a needle, mean it is not the start of an
+#: absolute path. A directory that happens to be named "root" inside a relative
+#: path is an ordinary name, not this machine's layout: the manifest lists
+#: `dogfood/unattended-e2e/root/projects/...`, and the unnarrowed check
+#: reported the manifest itself as a leak.
+_PATH_CHARS = frozenset(
+    "abcdefghijklmnopqrstuvwxyz" "ABCDEFGHIJKLMNOPQRSTUVWXYZ" "0123456789._-/"
+)
+
+
 def contains_home_path(text: str) -> bool:
-    if any(needle in text for needle in _home_path_needles()):
-        return True
+    """True when an absolute home-ish path appears, at the start of a path.
+
+    Narrowed deliberately and no further: a needle in quotes, in brackets or at
+    the start of a line still counts, because the character before it cannot be
+    part of a path. Only a needle preceded by another path segment is let
+    through.
+    """
+    for needle in _home_path_needles():
+        pos = text.find(needle)
+        while pos != -1:
+            if pos == 0 or text[pos - 1] not in _PATH_CHARS:
+                return True
+            pos = text.find(needle, pos + 1)
     return bool(_mnt_pattern().search(text))
 
 
@@ -494,9 +596,14 @@ def contains_home_path(text: str) -> bool:
 # general algorithmic patterns.
 # --------------------------------------------------------------------------
 
+#: Loopback is deliberately **not** here. This machine's house rules require
+#: local-only logging on 127.0.0.1, and a test that opens a listener on
+#: loopback to prove a sandbox cannot reach it is doing exactly what the rules
+#: ask. Loopback reveals no network topology: every machine has the same one.
+#: The other three ranges stay, because those do say something about where the
+#: author sits.
 _PRIVATE_IPV4_RE = re.compile(
-    r"\b(?:127\.\d{1,3}\.\d{1,3}\.\d{1,3}"
-    r"|10\.\d{1,3}\.\d{1,3}\.\d{1,3}"
+    r"\b(?:10\.\d{1,3}\.\d{1,3}\.\d{1,3}"
     r"|172\.(?:1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}"
     r"|192\.168\.\d{1,3}\.\d{1,3})\b"
 )
@@ -535,8 +642,25 @@ def _classify(rel_path: str, root: Path) -> tuple[str, str]:
     parts = rel_path.split("/")
     top = parts[0]
 
+    # A parked predecessor, at any depth. Asked before the directory rules so
+    # that a stamped sibling is classified by what it *is* rather than by
+    # where it happens to live.
+    m = _VERSIONED_STAMP_RE.match(parts[-1])
+    if m and (root / "/".join(parts[:-1]) / m.group("base")).is_file():
+        return "EXCLUDE", "parked-predecessor"
+
     if rel_path == "pyproject.toml" or top == "src":
         return "INCLUDE", "package"
+
+    # Named evidence subtrees, checked before the wholesale directory rules.
+    # `dogfood/` is internal by default and should stay that way -- it is a
+    # working tree, not a deliverable. But three things under it are the
+    # evidence that public claims rest on, and a claim whose evidence is not
+    # in the export is a claim the reader is asked to take on trust. That is
+    # the one thing this project's documents say nobody should have to do.
+    for prefix, decision, rule in _EVIDENCE_PREFIXES:
+        if rel_path == prefix or rel_path.startswith(prefix + "/"):
+            return decision, rule
 
     for dirname, decision, rule in _DIRECTORY_RULES:
         if top == dirname:
@@ -890,6 +1014,69 @@ def _looks_like_repo_reference(s: str, top_level_names: set[str]) -> bool:
 _U2B_EXCLUDED_EXTENSIONS = frozenset({".py", ".json"})
 
 
+#: References a published document makes that a reader cannot follow, and
+#: that are **not** going to be removed, each with the reason. Data rather
+#: than a branch in the code, for the same reason `CLAIMS.json` keeps its
+#: surface exclusions as data: a decision that can be read, reviewed and
+#: counted is a different thing from a special case inside a function.
+#:
+#: The bar for an entry here is high and only one situation has met it so
+#: far: a document that is a **record of what someone else wrote**. Editing a
+#: reviewer's report so that its citations resolve would make the report say
+#: something the reviewer did not write, which is a worse defect than a
+#: pointer a reader cannot follow. Every other published document had its
+#: citations rewritten to name the internal document without a path
+#: (`docs/EVIDENCE_INDEX.md` lists them and says where their substance is
+#: published).
+#:
+#: Acknowledged is not invisible: every entry is printed on every run, and
+#: `tests/test_export_manifest.py` pins this list so that it cannot grow
+#: without a test changing with it.
+U2B_ANERKANNT: dict[str, str] = {
+    "paper/REVIEW_A.md":
+        "an independent reviewer's report, published as written. Its "
+        "citations are what the reviewer read; rewriting them would make the "
+        "report say something they did not write. The documents are named in "
+        "docs/EVIDENCE_INDEX.md",
+    "paper/REVIEW_B.md":
+        "an independent reviewer's report, published as written -- and one of "
+        "its findings (B-03) is *about* these very references, so its paths "
+        "are the subject of the finding rather than pointers it offers a "
+        "reader. The documents are named in docs/EVIDENCE_INDEX.md",
+    "paper/AUDIT.md -> runs/a03/receipts":
+        "the audit's source column names where a number was **recomputed "
+        "from**, and `tools/audit_refs.py numbers-recomputed` requires that "
+        "path to exist. For this row the place is the a03 run's receipt tree, "
+        "which the export deliberately does not carry (limit 12e): its "
+        "receipts record the absolute paths the checks ran at. Naming "
+        "anything else in that column would misstate where the figure came "
+        "from, and naming nothing would make the row unverifiable. What the "
+        "tree contains, and where its substance is published, is described in "
+        "docs/EVIDENCE_INDEX.md. Only this one reference is acknowledged; "
+        "every other reference AUDIT.md makes still has to resolve",
+}
+
+
+def teile_u2b(findings: list[dict]) -> tuple[list[dict], list[dict]]:
+    """(findings that stand, findings whose reference is acknowledged).
+
+    A key is either a whole document -- everything it cites -- or a single
+    `from -> to` pair. The pair form exists because acknowledging a whole
+    document to excuse one reference is how an exemption list stops meaning
+    anything: `paper/AUDIT.md` has one reference that cannot be removed, and
+    all its others must keep failing if they ever break.
+    """
+    offen, anerkannt = [], []
+    for f in findings:
+        grund = (U2B_ANERKANNT.get(f"{f.get('from')} -> {f.get('to')}")
+                 or U2B_ANERKANNT.get(f.get("from")))
+        if grund:
+            anerkannt.append({**f, "acknowledged": grund})
+        else:
+            offen.append(f)
+    return offen, anerkannt
+
+
 def check_u2b(entries: list[dict], root: Path) -> list[dict]:
     """For every INCLUDE entry, resolves its extracted references against
     the manifest. Reports a finding for each reference whose target is
@@ -1121,9 +1308,17 @@ def cmd_check(args: argparse.Namespace) -> int:
         return 1
 
     findings = 0
-    for f in check_u2b(on_disk_entries, root):
+    offen, anerkannt = teile_u2b(check_u2b(on_disk_entries, root))
+    for f in offen:
         findings += 1
         print(f"FAIL: U2b: {f['from']} references {f['to']} -- {f['reason']}")
+    # Printed on every run, never counted as a finding. A reference that has
+    # been thought about and decided is a different state from one nobody has
+    # looked at, and the difference is only worth anything if the decision
+    # stays in front of the reader.
+    for f in anerkannt:
+        print(f"ACKNOWLEDGED: {f['from']} references {f['to']} "
+              f"-- {f['reason']}; {f['acknowledged']}")
     for f in scan_include_for_leaks(on_disk_entries, root):
         findings += 1
         print(f"FAIL: {f['type']} found in INCLUDE-classified {f['path']}")
@@ -1132,7 +1327,10 @@ def cmd_check(args: argparse.Namespace) -> int:
         print(f"{findings} problem(s).")
         return 1
 
-    print(f"OK: {manifest_path} matches a fresh derivation and passes U2b + the leak scan ({len(on_disk_entries)} entries)")
+    print(f"OK: {manifest_path} matches a fresh derivation and passes U2b + "
+          f"the leak scan ({len(on_disk_entries)} entries, "
+          f"{len(anerkannt)} acknowledged reference(s) in "
+          f"{len(U2B_ANERKANNT)} document(s))")
     return 0
 
 

@@ -87,11 +87,33 @@ def _register_trust(store, root) -> str | None:
     try:
         from . import trust
 
-        # What gets registered is where the roles actually sit: the arena
-        # root. The run directory is deliberately **no longer** handed to them
-        # as a working directory -- that is where the evidence lives.
+        # What gets registered is where the roles actually sit. The arena root
+        # for the developer and QA; the run directory is deliberately **no
+        # longer** handed to them as a working directory -- that is where the
+        # evidence lives.
+        #
+        # And the planner's own root, which O125 separated out. It has to be
+        # registered here rather than left to be discovered: a directory the
+        # harness has never seen stops the agent at a dialog nobody in a pane
+        # can answer, and moving the planner somewhere safer would otherwise
+        # have cost every run its first iteration. Created now, because
+        # registering a path that does not exist registers nothing.
+        planner_root = store.arenas_dir / "planner"
+        planner_root.mkdir(parents=True, exist_ok=True)
+        # The **answers directory**, not the run directory -- and this is a
+        # tidiness change, not a control. A reviewer read the harness's own
+        # resolution: trust is searched from a session's working directory
+        # **upwards**, so registering a child of a directory nobody works in
+        # grants nothing, and removing the parent takes nothing away either.
+        # Every role has a shell, which the policy says of itself
+        # (`declared_but_unenforced`), so `checks.json` was never out of reach.
+        # What actually stops a write there is the witness in `capability.py`,
+        # which fails the run closed. This narrows what HoH asks for to what
+        # its roles need: a place to put their answer.
+        antworten = store.dir / "answers"
+        antworten.mkdir(parents=True, exist_ok=True)
         registered = [
-            path for path in (store.arenas_dir, store.dir)
+            path for path in (store.arenas_dir, planner_root, antworten)
             if trust.register(path, owned_root=root)
         ]
         if registered:
@@ -292,7 +314,8 @@ def cmd_start(args) -> int:
         repo_path=args.repo,
         project_name=args.project or Path(args.repo).name,
         spec_path=args.spec,
-        budgets=Budgets(max_iterations=args.max_iterations),
+        budgets=Budgets(max_iterations=args.max_iterations,
+                        max_dispatches=getattr(args, "max_dispatches", None)),
         delivery_mode=args.mode,
     )
     with store.lock():
@@ -535,6 +558,140 @@ def cmd_unblock(args) -> int:
     return 0
 
 
+def cmd_amend(args) -> int:
+    """Record a change to a running specification, with what it costs.
+
+    Limit 15 said a specification is immutable for the life of a run and there
+    is no supported path to amend one. That was a safe default and a real
+    obstruction: requirements are discovered by working on them, and a run
+    that cannot absorb a correction has to be thrown away, losing its
+    evidence, its budget and the history of why the correction was needed.
+
+    This is the supported path, and it is deliberately not a shortcut. The old
+    text is parked and stays readable; the new text is a version beside it; an
+    acceptance-affecting amendment names the criteria it touches, and the
+    controller then refuses to accept a candidate until each of them has been
+    planned and measured again. Nothing here judges whether an amendment is
+    honest -- it makes the shape, the author, the reason and the cost visible
+    in one place so that a reader can.
+    """
+    from .amendment import AmendmentKind, AmendmentLedger, park_and_amend, text_digest
+
+    store = _store(args)
+    neuer_text = Path(args.spec_file).expanduser().read_text(encoding="utf-8")
+    try:
+        with store.lock():
+            state = store.read_state()
+            kette = store.read_amendments(origin_digest=state.spec_digest)
+            if not kette.amendments and kette.origin_digest != state.spec_digest:
+                kette = AmendmentLedger(run_id=state.run_id,
+                                        origin_digest=state.spec_digest)
+            betroffen = [c.strip() for c in (args.affects or "").split(",") if c.strip()]
+            nach_annahme = state.last_accepted_candidate is not None
+            amendment = park_and_amend(
+                state.spec_path, neuer_text,
+                run_id=state.run_id, amendment_id=args.amendment_id,
+                kind=AmendmentKind(args.kind), actor=args.actor,
+                reason=args.reason, affected_criteria=betroffen,
+                evidence=[e for e in (args.evidence or "").split(",") if e],
+                after_acceptance=nach_annahme, write_seq=state.write_seq,
+            )
+            # Built before the chain is written, so a duplicate id or a
+            # broken chain is refused with nothing changed. The amendment
+            # itself already validated before the specification moved.
+            kette = AmendmentLedger(
+                run_id=kette.run_id, origin_digest=kette.origin_digest,
+                amendments=[*kette.amendments, amendment],
+            )
+            store.write_amendments(kette)
+            state.note(f"specification amended: {amendment.summary()}")
+            state.spec_digest = text_digest(neuer_text)
+            store.write_state(state)
+    except (StoreError, LockBusy, ValueError, OSError) as exc:
+        print(f"refused: {exc}", file=sys.stderr)
+        return 2
+    print(kette.report())
+    noetig = kette.revalidation_needed()
+    if noetig:
+        print(f"\nAcceptance is withheld until {', '.join(sorted(noetig))} "
+              "has been planned and measured against the new text.")
+    return 0
+
+
+def _inconclusive_checks(store, state, iteration: int) -> list[tuple[str, str]]:
+    """The criteria of one iteration whose receipts say they never ran.
+
+    Read from the receipts, not from the loop's own summary: the summary knows
+    "not accepted", and only the receipt knows whether that was a product
+    defect or an infrastructure refusal.
+    """
+    raus: list[tuple[str, str]] = []
+    verzeichnis = store.dir / "receipts"
+    if not verzeichnis.is_dir():
+        return raus
+    for f in sorted(verzeichnis.glob(f"{state.run_id}-i{iteration}-*.json")):
+        if f.stem.endswith("-basis"):
+            continue
+        try:
+            d = json.loads(f.read_text())
+        except (OSError, ValueError):
+            continue
+        if d.get("runner_ok", True) and d.get("exit_code") not in (124, 126, 127):
+            continue
+        grund = {
+            124: "timeout", 126: "refused or not executable", 127: "not found",
+        }.get(d.get("exit_code"), "infrastructure error")
+        raus.append((d.get("check_id", f.stem), grund))
+    return raus
+
+
+def _isolation_for_run(state, angefordert: str | None):
+    """The isolation for this invocation, reconciled with the run's own.
+
+    Three cases, and only one of them is a judgement call:
+
+    * no flag -- the run keeps what it was started with;
+    * the same value -- nothing to decide;
+    * a different value -- allowed upwards, refused downwards. Lowering it
+      mid-run would mean the accepted candidate was verified partly under a
+      sandbox and partly not, and the run record would carry a single word for
+      two different regimes.
+    """
+    gespeichert = getattr(state, "isolation", "none") or "none"
+    if angefordert is None or angefordert == gespeichert:
+        return _isolation(gespeichert)
+    neu = _isolation(angefordert)
+    rang = {"none": 0, "strict": 1}
+    if rang.get(angefordert, 0) < rang.get(gespeichert, 0):
+        raise ValueError(
+            f"this run was started under --isolation {gespeichert} and asking "
+            f"for {angefordert} now would verify part of it under a sandbox "
+            "and part of it without one. Start a new run if that is what you "
+            "want; a run's isolation is a property of the run."
+        )
+    state.isolation = angefordert
+    return neu
+
+
+def _isolation(name: str):
+    """The requested isolation, or None for the historical path.
+
+    Returns None rather than `Isolation.NONE` for "none" so that the runner
+    takes exactly the code path it took before this flag existed. The two are
+    equivalent in effect; keeping them literally the same path means the
+    default cannot drift because someone changed what NONE does.
+    """
+    if name in ("", "none"):
+        return None
+    from .sandbox import Isolation
+
+    try:
+        return Isolation(name)
+    except ValueError:
+        erlaubt = ", ".join(i.value for i in Isolation)
+        raise ValueError(f"unknown isolation {name!r}; expected one of: {erlaubt}") from None
+
+
 def _per_role(pairs: list[str]) -> dict[Role, str]:
     """Parses `role=value` pairs into a per-role mapping.
 
@@ -635,7 +792,53 @@ def cmd_run(args) -> int:
             file=sys.stderr,
         )
 
-    controller = Controller(store, dispatcher, spec_path=state.spec_path)
+    try:
+        isolation = _isolation_for_run(state, args.isolation)
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+    if isolation is not None:
+        # Resolve the backend *before* any role is dispatched. Discovering at
+        # the first acceptance check that the machine cannot provide the
+        # isolation asked for means an entire planner and developer round has
+        # already been spent on a run that can only end INCONCLUSIVE.
+        from .sandbox import SandboxUnavailable, select
+
+        try:
+            backend = select(isolation)
+        except SandboxUnavailable as exc:
+            print(
+                f"--isolation {args.isolation} was requested and cannot be "
+                f"provided here: {exc}\n"
+                "Nothing has been dispatched. Ask for --isolation none "
+                "explicitly if you accept running unsandboxed.",
+                file=sys.stderr,
+            )
+            return 2
+        _print({
+            "isolation": isolation.value,
+            "backend": backend.name,
+            "note": "every acceptance check in this run, candidate and "
+                    "baseline alike, executes under this isolation",
+        })
+
+    # Persisted here, before a single role is dispatched. The guard that used
+    # to stand here compared `state.isolation` against the value
+    # `_isolation_for_run` had *just assigned to it*, so it was never true and
+    # the write never happened. In the happy path the value reached disk by
+    # accident, on the controller's first checkpoint; anything that stopped
+    # before that -- an unreadable spec, a stop request, `--iterations 0` --
+    # left the run recorded as unsandboxed, and the next `hoh run` continued it
+    # that way without a word.
+    gewuenscht = isolation.value if isolation is not None else "none"
+    if state.isolation != gewuenscht:
+        state.isolation = gewuenscht
+        with store.lock():
+            store.write_state(state)
+
+    controller = Controller(
+        store, dispatcher, spec_path=state.spec_path, isolation=isolation
+    )
 
     ran = 0
     waiting_for_approval = False
@@ -679,6 +882,19 @@ def cmd_run(args) -> int:
         waiting_for_approval = waiting_for_approval or out.waiting_for_approval
         label = "accepted" if out.accepted else "not accepted"
         print(f"Iteration {out.iteration}: {label} -- {out.reason}")
+        unklar = _inconclusive_checks(store, state, out.iteration)
+        if unklar and not out.accepted:
+            # "Not accepted" is true and useless when the reason is that
+            # nothing ran. An iteration whose criteria were refused by the
+            # guard, timed out, or could not be isolated has measured nothing
+            # about the product -- and a transcript that renders that as a
+            # product rejection is the laundering this project exists to stop.
+            # A reviewer read exactly that off a real run's log.
+            print(
+                f"  {len(unklar)} of these did not run at all "
+                f"(INCONCLUSIVE, not a verdict): "
+                + ", ".join(f"{cid} [{grund}]" for cid, grund in unklar)
+            )
 
         if state.condition is not Condition.ACTIVE:
             print(f"Run is now {state.condition.value}: {state.stop_reason or ''}")
@@ -896,6 +1112,126 @@ def cmd_list(args) -> int:
 
 
 # --------------------------------------------------------------------------- #
+# The project layer: which runs happen at all
+# --------------------------------------------------------------------------- #
+
+
+def cmd_project(args) -> int:
+    """Inspect the orchestration layer above a single run.
+
+    Deliberately read-only for now. Driving a project needs a `RunLauncher`
+    bound to real Herdr dispatch, and shipping a command that *looks* like it
+    orchestrates while executing nothing would be worse than not shipping it:
+    the thing this project keeps finding is claims that outrun what was
+    measured. `status` and `resume` answer the question a returning session
+    actually has -- what does this state say to do next -- and they answer it
+    from the persisted file alone.
+    """
+    from .projectstore import (
+        ProjectStore, list_projects, record_external_action, resume_decision, unblock,
+    )
+
+    if args.project_cmd == "list":
+        projekte = list_projects(args.root)
+        if not projekte:
+            print(f"no projects under {args.root}")
+            return 0
+        for pid in projekte:
+            try:
+                st = ProjectStore(args.root, pid).read_state()
+                verdikt, _ = resume_decision(st)
+                offen = sum(1 for n in st.nodes if not n.settled)
+                print(f"{pid}  {verdikt:9s}  nodes={len(st.nodes)} open={offen} "
+                      f"closure_gen={st.closure_generation}")
+            except StoreError as exc:
+                print(f"{pid}  UNREADABLE: {exc}")
+        return 0
+
+    store = ProjectStore(args.root, args.project_id)
+    if not store.exists():
+        print(f"project {args.project_id} has no state under {args.root}", file=sys.stderr)
+        return 2
+    try:
+        st = store.read_state()
+    except StoreError as exc:
+        # A damaged state blocks rather than being replaced, and the exit code
+        # says so: a reader scripting against this must not see 0.
+        print(f"UNREADABLE: {exc}", file=sys.stderr)
+        return 3
+
+    if args.project_cmd == "record-action":
+        try:
+            st = record_external_action(
+                store, actor=args.actor, reason=args.reason,
+                repo_path=st.repo_path, node=args.node,
+                head_before=args.head_before or "",
+            )
+        except StoreError as exc:
+            print(f"refused: {exc}", file=sys.stderr)
+            return 4
+        r = st.external_actions[-1]
+        print(f"{r.action_id} recorded: {r.actor} -- {r.head_before or '?'} -> "
+              f"{r.head_after or '?'}{' (tree unchanged)' if not r.changed_the_tree else ''}")
+        return 0
+
+    if args.project_cmd == "unblock":
+        try:
+            st = unblock(store, args.node, args.reason)
+        except StoreError as exc:
+            print(f"refused: {exc}", file=sys.stderr)
+            return 4
+        n = st.node(args.node)
+        print(f"{args.node} is now {n.lifecycle.value}; recorded as {st.decisions[-1].id}")
+        return 0
+
+    verdikt, grund = resume_decision(st)
+
+    if args.project_cmd == "resume":
+        print(json.dumps({"project_id": st.project_id, "verdict": verdikt,
+                          "reason": grund, "measurement_head": st.measurement_head,
+                          "closure_generation": st.closure_generation,
+                          "rc_closed": st.rc_closed()}, indent=2))
+        return 0
+
+    # status
+    print(f"project {st.project_id}  ({st.repo_path})")
+    print(f"  verdict          {verdikt}")
+    print(f"  reason           {grund}")
+    print(f"  dag terminal     {st.dag_terminal()}")
+    print(f"  gates green      {st.gates_green()}")
+    print(f"  RC_CLOSED        {st.rc_closed()}")
+    print(f"  measured at      {st.measurement_head or '(nothing recorded)'}")
+    print(f"  closure gen      {st.closure_generation}")
+    print(f"  write_seq        {st.write_seq}")
+    print("  nodes:")
+    for n in st.nodes:
+        marke = "repair" if n.repair_of else ""
+        print(f"    {n.id:24s} {n.lifecycle.value:10s} {n.action_class.value:8s} "
+              f"rej={n.rejections} {marke}")
+    if st.gates:
+        letzte = {}
+        for g in st.gates:
+            letzte[g.name] = g
+        print("  gates (most recent per name):")
+        for name, g in sorted(letzte.items()):
+            print(f"    {name:24s} {g.outcome.value:8s} @{g.subject}")
+    if st.decisions:
+        print(f"  decisions: {len(st.decisions)} recorded, latest:")
+        d = st.decisions[-1]
+        print(f"    {d.id} {d.kind.value} by {d.actor}: {d.reason}")
+    if st.external_actions:
+        # Shown separately, and shown at all: a repository change that is
+        # invisible here is one a later closure measures without anyone being
+        # able to say where it came from.
+        print(f"  external actions: {len(st.external_actions)} recorded")
+        for r in st.external_actions[-3:]:
+            bewegt = "" if r.changed_the_tree else "  (tree unchanged)"
+            print(f"    {r.action_id} {r.actor}: {r.head_before or '?'} -> "
+                  f"{r.head_after or '?'}{bewegt}  {r.reason[:60]}")
+    return 0
+
+
+# --------------------------------------------------------------------------- #
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -923,6 +1259,13 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--run-id", help="own run id instead of a generated one")
     s.add_argument("--max-iterations", type=int, default=10)
     s.add_argument(
+        "--max-dispatches", type=int, default=None,
+        help="ceiling on role dispatches for this run. The field existed and "
+             "nothing could set it, so a project that wanted to hold a node "
+             "and its repair runs to one shared budget had no way to say so -- "
+             "which is how a matched-budget benchmark came to give one arm "
+             "twice the resource")
+    s.add_argument(
         "--mode",
         choices=["no-mistakes", "direct-PR", "local-only"],
         default="local-only",
@@ -942,6 +1285,14 @@ def build_parser() -> argparse.ArgumentParser:
                         "setup for the independent review")
     r.add_argument("--no-herdr", action="store_true",
                    help="run without Herdr -- no acceptance value for A01/A02/A12")
+    r.add_argument(
+        "--isolation", default=None, choices=("none", "strict"),
+        help="how acceptance checks are executed. 'none' is the historical "
+             "path: a reduced environment and setrlimit, which is a tripwire "
+             "and not a boundary. 'strict' runs every check inside a "
+             "filesystem- and network-isolated sandbox and refuses to start "
+             "the run at all if the machine cannot provide one.",
+    )
     r.add_argument(
         "--role-model", action="append", default=[], metavar="ROLE=MODEL",
         help="model per role, repeatable: planner=sonnet, qa=opus. "
@@ -987,6 +1338,26 @@ def build_parser() -> argparse.ArgumentParser:
                      "checked that nothing is running any more",
             )
         c.set_defaults(func=fn)
+
+    am = sub.add_parser(
+        "amend", help="Change a running specification, on the record")
+    am.add_argument("run_id")
+    am.add_argument("--spec-file", required=True,
+                    help="the new text. The old one is parked, never replaced")
+    am.add_argument("--amendment-id", required=True)
+    am.add_argument("--kind", required=True,
+                    choices=["clarify", "narrow", "widen", "correct"],
+                    help="clarify claims not to change what would pass, and is "
+                         "held to that claim; the other three do")
+    am.add_argument("--actor", required=True, help="who is amending, by name")
+    am.add_argument("--reason", required=True)
+    am.add_argument("--affects", default="",
+                    help="comma-separated check ids this amendment touches. "
+                         "Their evidence stops counting and they have to be "
+                         "measured again before a candidate can be accepted")
+    am.add_argument("--evidence", default="",
+                    help="comma-separated references that prompted this")
+    am.set_defaults(func=cmd_amend)
 
     gl = sub.add_parser("goal", help="Goalbook spanning run boundaries")
     gs = gl.add_subparsers(dest="goal_command", required=True)
@@ -1039,6 +1410,41 @@ def build_parser() -> argparse.ArgumentParser:
 
     c = sub.add_parser("list", help="All runs")
     c.set_defaults(func=cmd_list, run_id=None)
+
+    pr = sub.add_parser(
+        "project",
+        help="The orchestration layer above a run: which runs happen at all",
+    )
+    ps = pr.add_subparsers(dest="project_cmd", required=True)
+    ps.add_parser("list", help="All projects with their resume verdict")
+    for name, helptext in (
+        ("status", "Full state: nodes, gates, closure, decisions"),
+        ("resume", "What a fresh session should do, as JSON"),
+    ):
+        sp = ps.add_parser(name, help=helptext)
+        sp.add_argument("project_id")
+    ub = ps.add_parser(
+        "unblock",
+        help="Return a BLOCKED node to READY, with a reason that goes on the record",
+    )
+    ub.add_argument("project_id")
+    ub.add_argument("node")
+    ub.add_argument("--reason", required=True,
+                    help="why it is safe to proceed -- becomes a decision record")
+    ra = ps.add_parser(
+        "record-action",
+        help="Record a repository change made outside the loop, so closure can be traced",
+    )
+    ra.add_argument("project_id")
+    ra.add_argument("--actor", required=True,
+                    help="'human', 'operator', or the tool that made the change")
+    ra.add_argument("--reason", required=True, help="why it was made")
+    ra.add_argument("--node", default=None, help="the node it relates to, if any")
+    ra.add_argument("--head-before", default="",
+                    help="the repository head before the change -- it cannot be "
+                         "measured afterwards, so it has to be supplied")
+    pr.set_defaults(func=cmd_project, run_id=None, project_id=None, node=None,
+                    reason=None, actor=None, head_before=None)
 
     return p
 

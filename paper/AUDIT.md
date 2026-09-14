@@ -76,7 +76,7 @@ agreeing on a wrong number is exactly the failure mode that survives a
 compare-the-documents check. Of the 38 numbers `paper/NUMBERS.md`'s own table
 catalogues, 3 are independently recomputable inside this checkout (the two
 structural ordinals, and the "3 contradictory license statements" figure,
-recomputed by counting the distinct rows of `dogfood/specs/d2b-licenses.md`'s
+recomputed by counting the distinct rows of the internal *d2b-licenses* specification's
 own table rather than by re-reading `docs/LIMITATIONS.md`'s restatement of
 the same figure). The remaining 35 need either `runs/` (gitignored, absent
 from this checkout -- confirmed: `runs/` does not exist here, O33) or `.git`
@@ -106,13 +106,13 @@ support for `a02`'s original claim. `a03` (`A03_NACHWEIS.md`) is consistently
 named as the corrected replacement.
 
 **External citations.** One `source Q<n>` token in the paper: `source Q2`,
-citing `docs/QUELLENCHECK.md` row Q2. Marked `EXTERNAL` per the
+citing the internal *Quellencheck* row Q2. Marked `EXTERNAL` per the
 specification: the URL and read-date are well-formed and quoted, but this is
 a dated read of a third party's repository, not something this checkout can
 re-fetch (no network access here) or otherwise reproduce.
 
 **Overclaim vocabulary.** Searched the whitespace-normalised paper for the
-exact vocabulary `dogfood/specs/d5-paper.md`'s own criterion 10 names:
+exact vocabulary the internal *d5-paper* specification's own criterion 10 names:
 unqualified superlative, "proves", "guarantees", "fully autonomous",
 "production-ready", "solves", "verifies that", "ensures correctness",
 "cannot fail" (word-boundary matches, so "solves" does not fire on
@@ -123,7 +123,7 @@ instruction that a count is not auditable.
 
 **Commit references and run/receipt references.** Searched
 `paper/POSITION_PAPER.md` for hex-looking commit shas (7-40 hex characters)
-and for specific `runs/...` receipt-style path references. Found **none** --
+and for specific the runs tree receipt-style path references. Found **none** --
 the paper discusses `runs/` only as a directory/concept (11 mentions, all
 about its absence or its role, none naming a specific run's receipt file),
 and never quotes a commit sha in its own prose (several `CLAIMS.json` claim
@@ -194,7 +194,8 @@ manufacturing rows for citations that do not exist.
 | NUMBER 0 (C-059) | NOT_CHECKED | N/A -- would require runs/d1's own persisted run state (the controller's `discriminates` flag for iteration 1) | O33: runs/ is gitignored and absent from this checkout; `ls runs/` confirms no such directory exists here either. Claimed: 0. |
 | NUMBER 0 (C-073) | NOT_CHECKED | N/A -- would require running `hoh resume-quota` against this project's full runs/ history | O33: runs/ is gitignored and absent; the command's own claimed output ('checked': 37, 'results': []) cannot be reproduced without the full runs/ tree. Claimed: 0 (of 37 checked). |
 | NUMBER 1 (structural) | RESOLVED | paper/POSITION_PAPER.md | Structural: iteration ordinal ("iteration 1") and the paper's own §1 cross-reference, per paper/NUMBERS.md's own note ("not itself a distinct ledger measurement"). Recomputed trivially by confirming §1 exists and the label is used consistently; not a measurement. |
-| NUMBER 2 (C-050) | NOT_CHECKED | N/A -- would require runs/a03's own persisted receipts for iteration 2 | O33: runs/ absent. Claimed: 2 (of 3) checks with differing exit codes, a03 iteration 2. |
+| NUMBER 2 (C-050) | RESOLVED | runs/a03/receipts | **Recomputed 2026-09-14**, when `runs/a03/receipts/` turned out to be present in this checkout after all -- the row above it had been NOT_CHECKED since O33 on the stated ground that `runs/` was absent. Pairing every `a03-i2-*` receipt with its `-basis` twin gives 3 checks carrying both: `K6` (basis 0 -> candidate 0), `K7` (1 -> 0), `K8` (1 -> 0). Two of the three have differing exit codes. Recomputed value 2 == printed value 2. |
+| NUMBER 3 (C-050) | RESOLVED | runs/a03/receipts | The denominator of the same ratio, recomputed from the same pairing: 3 checks of a03 iteration 2 carry both a `-basis` and a candidate receipt (`K6`, `K7`, `K8`). Recomputed value 3 == printed value 3. This row is the one `coverage` was missing: `paper/NUMBERS.md` catalogued both halves of the `2 of 3` and this audit had checked only the 2. |
 | NUMBER 2 (C-054) | NOT_CHECKED | N/A -- would require git merge history (which of this project's commits are merge commits, and which two produced the license and coverage-anchor incidents) | O31: this resolver never invokes git, regardless of whether `.git` happens to be reachable from this checkout's cwd; docs/LIMITATIONS.md's own prose narrates the same '2 merges total' figure but re-reading that narration is not independent recomputation (this project's own numbers-must-be-recomputed rule exists precisely to rule that move out). Claimed: 2. |
 | NUMBER 2 (C-055) | NOT_CHECKED | N/A -- would require identifying, by name, the 2 runs that lost an iteration to a differential criterion, from runs/ history | O33/O31: neither docs/LIMITATIONS.md nor DOGFOOD_LEDGER.md nor dogfood/ABSCHLUSSBERICHT.md names the 2 runs explicitly (checked: `grep` for the figure in both finds only the same restated number, not an enumerable list). Claimed: 2. |
 | NUMBER 3 (C-048) | NOT_CHECKED | N/A -- would require runs/a03's own persisted receipts for iteration 1 | O33: runs/ absent. Claimed: 3 (of 5) checks discriminated, a03 iteration 1. |
@@ -274,7 +275,7 @@ This audit could not check 35 of the 38 catalogued numbers inside
 this arena/checkout. They fall into two groups:
 
 **Needs `runs/` only (O33 -- gitignored, absent from the candidate snapshot), 28 rows:**
-NUMBER 0 (C-059), NUMBER 0 (C-073), NUMBER 2 (C-050), NUMBER 3 (C-048), NUMBER 3 (C-034), NUMBER 5 (C-019), NUMBER 5 (C-048), NUMBER 6 (C-026), NUMBER 7 (C-031), NUMBER 8 (C-038), NUMBER 9 (C-026), NUMBER 9 (C-034), NUMBER 9 (C-043), NUMBER 10 (C-043), NUMBER 11 (C-021), NUMBER 11 (C-038), NUMBER 13 (C-019), NUMBER 13 (C-031), NUMBER 18 (C-033), NUMBER 21 (C-047), NUMBER 28 (C-061), NUMBER 32 (C-042), NUMBER 36 (C-023), NUMBER 37 (C-037), NUMBER 37 (C-073), NUMBER 48 (C-018), NUMBER 52 (C-028), NUMBER 52 (C-061).
+NUMBER 0 (C-059), NUMBER 0 (C-073), NUMBER 2 (C-050), NUMBER 3 (C-050), NUMBER 3 (C-048), NUMBER 3 (C-034), NUMBER 5 (C-019), NUMBER 5 (C-048), NUMBER 6 (C-026), NUMBER 7 (C-031), NUMBER 8 (C-038), NUMBER 9 (C-026), NUMBER 9 (C-034), NUMBER 9 (C-043), NUMBER 10 (C-043), NUMBER 11 (C-021), NUMBER 11 (C-038), NUMBER 13 (C-019), NUMBER 13 (C-031), NUMBER 18 (C-033), NUMBER 21 (C-047), NUMBER 28 (C-061), NUMBER 32 (C-042), NUMBER 36 (C-023), NUMBER 37 (C-037), NUMBER 37 (C-073), NUMBER 48 (C-018), NUMBER 52 (C-028), NUMBER 52 (C-061).
 Confirm by running `python3 tools/check_claims.py check all` against a checkout
 that *does* have the full `runs/` tree (the same command reports
 `ENVIRONMENT GAP`, not a content defect, here) -- and by the operator's own
@@ -305,22 +306,33 @@ alongside the "2" the table does catalogue.
 
 | Verdict | Count |
 |---|---|
-| RESOLVED | 58 |
+| RESOLVED | 60 |
 | MISMATCH | 0 |
 | MISSING | 0 |
 | EXTERNAL | 1 |
-| NOT_CHECKED | 35 |
-| **Total rows** | **94** |
+| NOT_CHECKED | 34 |
+| **Total rows** | **95** |
 
-58 rows resolved cleanly (47 claim-id lookups, all of them
+60 rows resolved cleanly (47 claim-id lookups, all of them
 confirmed against current code/docs where their evidence names a file or
-test; 3 recomputed numbers; 5 `a02` mentions, all correctly marked
+test; 5 recomputed numbers; 5 `a02` mentions, all correctly marked
 invalidated; 3 overclaim-vocabulary hits, all hedged or quoted-and-negated).
-35 rows are honestly `NOT_CHECKED` -- every one of the 35 remaining
+34 rows are honestly `NOT_CHECKED` -- every one of the 34 remaining
 numbers, each because recomputing it needs `runs/` and/or `.git`, neither of
 which this checkout's own resolver touches. 1 row is `EXTERNAL` (the one
 dated external citation). Zero `MISMATCH`, zero `MISSING`: nothing this audit
 checked came back wrong, and no cited claim id was absent from the ledger.
 That is the honest result, reported plainly rather than manufactured: this
-audit looked at all 94 citations it could extract and is reporting exactly
-what came back, including the 35 it could not check and why.
+audit looked at all 95 citations it could extract and is reporting exactly
+what came back, including the 34 it could not check and why.
+
+**Updated 2026-09-14.** Two rows moved and one was added. `NUMBER 2 (C-050)`
+had been `NOT_CHECKED` since O33 on the stated ground that `runs/` was absent;
+it is present in this checkout, so the ratio was recomputed from
+`runs/a03/receipts` -- three checks of a03 iteration 2 carry both a `-basis`
+and a candidate receipt, and two of the three have differing exit codes. The
+denominator got the row it never had (`NUMBER 3 (C-050)`), which is what the
+`coverage` check had been red about since before the benchmark it cites had
+run. The counts above are the recount, not an edit: `python3
+tools/audit_refs.py summary-consistency` compares them against the table and
+was what caught the stale pair.

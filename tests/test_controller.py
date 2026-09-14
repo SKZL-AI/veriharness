@@ -14,6 +14,7 @@ from pathlib import Path
 
 import pytest
 
+from hoh import roles
 from hoh.contracts import Budgets, Outcome, Role, RunState, Stage
 from hoh.controller import Controller, DispatchError, new_run_id
 from hoh.evidence import EvidenceStatus
@@ -283,7 +284,14 @@ def test_a_criterion_kept_quiet_about_stays_open(tmp_path, repo, spec):
 
 
 def test_a_source_change_during_qa_breaks_the_binding(tmp_path, repo, spec):
-    """A05: a source changed after the freeze."""
+    """A05: a source changed after the freeze.
+
+    Two nets catch this now and the order matters. The witness fires first,
+    during the dispatch, naming the tree; the binding check remains behind it
+    for anything that changes outside a dispatch window. Either way the
+    iteration is not accepted and the run is blocked -- which is the property
+    A05 is about.
+    """
 
     def sabotage(state: RunState) -> dict:
         (repo / "app.py").write_text("# changed during QA\n", encoding="utf-8")
@@ -296,8 +304,32 @@ def test_a_source_change_during_qa_breaks_the_binding(tmp_path, repo, spec):
 
     assert not out.accepted
     assert ("candidate binding" in out.reason
-            or "modified during QA" in out.reason)
+            or "modified during QA" in out.reason
+            or "capability violation" in out.reason)
     assert state.condition.value == "BLOCKED"
+
+
+def test_a_source_change_during_qa_is_named_as_a_capability_violation(
+        tmp_path, repo, spec):
+    """The witness is what sees it, and it says so rather than crashing.
+
+    A violation raised out of `run_iteration` would end the process; a
+    violation converted into an outage would be re-read as a missing verdict
+    and the loop would carry on. It is neither: a blocked run with the tree
+    named in its reason.
+    """
+
+    def sabotage(state: RunState) -> dict:
+        (repo / "app.py").write_text("# changed during QA\n", encoding="utf-8")
+        return qa_pass(state)
+
+    d = FakeDispatcher(repo=repo, plan_json=plan_for, qa_json=sabotage)
+    ctrl, state, _ = build(tmp_path, repo, spec, d)
+    out = ctrl.run_iteration(state)
+
+    assert "capability violation" in out.reason
+    assert str(repo) in out.reason
+    assert any("capability violation" in h for h in state.history)
 
 
 # --- A house rule inside an acceptance criterion --------------------------- #
@@ -377,6 +409,30 @@ def test_a_second_schema_violation_aborts(tmp_path, repo, spec):
 
     with pytest.raises(DispatchError, match="repair budget"):
         ctrl.run_iteration(state)
+
+
+def test_a_misbound_plan_is_recorded_as_a_failed_dispatch(tmp_path, repo, spec):
+    """A plan that is schema-valid JSON but bound to the wrong run is
+    rejected by `_assert_plan_bound` -- the telemetry record for that
+    dispatch has to say so too. `note_dispatch(outcome="ok")` must not fire
+    before the binding check has actually passed, or the record would claim
+    success for a dispatch the controller itself refused."""
+
+    def misbound(s: RunState) -> dict:
+        bad = plan_for(s)
+        bad["run_id"] = "some-other-run"
+        return bad
+
+    d = FakeDispatcher(repo=repo, plan_json=misbound, qa_json=qa_pass)
+    ctrl, state, _ = build(tmp_path, repo, spec, d)
+
+    with pytest.raises(roles.RoleOutputError, match="not bound to this run"):
+        ctrl.run_iteration(state)
+
+    planner_records = [r for r in ctrl.telemetry().read() if r.role == "planner"]
+    assert len(planner_records) == 1
+    assert planner_records[0].outcome == "failed"
+    assert "run_id" in planner_records[0].detail
 
 
 # --- Warm start across two loops (A02) ------------------------------------- #

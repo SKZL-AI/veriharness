@@ -1,0 +1,185 @@
+{
+  "what": "Who executed each unit of work after O105, and on what evidence. The categories are a judgement; the coverage is checked by tools/attribution.py, which refuses a history with a commit that belongs to no entry.",
+  "anchor": "13628f3224983bf9924cf728a82174abd4310cb9",
+  "anchor_is": "O105 -- the commit that recorded the first unattended fixpoint. Everything after it is this phase.",
+  "honest_reading": "Most of this phase was written by the main session, not by the product. That is the number, and the entries say for each unit why it was or was not a candidate for the product path. Bootstrap and security-boundary work is a defensible reason; 'it was quicker' is not one, and does not appear below.",
+  "entries": [
+    {
+      "id": "meta-evidence-and-isolation",
+      "category": "MAIN_ORCHESTRATOR_DIRECT",
+      "is_development_node": true,
+      "commits": [
+        "ded88f5d37acc6fbfcb3d9ceffabbcb5b0a8d7ab"
+      ],
+      "why_not_the_product": "The isolation record is the evidence the product's own acceptance rests on, and assurance.py is the rule layer that decides what counts as measured. A product that certifies its own measuring instrument through the instrument is a circle. Independent meta-audit is one of the three cases where direct work is the right answer."
+    },
+    {
+      "id": "approval-scope-hardening",
+      "category": "MAIN_ORCHESTRATOR_DIRECT",
+      "is_development_node": true,
+      "commits": [
+        "cee1585f005ae83182f2d06b358b5289017ccf8a"
+      ],
+      "why_not_the_product": "A security boundary: PrefixScopedProvider can hand an agent write access to a directory. Having an agent write the check that governs what agents may be trusted with is the one delegation this project should not make."
+    },
+    {
+      "id": "evidence-integrity-after-review",
+      "category": "MAIN_ORCHESTRATOR_DIRECT",
+      "is_development_node": true,
+      "commits": [
+        "5d54479e1dbf4949f7a1c9a67b14ee3c17e73abf"
+      ],
+      "why_not_the_product": "Responses to an adversarial review of the product's own evidence path, including the finding that its first STRICT campaign proved nothing. Auditing the audit belongs outside the thing being audited."
+    },
+    {
+      "id": "proof-pipe",
+      "category": "MAIN_ORCHESTRATOR_DIRECT",
+      "is_development_node": true,
+      "commits": [
+        "c501fb6b2fcc78afe96236b728c180e623cab5d6"
+      ],
+      "why_not_the_product": "Same boundary: the mechanism that proves the sandbox isolated. A reviewer had just shown the previous version was forgeable by the checked command itself."
+    },
+    {
+      "id": "taxonomy-telemetry-amendment",
+      "category": "MAIN_ORCHESTRATOR_DIRECT",
+      "is_development_node": true,
+      "commits": [
+        "d2bd7aa21d0299121888e504b3482600d2d663be",
+        "940422995e1cb1a79b657505c085853b4967a45c"
+      ],
+      "why_not_the_product": "Bootstrap. These three modules are the contracts the product path would record against; they had to exist before a node could be specified in terms of them. The *wiring* of telemetry into the controller was then handed to the product -- see telemetry-wiring."
+    },
+    {
+      "id": "strict-evidence-and-routing",
+      "category": "MAIN_ORCHESTRATOR_DIRECT",
+      "is_development_node": false,
+      "commits": [
+        "808a4b879072b8e41de70961f09c83060ae0da0d"
+      ],
+      "why_not_the_product": "Not a development node: it installs the evidence four product runs produced, and disposes of routing. Collecting and reporting what the product did is the orchestrator's job by definition."
+    },
+    {
+      "id": "benchmark-infrastructure",
+      "category": "MAIN_ORCHESTRATOR_DIRECT",
+      "is_development_node": false,
+      "commits": [
+        "77fd07ffa6e0578c1579b3273cf58df854c675e5"
+      ],
+      "why_not_the_product": "Not a development node: it is the measuring apparatus for comparing the product against a baseline, including the hidden suites the product must never see. An arm that could read its own measurement is not an arm."
+    },
+    {
+      "id": "attribution-ledger",
+      "category": "MAIN_ORCHESTRATOR_DIRECT",
+      "is_development_node": false,
+      "range": {
+        "from": "77fd07ffa6e0578c1579b3273cf58df854c675e5",
+        "to": "3dcbc7b7574cdbe1b5a492024b08f1dc8ad7d260"
+      },
+      "why_not_the_product": "Not a development node: it is the measurement of who did the development. Named as a range rather than as a list because the commit that writes this entry cannot know its own sha -- the same self-reference O97 hit with the attribution table, solved the same way, by naming a boundary instead of a value."
+    },
+    {
+      "id": "telemetry-wiring",
+      "category": "VERIHARNESS_RUN",
+      "is_development_node": true,
+      "node_id": "telemetry-wiring",
+      "project_state": "dogfood/selfhost-e2e/root/projects/selbst/project.json",
+      "range": {
+        "from": "3dcbc7b7574cdbe1b5a492024b08f1dc8ad7d260",
+        "to": "bfc169f4c12ecb4cdb5afe7ae150c2de4a661810"
+      },
+      "why_not_the_product": "This one *was* the product. The control plane specified it, dispatched three iterations, accepted a candidate and decided the merge; the main session started the process and answered four blocks, each recorded in the project state with its reason. The range runs to HEAD because the merge and the entry describing it cannot name their own shas -- the same self-reference O97 hit, solved the same way. **Range closed on 2026-09-13.** It ran to HEAD, and HEAD moved: four commits of capability, measurement and amendment work -- none of which the product executed -- were silently inside it. The tiling check cannot see that, because the range still tiles. A closed range and a second commit are the answer to the self-reference, and the entry below is that second commit.",
+      "merge_commit": "6512538ac54173ef6606348c2e80c57a42b92c02"
+    },
+    {
+      "id": "capability-boundary-and-amendment-path",
+      "category": "MAIN_ORCHESTRATOR_DIRECT",
+      "is_development_node": true,
+      "commits": [
+        "f3b36e9c9b7372e01e757795cc09682f87477368",
+        "450de48e29fec6ec5679d122417613dbc673b159",
+        "f8a4003c6dd615b1d8581acc750cdfcba2f14d6f",
+        "8c10b89b246b9281bfae3a35196dfc4dbf992c4b",
+        "b5b9a52ddc26dcf22b8fb0a5bef0e79890cdcae9",
+        "58842af86d36e5e04d371ff291e28488b412833c",
+        "6cb3dbb2c0c36f37e48b460d0e420919f317936e",
+        "c233566269a1ac80d1412d757fc7cb0b71ea99e8",
+        "73b64cd8207eedd98e27d138573193eb2e49dcc9",
+        "d9f113dc11b271d4faa4c04b7c19546705b057eb",
+        "793a2351b751af7a95ce38f08f57ee073e6bbe4f",
+        "bde348abf6ec6c2e018f1aeb42abeebf9ddbea42",
+        "dd9fa13e35f88ce473c568ce1d60b21307faeeba",
+        "a336edbd2eb6cdbccc45c321e71648333fd8772c",
+        "a52374c130bfb8cdc4d7e5dcec8e3467484fc5e0",
+        "a856df55cce6c81fa92ab134dfd7a35e5b6245b1",
+        "0ec026b7ca0e273ecc575de2c5635b172626b342",
+        "1c479d9cd2a7e2b4774ac848cb323797f91bb751",
+        "ef40a2266f10c895b34ab575357216adafd6b293",
+        "f1b1227322d1501eeecb9d68c07569e1283b9b7f",
+        "90bb9557664bfc138233ec3f7386aeb632718c4c",
+        "5124294a221062dfaac835241e73dbe056f7cad2",
+        "25f4ab9189598ab452769bf8d0a0ece70d835298",
+        "726ca7cae31a4531b4551f52eceb30337f9b50d7",
+        "640d05d58d47e35981e26b1aa1ff729b8668bea6",
+        "c3a17d7558131baedd41e8aeeb9de9e94acffe33",
+        "27193c0dc4f014fccc70852a113c65460dcb3399",
+        "f8c670ed95a61d965689f487d48e1d2b18b0fc57",
+        "20a92bded7553d43d2ad7fb47c4b8e321b53c847",
+        "d8dbcfd9cf6a3f54fb7e1af0434a22558f9715d1",
+        "4e6d64c027fc49a1e0e5b9e7c7928b8dc42ae594",
+        "aa3164d89f4cb9e5e9c5caa4d94cf451fa3cca9b",
+        "65f8cbb3a009064e2d8a345bfed9de71e12fa5fa",
+        "0368ccda6188fe12f19124adc0fe0fab6eecbb77"
+      ],
+      "why_not_the_product": "The main session wrote all of it directly. Two reasons, and only the first is a good one. The capability boundary is the mechanism that decides whether a run's roles may be trusted at all, so running it through the roles it constrains would have been a bootstrap: the product cannot supervise the installation of its own supervisor. The amendment path and the measurement tooling had no such excuse -- they are ordinary features, and they were written by hand because the session was already holding the context. That is the reason this phase's ratio is what it is, and it is written here rather than rounded off."
+    },
+    {
+      "id": "budget-enforcement-and-v3-preregistration",
+      "category": "MAIN_ORCHESTRATOR_DIRECT",
+      "is_development_node": true,
+      "commits": [
+        "b1994f4fd6cf95257dac503f526db692e355f8ae",
+        "c4308cd3415aff64e1e3bdb890bbdd61c20ef750",
+        "d22fc1536f43dafc0159397ecc41be99e18e3ecc",
+        "d6ae7cdd407eeb6fb4456af4846d74ca57aa75e0"
+      ],
+      "why_not_the_product": "The main session wrote all of it directly, and the reason is the same bootstrap the entry above names, one level further in. This work is the *budget* the product spends when it runs: the check that refuses a tenth dispatch, the counter the launcher reads across processes, and the instrument that falsifies both. A run of the product to install its own spending limit would have been supervised by the limit it was installing. The pre-registration and the freeze are the same shape: they are the rules a campaign of product runs is measured against, and a product run cannot be the thing that fixes what it will be measured by. What *was* delegated is the part that could be: two independent adversarial reviews, dispatched to refute the result rather than to produce it, both of which returned 'Freigabe: NEIN' and whose sixteen findings are recorded as O147 through O151. The campaign that follows this commit is the product doing the work -- 45 runs under the frozen instrument -- and that is where the ratio this ledger reports should start moving."
+    },
+    {
+      "id": "v3-campaign-closure-and-public-reference-work",
+      "category": "MAIN_ORCHESTRATOR_DIRECT",
+      "is_development_node": true,
+      "commits": [
+        "37d13e324be8f2bbcf809caf2ef6ae667796a4af",
+        "6e6f5abefe5c965f037e3e40ff043b0e2cb6f312",
+        "ed6f7a86ef4264edca9ef7e13d596ee21e034e38"
+      ],
+      "why_not_the_product": "Written by the main session while campaign v3's 45 runs were executing, and deliberately outside the frozen set: the public reference closure, the paper audit, and the record of a defect in the frozen instrument that was **not** repaired while it ran. None of it could have gone through the product without changing the instrument the campaign was being measured by, which is the one thing a running campaign forbids. The product's own contribution during this window is the campaign itself: 45 runs under an enforced budget, whose result is reported in docs/BENCHMARK_RESULTS_v3.md and is not flattering to it."
+    },
+    {
+      "id": "v3-closure-and-drift-accounting",
+      "category": "MAIN_ORCHESTRATOR_DIRECT",
+      "is_development_node": true,
+      "commits": [
+        "fb88ab630175f924e0e62efd0f92b4af74eeb1af",
+        "e29ad146a758f7ad392d0984dd74f2ba18033a4f",
+        "0f7bf70bbe57551cefaf6cad719013e07007af53",
+        "8883fa9fb71cf48ddb54ba60f4fe9cc65ee5a900",
+        "d4f5d97edc0af0d26c3b01c4cc2efd0079bd0b9e",
+        "1a3e42519e974bdc55c440abae190c75002c8fc7",
+        "eec9cb6fd51f6e98c2a15dbd95b5ff62d99d3005",
+        "4f218735182f8ac96f5d034c36161a791b5d77b6",
+        "559449a14cd102ee66f14f9e2e83c55b81c1ed58",
+        "0bef4c658036cfa8d56d129eb47c710ec3afcc2b",
+        "751d7bec94797b3217f095e26e41af510c626295",
+        "c56bd59dae653b2d7774eb2cc29adcb64e504e9c",
+        "f8c303879c2206172cad02fc510fd3c9d85602c9",
+        "b4d29362d8090dbb7d1bdcc130788ddb70a97a44",
+        "ddc9b5d0c62fee35c709220735920a1164d74506",
+        "6998759755f88b70584c31516b85a84bdfdc2b67",
+        "394473aafb892f5f2e347fbbf1affb4ab476b652"
+      ],
+      "why_not_the_product": "The campaign's own closure: its result, the classification of a defect in the frozen reporter, and the rule that decides when drift after a campaign is a repair rather than an escape. None of it could have gone through the product, for the reason the campaign itself measured -- under the budget the protocol declares, the control plane reached no fixpoint on any of the five benchmark tasks, so it is in no position to close work of this kind here either. That is the honest version of this field for this window: not 'the product was unsuitable for supervising its own instrument', which is also true, but 'the product does not currently close'. Extended as the closure continued: the telemetry evidence the campaign itself supplied, and the repair of a gate that failed its own next run."
+    }
+  ]
+}

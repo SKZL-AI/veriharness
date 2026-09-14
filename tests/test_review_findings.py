@@ -1965,14 +1965,49 @@ def test_cost_approval_is_reproduced():
 
 
 def test_dispatch_budget_takes_effect(tmp_path, repo, spec):
+    """`max_dispatches=2` buys two provider calls, and the third is refused.
+
+    Correction provenance (2026-09-13, `tools/budget_evidence.py`): this used
+    to assert only that *something* raised. It passed against an off-by-one --
+    the counter was raised before the budget was consulted, so a ceiling of
+    two bought **one** call and refused the second. The test could not see the
+    difference because it never looked at how many calls got through. It does
+    now, which is the number the benchmark's matched-budget premise rests on.
+    """
     d = FakeDispatcher(repo=repo, plan_json=plan_for, qa_json=qa_pass)
     ctrl, state, _ = build(tmp_path, repo, spec, d)
     state.budgets = Budgets(max_iterations=5, max_dispatches=2)
 
+    out = ctrl.run_iteration(state)
+
+    assert [r.value for r in d.calls] == ["planner", "developer"]
+    assert state.usage.dispatches == 2
+    assert not out.accepted
+    # The refusal is *named* in the outcome. A run that stops on its own
+    # ceiling and reports "no QA verdict" without saying why reads like an
+    # outage, and an outage is waited out.
+    assert "dispatch budget exhausted (2/2)" in out.reason
+    assert state.budget_exhausted() == "dispatch budget exhausted (2/2)"
+
+
+def test_a_refused_dispatch_reaches_the_caller_where_nothing_handles_it(
+        tmp_path, repo, spec):
+    """QA's refusal becomes an unverified iteration; the developer's raises.
+
+    Both are the same refusal at different points of the loop, and both are
+    worth a test: the swallowed one must still carry its reason (above), and
+    the raised one must say "budget", not "provider".
+    """
+    d = FakeDispatcher(repo=repo, plan_json=plan_for, qa_json=qa_pass)
+    ctrl, state, _ = build(tmp_path, repo, spec, d)
+    state.budgets = Budgets(max_iterations=5, max_dispatches=1)
+
     from hoh.controller import DispatchError
 
-    with pytest.raises(DispatchError, match="dispatch budget"):
+    with pytest.raises(DispatchError, match="dispatch budget exhausted"):
         ctrl.run_iteration(state)
+    assert [r.value for r in d.calls] == ["planner"]
+    assert state.usage.dispatches == 1
 
 
 def test_wallclock_budget_takes_effect(tmp_path, repo, spec):

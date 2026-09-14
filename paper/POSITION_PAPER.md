@@ -30,7 +30,7 @@ by claim id, wherever the ledger carries one. `CLAIMS.json`'s own coverage is
 declared, not universal: it catalogues every number-bearing sentence in
 `README.md` and `docs/**`, plus the two mandatory `a02` invalidation entries
 and a fixed set of unflattering measured findings -- it does **not** extend
-to `dogfood/ABSCHLUSSBERICHT.md`, `DOGFOOD_LEDGER.md`, or `PROVENANCE.md`.
+to the internal *Abschlussbericht*, `DOGFOOD_LEDGER.md`, or `PROVENANCE.md`.
 Several of this project's strongest findings live in those documents, not in
 the ledger. Where that is true below, this paper says so plainly, in the same
 breath as the finding, rather than dressing an unledgered number up as a
@@ -211,7 +211,7 @@ operator closed this gap, alongside four related guard gaps in the same
 review pass, none of it feature work.
 
 `CLAIMS.json` does not carry a claim id for the B-G1 finding itself: the
-finding lives in `dogfood/ABSCHLUSSBERICHT.md`'s point D and in the
+finding lives in the internal *Abschlussbericht*'s point D and in the
 non-numeric half of `docs/LIMITATIONS.md`'s discussion of arena isolation,
 neither of which the ledger's own coverage extends to (see §0). What the
 ledger does carry, and what motivates taking B-G1 seriously rather than as an
@@ -399,7 +399,7 @@ rejected anyway: the controller's own reasoning, recorded verbatim in the
 project's dogfood accounting, is that no criterion demonstrated the
 increment, because every one of them was already green on the predecessor
 state. `CLAIMS.json` does not carry a claim id for `d2c2`: it is recorded in
-`dogfood/ABSCHLUSSBERICHT.md`'s run table, not in `README.md` or `docs/**`,
+the internal *Abschlussbericht*'s run table, not in `README.md` or `docs/**`,
 so this paper reports its numbers -- ten of ten criteria passing, zero of
 them discriminating in the acceptance-governing sense -- as sourced to that
 document rather than as ledger-verified (see §0).
@@ -411,7 +411,7 @@ which is the closest this paper can come to corroborating it by claim id:
 words, because it "was already green on the last accepted state and
 therefore does not demonstrate the increment" -- the plan's own framing lost
 to the measurement. `CLAIMS.json` does not carry a claim id for this `K11`
-detail: it is recorded in `dogfood/ABSCHLUSSBERICHT.md`, not in `README.md`
+detail: it is recorded in the internal *Abschlussbericht*, not in `README.md`
 or `docs/**`, so this paper reports it as sourced to that document rather
 than as ledger-verified (see §0). `d2c2`'s rejection is the same rule
 applied to an entire iteration rather than a single criterion inside one: an
@@ -493,7 +493,7 @@ that consolidated accepted candidates into `master`. `HoH` -- `VeriHarness`
 under its architectural name -- was forbidden `src/hoh/` and `tests/`
 throughout every dogfood run recorded in this project; every line of
 production code the loop is credited with above is documentation, packaging,
-or governance prose, never `src/` or `tests/`. `dogfood/ABSCHLUSSBERICHT.md`'s
+or governance prose, never `src/` or `tests/`. the internal *Abschlussbericht*'s
 point D carries the complete, itemized list of these interventions,
 including two that were mistakes of the operator's own -- a specification
 edited mid-verification and then reverted, and an early accounting tool that
@@ -518,7 +518,7 @@ adaptation**, not an official Harness-of-Harness release, not an installable
 HoH package, and not a full replication of the paper. `HoH-lite`, a
 lightweight variant announced in that repository's own README, remains only
 announced there and was not shipped as of the check this project performed
-(`docs/QUELLENCHECK.md`, source Q2); this project therefore claims no
+(the internal *Quellencheck*, source Q2); this project therefore claims no
 dependency on an installable HoH package, because at the time of that check
 there was none to depend on.
 

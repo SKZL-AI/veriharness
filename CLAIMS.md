@@ -40,10 +40,10 @@ d4e: `CLAIMS.json` now declares, for every `INCLUDE` path in `EXPORT_MANIFEST.js
 | C-010 | SUPPORTED | Instead the run stays visibly `BLOCKED`, and `resume-quota` picks it up once `quota.is_due(retry_after)` says the wait is over. It resumes **only** `blocked_kind="usage_limit"` -- every other block has a cause a human has to clear, and stepping over that automatically would reintroduce exactly the silent-automation risk this project is built against. After `MAX_RESUME_ATTEMPTS` (5) unsuccessful automatic resumes in a row, the run stops trying and stays blocked, because unbounded automatic retries can spend money without making any progress. ⟦project is built against. After `MAX_RESUME_ATTEMPTS` (5) unsuccessful⟧ | docs/RECOVERY.md:110 |
 | C-011 | INVALIDATED | **Ergebnis (urspruengliche Fassung):** A02 erfüllt — zwei aufeinanderfolgende akzeptierte Inkremente mit Warm-Start und evidenzbasiertem Replanning, auf echten Herdr-Endpoints. ⟦**Ergebnis (urspruengliche Fassung):** A02 erfüllt — zwei aufeinanderfolgende akzeptierte Inkremente mit Warm-Start und evidenzbasiertem Replanning, auf echten Herdr-Endpoints.⟧ | A02_BERICHT.md:13 |
 | C-012 | INVALIDATED | **H2** Echter HoH-Pfad — **fertig** — drei getrennte Rollenkontexte, Kandidatenbindung, Runner-Receipts, Warm-Start, Replanning. Zwei aufeinanderfolgende Inkremente sind mit `a02-i5` und `a02-i6` belegt. | HOH_ACCEPTANCE_REPORT.md:61 |
-| C-013 | UNSUPPORTED | There is no matched-budget comparison against a plain agent working the same specification without HoH's plan/develop/verify loop around it, and no baseline run of any kind exists in this repository's evidence. ⟦There is no matched-budget comparison against a plain agent working the same specification without HoH's plan/develop/verify loop around it, and no baseline run of any kind exists in this repository's evidence.⟧ | docs/LIMITATIONS.md:70 |
+| C-013 | SUPPORTED | **Arm A -- a plain agent, no harness -- passed all five hidden suites.** Including the composition task, where a plausible implementation is correct once and wrong when applied twice, and the task where a weak test suite lets a wrong implementation through. ⟦**Arm A -- a plain agent, no harness -- passed all five hidden suites.**⟧ | docs/LIMITATIONS.md:111 |
 | C-014 | UNSUPPORTED | That distinction has a direct operational consequence in `cli.cmd_run`: on any other kind of failure, the CLI closes its own Herdr tabs on the way out so they do not clutter the multiplexer; when the failure is specifically `WaitingForApproval`, it leaves the role tabs open instead, because closing them would remove the one place a human could still answer the dialog. ⟦when the failure is specifically WaitingForApproval, it leaves the role tabs open instead, because closing them would remove the one place a human could still answer the dialog⟧ | docs/RECOVERY.md:74 |
-| C-015 | INVALIDATED | "This project's own dogfood evidence never touched `src/` or `tests/`." ⟦This project's own dogfood evidence never touched `src/` or `tests/`.⟧ | docs/LIMITATIONS.md:211 |
-| C-016 | UNSUPPORTED | `src/hoh/runner.py`'s own module docstring says this outright: the guard around acceptance-check commands is a tripwire against accidents, not a security boundary against a deliberately hostile plan. ⟦the guard around acceptance-check commands is a tripwire against accidents, not a security boundary against a deliberately hostile plan⟧ | docs/LIMITATIONS.md:92 |
+| C-015 | INVALIDATED | "This project's own dogfood evidence never touched `src/` or `tests/`." ⟦This project's own dogfood evidence never touched `src/` or `tests/`.⟧ | docs/LIMITATIONS.md:295 |
+| C-016 | UNSUPPORTED | `src/hoh/runner.py`'s own module docstring says this outright: the guard around acceptance-check commands is a tripwire against accidents, not a security boundary against a deliberately hostile plan. ⟦the guard around acceptance-check commands is a tripwire against accidents, not a security boundary against a deliberately hostile plan⟧ | docs/LIMITATIONS.md:108 |
 | C-017 | UNSUPPORTED | The consolidated repository currently contradicts itself about its own license. ⟦Per-run, receipt-bound evidence verification is sufficient to keep this project's public statements about itself consistent.⟧ | dogfood/specs/d2b-licenses.md:17 |
 | C-018 | SUPPORTED | Dogfood run d1 (packaging) recorded 48 receipt files under `runs/d1/receipts/` across its two iterations. [reconstruction fallback -- source line shown as recorded, not reconstructed] | runs/d1/receipts |
 | C-019 | SUPPORTED | d1 iteration 1 reached VERIFYING; of the checks for which both a `-basis` and a candidate receipt exist for that iteration, 5 of 13 discriminated (candidate and basis exit codes differed). [reconstruction fallback -- source line shown as recorded, not reconstructed] | runs/d1/receipts |
@@ -79,29 +79,29 @@ d4e: `CLAIMS.json` now declares, for every `INCLUDE` path in `EXPORT_MANIFEST.js
 | C-049 | SUPPORTED | a03 iteration 1's candidate (committed as `e348be3fab0b`) was accepted; a03 is the run this project's A03_NACHWEIS.md corrected-evidence report and HOH_ACCEPTANCE_REPORT.md's H2 row rest on. [reconstruction fallback -- source line shown as recorded, not reconstructed] | runs/a03/state.json |
 | C-050 | SUPPORTED | a03 iteration 2 reached VERIFYING; of the checks with both a `-basis` and a candidate receipt for that iteration, 2 of 3 discriminated. [reconstruction fallback -- source line shown as recorded, not reconstructed] | runs/a03/receipts |
 | C-051 | SUPPORTED | a03 iteration 2's candidate (committed as `86ad5fff829e`) was accepted; a03 reached CHECKPOINTED with 2 consecutive accepted iterations, the pair this project's earlier two-consecutive-increments claim rests on. Iteration 2's plan also attempted to redefine three already-validated preservation checks (K2, K4, K5); the run's guard against redefinition kept the originally validated commands instead. [reconstruction fallback -- source line shown as recorded, not reconstructed] | runs/a03/state.json |
-| C-052 | UNSUPPORTED | This is the sharpest limit in this document, because it says the project's own verification discipline is insufficient for the thing it is most likely to be used for: composing the output of several runs. Two runs, each verified against its own base with candidate-bound evidence and each respecting its own declared scope, left the combined state inconsistent after being merged -- twice. Once the merge produced 3 contradictory statements about this project's own licence. Once it left 5 coverage anchors pointing at content that had moved, across 2 merges total. ⟦-- twice. Once the merge produced 3 contradictory statements about this⟧ | docs/LIMITATIONS.md:242 |
-| C-053 | UNSUPPORTED | Two runs, each verified against its own base with candidate-bound evidence and each respecting its own declared scope, left the combined state inconsistent after being merged -- twice. Once the merge produced 3 contradictory statements about this project's own licence. Once it left 5 coverage anchors pointing at content that had moved, across 2 merges total. **Neither run was wrong** on its own terms: each was checked against its own base, its own scope, and its own evidence, and each check passed honestly. ⟦project's own licence. Once it left 5 coverage anchors pointing at content⟧ | docs/LIMITATIONS.md:243 |
-| C-054 | UNSUPPORTED | Once the merge produced 3 contradictory statements about this project's own licence. Once it left 5 coverage anchors pointing at content that had moved, across 2 merges total. **Neither run was wrong** on its own terms: each was checked against its own base, its own scope, and its own evidence, and each check passed honestly. Per-run evidence binding is therefore necessary and not sufficient: a reader who treats "every run in this history was individually verified" as "the current merged state is verified" is making a claim per-run checking does not support. ⟦that had moved, across 2 merges total. **Neither run was wrong** on its own⟧ | docs/LIMITATIONS.md:244 |
-| C-055 | UNSUPPORTED | Measured: 2 runs in this project's own history lost an iteration each to acceptance criteria that tried to express a differential property inside the loop anyway. ⟦Measured: 2 runs in this project's own history lost an iteration each to⟧ | docs/LIMITATIONS.md:322 |
-| C-056 | UNSUPPORTED | `runs/` is gitignored, so it is absent from any candidate's own snapshot -- `git archive HEAD` run against this project yields 0 entries under `runs/`. ⟦`git archive HEAD` run against this project yields 0 entries under `runs/`.⟧ | docs/LIMITATIONS.md:332 |
-| C-057 | UNSUPPORTED | `runs/` is gitignored, so it is absent from any candidate's own snapshot -- `git archive HEAD` run against this project yields 0 entries under `runs/`. A check command inside a run therefore cannot inspect that run's own evidence trail, or any other run's, because the directory holding it simply is not there to read. Measured: 6 of 15 acceptance criteria in one run failed for this single reason, each one trying to assert something about evidence that its own arena did not contain. ⟦is not there to read. Measured: 6 of 15 acceptance criteria in one run⟧ | docs/LIMITATIONS.md:335 |
-| C-058 | UNSUPPORTED | For one iteration in this project's history the two diverge outright: the receipt-derived count was **5 of 13**, while the acceptance-governing `discriminates` flag was 0, because that iteration was an outage with no QA verdict at all -- there was no acceptance decision for the flag to be true about, regardless of how many receipt pairs happened to differ. ⟦outright: the receipt-derived count was **5 of 13**, while the⟧ | docs/LIMITATIONS.md:364 |
-| C-059 | UNSUPPORTED | For one iteration in this project's history the two diverge outright: the receipt-derived count was **5 of 13**, while the acceptance-governing `discriminates` flag was 0, because that iteration was an outage with no QA verdict at all -- there was no acceptance decision for the flag to be true about, regardless of how many receipt pairs happened to differ. ⟦acceptance-governing `discriminates` flag was 0, because that iteration was⟧ | docs/LIMITATIONS.md:365 |
-| C-060 | UNSUPPORTED | Measured: 2 runs in this project's own history carry an inflated counter for exactly this reason and stay blocked on resume -- their state files were written by a version whose charges the current version cannot safely reinterpret. ⟦Measured: 2 runs in this project's own history carry an inflated counter for⟧ | docs/LIMITATIONS.md:386 |
-| C-061 | UNSUPPORTED | `_scratch_dir`'s own docstring in `src/hoh/runner.py` records the measurement: 28 of 52 candidate arenas in this project's history carry a `pytest-of-<user>/` directory left by an earlier check. ⟦records the measurement: 28 of 52 candidate arenas in this project's⟧ | docs/LIMITATIONS.md:133 |
-| C-062 | SUPPORTED | The specification digest check sits at the top of every iteration, not somewhere further down the loop where a plan or a check could still slip past it. `src/hoh/controller.py`, line 207, reads the check `if digest(spec_text) != state.spec_digest:` before that iteration's planning begins, and blocks the run outright the moment the text on disk stops matching the digest recorded when the run itself started. `unblock`, in `src/hoh/stages.py`, line 226, is the only function that lifts such a block, and its own body clears `blocked_reason` and `stop_reason` but never touches `state.spec_digest` -- so the very next iteration reads the same edited specification, recomputes the same mismatched digest, and blocks again. ⟦it. `src/hoh/controller.py`, line 207, reads the check⟧ | docs/LIMITATIONS.md:429 |
-| C-063 | SUPPORTED | `unblock`, in `src/hoh/stages.py`, line 226, is the only function that lifts such a block, and its own body clears `blocked_reason` and `stop_reason` but never touches `state.spec_digest` -- so the very next iteration reads the same edited specification, recomputes the same mismatched digest, and blocks again. ⟦`src/hoh/stages.py`, line 226, is the only function that lifts such a block,⟧ | docs/LIMITATIONS.md:433 |
-| C-064 | SUPPORTED | The cost is this project's own. Run `D5`'s criterion 6 required, verbatim, "all twelve limitations" -- the line stands recorded today in `dogfood/specs/d5-paper.md` -- at a point when `docs/LIMITATIONS.md` held 12 limits. By the time that run actually ran, run `d3e` had already merged limit 13 and limit 14, and the file held 14; that mismatch, and this same digest mechanism as its cause, is recorded in `dogfood/specs/d5l-limits-from-the-file.md`. ⟦The cost is this project's own. Run `D5`'s criterion 6 required, verbatim,⟧ | docs/LIMITATIONS.md:448 |
-| C-065 | SUPPORTED | Run `D5`'s criterion 6 required, verbatim, "all twelve limitations" -- the line stands recorded today in `dogfood/specs/d5-paper.md` -- at a point when `docs/LIMITATIONS.md` held 12 limits. ⟦`dogfood/specs/d5-paper.md` -- at a point when `docs/LIMITATIONS.md` held 12⟧ | docs/LIMITATIONS.md:450 |
-| C-066 | SUPPORTED | The cost is this project's own. Run `D5`'s criterion 6 required, verbatim, "all twelve limitations" -- the line stands recorded today in `dogfood/specs/d5-paper.md` -- at a point when `docs/LIMITATIONS.md` held 12 limits. By the time that run actually ran, run `d3e` had already merged limit 13 and limit 14, and the file held 14; that mismatch, and this same digest mechanism as its cause, is recorded in `dogfood/specs/d5l-limits-from-the-file.md`. The running specification could not be corrected in place -- the same immutability this entry describes applied to it too -- so the fix did not happen inside that run; it became a separate one. ⟦limits. By the time that run actually ran, run `d3e` had already merged limit⟧ | docs/LIMITATIONS.md:451 |
-| C-067 | SUPPORTED | By the time that run actually ran, run `d3e` had already merged limit 13 and limit 14, and the file held 14; that mismatch, and this same digest mechanism as its cause, is recorded in `dogfood/specs/d5l-limits-from-the-file.md`. ⟦13 and limit 14, and the file held 14; that mismatch, and this same digest⟧ | docs/LIMITATIONS.md:452 |
-| C-068 | UNSUPPORTED | On 2026-09-08, around 21:15Z, two independent runs failed in the same shape within one window, across four role sessions in total: `d5`'s QA left no answer file behind for iteration 1, so the iteration was not accepted for lack of a verdict, and `d5`'s planner then left no answer file behind for iteration 2, blocking the run outright. ⟦On 2026-09-08, around 21:15Z, two independent runs failed in the same shape⟧ | docs/LIMITATIONS.md:461 |
-| C-069 | UNSUPPORTED | On 2026-09-08, around 21:15Z, two independent runs failed in the same shape within one window, across four role sessions in total: `d5`'s QA left no answer file behind for iteration 1, so the iteration was not accepted for lack of a verdict, and `d5`'s planner then left no answer file behind for iteration 2, blocking the run outright. ⟦within one window, across four role sessions in total: `d5`'s QA left no answer⟧ | docs/LIMITATIONS.md:462 |
-| C-070 | UNSUPPORTED | On 2026-09-08, around 21:15Z, two independent runs failed in the same shape within one window, across four role sessions in total: `d5`'s QA left no answer file behind for iteration 1, so the iteration was not accepted for lack of a verdict, and `d5`'s planner then left no answer file behind for iteration 2, blocking the run outright. ⟦file behind for iteration 1, so the iteration was not accepted for lack of a⟧ | docs/LIMITATIONS.md:463 |
-| C-071 | UNSUPPORTED | On 2026-09-08, around 21:15Z, two independent runs failed in the same shape within one window, across four role sessions in total: `d5`'s QA left no answer file behind for iteration 1, so the iteration was not accepted for lack of a verdict, and `d5`'s planner then left no answer file behind for iteration 2, blocking the run outright. ⟦verdict, and `d5`'s planner then left no answer file behind for iteration 2,⟧ | docs/LIMITATIONS.md:464 |
-| C-072 | UNSUPPORTED | On 2026-09-08, around 21:15Z, two independent runs failed in the same shape within one window, across four role sessions in total: `d5`'s QA left no answer file behind for iteration 1, so the iteration was not accepted for lack of a verdict, and `d5`'s planner then left no answer file behind for iteration 2, blocking the run outright. `d4h` failed the same way, in the same window, session for session. Every one of those four sessions produced the same message: "left no answer file behind." ⟦blocking the run outright. `d4h` failed the same way, in the same window,⟧ | docs/LIMITATIONS.md:465 |
-| C-073 | UNSUPPORTED | `hoh resume-quota`, run across this project's full run history, reported `{"checked": 37, "results": []}`: 37 runs checked, 0 identified as quota-blocked -- while two of the runs it checked, `d5` and `d4h`, were. ⟦`{"checked": 37, "results": []}`: 37 runs checked, 0 identified as⟧ | docs/LIMITATIONS.md:471 |
-| C-074 | UNSUPPORTED | `hoh resume-quota`, run across this project's full run history, reported `{"checked": 37, "results": []}`: 37 runs checked, 0 identified as quota-blocked -- while two of the runs it checked, `d5` and `d4h`, were. ⟦quota-blocked -- while two of the runs it checked, `d5` and `d4h`, were.⟧ | docs/LIMITATIONS.md:472 |
+| C-052 | UNSUPPORTED | This is the sharpest limit in this document, because it says the project's own verification discipline is insufficient for the thing it is most likely to be used for: composing the output of several runs. Two runs, each verified against its own base with candidate-bound evidence and each respecting its own declared scope, left the combined state inconsistent after being merged -- twice. Once the merge produced 3 contradictory statements about this project's own licence. Once it left 5 coverage anchors pointing at content that had moved, across 2 merges total. ⟦-- twice. Once the merge produced 3 contradictory statements about this⟧ | docs/LIMITATIONS.md:326 |
+| C-053 | UNSUPPORTED | Two runs, each verified against its own base with candidate-bound evidence and each respecting its own declared scope, left the combined state inconsistent after being merged -- twice. Once the merge produced 3 contradictory statements about this project's own licence. Once it left 5 coverage anchors pointing at content that had moved, across 2 merges total. **Neither run was wrong** on its own terms: each was checked against its own base, its own scope, and its own evidence, and each check passed honestly. ⟦project's own licence. Once it left 5 coverage anchors pointing at content⟧ | docs/LIMITATIONS.md:327 |
+| C-054 | UNSUPPORTED | Once the merge produced 3 contradictory statements about this project's own licence. Once it left 5 coverage anchors pointing at content that had moved, across 2 merges total. **Neither run was wrong** on its own terms: each was checked against its own base, its own scope, and its own evidence, and each check passed honestly. Per-run evidence binding is therefore necessary and not sufficient: a reader who treats "every run in this history was individually verified" as "the current merged state is verified" is making a claim per-run checking does not support. ⟦that had moved, across 2 merges total. **Neither run was wrong** on its own⟧ | docs/LIMITATIONS.md:328 |
+| C-055 | UNSUPPORTED | Measured: 2 runs in this project's own history lost an iteration each to acceptance criteria that tried to express a differential property inside the loop anyway. ⟦Measured: 2 runs in this project's own history lost an iteration each to⟧ | docs/LIMITATIONS.md:406 |
+| C-056 | UNSUPPORTED | `runs/` is gitignored, so it is absent from any candidate's own snapshot -- `git archive HEAD` run against this project yields 0 entries under `runs/`. ⟦`git archive HEAD` run against this project yields 0 entries under `runs/`.⟧ | docs/LIMITATIONS.md:416 |
+| C-057 | UNSUPPORTED | `runs/` is gitignored, so it is absent from any candidate's own snapshot -- `git archive HEAD` run against this project yields 0 entries under `runs/`. A check command inside a run therefore cannot inspect that run's own evidence trail, or any other run's, because the directory holding it simply is not there to read. Measured: 6 of 15 acceptance criteria in one run failed for this single reason, each one trying to assert something about evidence that its own arena did not contain. ⟦is not there to read. Measured: 6 of 15 acceptance criteria in one run⟧ | docs/LIMITATIONS.md:419 |
+| C-058 | UNSUPPORTED | For one iteration in this project's history the two diverge outright: the receipt-derived count was **5 of 13**, while the acceptance-governing `discriminates` flag was 0, because that iteration was an outage with no QA verdict at all -- there was no acceptance decision for the flag to be true about, regardless of how many receipt pairs happened to differ. ⟦outright: the receipt-derived count was **5 of 13**, while the⟧ | docs/LIMITATIONS.md:448 |
+| C-059 | UNSUPPORTED | For one iteration in this project's history the two diverge outright: the receipt-derived count was **5 of 13**, while the acceptance-governing `discriminates` flag was 0, because that iteration was an outage with no QA verdict at all -- there was no acceptance decision for the flag to be true about, regardless of how many receipt pairs happened to differ. ⟦acceptance-governing `discriminates` flag was 0, because that iteration was⟧ | docs/LIMITATIONS.md:449 |
+| C-060 | UNSUPPORTED | Measured: 2 runs in this project's own history carry an inflated counter for exactly this reason and stay blocked on resume -- their state files were written by a version whose charges the current version cannot safely reinterpret. ⟦Measured: 2 runs in this project's own history carry an inflated counter for⟧ | docs/LIMITATIONS.md:470 |
+| C-061 | UNSUPPORTED | `_scratch_dir`'s own docstring in `src/hoh/runner.py` records the measurement: 28 of 52 candidate arenas in this project's history carry a `pytest-of-<user>/` directory left by an earlier check. ⟦records the measurement: 28 of 52 candidate arenas in this project's⟧ | docs/LIMITATIONS.md:176 |
+| C-062 | SUPPORTED | The specification digest check sits at the top of every iteration, not somewhere further down the loop where a plan or a check could still slip past it. `src/hoh/controller.py`, line 207, reads the check `if digest(spec_text) != state.spec_digest:` before that iteration's planning begins, and blocks the run outright the moment the text on disk stops matching the digest recorded when the run itself started. `unblock`, in `src/hoh/stages.py`, line 226, is the only function that lifts such a block, and its own body clears `blocked_reason` and `stop_reason` but never touches `state.spec_digest` -- so the very next iteration reads the same edited specification, recomputes the same mismatched digest, and blocks again. ⟦it. `src/hoh/controller.py`, line 207, reads the check⟧ | docs/LIMITATIONS.md:513 |
+| C-063 | SUPPORTED | `unblock`, in `src/hoh/stages.py`, line 226, is the only function that lifts such a block, and its own body clears `blocked_reason` and `stop_reason` but never touches `state.spec_digest` -- so the very next iteration reads the same edited specification, recomputes the same mismatched digest, and blocks again. ⟦`src/hoh/stages.py`, line 226, is the only function that lifts such a block,⟧ | docs/LIMITATIONS.md:517 |
+| C-064 | SUPPORTED | The cost is this project's own. Run `D5`'s criterion 6 required, verbatim, "all twelve limitations" -- the line stands recorded today in the internal *d5-paper* specification -- at a point when `docs/LIMITATIONS.md` held 12 limits. By the time that run actually ran, run `d3e` had already merged limit 13 and limit 14, and the file held 14; that mismatch, and this same digest mechanism as its cause, is recorded in the internal *d5l-limits-from-the-file* specification. ⟦The cost is this project's own. Run `D5`'s criterion 6 required, verbatim,⟧ | docs/LIMITATIONS.md:532 |
+| C-065 | SUPPORTED | Run `D5`'s criterion 6 required, verbatim, "all twelve limitations" -- the line stands recorded today in the internal *d5-paper* specification -- at a point when `docs/LIMITATIONS.md` held 12 limits. ⟦the internal *d5-paper* specification -- at a point when `docs/LIMITATIONS.md` held 12⟧ | docs/LIMITATIONS.md:893 |
+| C-066 | SUPPORTED | The cost is this project's own. Run `D5`'s criterion 6 required, verbatim, "all twelve limitations" -- the line stands recorded today in the internal *d5-paper* specification -- at a point when `docs/LIMITATIONS.md` held 12 limits. By the time that run actually ran, run `d3e` had already merged limit 13 and limit 14, and the file held 14; that mismatch, and this same digest mechanism as its cause, is recorded in the internal *d5l-limits-from-the-file* specification. The running specification could not be corrected in place -- the same immutability this entry describes applied to it too -- so the fix did not happen inside that run; it became a separate one. ⟦limits. By the time that run actually ran, run `d3e` had already merged limit⟧ | docs/LIMITATIONS.md:535 |
+| C-067 | SUPPORTED | By the time that run actually ran, run `d3e` had already merged limit 13 and limit 14, and the file held 14; that mismatch, and this same digest mechanism as its cause, is recorded in the internal *d5l-limits-from-the-file* specification. ⟦13 and limit 14, and the file held 14; that mismatch, and this same digest⟧ | docs/LIMITATIONS.md:536 |
+| C-068 | UNSUPPORTED | On 2026-09-08, around 21:15Z, two independent runs failed in the same shape within one window, across four role sessions in total: `d5`'s QA left no answer file behind for iteration 1, so the iteration was not accepted for lack of a verdict, and `d5`'s planner then left no answer file behind for iteration 2, blocking the run outright. ⟦On 2026-09-08, around 21:15Z, two independent runs failed in the same shape⟧ | docs/LIMITATIONS.md:545 |
+| C-069 | UNSUPPORTED | On 2026-09-08, around 21:15Z, two independent runs failed in the same shape within one window, across four role sessions in total: `d5`'s QA left no answer file behind for iteration 1, so the iteration was not accepted for lack of a verdict, and `d5`'s planner then left no answer file behind for iteration 2, blocking the run outright. ⟦within one window, across four role sessions in total: `d5`'s QA left no answer⟧ | docs/LIMITATIONS.md:546 |
+| C-070 | UNSUPPORTED | On 2026-09-08, around 21:15Z, two independent runs failed in the same shape within one window, across four role sessions in total: `d5`'s QA left no answer file behind for iteration 1, so the iteration was not accepted for lack of a verdict, and `d5`'s planner then left no answer file behind for iteration 2, blocking the run outright. ⟦file behind for iteration 1, so the iteration was not accepted for lack of a⟧ | docs/LIMITATIONS.md:547 |
+| C-071 | UNSUPPORTED | On 2026-09-08, around 21:15Z, two independent runs failed in the same shape within one window, across four role sessions in total: `d5`'s QA left no answer file behind for iteration 1, so the iteration was not accepted for lack of a verdict, and `d5`'s planner then left no answer file behind for iteration 2, blocking the run outright. ⟦verdict, and `d5`'s planner then left no answer file behind for iteration 2,⟧ | docs/LIMITATIONS.md:548 |
+| C-072 | UNSUPPORTED | On 2026-09-08, around 21:15Z, two independent runs failed in the same shape within one window, across four role sessions in total: `d5`'s QA left no answer file behind for iteration 1, so the iteration was not accepted for lack of a verdict, and `d5`'s planner then left no answer file behind for iteration 2, blocking the run outright. `d4h` failed the same way, in the same window, session for session. Every one of those four sessions produced the same message: "left no answer file behind." ⟦blocking the run outright. `d4h` failed the same way, in the same window,⟧ | docs/LIMITATIONS.md:549 |
+| C-073 | UNSUPPORTED | `hoh resume-quota`, run across this project's full run history, reported `{"checked": 37, "results": []}`: 37 runs checked, 0 identified as quota-blocked -- while two of the runs it checked, `d5` and `d4h`, were. ⟦`{"checked": 37, "results": []}`: 37 runs checked, 0 identified as⟧ | docs/LIMITATIONS.md:555 |
+| C-074 | UNSUPPORTED | `hoh resume-quota`, run across this project's full run history, reported `{"checked": 37, "results": []}`: 37 runs checked, 0 identified as quota-blocked -- while two of the runs it checked, `d5` and `d4h`, were. ⟦quota-blocked -- while two of the runs it checked, `d5` and `d4h`, were.⟧ | docs/LIMITATIONS.md:556 |
 | C-075 | SUPPORTED | - The goalbook's persisted schema identifier is now `hoh-goalbook.v2`. The identifier is actually read and enforced on load: an unrecognized identifier is rejected by name instead of being guessed at, and a pre-existing `hoh-goalbook.v1` file is migrated rather than silently reinterpreted under the new field names. ⟦The goalbook's persisted schema is now `hoh-goalbook.v2`: loading rejects an unrecognized schema identifier by name, and a pre-existing `hoh-goalbook.v1` file is migrated on write rather than silently reinterpreted.⟧ | CHANGELOG.md:24 |
 | C-076 | UNSUPPORTED | This must exit 0. The selected rule set is deliberately narrow -- undefined names and syntax errors, not a full style pass -- so do not widen it as a side effect of an unrelated change without saying so explicitly. ⟦`ruff check --select F,E9 src tests` is deliberately scoped to undefined names and syntax errors, not a full style pass, and must exit 0.⟧ | CONTRIBUTING.md:21 |
 | C-077 | SUPPORTED | - This project invokes an external `herdr` binary as a subprocess at runtime rather than importing it as a library; see `src/hoh/herdr.py` for every call site and the `require_herdr()`/`available()` checks that guard them. - Herdr's project license is Apache-2.0, per the GitHub API license endpoint `repos/herdrdev/herdr/license` (spdx_id: "Apache-2.0", path: LICENSE, 11357 bytes; default branch master), which the project homepage herdr.dev states the same way; read 2026-09-08. - That project-level statement is about the upstream Herdr project, not necessarily about the build actually used here: the `herdr` binary installed in this worktree is version 0.8.0 (confirmed via `herdr --version` -> `herdr 0.8.0`), it ships with no bundled LICENSE file of its own, and it is the v0.9.0 Homebrew formula -- one version ahead of what is installed here -- that independently states Apache-2.0. ⟦Herdr's project license is Apache-2.0, per the GitHub API license endpoint `repos/herdrdev/herdr/license` and the herdr.dev project homepage, both read 2026-09-08.⟧ | PROVENANCE.md:10 |
@@ -127,8 +127,8 @@ d4e: `CLAIMS.json` now declares, for every `INCLUDE` path in `EXPORT_MANIFEST.js
 | C-097 | UNSUPPORTED | **Claim-id resolution.** Each id is looked up in `CLAIMS.json`; the row is `RESOLVED` once the id exists there, and the ledger's own `status` value (`SUPPORTED` / `UNSUPPORTED` / `INVALIDATED`) is quoted in the row -- an `INVALIDATED` claim still resolves as a *citation* (the id exists and its status is stated correctly), which is a different question from whether the underlying finding is corroborated. All 47 claim ids cited in the paper exist in `CLAIMS.json`; none are `MISSING`. ⟦All 47 claim ids cited in paper/POSITION_PAPER.md (43 literal-token matches plus 4 from range expansion) exist in CLAIMS.json; none are MISSING.⟧ | paper/AUDIT.md:38 |
 | C-098 | SUPPORTED | It independently reimplements that digest check (`sha256` of the line with internal whitespace collapsed) rather than trusting `tools/check_claims.py`'s `check evidence` subcommand, because that subcommand's own `file:` resolution is a bare line-count range check (`resolve_evidence` in `tools/check_claims.py`, around line 328-343: "does the line number fall inside the file", nothing about content) -- it would not have caught a citation whose line drifted to different content. ⟦tools/check_claims.py's resolve_evidence() file: form resolution (around lines 328-343) only checks whether the cited line number falls inside the file's line count, without checking the line's content.⟧ | paper/AUDIT.md:52 |
 | C-099 | UNSUPPORTED | Also ran `python3 tools/check_claims.py check all` directly: 57 problems, every one an `ENVIRONMENT GAP` on `receipt:`/`run:`/`receiptcount:`/`discriminated:` evidence (the runs/-dependent forms); zero `file:`/`test:` evidence problems reported, consistent with this audit's own finding. ⟦Running `python3 tools/check_claims.py check all` in the checkout this audit ran in reported 57 problems, every one an ENVIRONMENT GAP on runs/-dependent evidence, with zero file:/test: evidence problems.⟧ | paper/AUDIT.md:67 |
-| C-100 | UNSUPPORTED | **Numbers.** Recomputed, not compared to `paper/NUMBERS.md` -- this project has already produced one false number by reading a `du -sh` block count as a byte size (see `paper/POSITION_PAPER.md`'s own history), and two documents agreeing on a wrong number is exactly the failure mode that survives a compare-the-documents check. Of the 38 numbers `paper/NUMBERS.md`'s own table catalogues, 3 are independently recomputable inside this checkout (the two structural ordinals, and the "3 contradictory license statements" figure, recomputed by counting the distinct rows of `dogfood/specs/d2b-licenses.md`'s own table rather than by re-reading `docs/LIMITATIONS.md`'s restatement of the same figure). The remaining 35 need either `runs/` (gitignored, absent from this checkout -- confirmed: `runs/` does not exist here, O33) or `.git` history (absent from an arena by construction, O31; also not invoked here by design even though this particular checkout happens to have `.git`, because the resolver must behave identically inside an arena that has neither). ⟦paper/AUDIT.md's own 'Numbers' section (a per-row audit of paper/NUMBERS.md's table) contains 38 rows.⟧ | paper/AUDIT.md:76 |
-| C-101 | UNSUPPORTED | **Numbers.** Recomputed, not compared to `paper/NUMBERS.md` -- this project has already produced one false number by reading a `du -sh` block count as a byte size (see `paper/POSITION_PAPER.md`'s own history), and two documents agreeing on a wrong number is exactly the failure mode that survives a compare-the-documents check. Of the 38 numbers `paper/NUMBERS.md`'s own table catalogues, 3 are independently recomputable inside this checkout (the two structural ordinals, and the "3 contradictory license statements" figure, recomputed by counting the distinct rows of `dogfood/specs/d2b-licenses.md`'s own table rather than by re-reading `docs/LIMITATIONS.md`'s restatement of the same figure). The remaining 35 need either `runs/` (gitignored, absent from this checkout -- confirmed: `runs/` does not exist here, O33) or `.git` history (absent from an arena by construction, O31; also not invoked here by design even though this particular checkout happens to have `.git`, because the resolver must behave identically inside an arena that has neither). Those 35 are `NOT_CHECKED`, each row naming which of the two is missing and what command or file would resolve it once available. ⟦35 of the 38 numbers in paper/AUDIT.md's own Numbers table are marked NOT_CHECKED because they need runs/ and/or .git, neither available in this checkout.⟧ | paper/AUDIT.md:81 |
+| C-100 | UNSUPPORTED | **Numbers.** Recomputed, not compared to `paper/NUMBERS.md` -- this project has already produced one false number by reading a `du -sh` block count as a byte size (see `paper/POSITION_PAPER.md`'s own history), and two documents agreeing on a wrong number is exactly the failure mode that survives a compare-the-documents check. Of the 38 numbers `paper/NUMBERS.md`'s own table catalogues, 3 are independently recomputable inside this checkout (the two structural ordinals, and the "3 contradictory license statements" figure, recomputed by counting the distinct rows of the internal *d2b-licenses* specification's own table rather than by re-reading `docs/LIMITATIONS.md`'s restatement of the same figure). The remaining 35 need either `runs/` (gitignored, absent from this checkout -- confirmed: `runs/` does not exist here, O33) or `.git` history (absent from an arena by construction, O31; also not invoked here by design even though this particular checkout happens to have `.git`, because the resolver must behave identically inside an arena that has neither). ⟦paper/AUDIT.md's own 'Numbers' section (a per-row audit of paper/NUMBERS.md's table) contains 38 rows.⟧ | paper/AUDIT.md:76 |
+| C-101 | UNSUPPORTED | **Numbers.** Recomputed, not compared to `paper/NUMBERS.md` -- this project has already produced one false number by reading a `du -sh` block count as a byte size (see `paper/POSITION_PAPER.md`'s own history), and two documents agreeing on a wrong number is exactly the failure mode that survives a compare-the-documents check. Of the 38 numbers `paper/NUMBERS.md`'s own table catalogues, 3 are independently recomputable inside this checkout (the two structural ordinals, and the "3 contradictory license statements" figure, recomputed by counting the distinct rows of the internal *d2b-licenses* specification's own table rather than by re-reading `docs/LIMITATIONS.md`'s restatement of the same figure). The remaining 35 need either `runs/` (gitignored, absent from this checkout -- confirmed: `runs/` does not exist here, O33) or `.git` history (absent from an arena by construction, O31; also not invoked here by design even though this particular checkout happens to have `.git`, because the resolver must behave identically inside an arena that has neither). Those 35 are `NOT_CHECKED`, each row naming which of the two is missing and what command or file would resolve it once available. ⟦35 of the 38 numbers in paper/AUDIT.md's own Numbers table are marked NOT_CHECKED because they need runs/ and/or .git, neither available in this checkout.⟧ | paper/AUDIT.md:81 |
 | C-102 | UNSUPPORTED | Those 35 are `NOT_CHECKED`, each row naming which of the two is missing and what command or file would resolve it once available. ⟦35 of paper/AUDIT.md's Numbers-table rows are marked NOT_CHECKED.⟧ | paper/AUDIT.md:86 |
 | C-103 | INVALIDATED | One incidental finding, not a row (out of `coverage`'s scope, which is limited to what `paper/NUMBERS.md`'s table already catalogues): that table does not carry a separate entry for the digit "3" in the paper's own §3 sentence "Its second iteration: 2 of 3 such checks differed, the candidate was accepted again..." (a03 iteration 2, C-050) -- it catalogues the "2" but not the "3" of that same ratio, even though both digits appear in `POSITION_PAPER.md`'s prose. ⟦paper/NUMBERS.md's table does not carry a separate row for the digit "3" in the paper's own §3 sentence about a03 iteration 2's "2 of 3" ratio (C-050).⟧ | paper/AUDIT.md:91 |
 | C-104 | UNSUPPORTED | **a02 mentions.** Re-parsed independently (whitespace-normalised, `\ba02\b`): 5 mentions, matching the plan's stated count exactly (the plan said not to trust that figure and to recount -- recounted, and it holds). ⟦An independent whitespace-normalised regex re-parse of paper/POSITION_PAPER.md for \ba02\b finds exactly 5 mentions.⟧ | paper/AUDIT.md:101 |
@@ -150,30 +150,338 @@ d4e: `CLAIMS.json` now declares, for every `INCLUDE` path in `EXPORT_MANIFEST.js
 | C-120 | UNSUPPORTED | But the same report table also names 32 direct `git merge --no-ff` operations performed by the operator to land accepted candidate branches on `master`, framed throughout as ordinary "Operatorarbeit." Landing work on a project's integration branch is exactly the action `src/hoh/delivery.py`'s own module docstring quotes the handoff as reserving to the captain and firstmate ("this assignment grants no additional push, merge, deployment or purchasing rights"), and `deliver()`'s own `local-only` mode — the one path that can touch a branch at all, and only once both `yolo == "off"` and `approved` are true — refuses to ever create a merge commit ("No rebase, no merge commit, no force" — `src/hoh/delivery.py:16`). ⟦The project's own dogfood accounting names 32 direct `git merge --no-ff` operations performed by the operator to land accepted candidate branches on `master` -- exactly the class of action `src/hoh/delivery.py`'s own `local-only` delivery mode refuses to ever perform (no merge commit, no force), a stronger action against the protected branch than the code's own captain-gated delivery path permits itself, executed through a channel (`git merge`, run directly) the code's delivery guard never sees; `hoh deliver --approve` itself was never invoked anywhere in this repository's history.⟧ | paper/REVIEW_B.md:393 |
 | C-121 | UNSUPPORTED | A runtime-assembled needle scan (home-directory prefixes, a private-address pattern, and a token-shaped-string pattern, none of them written as a literal forbidden substring in the scanning code) was run over: the 65 files `dogfood/EXPORT_DATEIMENGE.md` currently proposes for `EIN`; the full 176-entry INCLUDE set a fresh `tools/export_manifest.py derive()` produces under the current rules (`scan_include_for_leaks` reports 0 findings); the 18 tracked files under `build/lib/hoh/**`; and all 19 `.v*`-suffixed predecessor files at the repository root and under `history/`. ⟦A runtime-assembled needle scan (home-directory prefixes, a private-address pattern, a token-shaped-string pattern, none written as a literal forbidden substring in the scanning code) found 0 leaks across the 65 files dogfood/EXPORT_DATEIMENGE.md then proposed for EIN, the full 176-entry INCLUDE set a fresh `tools/export_manifest.py derive()` then produced, the 18 tracked files under `build/lib/hoh/**`, and all 19 `.v*`-suffixed predecessor files; the only hits were self-referential mentions inside the guard's own source/pattern-documentation files and `.invalid`-domain test fixtures, none a real leak.⟧ | paper/REVIEW_B.md:434 |
 | C-122 | SUPPORTED | `yolo` has exactly one settable value reachable from any code path (`Literal["on", "off"] = "off"` in `src/hoh/contracts.py:447`, and `controller.py:167` sets it literally to `"off"`); no CLI flag, argparse choice, or other entry point sets it to `"on"` anywhere in `src/hoh/**`, and `deliver()` independently refuses delivery if it were ever anything but `"off"` — this is enforced in the code path actually executed by `hoh deliver`, not only documented in prose. ⟦`yolo` has exactly one settable value reachable from any code path in this project's own source: `Literal["on", "off"] = "off"` in `src/hoh/contracts.py`, and `controller.py` sets it literally to `"off"`; no CLI flag, argparse choice, or other entry point anywhere in `src/hoh/**` sets it to `"on"`, and `deliver()` independently refuses delivery if it were ever anything but `"off"`.⟧ | paper/REVIEW_B.md:456 |
-| C-123 | SUPPORTED | Measured on the campaign that produced this release: **65 runs carrying 1,988 receipts (880 of them control runs), 100 iterations that produced receipts, 51 specifications, 45 merges and 97 recorded findings**, across five calendar days and 3.5 days of elapsed wall-clock -- and the position paper, the claims ledger, the release documents and the export machinery among the artifacts produced. ⟦Measured on the campaign that produced this release: **65 runs carrying 1,988⟧ | docs/LIMITATIONS.md:26 |
+| C-123 | SUPPORTED | Measured on the campaign that produced this release: **65 runs carrying 1,988 receipts (880 of them control runs), 100 iterations that produced receipts, 51 specifications, 45 merges and 127 recorded findings**, across five calendar days and 3.5 days of elapsed wall-clock -- and the position paper, the claims ledger, the release documents and the export machinery among the artifacts produced. ⟦Measured on the campaign that produced this release: **65 runs carrying 1,988⟧ | docs/LIMITATIONS.md:26 |
 | C-124 | SUPPORTED | VeriHarness / HoH verification kernel — One run: plan → develop → independent QA → evidence → accept/reject → replan — 65 runs | README.md:90 |
 | C-125 | SUPPORTED | Runs — **65** | README.md:112 |
 | C-126 | SUPPORTED | Receipts — **1,988**, of which **880** are control runs | README.md:113 |
 | C-127 | SUPPORTED | Iterations that produced receipts — **100** (98 of them criterion receipts) | README.md:114 |
 | C-128 | SUPPORTED | Distinct specifications — **51** | README.md:115 |
 | C-129 | SUPPORTED | Merges into the mainline — **45** | README.md:116 |
-| C-130 | SUPPORTED | Recorded findings — **97** | README.md:117 |
+| C-130 | SUPPORTED | Recorded findings — **127** | README.md:117 |
 | C-131 | SUPPORTED | Human governance decisions — **7** | README.md:118 |
-| C-132 | SUPPORTED | A campaign that produces 97 recorded findings against its own harness is not a campaign that went smoothly. ⟦campaign that produces 97 recorded findings against its own harness is not a⟧ | README.md:122 |
+| C-132 | SUPPORTED | A campaign that produces 127 recorded findings against its own harness is not a campaign that went smoothly. ⟦campaign that produces 127 recorded findings against its own harness is not a⟧ | README.md:122 |
 | C-133 | SUPPORTED | `src/hoh/` — 49 — 1 — 48 | README.md:150 |
 | C-134 | SUPPORTED | `tests/` — 70 — 19 — 51 | README.md:151 |
 | C-135 | SUPPORTED | `docs/` — 15 — 9 — 6 | README.md:152 |
 | C-136 | SUPPORTED | `paper/` — 10 — 9 — 1 | README.md:153 |
-| C-137 | SUPPORTED | Measured on the campaign that produced this release: **65 runs carrying 1,988 receipts (880 of them control runs), 100 iterations that produced receipts, 51 specifications, 45 merges and 97 recorded findings**, across five calendar days and 3.5 days of elapsed wall-clock -- and the position paper, the claims ledger, the release documents and the export machinery among the artifacts produced. ⟦receipts (880 of them control runs), 100 iterations that produced receipts,⟧ | docs/LIMITATIONS.md:27 |
-| C-138 | SUPPORTED | Measured on the campaign that produced this release: **65 runs carrying 1,988 receipts (880 of them control runs), 100 iterations that produced receipts, 51 specifications, 45 merges and 97 recorded findings**, across five calendar days and 3.5 days of elapsed wall-clock -- and the position paper, the claims ledger, the release documents and the export machinery among the artifacts produced. ⟦51 specifications, 45 merges and 97 recorded findings**, across five calendar⟧ | docs/LIMITATIONS.md:28 |
+| C-137 | SUPPORTED | Measured on the campaign that produced this release: **65 runs carrying 1,988 receipts (880 of them control runs), 100 iterations that produced receipts, 51 specifications, 45 merges and 127 recorded findings**, across five calendar days and 3.5 days of elapsed wall-clock -- and the position paper, the claims ledger, the release documents and the export machinery among the artifacts produced. ⟦receipts (880 of them control runs), 100 iterations that produced receipts,⟧ | docs/LIMITATIONS.md:27 |
+| C-138 | SUPPORTED | Measured on the campaign that produced this release: **65 runs carrying 1,988 receipts (880 of them control runs), 100 iterations that produced receipts, 51 specifications, 45 merges and 127 recorded findings**, across five calendar days and 3.5 days of elapsed wall-clock -- and the position paper, the claims ledger, the release documents and the export machinery among the artifacts produced. ⟦51 specifications, 45 merges and 127 recorded findings**, across five calendar⟧ | docs/LIMITATIONS.md:28 |
 | C-139 | SUPPORTED | A human decided seven things -- `DEC-R1`, `DEC-R1a`, `DEC-R2`, `DEC-R3`, `DEC-R4`, `DEC-R5`, `DEC-R6`: the project's public name, which files the export carries, how one class of reference is dispositioned, and whether to publish. ⟦seven things -- `DEC-R1`, `DEC-R1a`, `DEC-R2`, `DEC-R3`, `DEC-R4`, `DEC-R5`,⟧ | docs/LIMITATIONS.md:44 |
-| C-140 | SUPPORTED | A human decided seven things -- `DEC-R1`, `DEC-R1a`, `DEC-R2`, `DEC-R3`, `DEC-R4`, `DEC-R5`, `DEC-R6`: the project's public name, which files the export carries, how one class of reference is dispositioned, and whether to publish. Seven governance decisions against 65 runs, 51 specifications, 45 merges and 97 findings. The same orchestration configured with those policies delegated in advance would have resolved them itself. That is a statement about the design, not a measurement: this deployment did not run that way, so it is listed here as untested rather than as a result. ⟦decisions against 65 runs, 51 specifications, 45 merges and 97 findings. The⟧ | docs/LIMITATIONS.md:47 |
-| C-141 | SUPPORTED | Measured directly against this repository's own commit history: **no run has ever added or edited a line of Python inside `src/`.** That wording is narrower than this entry carried until 2026-09-10, and the narrowing is a correction, not a hedge. The earlier form was "no run has ever added or edited a line inside `src/`", and it is false: run `d1` added `src/hoh/policy/dangerous-patterns.txt` and `src/hoh/policy/house-rules-patterns.txt` -- packaged copies of the guard pattern lists, so that an installed wheel could run an acceptance check at all -- and that commit reached the mainline through the ordinary merge of the accepted candidate `d1-i2`. It is one commit against 49 non-merge commits touching `src/hoh/`; the other 48 were written outside any run. It contains no `.py` file, which is why the corrected claim still says something worth saying. ⟦accepted candidate `d1-i2`. It is one commit against 49 non-merge commits⟧ | docs/LIMITATIONS.md:192 |
+| C-140 | SUPPORTED | A human decided seven things -- `DEC-R1`, `DEC-R1a`, `DEC-R2`, `DEC-R3`, `DEC-R4`, `DEC-R5`, `DEC-R6`: the project's public name, which files the export carries, how one class of reference is dispositioned, and whether to publish. Seven governance decisions against 65 runs, 51 specifications, 45 merges and 127 findings. The same orchestration configured with those policies delegated in advance would have resolved them itself. That is a statement about the design, not a measurement: this deployment did not run that way, so it is listed here as untested rather than as a result. ⟦decisions against 65 runs, 51 specifications, 45 merges and 127 findings. The⟧ | docs/LIMITATIONS.md:47 |
+| C-141 | SUPPORTED | Measured directly against this repository's own commit history: **no run has ever added or edited a line of Python inside `src/`.** That wording is narrower than this entry carried until 2026-09-10, and the narrowing is a correction, not a hedge. The earlier form was "no run has ever added or edited a line inside `src/`", and it is false: run `d1` added `src/hoh/policy/dangerous-patterns.txt` and `src/hoh/policy/house-rules-patterns.txt` -- packaged copies of the guard pattern lists, so that an installed wheel could run an acceptance check at all -- and that commit reached the mainline through the ordinary merge of the accepted candidate `d1-i2`. It is one commit against 49 non-merge commits touching `src/hoh/`; the other 48 were written outside any run. It contains no `.py` file, which is why the corrected claim still says something worth saying. ⟦accepted candidate `d1-i2`. It is one commit against 49 non-merge commits⟧ | docs/LIMITATIONS.md:276 |
 | C-142 | SUPPORTED | **Multi-day orchestrated operation is demonstrated; long-duration operation without intervention is not.** The campaign behind this paper ran **65 runs, 1,988 receipts (880 of them control runs) and 100 iterations that produced receipts, across five calendar days and 3.5 days of elapsed wall-clock**, producing this paper, the claims ledger and the release machinery among its artifacts. ⟦   **65 runs, 1,988 receipts (880 of them control runs) and 100 iterations⟧ | paper/POSITION_PAPER.md:568 |
 | C-143 | SUPPORTED | `README.md`, `RELEASE_NOTES.md` — The dogfood evidence "covers documentation and governance work, never a change to `src/` or `tests/`" — False on both halves. 19 of 70 commits under `tests/` arrived via run branches, and one run added two files under `src/hoh/policy/`. | RELEASE_NOTES.md:75 |
 | C-144 | SUPPORTED | Measured over the non-merge commits reachable from the mainline: `tests/` has 70 commits, 19 of them arriving via run branches across three run-authored files; `src/hoh/` has 49 commits, one of which arrived via a run branch -- run `d1` adding `src/hoh/policy/dangerous-patterns.txt` and `src/hoh/policy/house-rules-patterns.txt` so an installed wheel could execute an acceptance check at all. ⟦the non-merge commits reachable from the mainline: `tests/` has 70 commits, 19 of them⟧ | RELEASE_NOTES.md:210 |
 | C-145 | SUPPORTED | `tools/` — 20 — 19 — 1 | README.md:154 |
 | C-146 | SUPPORTED | **One claim flipped, and it is worth naming rather than quietly restating.** rc2 reported `paper/` as 9/9/**0** -- nothing written to the position paper outside a run. ⟦rc2 reported `paper/` as 9/9/**0** -- nothing written to the position paper⟧ | RELEASE_NOTES.md:33 |
+| C-147 | INVALIDATED | **What the sandbox added here, stated precisely, because the first version of this paragraph was wrong in both directions.** ⟦**What the sandbox added here, stated precisely, because the first version of⟧ | docs/LIMITATIONS.md:186 |
+| C-148 | INVALIDATED | **What the sandbox added here, stated precisely, because the first version of this paragraph was wrong in both directions.** ⟦**What the sandbox added here, stated precisely, because the first version of⟧ | docs/LIMITATIONS.md:186 |
+| C-149 | UNSUPPORTED | A real run was driven by the control plane and killed twice with `os._exit(9)` -- once after a candidate was accepted but before the merge, once after the merge but before global closure -- and a fresh process, holding nothing but the persisted state, resumed correctly both times: it read the run record rather than re-dispatching, merged exactly once, and reached a fixpoint. ⟦`os._exit(9)` -- once after a candidate was accepted but before the merge, once⟧ | docs/LIMITATIONS.md:65 |
+| C-150 | SUPPORTED | It said the sandbox closed this failure. It did not, because the common case was already closed: since 2026-09-08 `_env` sets `GIT_CEILING_DIRECTORIES` to the arena's parent, and with that in place `git rev-parse --show-toplevel` inside an arena exits `128` instead of naming the ancestor repository. A sandbox was not needed for that and is not what fixed it. ⟦inside an arena exits `128` instead of naming the ancestor repository. A⟧ | docs/LIMITATIONS.md:192 |
+| C-151 | SUPPORTED | Ceiling set, no sandbox — `128` — prevented | docs/LIMITATIONS.md:202 |
+| C-152 | SUPPORTED | **The check removes the ceiling**, no sandbox — `0` — **names the ancestor repository** | docs/LIMITATIONS.md:203 |
+| C-153 | SUPPORTED | The check removes the ceiling, sandboxed — `128` — prevented | docs/LIMITATIONS.md:204 |
+| C-154 | SUPPORTED | The export's own leak scan found such paths in 36 files of the first two trees and refused them, which is the behaviour anyone would want from it. ⟦in 36 files of the first two trees and refused them, which is the⟧ | docs/EVIDENCE_INDEX.md:12 |
+| C-155 | SUPPORTED | Anyone holding the repository that contains these trees can re-derive every number below with `python3 tools/evidence_index.py`, and a mismatch means the tree has changed since this file was written. ⟦number below with `python3 tools/evidence_index.py`, and a mismatch⟧ | docs/EVIDENCE_INDEX.md:25 |
+| C-156 | SUPPORTED | * tree digest: `838017219d7599a9` over 27 file(s), 36776 bytes * receipts carrying an isolation record: 10 * receipts where isolation was **shown** from inside -- namespaces differing from the runner's, candidate read-only, network denied: **10 of 10** ⟦* tree digest: `838017219d7599a9` over 27 file(s), 36776 bytes⟧ | docs/EVIDENCE_INDEX.md:30 |
+| C-157 | SUPPORTED | * tree digest: `838017219d7599a9` over 27 file(s), 36776 bytes * receipts carrying an isolation record: 10 * receipts where isolation was **shown** from inside -- namespaces differing from the runner's, candidate read-only, network denied: **10 of 10** ⟦* receipts carrying an isolation record: 10⟧ | docs/EVIDENCE_INDEX.md:31 |
+| C-158 | SUPPORTED | * tree digest: `838017219d7599a9` over 27 file(s), 36776 bytes * receipts carrying an isolation record: 10 * receipts where isolation was **shown** from inside -- namespaces differing from the runner's, candidate read-only, network denied: **10 of 10** ⟦**10 of 10**⟧ | docs/EVIDENCE_INDEX.md:34 |
+| C-159 | SUPPORTED | `strictroman4-i1-a1-K1-basis` — 1 — True — strict — True — True — read-only — denied | docs/EVIDENCE_INDEX.md:38 |
+| C-160 | SUPPORTED | `strictroman4-i1-a1-K1` — 0 — True — strict — True — True — read-only — denied | docs/EVIDENCE_INDEX.md:39 |
+| C-161 | SUPPORTED | `strictroman4-i1-a1-K2-basis` — 0 — True — strict — True — True — read-only — denied | docs/EVIDENCE_INDEX.md:40 |
+| C-162 | SUPPORTED | `strictroman4-i1-a1-K2` — 0 — True — strict — True — True — read-only — denied | docs/EVIDENCE_INDEX.md:41 |
+| C-163 | SUPPORTED | `strictroman4-i2-a1-K1` — 0 — True — strict — True — True — read-only — denied | docs/EVIDENCE_INDEX.md:42 |
+| C-164 | SUPPORTED | `strictroman4-i2-a1-K2` — 0 — True — strict — True — True — read-only — denied | docs/EVIDENCE_INDEX.md:43 |
+| C-165 | SUPPORTED | `strictroman4-i3-a1-K1` — 0 — True — strict — True — True — read-only — denied | docs/EVIDENCE_INDEX.md:44 |
+| C-166 | SUPPORTED | `strictroman4-i3-a1-K2` — 0 — True — strict — True — True — read-only — denied | docs/EVIDENCE_INDEX.md:45 |
+| C-167 | SUPPORTED | `strictroman4-i3-a1-K3-basis` — 0 — True — strict — True — True — read-only — denied | docs/EVIDENCE_INDEX.md:46 |
+| C-168 | SUPPORTED | `strictroman4-i3-a1-K3` — 0 — True — strict — True — True — read-only — denied | docs/EVIDENCE_INDEX.md:47 |
+| C-169 | SUPPORTED | * tree digest: `414bb7958722afa2` over 82 file(s), 149759 bytes * nodes and their final lifecycle: `repair-1-1` = MERGED, `slugify` = MERGED * repair nodes the run created by itself: `repair-1-1` * closure generations: 2 * decisions recorded: 4, of which by a person: **0** * repository mutations nothing in the state accounts for: **0** ⟦* tree digest: `414bb7958722afa2` over 82 file(s), 149759 bytes⟧ | docs/EVIDENCE_INDEX.md:56 |
+| C-170 | SUPPORTED | * tree digest: `414bb7958722afa2` over 82 file(s), 149759 bytes * nodes and their final lifecycle: `repair-1-1` = MERGED, `slugify` = MERGED * repair nodes the run created by itself: `repair-1-1` * closure generations: 2 * decisions recorded: 4, of which by a person: **0** * repository mutations nothing in the state accounts for: **0** ⟦* nodes and their final lifecycle: `repair-1-1` = MERGED, `slugify` = MERGED⟧ | docs/EVIDENCE_INDEX.md:57 |
+| C-171 | SUPPORTED | * tree digest: `414bb7958722afa2` over 82 file(s), 149759 bytes * nodes and their final lifecycle: `repair-1-1` = MERGED, `slugify` = MERGED * repair nodes the run created by itself: `repair-1-1` * closure generations: 2 * decisions recorded: 4, of which by a person: **0** * repository mutations nothing in the state accounts for: **0** ⟦* repair nodes the run created by itself: `repair-1-1`⟧ | docs/EVIDENCE_INDEX.md:58 |
+| C-172 | SUPPORTED | * tree digest: `414bb7958722afa2` over 82 file(s), 149759 bytes * nodes and their final lifecycle: `repair-1-1` = MERGED, `slugify` = MERGED * repair nodes the run created by itself: `repair-1-1` * closure generations: 2 * decisions recorded: 4, of which by a person: **0** * repository mutations nothing in the state accounts for: **0** ⟦* closure generations: 2⟧ | docs/EVIDENCE_INDEX.md:59 |
+| C-173 | SUPPORTED | * tree digest: `414bb7958722afa2` over 82 file(s), 149759 bytes * nodes and their final lifecycle: `repair-1-1` = MERGED, `slugify` = MERGED * repair nodes the run created by itself: `repair-1-1` * closure generations: 2 * decisions recorded: 4, of which by a person: **0** * repository mutations nothing in the state accounts for: **0** ⟦* decisions recorded: 4, of which by a person: **0**⟧ | docs/EVIDENCE_INDEX.md:60 |
+| C-174 | SUPPORTED | * tree digest: `414bb7958722afa2` over 82 file(s), 149759 bytes * nodes and their final lifecycle: `repair-1-1` = MERGED, `slugify` = MERGED * repair nodes the run created by itself: `repair-1-1` * closure generations: 2 * decisions recorded: 4, of which by a person: **0** * repository mutations nothing in the state accounts for: **0** ⟦* repository mutations nothing in the state accounts for: **0**⟧ | docs/EVIDENCE_INDEX.md:61 |
+| C-175 | SUPPORTED | Generated by `python3 tools/benchmark.py report --campaign v1 --write` from the cells in `dogfood/benchmark/results/`. ⟦Generated by `python3 tools/benchmark.py report --campaign v1 --write` from⟧ | docs/BENCHMARK_RESULTS.md:3 |
+| C-176 | SUPPORTED | **15 of 15 cells have run.** ⟦**15 of 15 cells have run.**⟧ | docs/BENCHMARK_RESULTS.md:26 |
+| C-177 | SUPPORTED | `parse_duration/C` — node nparse4o90hmk9 is waiting for a human approval: iteration aborted: planner waits for an approval in pane w17:p8N. A blocked dialog is not answered automatically. | docs/BENCHMARK_RESULTS.md:45 |
+| C-178 | SUPPORTED | `retry_backoff/C` — node nretryceoewd3m is waiting for a human approval: iteration aborted: planner waits for an approval in pane w17:p8P. A blocked dialog is not answered automatically. | docs/BENCHMARK_RESULTS.md:46 |
+| C-179 | SUPPORTED | `slug_pair/C` — node nslugpljjzphb8 is waiting for a human approval: iteration aborted: planner waits for an approval in pane w17:p8Q. A blocked dialog is not answered automatically. | docs/BENCHMARK_RESULTS.md:47 |
+| C-180 | SUPPORTED | `to_roman/C` — node ntoromsrd2ds4p is waiting for a human approval: iteration aborted: planner waits for an approval in pane w17:p8M. A blocked dialog is not answered automatically. | docs/BENCHMARK_RESULTS.md:48 |
+| C-181 | SUPPORTED | `ledger_apply` — A — 26 — 1 | docs/BENCHMARK_RESULTS.md:68 |
+| C-182 | SUPPORTED | `ledger_apply` — B — 372 — 9 | docs/BENCHMARK_RESULTS.md:69 |
+| C-183 | SUPPORTED | `ledger_apply` — C — 1308 — 9 | docs/BENCHMARK_RESULTS.md:70 |
+| C-184 | SUPPORTED | `parse_duration` — A — 114 — 1 | docs/BENCHMARK_RESULTS.md:71 |
+| C-185 | SUPPORTED | `parse_duration` — B — 131 — 3 | docs/BENCHMARK_RESULTS.md:72 |
+| C-186 | SUPPORTED | `parse_duration` — C — 180 — 9 | docs/BENCHMARK_RESULTS.md:73 |
+| C-187 | SUPPORTED | `retry_backoff` — A — 31 — 1 | docs/BENCHMARK_RESULTS.md:74 |
+| C-188 | SUPPORTED | `retry_backoff` — B — 381 — 9 | docs/BENCHMARK_RESULTS.md:75 |
+| C-189 | SUPPORTED | `retry_backoff` — C — 140 — 9 | docs/BENCHMARK_RESULTS.md:76 |
+| C-190 | SUPPORTED | `slug_pair` — A — 20 — 1 | docs/BENCHMARK_RESULTS.md:77 |
+| C-191 | SUPPORTED | `slug_pair` — B — 283 — 9 | docs/BENCHMARK_RESULTS.md:78 |
+| C-192 | SUPPORTED | `slug_pair` — C — 59 — 9 | docs/BENCHMARK_RESULTS.md:79 |
+| C-193 | SUPPORTED | `to_roman` — A — 24 — 1 | docs/BENCHMARK_RESULTS.md:80 |
+| C-194 | SUPPORTED | `to_roman` — B — 286 — 9 | docs/BENCHMARK_RESULTS.md:81 |
+| C-195 | SUPPORTED | `to_roman` — C — 93 — 9 | docs/BENCHMARK_RESULTS.md:82 |
+| C-196 | SUPPORTED | Campaign v1 is complete at 15 of 15 cells and is marked `PRE-O125-CLOSURE`. ⟦Campaign v1 is complete at 15 of 15 cells and is marked `PRE-O125-CLOSURE`.⟧ | docs/BENCHMARK_PROTOCOL.md:175 |
+| C-197 | SUPPORTED | **Nothing here says VeriHarness performed better.** Arm A -- a plain agent with no control plane -- produced the most passing cells. The reason the C cells stopped is named per cell below, and in four of five it is the same reason: a planner pane that had finished was read as waiting for an approval. That is O127, a defect in this harness. ⟦as waiting for an approval. That is O127, a defect in this harness.⟧ | docs/BENCHMARK_RESULTS.md:20 |
+| C-198 | SUPPORTED | * tree digest: `186d452708fb6cfe` over 26 file(s), 67896 bytes * verdict recorded by the measurement: **VERIFIED** ⟦* tree digest: `186d452708fb6cfe` over 26 file(s), 67896 bytes⟧ | docs/EVIDENCE_INDEX.md:76 |
+| C-199 | SUPPORTED | `planner_capability_violations` — 0 | docs/EVIDENCE_INDEX.md:81 |
+| C-200 | SUPPORTED | `planner_repo_mutations` — 0 | docs/EVIDENCE_INDEX.md:82 |
+| C-201 | SUPPORTED | `planner_git_mutations` — 0 | docs/EVIDENCE_INDEX.md:83 |
+| C-202 | SUPPORTED | `planner_generated_implementation` — 0 | docs/EVIDENCE_INDEX.md:84 |
+| C-203 | SUPPORTED | * the planner's copies, each against the tree it was materialised from: `601e8468f428`, `f24e440e7df5` * files the accepted candidate touched: `fib.py`, with 13 receipt(s) * instrument control -- seven violations planted into throwaway copies, each detected on its own: **7 of 7** * the controller's witness was armed for **2 of 2** planner dispatch(es), read from the dispatch records themselves rather than derived from what the controller does today ⟦* instrument control -- seven violations planted into throwaway copies, each detected on its own: **7 of 7**⟧ | docs/EVIDENCE_INDEX.md:96 |
+| C-204 | SUPPORTED | * the planner's copies, each against the tree it was materialised from: `601e8468f428`, `f24e440e7df5` * files the accepted candidate touched: `fib.py`, with 13 receipt(s) * instrument control -- seven violations planted into throwaway copies, each detected on its own: **7 of 7** * the controller's witness was armed for **2 of 2** planner dispatch(es), read from the dispatch records themselves rather than derived from what the controller does today ⟦* files the accepted candidate touched: `fib.py`, with 13 receipt(s)⟧ | docs/EVIDENCE_INDEX.md:95 |
+| C-205 | SUPPORTED | * the planner's copies, each against the tree it was materialised from: `601e8468f428`, `f24e440e7df5` * files the accepted candidate touched: `fib.py`, with 13 receipt(s) * instrument control -- seven violations planted into throwaway copies, each detected on its own: **7 of 7** * the controller's witness was armed for **2 of 2** planner dispatch(es), read from the dispatch records themselves rather than derived from what the controller does today ⟦* the controller's witness was armed for **2 of 2** planner dispatch(es), read from the dispatch records themselves rather than derived from what the controller does today⟧ | docs/EVIDENCE_INDEX.md:97 |
+| C-206 | SUPPORTED | **Nothing tested the installation.** Setting `protected=()` for the planner -- switching the detection half off entirely -- left the whole suite green at 840 tests. ⟦switching the detection half off entirely -- left the whole suite green at 840⟧ | docs/LIMITATIONS.md:618 |
+| C-207 | SUPPORTED | Run `cfnfib7a`, a real three-agent Herdr+HoH dispatch against the adversarial specification above, reports `planner_capability_boundary = VERIFIED`: `planner_repo_mutations`, `planner_git_mutations` and `planner_generated_implementation` all zero, the planner's plan valid, the developer's candidate landed and acceptance working. ⟦Run `cfnfib7a`, a real three-agent Herdr+HoH dispatch against the adversarial⟧ | docs/LIMITATIONS.md:632 |
+| C-208 | SUPPORTED | The number that took two reviews to get right is the last one: **the witness was armed for 2 of 2 planner dispatches**, read out of the dispatch records rather than derived from the controller's source. ⟦was armed for 2 of 2 planner dispatches**, read out of the dispatch records⟧ | docs/LIMITATIONS.md:640 |
+| C-209 | SUPPORTED | Measured on this project's own confinement run `cfnfib6a`. The criterion was `python3 -m unittest discover -s tests -t . -v`, and **both** receipts -- the baseline and the candidate -- end identically: ⟦Measured on this project's own confinement run `cfnfib6a`. The criterion was⟧ | docs/LIMITATIONS.md:650 |
+| C-210 | SUPPORTED | The criterion was `python3 -m unittest discover -s tests -t . -v`, and **both** receipts -- the baseline and the candidate -- end identically: ⟦`python3 -m unittest discover -s tests -t . -v`, and **both** receipts -- the⟧ | docs/LIMITATIONS.md:651 |
+| C-211 | SUPPORTED | HoH already has that state for the infrastructure exit codes `{124, 126, 127}`; here the exit code is 1 and the distinction is unavailable. ⟦`{124, 126, 127}`; here the exit code is 1 and the distinction is unavailable.⟧ | docs/LIMITATIONS.md:665 |
+| C-212 | SUPPORTED | **Priority: medium, and open.** Related: the check environment is reduced, not empty. `ENV_ALLOWLIST` and `PYTHONNOUSERSITE=1` keep the operator's home and the user site directory out; the interpreter's own `site-packages` stay, and a module name collision there reaches the check. ⟦empty. `ENV_ALLOWLIST` and `PYTHONNOUSERSITE=1` keep the operator's home and⟧ | docs/LIMITATIONS.md:680 |
+| C-213 | SUPPORTED | **A change and its undo are one moment apart.** Measured: a commit inside a dispatch moves the git digest, and `git reset --hard HEAD~1` in the same dispatch moves it back. ⟦dispatch moves the git digest, and `git reset --hard HEAD~1` in the same⟧ | docs/LIMITATIONS.md:702 |
+| C-214 | SUPPORTED | **A full digest is cheap here and is not cheap everywhere.** Measured on this project's own tree at 979,952 files and 5.2 GB: 121 s cold, 51 s warm, per call, twice per planner and QA dispatch. ⟦project's own tree at 979,952 files and 5.2 GB: 121 s cold, 51 s warm, per⟧ | docs/LIMITATIONS.md:720 |
+| C-215 | SUPPORTED | A repository of research size in `repo_path` would make the witness the dominant cost of a dispatch, and over a 51-second window any concurrent writer in the tree is a finding. ⟦dispatch, and over a 51-second window any concurrent writer in the tree is a⟧ | docs/LIMITATIONS.md:724 |
+| C-216 | SUPPORTED | Running it here reports 21 such references, and they are old rather than new: ⟦reports 21 such references, and they are old rather than new:⟧ | docs/LIMITATIONS.md:735 |
+| C-217 | SUPPORTED | Counted from the run trees' own dispatch logs, that cell spent 18 dispatches and reported 9 -- arm C runs a further full run per repair node, and none of it was counted. ⟦logs, that cell spent 18 dispatches and reported 9 -- arm C runs a further⟧ | docs/BENCHMARK_PROTOCOL.md:180 |
+| C-218 | SUPPORTED | `ledger_apply` — A — 1 (asserted, not counted) — 9 — unknown | docs/BENCHMARK_RESULTS.md:37 |
+| C-219 | SUPPORTED | `ledger_apply` — B — 9 (asserted, not counted) — 9 — unknown | docs/BENCHMARK_RESULTS.md:38 |
+| C-220 | SUPPORTED | `ledger_apply` — C — 9 (asserted, not counted) — 9 — unknown | docs/BENCHMARK_RESULTS.md:39 |
+| C-221 | SUPPORTED | `parse_duration` — A — 1 (asserted, not counted) — 9 — unknown | docs/BENCHMARK_RESULTS.md:40 |
+| C-222 | SUPPORTED | `parse_duration` — B — 3 (asserted, not counted) — 9 — unknown | docs/BENCHMARK_RESULTS.md:41 |
+| C-223 | SUPPORTED | `parse_duration` — C — 9 (asserted, not counted) — 9 — unknown | docs/BENCHMARK_RESULTS.md:42 |
+| C-224 | SUPPORTED | `retry_backoff` — A — 1 (asserted, not counted) — 9 — unknown | docs/BENCHMARK_RESULTS.md:43 |
+| C-225 | SUPPORTED | `retry_backoff` — B — 9 (asserted, not counted) — 9 — unknown | docs/BENCHMARK_RESULTS.md:44 |
+| C-226 | SUPPORTED | `retry_backoff` — C — 9 (asserted, not counted) — 9 — unknown | docs/BENCHMARK_RESULTS.md:45 |
+| C-227 | SUPPORTED | `slug_pair` — A — 1 (asserted, not counted) — 9 — unknown | docs/BENCHMARK_RESULTS.md:46 |
+| C-228 | SUPPORTED | `slug_pair` — B — 9 (asserted, not counted) — 9 — unknown | docs/BENCHMARK_RESULTS.md:47 |
+| C-229 | SUPPORTED | `slug_pair` — C — 9 (asserted, not counted) — 9 — unknown | docs/BENCHMARK_RESULTS.md:48 |
+| C-230 | SUPPORTED | `to_roman` — A — 1 (asserted, not counted) — 9 — unknown | docs/BENCHMARK_RESULTS.md:49 |
+| C-231 | SUPPORTED | `to_roman` — B — 9 (asserted, not counted) — 9 — unknown | docs/BENCHMARK_RESULTS.md:50 |
+| C-232 | SUPPORTED | `to_roman` — C — 9 (asserted, not counted) — 9 — unknown | docs/BENCHMARK_RESULTS.md:51 |
+| C-233 | SUPPORTED | `parse_duration` — C — 18 (recorded as 9) — 9 — yes | docs/BENCHMARK_RESULTS_v2.md:36 |
+| C-234 | SUPPORTED | `retry_backoff` — C — 18 (recorded as 9) — 9 — yes | docs/BENCHMARK_RESULTS_v2.md:37 |
+| C-235 | SUPPORTED | **15 of 15 cells have run.** ⟦**15 of 15 cells have run.**⟧ | docs/BENCHMARK_RESULTS_v2.md:34 |
+| C-236 | SUPPORTED | `parse_duration` — C — 1663 — 9 | docs/BENCHMARK_RESULTS_v2.md:67 |
+| C-237 | SUPPORTED | `retry_backoff` — C — 1917 — 9 | docs/BENCHMARK_RESULTS_v2.md:68 |
+| C-238 | SUPPORTED | **Read arm C's closures with O137 beside them.** The global gate runs `unittest discover` over the merged state, and every task's base is a single source file with no test -- so the gate's first result is RED with `NO TESTS RAN`, which is the signature this project treats as "nothing executed". ⟦**Read arm C's closures with O137 beside them.** The global gate runs⟧ | docs/BENCHMARK_RESULTS_v2.md:9 |
+| C-239 | SUPPORTED | The four cells' run trees still hold a valid plan in `answers/i1-a0-planner.json` -- 5, 6, 4 and 3 acceptance criteria respectively -- written while the run state says `PLANNING / BLOCKED / planner waits for an approval`. ⟦trees still hold a valid plan in `answers/i1-a0-planner.json` -- 5,⟧ | docs/BENCHMARK_RESULTS.md:23 |
+| C-240 | SUPPORTED | `slug_pair` — C — 18 — 9 — yes | docs/BENCHMARK_RESULTS_v2.md:47 |
+| C-241 | SUPPORTED | `slug_pair` — C — 1498 — 18 | docs/BENCHMARK_RESULTS_v2.md:79 |
+| C-242 | SUPPORTED | `retry_backoff` — C — **no** — yes — (excluded) — PASS | docs/BENCHMARK_RESULTS_v2.md:41 |
+| C-243 | SUPPORTED | `slug_pair` — C — **no** — yes — (excluded) — PASS | docs/BENCHMARK_RESULTS_v2.md:42 |
+| C-244 | SUPPORTED | 15 cell(s) appear on both sides. Cells that ran in only one campaign are not in this table and are not counted anywhere in it. ⟦15 cell(s) appear on both sides. Cells that ran in only one⟧ | docs/BENCHMARK_RESULTS_v2.md:56 |
+| C-245 | SUPPORTED | `to_roman` — C — **no** — yes — (excluded) — PASS | docs/BENCHMARK_RESULTS_v2.md:43 |
+| C-246 | SUPPORTED | `to_roman` — C — 18 — 9 — yes | docs/BENCHMARK_RESULTS_v2.md:66 |
+| C-247 | SUPPORTED | `to_roman` — C — 1756 — 18 | docs/BENCHMARK_RESULTS_v2.md:99 |
+| C-248 | SUPPORTED | `tests` — PASS — 1248 passed — `python3 -m pytest -q` | docs/READINESS.md:14 |
+| C-249 | SUPPORTED | `lint` — PASS — clean — `ruff check --select F,E9 src tests tools` | docs/READINESS.md:15 |
+| C-250 | SUPPORTED | `claims` — PASS — OK: all checks passed — `python3 tools/check_claims.py check all` | docs/READINESS.md:16 |
+| C-251 | SUPPORTED | `union_invariants` — PASS — U1-U5 pass — `python3 tools/union_gate.py` | docs/READINESS.md:17 |
+| C-252 | SUPPORTED | `meta_evidence` — PASS — 5 metric(s) VERIFIED, closure GREEN — `python3 tools/meta_evidence.py --falsify` | docs/READINESS.md:18 |
+| C-253 | SUPPORTED | `planner_capability_boundary` — PASS — VERIFIED on run cfnfib8a, witness armed for 2 of 2 planner dispatch(es) — `read dogfood/planner-confinement/SUMMARY.json` | docs/READINESS.md:19 |
+| C-254 | SUPPORTED | `budget_enforcement` — PASS — VERIFIED; ceilings [9, 8, 4], product refused a dispatch at [8, 4]; 2 falsifier(s) all detected — `python3 tools/budget_evidence.py --out dogfood/budget-enforcement/BUDGET_EVIDENCE.json` | docs/READINESS.md:20 |
+| C-255 | SUPPORTED | `post_o143_closure` — PASS — VERIFIED; halt CLOSED; 18 of 18 declared dispatches (primary 9, repair 9); 1 repair node(s); 0 human decision(s) — `python3 tools/closure_e2e.py` | docs/READINESS.md:21 |
+| C-256 | SUPPORTED | `telemetry_on_real_dispatches` — PASS — 2 audit(s): fully validated on benchmark-v3-telemetry; no field gaps — `python3 tools/telemetry_audit.py --run-root PATH --run-id ID --out dogfood/<tree>/TELEMETRY_AUDIT.json` | docs/READINESS.md:22 |
+| C-257 | SUPPORTED | `benchmark_v3_preregistration` — PASS — DRIFTED, 51 file(s) frozen at d22fc1536f43 -- moved after the campaign, accounted for: tools/benchmark.py, tools/readiness.py, tools/repetition_plan.py — `python3 tools/prereg.py check --campaign v3` | docs/READINESS.md:23 |
+| C-258 | SUPPORTED | `benchmark_v2_historical` — FAIL (advisory) — HISTORICAL_COMPLETE; matched_budget_valid = NO; budget_rule violated: 2 cell(s) ran past the dispatch budget without being stopped — `python3 tools/repetition_plan.py --campaign v2` | docs/READINESS.md:24 |
+| C-259 | SUPPORTED | `benchmark_v3` — PASS — 15 of 15 cells; COMPLETE; matched_budget_valid = YES; freeze DRIFTED (post-campaign repair, accounted for) — `python3 tools/prereg.py check --campaign v3 && python3 tools/repetition_plan.py --campaign v3` | docs/READINESS.md:25 |
+| C-260 | SUPPORTED | `export_manifest` — FAIL (advisory) — no leaks, 1 dangling reference(s), 0 other problem(s) — `python3 tools/export_manifest.py check` | docs/READINESS.md:26 |
+| C-261 | SUPPORTED | `clean_install` — PASS — 0 red step(s) — `python3 tools/clean_install_check.py` | docs/READINESS.md:27 |
+| C-262 | SUPPORTED | `attribution` — PASS — 1 of 10 nodes through the product — `python3 tools/attribution.py` | docs/READINESS.md:28 |
+| C-263 | SUPPORTED | `ledger_apply` — A — yes — yes — PASS — PASS | docs/BENCHMARK_RESULTS_v2.md:40 |
+| C-264 | SUPPORTED | `ledger_apply` — B — yes — yes — PASS — PASS | docs/BENCHMARK_RESULTS_v2.md:41 |
+| C-265 | SUPPORTED | `ledger_apply` — C — yes — yes — PASS — PASS | docs/BENCHMARK_RESULTS_v2.md:42 |
+| C-266 | SUPPORTED | `parse_duration` — A — yes — yes — PASS — PASS | docs/BENCHMARK_RESULTS_v2.md:43 |
+| C-267 | SUPPORTED | `parse_duration` — B — **no** — yes — (excluded) — PASS | docs/BENCHMARK_RESULTS_v2.md:44 |
+| C-268 | SUPPORTED | `parse_duration` — C — **no** — yes — (excluded) — PASS | docs/BENCHMARK_RESULTS_v2.md:45 |
+| C-269 | SUPPORTED | `retry_backoff` — A — yes — yes — PASS — PASS | docs/BENCHMARK_RESULTS_v2.md:46 |
+| C-270 | SUPPORTED | `retry_backoff` — B — yes — yes — PASS — PASS | docs/BENCHMARK_RESULTS_v2.md:47 |
+| C-271 | SUPPORTED | `slug_pair` — A — yes — yes — PASS — PASS | docs/BENCHMARK_RESULTS_v2.md:49 |
+| C-272 | SUPPORTED | `slug_pair` — B — yes — yes — PASS — FAIL | docs/BENCHMARK_RESULTS_v2.md:50 |
+| C-273 | SUPPORTED | `to_roman` — A — yes — yes — PASS — PASS | docs/BENCHMARK_RESULTS_v2.md:52 |
+| C-274 | SUPPORTED | `to_roman` — B — yes — yes — PASS — PASS | docs/BENCHMARK_RESULTS_v2.md:53 |
+| C-275 | SUPPORTED | `ledger_apply` — B — 7 — 9 — no | docs/BENCHMARK_RESULTS_v2.md:75 |
+| C-276 | SUPPORTED | `ledger_apply` — C — 18 — 9 — yes | docs/BENCHMARK_RESULTS_v2.md:76 |
+| C-277 | SUPPORTED | `parse_duration` — B — 7 — 9 — no | docs/BENCHMARK_RESULTS_v2.md:78 |
+| C-278 | SUPPORTED | `retry_backoff` — B — 7 — 9 — no | docs/BENCHMARK_RESULTS_v2.md:81 |
+| C-279 | SUPPORTED | `slug_pair` — B — 7 — 9 — no | docs/BENCHMARK_RESULTS_v2.md:84 |
+| C-280 | SUPPORTED | `to_roman` — B — 7 — 9 — no | docs/BENCHMARK_RESULTS_v2.md:87 |
+| C-281 | SUPPORTED | `ledger_apply` — PASS — PASS — PASS | docs/BENCHMARK_RESULTS_v2.md:94 |
+| C-282 | SUPPORTED | `parse_duration` — PASS — PASS — PASS | docs/BENCHMARK_RESULTS_v2.md:95 |
+| C-283 | SUPPORTED | `retry_backoff` — PASS — PASS — PASS | docs/BENCHMARK_RESULTS_v2.md:96 |
+| C-284 | SUPPORTED | `slug_pair` — PASS — FAIL — PASS | docs/BENCHMARK_RESULTS_v2.md:97 |
+| C-285 | SUPPORTED | `to_roman` — PASS — PASS — PASS | docs/BENCHMARK_RESULTS_v2.md:98 |
+| C-286 | SUPPORTED | `ledger_apply` — False — False — False | docs/BENCHMARK_RESULTS_v2.md:108 |
+| C-287 | SUPPORTED | `parse_duration` — False — False — False | docs/BENCHMARK_RESULTS_v2.md:109 |
+| C-288 | SUPPORTED | `retry_backoff` — False — False — False | docs/BENCHMARK_RESULTS_v2.md:110 |
+| C-289 | SUPPORTED | `slug_pair` — False — True — False | docs/BENCHMARK_RESULTS_v2.md:111 |
+| C-290 | SUPPORTED | `to_roman` — False — False — False | docs/BENCHMARK_RESULTS_v2.md:112 |
+| C-291 | SUPPORTED | `ledger_apply` — A — 43 — 1 | docs/BENCHMARK_RESULTS_v2.md:118 |
+| C-292 | SUPPORTED | `ledger_apply` — B — 408 — 7 | docs/BENCHMARK_RESULTS_v2.md:119 |
+| C-293 | SUPPORTED | `ledger_apply` — C — 1672 — 18 | docs/BENCHMARK_RESULTS_v2.md:120 |
+| C-294 | SUPPORTED | `parse_duration` — A — 41 — 1 | docs/BENCHMARK_RESULTS_v2.md:121 |
+| C-295 | SUPPORTED | `parse_duration` — B — 538 — 7 | docs/BENCHMARK_RESULTS_v2.md:122 |
+| C-296 | SUPPORTED | `retry_backoff` — A — 44 — 1 | docs/BENCHMARK_RESULTS_v2.md:124 |
+| C-297 | SUPPORTED | `retry_backoff` — B — 503 — 7 | docs/BENCHMARK_RESULTS_v2.md:125 |
+| C-298 | SUPPORTED | `slug_pair` — A — 27 — 1 | docs/BENCHMARK_RESULTS_v2.md:127 |
+| C-299 | SUPPORTED | `slug_pair` — B — 584 — 7 | docs/BENCHMARK_RESULTS_v2.md:128 |
+| C-300 | SUPPORTED | `to_roman` — A — 32 — 1 | docs/BENCHMARK_RESULTS_v2.md:130 |
+| C-301 | SUPPORTED | `to_roman` — B — 430 — 7 | docs/BENCHMARK_RESULTS_v2.md:131 |
+| C-302 | SUPPORTED | `ledger_apply` — A — 1 (asserted, not counted) — 9 — unknown | docs/BENCHMARK_RESULTS_v2.md:74 |
+| C-303 | SUPPORTED | `parse_duration` — A — 1 (asserted, not counted) — 9 — unknown | docs/BENCHMARK_RESULTS_v2.md:77 |
+| C-304 | SUPPORTED | `retry_backoff` — A — 1 (asserted, not counted) — 9 — unknown | docs/BENCHMARK_RESULTS_v2.md:80 |
+| C-305 | SUPPORTED | `slug_pair` — A — 1 (asserted, not counted) — 9 — unknown | docs/BENCHMARK_RESULTS_v2.md:83 |
+| C-306 | SUPPORTED | `to_roman` — A — 1 (asserted, not counted) — 9 — unknown | docs/BENCHMARK_RESULTS_v2.md:86 |
+| C-307 | SUPPORTED | **The dispatch budget was defined and never enforced.** This document says a run that exceeds it "is stopped and recorded as `BUDGET_EXHAUSTED`", and that arm C's repair-node dispatches count. Neither happened: three of campaign v2's five arm-C cells spent 18 against 9 and halted normally. That is an instrument defect, not a protocol gap -- but it means those cells did not have the matched resource this benchmark is named after, and a future campaign has to enforce the rule rather than report it. ⟦five arm-C cells spent 18 against 9 and halted normally. That is an instrument⟧ | docs/BENCHMARK_PROTOCOL.md:219 |
+| C-308 | SUPPORTED | A node and the repair nodes it spawns draw on one shared ceiling of nine. The design block above says `per cell` for that reason: it read `per run`, which is the same number for arms A and B and three times the number for arm C, and two lines of one pre-registration giving different budgets is exactly the ambiguity this campaign exists to remove. * On spending dispatch 9 there is no tenth. Further work that would need one ends the cell in `BUDGET_EXHAUSTED` -- a measured final state, and explicitly not `PROVIDER_UNAVAILABLE`, not an ambiguous halt, and not a quiet close. ⟦* On spending dispatch 9 there is no tenth. Further work that would need one⟧ | docs/BENCHMARK_PROTOCOL.md:252 |
+| C-309 | SUPPORTED | The figure is read from the runs' own records (`state.json` usage and the `provider_calls` field of `telemetry.jsonl`), never asserted beside the result. v2's cost figure was asserted, and it was wrong by a factor of two in three cells. ⟦result. v2's cost figure was asserted, and it was wrong by a factor of two in⟧ | docs/BENCHMARK_PROTOCOL.md:259 |
+| C-310 | SUPPORTED | `dispatch_budget = 9` is enforced rather than described. The ninth call reaches the provider, the tenth is refused with the budget named, the count is written to disk before each call so a crash cannot refund it, and a second process reads the same spend; removing the enforcement turns every one of those controls red. `python3 tools/budget_evidence.py` measures it and reproduces the record, which this project keeps in its internal evidence tree and the export does not carry (limitation 12e). ⟦`dispatch_budget = 9` is enforced rather than described. The ninth call⟧ | docs/BENCHMARK_PROTOCOL.md:230 |
+| C-311 | SUPPORTED | **`repetitions = 3` is unconditional.** Not "three where the budget allows": that phrasing is what made v2's repetition requirement undecidable, and it is not repeated here in any form. ⟦that phrasing is what made v2's repetition requirement undecidable, and it is⟧ | docs/BENCHMARK_PROTOCOL.md:231 |
+| C-312 | SUPPORTED | The budget is meaningless without this, and v2's was: ⟦The budget is meaningless without this, and v2's was:⟧ | docs/BENCHMARK_PROTOCOL.md:243 |
+| C-313 | SUPPORTED | v2 found exactly one false accept: `slug_pair`, arm B, a normalisation that dropped a character (`'ahnlich-ja' != 'hnlich-ja'`). ⟦v2 found exactly one false accept: `slug_pair`, arm B, a normalisation that⟧ | docs/BENCHMARK_PROTOCOL.md:294 |
+| C-314 | SUPPORTED | What exists instead is visibility: `telemetry.jsonl` records `provider_calls` per dispatch record, so a charge that produced no call is `provider_calls: 0` on the line and can be counted by a reader. ⟦`provider_calls: 0` on the line and can be counted by a reader.⟧ | docs/LIMITATIONS.md:815 |
+| C-315 | SUPPORTED | `tools/budget_evidence.py` control K3 measures the order itself. ⟦`tools/budget_evidence.py` control K3 measures the order itself.⟧ | docs/LIMITATIONS.md:816 |
+| C-316 | SUPPORTED | It is therefore *under* the ceiling, not at it, and §"Matched budget"'s sentence "A gets nine turns" describes a design that was never built -- in v1 and in v2 arm A spent one dispatch per cell. ⟦that was never built -- in v1 and in v2 arm A spent one dispatch per cell.⟧ | docs/BENCHMARK_PROTOCOL.md:243 |
+| C-317 | SUPPORTED | `docs/BENCHMARK_PROTOCOL.md` §"Matched budget" says each arm gets at most nine role dispatches per task and that "A gets nine turns". Arms B and C are given that ceiling and, since O144, enforced against it. **Arm A is single-shot.** `tools/benchmark.py`'s `arm_a` makes exactly one provider call: one agent turn with the specification and the repository, no loop above it. Every arm-A cell in campaigns v1 and v2 records one dispatch. ⟦that ceiling and, since O144, enforced against it. **Arm A is single-shot.**⟧ | docs/LIMITATIONS.md:1060 |
+| C-318 | SUPPORTED | Every arm-A cell in campaigns v1 and v2 records one dispatch. ⟦in campaigns v1 and v2 records one dispatch.⟧ | docs/LIMITATIONS.md:1063 |
+| C-319 | SUPPORTED | A campaign in which A matches or beats B and C is therefore robust to the asymmetry -- which is what v1 and v2 found, A passing 5 of 5 in both. ⟦to the asymmetry -- which is what v1 and v2 found, A passing 5 of 5 in both.⟧ | docs/LIMITATIONS.md:1071 |
+| C-320 | SUPPORTED | `evidence_index` — PASS — EVIDENCE_INDEX.md matches the trees it describes — `python3 tools/evidence_index.py` | docs/READINESS.md:29 |
+| C-321 | SUPPORTED | `paper_audit` — PASS — 8 of 8 checks — `python3 tools/audit_refs.py <each check>` | docs/READINESS.md:30 |
+| C-322 | SUPPORTED | `external_ci` — PASS — success on 27cdbf8bcc99 (6 job(s)); sandbox_external_env = UNSUPPORTED_ENVIRONMENT — `python3 tools/exact_head_ci.py --run-id ID --export-commit SHA` | docs/READINESS.md:31 |
+| C-323 | SUPPORTED | So: **0 unacknowledged, 9 acknowledged in 2 documents.** The count above is what the gate reported before this, and it is left standing rather than edited, because the entry is the record of what was found. ⟦So: **0 unacknowledged, 9 acknowledged in 2 documents.** The count above is⟧ | docs/LIMITATIONS.md:796 |
+| C-324 | SUPPORTED | `NUMBER 2 (C-050)` had been `NOT_CHECKED` since O33 on the stated ground that `runs/` was absent; it is present in this checkout, so the ratio was recomputed from `runs/a03/receipts` -- three checks of a03 iteration 2 carry both a `-basis` and a candidate receipt, and two of the three have differing exit codes. ⟦`runs/a03/receipts` -- three checks of a03 iteration 2 carry both a `-basis`⟧ | paper/AUDIT.md:332 |
+| C-325 | SUPPORTED | `to_roman` — C — 3 — 9 — 9 — no | docs/BENCHMARK_RESULTS_v3.md:166 |
+| C-326 | SUPPORTED | `ledger_apply` — A — 1 — 1 — 9 — no | docs/BENCHMARK_RESULTS_v3.md:122 |
+| C-327 | SUPPORTED | `ledger_apply` — A — 2 — 1 — 9 — no | docs/BENCHMARK_RESULTS_v3.md:123 |
+| C-328 | SUPPORTED | `ledger_apply` — A — 3 — 1 — 9 — no | docs/BENCHMARK_RESULTS_v3.md:124 |
+| C-329 | SUPPORTED | `ledger_apply` — B — 1 — 6 — 9 — no | docs/BENCHMARK_RESULTS_v3.md:125 |
+| C-330 | SUPPORTED | `ledger_apply` — B — 2 — 6 — 9 — no | docs/BENCHMARK_RESULTS_v3.md:126 |
+| C-331 | SUPPORTED | `ledger_apply` — B — 3 — 6 — 9 — no | docs/BENCHMARK_RESULTS_v3.md:127 |
+| C-332 | SUPPORTED | `ledger_apply` — C — 1 — 9 — 9 — no | docs/BENCHMARK_RESULTS_v3.md:128 |
+| C-333 | SUPPORTED | `ledger_apply` — C — 2 — 9 — 9 — no | docs/BENCHMARK_RESULTS_v3.md:129 |
+| C-334 | SUPPORTED | `ledger_apply` — C — 3 — 9 — 9 — no | docs/BENCHMARK_RESULTS_v3.md:130 |
+| C-335 | SUPPORTED | `parse_duration` — A — 1 — 1 — 9 — no | docs/BENCHMARK_RESULTS_v3.md:131 |
+| C-336 | SUPPORTED | `parse_duration` — A — 2 — 1 — 9 — no | docs/BENCHMARK_RESULTS_v3.md:132 |
+| C-337 | SUPPORTED | `parse_duration` — A — 3 — 1 — 9 — no | docs/BENCHMARK_RESULTS_v3.md:133 |
+| C-338 | SUPPORTED | `parse_duration` — B — 1 — 7 — 9 — no | docs/BENCHMARK_RESULTS_v3.md:134 |
+| C-339 | SUPPORTED | `parse_duration` — B — 2 — 7 — 9 — no | docs/BENCHMARK_RESULTS_v3.md:135 |
+| C-340 | SUPPORTED | `parse_duration` — B — 3 — 6 — 9 — no | docs/BENCHMARK_RESULTS_v3.md:136 |
+| C-341 | SUPPORTED | `parse_duration` — C — 1 — 9 — 9 — no | docs/BENCHMARK_RESULTS_v3.md:137 |
+| C-342 | SUPPORTED | `parse_duration` — C — 2 — 9 — 9 — no | docs/BENCHMARK_RESULTS_v3.md:138 |
+| C-343 | SUPPORTED | `parse_duration` — C — 3 — 9 — 9 — no | docs/BENCHMARK_RESULTS_v3.md:139 |
+| C-344 | SUPPORTED | `retry_backoff` — A — 1 — 1 — 9 — no | docs/BENCHMARK_RESULTS_v3.md:140 |
+| C-345 | SUPPORTED | `retry_backoff` — A — 2 — 1 — 9 — no | docs/BENCHMARK_RESULTS_v3.md:141 |
+| C-346 | SUPPORTED | `retry_backoff` — A — 3 — 1 — 9 — no | docs/BENCHMARK_RESULTS_v3.md:142 |
+| C-347 | SUPPORTED | `retry_backoff` — B — 1 — 6 — 9 — no | docs/BENCHMARK_RESULTS_v3.md:143 |
+| C-348 | SUPPORTED | `retry_backoff` — B — 2 — 7 — 9 — no | docs/BENCHMARK_RESULTS_v3.md:144 |
+| C-349 | SUPPORTED | `retry_backoff` — B — 3 — 7 — 9 — no | docs/BENCHMARK_RESULTS_v3.md:145 |
+| C-350 | SUPPORTED | `retry_backoff` — C — 1 — 9 — 9 — no | docs/BENCHMARK_RESULTS_v3.md:146 |
+| C-351 | SUPPORTED | `retry_backoff` — C — 2 — 9 — 9 — no | docs/BENCHMARK_RESULTS_v3.md:147 |
+| C-352 | SUPPORTED | `retry_backoff` — C — 3 — 9 — 9 — no | docs/BENCHMARK_RESULTS_v3.md:148 |
+| C-353 | SUPPORTED | `slug_pair` — A — 1 — 1 — 9 — no | docs/BENCHMARK_RESULTS_v3.md:149 |
+| C-354 | SUPPORTED | `slug_pair` — A — 2 — 1 — 9 — no | docs/BENCHMARK_RESULTS_v3.md:150 |
+| C-355 | SUPPORTED | `slug_pair` — A — 3 — 1 — 9 — no | docs/BENCHMARK_RESULTS_v3.md:151 |
+| C-356 | SUPPORTED | `slug_pair` — B — 1 — 6 — 9 — no | docs/BENCHMARK_RESULTS_v3.md:152 |
+| C-357 | SUPPORTED | `slug_pair` — B — 2 — 6 — 9 — no | docs/BENCHMARK_RESULTS_v3.md:153 |
+| C-358 | SUPPORTED | `slug_pair` — B — 3 — 6 — 9 — no | docs/BENCHMARK_RESULTS_v3.md:154 |
+| C-359 | SUPPORTED | `slug_pair` — C — 1 — 9 — 9 — no | docs/BENCHMARK_RESULTS_v3.md:155 |
+| C-360 | SUPPORTED | `slug_pair` — C — 2 — 9 — 9 — no | docs/BENCHMARK_RESULTS_v3.md:156 |
+| C-361 | SUPPORTED | `slug_pair` — C — 3 — 9 — 9 — no | docs/BENCHMARK_RESULTS_v3.md:157 |
+| C-362 | SUPPORTED | `to_roman` — A — 1 — 1 — 9 — no | docs/BENCHMARK_RESULTS_v3.md:158 |
+| C-363 | SUPPORTED | `to_roman` — A — 2 — 1 — 9 — no | docs/BENCHMARK_RESULTS_v3.md:159 |
+| C-364 | SUPPORTED | `to_roman` — A — 3 — 1 — 9 — no | docs/BENCHMARK_RESULTS_v3.md:160 |
+| C-365 | SUPPORTED | `to_roman` — B — 1 — 6 — 9 — no | docs/BENCHMARK_RESULTS_v3.md:161 |
+| C-366 | SUPPORTED | `to_roman` — B — 2 — 6 — 9 — no | docs/BENCHMARK_RESULTS_v3.md:162 |
+| C-367 | SUPPORTED | `to_roman` — B — 3 — 6 — 9 — no | docs/BENCHMARK_RESULTS_v3.md:163 |
+| C-368 | SUPPORTED | `to_roman` — C — 1 — 9 — 9 — no | docs/BENCHMARK_RESULTS_v3.md:164 |
+| C-369 | SUPPORTED | `to_roman` — C — 2 — 9 — 9 — no | docs/BENCHMARK_RESULTS_v3.md:165 |
+| C-370 | SUPPORTED | `ledger_apply` — A — 1 — answered — PASS — no — 1 — no — - — - — 43.0 — no — no | docs/BENCHMARK_RESULTS_v3.md:174 |
+| C-371 | SUPPORTED | `ledger_apply` — A — 2 — answered — PASS — no — 1 — no — - — - — 40.2 — no — no | docs/BENCHMARK_RESULTS_v3.md:175 |
+| C-372 | SUPPORTED | `ledger_apply` — A — 3 — answered — PASS — no — 1 — no — - — - — 39.1 — no — no | docs/BENCHMARK_RESULTS_v3.md:176 |
+| C-373 | SUPPORTED | `ledger_apply` — B — 1 — accepted — PASS — no — 6 — no — - — - — 408.4 — no — no | docs/BENCHMARK_RESULTS_v3.md:177 |
+| C-374 | SUPPORTED | `ledger_apply` — B — 2 — accepted — PASS — no — 6 — no — - — - — 473.8 — no — no | docs/BENCHMARK_RESULTS_v3.md:178 |
+| C-375 | SUPPORTED | `ledger_apply` — B — 3 — accepted — PASS — no — 6 — no — - — - — 471.2 — no — no | docs/BENCHMARK_RESULTS_v3.md:179 |
+| C-376 | SUPPORTED | `ledger_apply` — C — 1 — BUDGET_EXHAUSTED — PASS — no — 9 — yes — 1 — 0 — 593.7 — no — no | docs/BENCHMARK_RESULTS_v3.md:180 |
+| C-377 | SUPPORTED | `ledger_apply` — C — 2 — BUDGET_EXHAUSTED — PASS — no — 9 — yes — 1 — 0 — 517.1 — no — no | docs/BENCHMARK_RESULTS_v3.md:181 |
+| C-378 | SUPPORTED | `ledger_apply` — C — 3 — BUDGET_EXHAUSTED — PASS — no — 9 — yes — 1 — 0 — 655.0 — no — no | docs/BENCHMARK_RESULTS_v3.md:182 |
+| C-379 | SUPPORTED | `parse_duration` — A — 1 — answered — PASS — no — 1 — no — - — - — 38.8 — no — no | docs/BENCHMARK_RESULTS_v3.md:183 |
+| C-380 | SUPPORTED | `parse_duration` — A — 2 — answered — PASS — no — 1 — no — - — - — 35.5 — no — no | docs/BENCHMARK_RESULTS_v3.md:184 |
+| C-381 | SUPPORTED | `parse_duration` — A — 3 — answered — PASS — no — 1 — no — - — - — 37.8 — no — no | docs/BENCHMARK_RESULTS_v3.md:185 |
+| C-382 | SUPPORTED | `parse_duration` — B — 1 — accepted — PASS — no — 7 — no — - — - — 370.3 — no — no | docs/BENCHMARK_RESULTS_v3.md:186 |
+| C-383 | SUPPORTED | `parse_duration` — B — 2 — accepted — PASS — no — 7 — no — - — - — 348.1 — no — no | docs/BENCHMARK_RESULTS_v3.md:187 |
+| C-384 | SUPPORTED | `parse_duration` — B — 3 — accepted — PASS — no — 6 — no — - — - — 388.5 — no — no | docs/BENCHMARK_RESULTS_v3.md:188 |
+| C-385 | SUPPORTED | `parse_duration` — C — 1 — BUDGET_EXHAUSTED — PASS — no — 9 — yes — 1 — 0 — 519.3 — no — no | docs/BENCHMARK_RESULTS_v3.md:189 |
+| C-386 | SUPPORTED | `parse_duration` — C — 2 — BUDGET_EXHAUSTED — PASS — no — 9 — yes — 1 — 0 — 467.1 — no — no | docs/BENCHMARK_RESULTS_v3.md:190 |
+| C-387 | SUPPORTED | `parse_duration` — C — 3 — BUDGET_EXHAUSTED — PASS — no — 9 — yes — 1 — 0 — 534.2 — no — no | docs/BENCHMARK_RESULTS_v3.md:191 |
+| C-388 | SUPPORTED | `retry_backoff` — A — 1 — answered — PASS — no — 1 — no — - — - — 34.7 — no — no | docs/BENCHMARK_RESULTS_v3.md:192 |
+| C-389 | SUPPORTED | `retry_backoff` — A — 2 — answered — PASS — no — 1 — no — - — - — 33.0 — no — no | docs/BENCHMARK_RESULTS_v3.md:193 |
+| C-390 | SUPPORTED | `retry_backoff` — A — 3 — answered — PASS — no — 1 — no — - — - — 34.8 — no — no | docs/BENCHMARK_RESULTS_v3.md:194 |
+| C-391 | SUPPORTED | `retry_backoff` — B — 1 — accepted — PASS — no — 6 — no — - — - — 448.9 — no — no | docs/BENCHMARK_RESULTS_v3.md:195 |
+| C-392 | SUPPORTED | `retry_backoff` — B — 2 — accepted — PASS — no — 7 — no — - — - — 450.2 — no — no | docs/BENCHMARK_RESULTS_v3.md:196 |
+| C-393 | SUPPORTED | `retry_backoff` — B — 3 — accepted — PASS — no — 7 — no — - — - — 408.5 — no — no | docs/BENCHMARK_RESULTS_v3.md:197 |
+| C-394 | SUPPORTED | `retry_backoff` — C — 1 — BUDGET_EXHAUSTED — PASS — no — 9 — yes — 1 — 0 — 780.2 — no — no | docs/BENCHMARK_RESULTS_v3.md:198 |
+| C-395 | SUPPORTED | `retry_backoff` — C — 2 — BUDGET_EXHAUSTED — PASS — no — 9 — yes — 1 — 0 — 590.7 — no — no | docs/BENCHMARK_RESULTS_v3.md:199 |
+| C-396 | SUPPORTED | `retry_backoff` — C — 3 — BUDGET_EXHAUSTED — PASS — no — 9 — yes — 1 — 0 — 701.2 — no — no | docs/BENCHMARK_RESULTS_v3.md:200 |
+| C-397 | SUPPORTED | `slug_pair` — A — 1 — answered — PASS — no — 1 — no — - — - — 29.7 — no — no | docs/BENCHMARK_RESULTS_v3.md:201 |
+| C-398 | SUPPORTED | `slug_pair` — A — 2 — answered — PASS — no — 1 — no — - — - — 28.2 — no — no | docs/BENCHMARK_RESULTS_v3.md:202 |
+| C-399 | SUPPORTED | `slug_pair` — A — 3 — answered — PASS — no — 1 — no — - — - — 34.0 — no — no | docs/BENCHMARK_RESULTS_v3.md:203 |
+| C-400 | SUPPORTED | `slug_pair` — B — 1 — accepted — FAIL — yes — 6 — no — - — - — 546.4 — no — no | docs/BENCHMARK_RESULTS_v3.md:204 |
+| C-401 | SUPPORTED | `slug_pair` — B — 2 — accepted — PASS — no — 6 — no — - — - — 503.4 — no — no | docs/BENCHMARK_RESULTS_v3.md:205 |
+| C-402 | SUPPORTED | `slug_pair` — B — 3 — accepted — PASS — no — 6 — no — - — - — 492.8 — no — no | docs/BENCHMARK_RESULTS_v3.md:206 |
+| C-403 | SUPPORTED | `slug_pair` — C — 1 — BUDGET_EXHAUSTED — PASS — no — 9 — yes — 1 — 0 — 732.5 — no — no | docs/BENCHMARK_RESULTS_v3.md:207 |
+| C-404 | SUPPORTED | `slug_pair` — C — 2 — BUDGET_EXHAUSTED — PASS — no — 9 — yes — 1 — 0 — 646.1 — no — no | docs/BENCHMARK_RESULTS_v3.md:208 |
+| C-405 | SUPPORTED | `slug_pair` — C — 3 — BUDGET_EXHAUSTED — FAIL — no — 9 — yes — 1 — 0 — 858.2 — no — no | docs/BENCHMARK_RESULTS_v3.md:209 |
+| C-406 | SUPPORTED | `to_roman` — A — 1 — answered — PASS — no — 1 — no — - — - — 33.3 — no — no | docs/BENCHMARK_RESULTS_v3.md:210 |
+| C-407 | SUPPORTED | `to_roman` — A — 2 — answered — PASS — no — 1 — no — - — - — 28.2 — no — no | docs/BENCHMARK_RESULTS_v3.md:211 |
+| C-408 | SUPPORTED | `to_roman` — A — 3 — answered — PASS — no — 1 — no — - — - — 30.3 — no — no | docs/BENCHMARK_RESULTS_v3.md:212 |
+| C-409 | SUPPORTED | `to_roman` — B — 1 — accepted — PASS — no — 6 — no — - — - — 336.4 — no — no | docs/BENCHMARK_RESULTS_v3.md:213 |
+| C-410 | SUPPORTED | `to_roman` — B — 2 — accepted — PASS — no — 6 — no — - — - — 328.8 — no — no | docs/BENCHMARK_RESULTS_v3.md:214 |
+| C-411 | SUPPORTED | `to_roman` — B — 3 — accepted — PASS — no — 6 — no — - — - — 334.2 — no — no | docs/BENCHMARK_RESULTS_v3.md:215 |
+| C-412 | SUPPORTED | `to_roman` — C — 1 — BUDGET_EXHAUSTED — PASS — no — 9 — yes — 1 — 0 — 443.1 — no — no | docs/BENCHMARK_RESULTS_v3.md:216 |
+| C-413 | SUPPORTED | `to_roman` — C — 2 — BUDGET_EXHAUSTED — PASS — no — 9 — yes — 1 — 0 — 551.9 — no — no | docs/BENCHMARK_RESULTS_v3.md:217 |
+| C-414 | SUPPORTED | `to_roman` — C — 3 — BUDGET_EXHAUSTED — PASS — no — 9 — yes — 1 — 0 — 589.6 — no — no | docs/BENCHMARK_RESULTS_v3.md:218 |
+| C-415 | SUPPORTED | `ledger_apply` — A — 3 — 3/3 — 0 — 1 — 0 — 0 | docs/BENCHMARK_RESULTS_v3.md:227 |
+| C-416 | SUPPORTED | `ledger_apply` — B — 3 — 3/3 — 0 — 6 — 0 — 0 | docs/BENCHMARK_RESULTS_v3.md:228 |
+| C-417 | SUPPORTED | `ledger_apply` — C — 3 — 3/3 — 0 — 9 — 3 — 0 | docs/BENCHMARK_RESULTS_v3.md:229 |
+| C-418 | SUPPORTED | `parse_duration` — A — 3 — 3/3 — 0 — 1 — 0 — 0 | docs/BENCHMARK_RESULTS_v3.md:230 |
+| C-419 | SUPPORTED | `parse_duration` — B — 3 — 3/3 — 0 — 6-7 — 0 — 0 | docs/BENCHMARK_RESULTS_v3.md:231 |
+| C-420 | SUPPORTED | `parse_duration` — C — 3 — 3/3 — 0 — 9 — 3 — 0 | docs/BENCHMARK_RESULTS_v3.md:232 |
+| C-421 | SUPPORTED | `retry_backoff` — A — 3 — 3/3 — 0 — 1 — 0 — 0 | docs/BENCHMARK_RESULTS_v3.md:233 |
+| C-422 | SUPPORTED | `retry_backoff` — B — 3 — 3/3 — 0 — 6-7 — 0 — 0 | docs/BENCHMARK_RESULTS_v3.md:234 |
+| C-423 | SUPPORTED | `retry_backoff` — C — 3 — 3/3 — 0 — 9 — 3 — 0 | docs/BENCHMARK_RESULTS_v3.md:235 |
+| C-424 | SUPPORTED | `slug_pair` — A — 3 — 3/3 — 0 — 1 — 0 — 0 | docs/BENCHMARK_RESULTS_v3.md:236 |
+| C-425 | SUPPORTED | `slug_pair` — B — 3 — 2/3 — 1 — 6 — 0 — 0 | docs/BENCHMARK_RESULTS_v3.md:237 |
+| C-426 | SUPPORTED | `slug_pair` — C — 3 — 2/3 — 0 — 9 — 3 — 0 | docs/BENCHMARK_RESULTS_v3.md:238 |
+| C-427 | SUPPORTED | `to_roman` — A — 3 — 3/3 — 0 — 1 — 0 — 0 | docs/BENCHMARK_RESULTS_v3.md:239 |
+| C-428 | SUPPORTED | `to_roman` — B — 3 — 3/3 — 0 — 6 — 0 — 0 | docs/BENCHMARK_RESULTS_v3.md:240 |
+| C-429 | SUPPORTED | `to_roman` — C — 3 — 3/3 — 0 — 9 — 3 — 0 | docs/BENCHMARK_RESULTS_v3.md:241 |
+| C-430 | SUPPORTED | `ledger_apply` — A — 47 — 1 | docs/BENCHMARK_RESULTS_v3.md:274 |
+| C-431 | SUPPORTED | `ledger_apply` — B — 522 — 6 | docs/BENCHMARK_RESULTS_v3.md:275 |
+| C-432 | SUPPORTED | `ledger_apply` — C — 727 — 9 | docs/BENCHMARK_RESULTS_v3.md:276 |
+| C-433 | SUPPORTED | `parse_duration` — A — 46 — 1 | docs/BENCHMARK_RESULTS_v3.md:277 |
+| C-434 | SUPPORTED | `parse_duration` — B — 432 — 6 | docs/BENCHMARK_RESULTS_v3.md:278 |
+| C-435 | SUPPORTED | `parse_duration` — C — 592 — 9 | docs/BENCHMARK_RESULTS_v3.md:279 |
+| C-436 | SUPPORTED | `retry_backoff` — A — 43 — 1 | docs/BENCHMARK_RESULTS_v3.md:280 |
+| C-437 | SUPPORTED | `retry_backoff` — B — 452 — 7 | docs/BENCHMARK_RESULTS_v3.md:281 |
+| C-438 | SUPPORTED | `retry_backoff` — C — 780 — 9 | docs/BENCHMARK_RESULTS_v3.md:282 |
+| C-439 | SUPPORTED | `slug_pair` — A — 42 — 1 | docs/BENCHMARK_RESULTS_v3.md:283 |
+| C-440 | SUPPORTED | `slug_pair` — B — 547 — 6 | docs/BENCHMARK_RESULTS_v3.md:284 |
+| C-441 | SUPPORTED | `slug_pair` — C — 951 — 9 | docs/BENCHMARK_RESULTS_v3.md:285 |
+| C-442 | SUPPORTED | `to_roman` — A — 35 — 1 | docs/BENCHMARK_RESULTS_v3.md:286 |
+| C-443 | SUPPORTED | `to_roman` — B — 370 — 6 | docs/BENCHMARK_RESULTS_v3.md:287 |
+| C-444 | SUPPORTED | `to_roman` — C — 654 — 9 | docs/BENCHMARK_RESULTS_v3.md:288 |
+| C-445 | SUPPORTED | **What it means, and only this:** the campaign was pre-registered before the first dispatch; the exact registration bytes were bound in a commit before it; all 45 runs completed; the matched budget was valid, meaning no cell exceeded the ceiling the protocol declares; the raw data is complete; and the analysis is reproducible from the cell files by a second, independently written aggregation. ⟦all 45 runs completed; the matched budget was valid, meaning no cell exceeded⟧ | docs/LIMITATIONS.md:858 |
+| C-446 | SUPPORTED | A -- plain agent — 15/15 PASS — 0 — answered | docs/LIMITATIONS.md:872 |
+| C-447 | SUPPORTED | B -- one `hoh run` — 14/15 PASS — 1 — 15/15 accepted | docs/LIMITATIONS.md:873 |
+| C-448 | SUPPORTED | C -- full control plane — 14/15 PASS — 0 — 15/15 `BUDGET_EXHAUSTED`, 0/15 `CLOSED` | docs/LIMITATIONS.md:874 |
+| C-449 | SUPPORTED | **Arm A, with one dispatch per cell, passed everything.** That is not a rounding detail. Arm A is single-shot by construction (limit 17), so it spent a ninth of what the harnessed arms were allowed, and it still produced the most passing cells and no false accept. ⟦rounding detail. Arm A is single-shot by construction (limit 17), so it spent⟧ | docs/LIMITATIONS.md:885 |
+| C-450 | SUPPORTED | **What the harness did demonstrate** is narrower and is worth stating on its own: arm B's verification kernel produced one measurable false accept on five small tasks, reproducing the same task and arm campaign v2 found, and arm C's control plane detected a red global gate and dispatched a repair node in every single cell -- it simply had no budget left to finish. ⟦small tasks, reproducing the same task and arm campaign v2 found, and arm C's⟧ | docs/LIMITATIONS.md:891 |
+| C-451 | SUPPORTED | `routing` — PASS — DEFERRED_ON_EVIDENCE — `read docs/ROUTING.md` | docs/READINESS.md:32 |
+| C-452 | SUPPORTED | The sentence above used to say there is *no* unmarked failure, and it invited a reader to check exactly that. Run against a real export tree it was wrong: 167 of 329 failures carried no marker. Two different things had been reported as one. An **anchor** that cannot resolve because its file is absent was marked; an **evidence reference** to the very same absent file was not, and 163 of the unmarked failures were that. ⟦167 of 329 failures carried no marker. Two different things had been reported⟧ | docs/LIMITATIONS.md:1164 |
+| C-453 | SUPPORTED | An **anchor** that cannot resolve because its file is absent was marked; an **evidence reference** to the very same absent file was not, and 163 of the unmarked failures were that. ⟦163 of the unmarked failures were that.⟧ | docs/LIMITATIONS.md:1167 |
+| C-454 | SUPPORTED | The asymmetry had no justification, so the tool was changed rather than the claim weakened to fit it: `check_claims.py` now asks `EXPORT_MANIFEST.json` whether an absent path is classified `EXCLUDE`. If it is, the file was never shipped and the failure is an environment gap; if it is not, the evidence is genuinely missing and it stays a content defect, which is the direction that fails safe. Measured again afterwards: 4 unmarked lines, all four the single rendering difference described above. ⟦fails safe. Measured again afterwards: 4 unmarked lines, all four the single⟧ | docs/LIMITATIONS.md:1174 |
 
 ### Evidence and notes
 
@@ -249,9 +557,10 @@ Invalidated run: `a02`
 **C-013**
 
 Evidence:
-- `file:docs/LIMITATIONS.md:25` -- resolvability: **PUBLIC**
+- `file:dogfood/benchmark/results/ledger_apply.A.1.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-13)
+- `file:docs/BENCHMARK_RESULTS.md:56` -- resolvability: **PUBLIC**
 
-Note: Absence claim: no comparison or baseline run exists in this project's evidence. None of this schema's evidence forms (test/file/receipt/run/cite) can positively prove a negative, so this is recorded as UNSUPPORTED rather than implied to be independently checkable; docs/LIMITATIONS.md's second limitation states it in full.
+Note: Absence claim: no comparison or baseline run exists in this project's evidence. None of this schema's evidence forms (test/file/receipt/run/cite) can positively prove a negative, so this is recorded as UNSUPPORTED rather than implied to be independently checkable; docs/LIMITATIONS.md's second limitation states it in full. Superseded on 2026-09-13 by measurement. The earlier claim, recorded from the first release until this date, was: "There is no matched-budget comparison against a plain agent working the same specification without HoH's plan/develop/verify loop around it, and no baseline run of any kind exists in this repository's evidence." It was true when written and is no longer: a matched-budget benchmark was run under a protocol committed before the first arm, and its result is the line now anchored here. The correction is by addition -- the old wording stays in this note -- and the direction is worth stating: the baseline did not favour the harness. Evidence corrected on 2026-09-13: it pointed at `tools/benchmark.py`, the program that runs the arms, which contains no result and never did -- `audit_refs claims-against-code` has been red on exactly this since before the benchmark ran. The five arm-A outcomes are in docs/BENCHMARK_RESULTS.md's correctness table, derived from the cells in dogfood/benchmark/results/.
 
 **C-014**
 
@@ -578,7 +887,7 @@ Note: Run D5's own specification, dogfood/specs/d5-paper.md, line 308, states cr
 Evidence:
 - `file:dogfood/specs/d5l-limits-from-the-file.md:6` -- resolvability: **LOCAL_ONLY** (resolved by the d3f developer, 2026-09-09)
 
-Note: dogfood/specs/d5l-limits-from-the-file.md, line 6, states plainly: 'sentence was written, docs/LIMITATIONS.md had twelve.' That committed document is this project's own record of the count at the time D5's criterion 6 was written, and it is present in this checkout independent of runs/ or git history.
+Note: dogfood/specs/d5l-limits-from-the-file.md, line 6, states plainly: 'sentence was written, docs/LIMITATIONS.md had twelve.' That committed document is this project's own record of the count at the time D5's criterion 6 was written, and it is present in this checkout independent of runs/ or git history. Re-anchored on 2026-09-14: the statement is unchanged, its citation of an internal working document was rewritten to name the document without a path. The documents are listed in docs/EVIDENCE_INDEX.md. 21 published references pointed at files the export does not carry; 12 were rewritten this way and 9 stand acknowledged in two reviewers' reports, which are published as written.
 
 **C-066**
 
@@ -938,7 +1247,7 @@ Evidence:
 - `receiptcount:d8=26` -- resolvability: **LOCAL_ONLY** (resolved by the orchestrating agent session, 2026-09-10)
 - `run:d8/1` -- resolvability: **LOCAL_ONLY** (resolved by the orchestrating agent session, 2026-09-10)
 
-Note: Catalogued during the rc2 correction cycle. The figure is not left free-standing in prose: it is bound to its source by a checker that fails the release gate on drift, which is the defect class that made this cycle necessary. Figure updated from 94 to 95 on 2026-09-10, when finding O95 was recorded; the earlier wording was "| Recorded findings | **94** |". Finding count updated from 95 to 96 on 2026-09-10, when finding O96 was recorded; the earlier wording was "| Recorded findings | **95** |". Anchor re-derived on 2026-09-10 (similarity 0.97) after finding O97: the attribution figures are now measured at a named commit rather than at HEAD, because the commit that writes them changes them. The earlier wording was: "| Recorded findings | **96** |".
+Note: Catalogued during the rc2 correction cycle. The figure is not left free-standing in prose: it is bound to its source by a checker that fails the release gate on drift, which is the defect class that made this cycle necessary. Figure updated from 94 to 95 on 2026-09-10, when finding O95 was recorded; the earlier wording was "| Recorded findings | **94** |". Finding count updated from 95 to 96 on 2026-09-10, when finding O96 was recorded; the earlier wording was "| Recorded findings | **95** |". Anchor re-derived on 2026-09-10 (similarity 0.97) after finding O97: the attribution figures are now measured at a named commit rather than at HEAD, because the commit that writes them changes them. The earlier wording was: "| Recorded findings | **96** |". Finding count updated to 98 on 2026-09-10 (O98 recorded); the earlier wording was "| Recorded findings | **97** |". Finding count updated to 99 on 2026-09-11 (O99 recorded); the earlier wording was "| Recorded findings | **98** |". Finding count updated to 100 on 2026-09-11 (O100 recorded); the earlier wording was "| Recorded findings | **99** |". Finding count updated to 101 on 2026-09-11 (O101 recorded); the earlier wording was "| Recorded findings | **100** |". Anchor re-derived on 2026-09-11 (similarity 0.97) when the finding count advanced and limit 6 was corrected; the earlier wording was "| Recorded findings | **101** |". Finding count updated from 105 to 111 on 2026-09-11, when findings O106-O111 were recorded (the meta-evidence rule layer and five defects an adversarial double review found in the isolation evidence path); the earlier wording was: "| Recorded findings | **105** |". Finding count updated from 111 to 113 on 2026-09-11, when O112 (a red baseline is not automatically a demonstrated increment) and O113 (the first STRICT run's isolation claim was unevidenced) were recorded; the earlier wording was: "| Recorded findings | **111** |". Finding count updated from 113 to 116 on 2026-09-12, when O114 (the isolation proof lay in the writable area of the thing being checked), O115 (STRICT_REAL_AGENT_E2E, at the fourth attempt) and O116 (the planner was never told how its own criteria are executed) were recorded; the earlier wording was: "| Recorded findings | **113** |". Finding count updated from 116 to 118 on 2026-09-12, when O117 (the first development node through the product's own control plane, and the gate that measured the wrong tree) and O118 (an environment dependence only the external CI could see) were recorded; the earlier wording was: "| Recorded findings | **116** |". Finding count updated from 118 to 119 on 2026-09-12, when O119 (a run's own specification was written into the repository it checks) was recorded; the earlier wording was: "| Recorded findings | **118** |". Finding count updated from 119 to 120 on 2026-09-12, when O120 (a human could unblock a node but not abandon one) was recorded; the earlier wording was: "| Recorded findings | **119** |". Finding count updated from 120 to 121 on 2026-09-12, when O121 (a gate that cannot answer is not red) was recorded; the earlier wording was: "| Recorded findings | **120** |". Finding count updated from 121 to 122 on 2026-09-12, when O122 (an acceptance was discarded by a later block) was recorded; the earlier wording was: "| Recorded findings | **121** |". Finding count updated from 122 to 123 on 2026-09-12, when O123 (a renamed gate made the project permanently unclosable) was recorded; the earlier wording was: "| Recorded findings | **122** |". Finding count updated from 123 to 124 on 2026-09-13, when O124 (the self-hosting campaign reached its fixpoint, and what it cost) was recorded; the earlier wording was: "| Recorded findings | **123** |". Finding count updated from 124 to 125 on 2026-09-13, when O125 (the planner writes, and its own prompt forbids it) was recorded; the earlier wording was: "| Recorded findings | **124** |". Finding count updated from 125 to 126 on 2026-09-13, when O126 (role capabilities became an enforced policy rather than a request) was recorded; the earlier wording was: "| Recorded findings | **125** |". Finding count updated from 126 to 127 on 2026-09-13, when O127 (a planner that had answered was reported as waiting) was recorded; the earlier wording was: "| Recorded findings | **126** |".
 
 **C-131**
 
@@ -954,7 +1263,7 @@ Evidence:
 - `receiptcount:d8=26` -- resolvability: **LOCAL_ONLY** (resolved by the orchestrating agent session, 2026-09-10)
 - `run:d8/1` -- resolvability: **LOCAL_ONLY** (resolved by the orchestrating agent session, 2026-09-10)
 
-Note: Catalogued during the rc2 correction cycle. The figure is not left free-standing in prose: it is bound to its source by a checker that fails the release gate on drift, which is the defect class that made this cycle necessary. Anchor re-derived on 2026-09-10: the earlier wording was "campaign that produces 94 recorded findings against its own harness is not" and implied that finding numbers can be traced into docs/LIMITATIONS.md. They cannot -- that document names no finding numbers, because U2 forbids a shipped file from referencing an unshipped one. The figure itself is unchanged. Figure updated from 94 to 95 on 2026-09-10, when finding O95 was recorded; the earlier wording was "campaign that produces 94 recorded findings against its own harness is not a". Finding count updated from 95 to 96 on 2026-09-10, when finding O96 was recorded; the earlier wording was "campaign that produces 95 recorded findings against its own harness is not a". Anchor re-derived on 2026-09-10 (similarity 0.99) after finding O97: the attribution figures are now measured at a named commit rather than at HEAD, because the commit that writes them changes them. The earlier wording was: "campaign that produces 96 recorded findings against its own harness is not a".
+Note: Catalogued during the rc2 correction cycle. The figure is not left free-standing in prose: it is bound to its source by a checker that fails the release gate on drift, which is the defect class that made this cycle necessary. Anchor re-derived on 2026-09-10: the earlier wording was "campaign that produces 94 recorded findings against its own harness is not" and implied that finding numbers can be traced into docs/LIMITATIONS.md. They cannot -- that document names no finding numbers, because U2 forbids a shipped file from referencing an unshipped one. The figure itself is unchanged. Figure updated from 94 to 95 on 2026-09-10, when finding O95 was recorded; the earlier wording was "campaign that produces 94 recorded findings against its own harness is not a". Finding count updated from 95 to 96 on 2026-09-10, when finding O96 was recorded; the earlier wording was "campaign that produces 95 recorded findings against its own harness is not a". Anchor re-derived on 2026-09-10 (similarity 0.99) after finding O97: the attribution figures are now measured at a named commit rather than at HEAD, because the commit that writes them changes them. The earlier wording was: "campaign that produces 96 recorded findings against its own harness is not a". Finding count updated to 98 on 2026-09-10 (O98 recorded); the earlier wording was "campaign that produces 97 recorded findings against its own harness is not a". Finding count updated to 99 on 2026-09-11 (O99 recorded); the earlier wording was "campaign that produces 98 recorded findings against its own harness is not a". Finding count updated to 100 on 2026-09-11 (O100 recorded); the earlier wording was "campaign that produces 99 recorded findings against its own harness is not a". Finding count updated to 101 on 2026-09-11 (O101 recorded); the earlier wording was "campaign that produces 100 recorded findings against its own harness is not a". Anchor re-derived on 2026-09-11 (similarity 0.99) when the finding count advanced and limit 6 was corrected; the earlier wording was "campaign that produces 101 recorded findings against its own harness is not a". Finding count updated from 105 to 111 on 2026-09-11, when findings O106-O111 were recorded (the meta-evidence rule layer and five defects an adversarial double review found in the isolation evidence path); the earlier wording was: "campaign that produces 105 recorded findings against its own harness is not a". Finding count updated from 111 to 113 on 2026-09-11, when O112 (a red baseline is not automatically a demonstrated increment) and O113 (the first STRICT run's isolation claim was unevidenced) were recorded; the earlier wording was: "campaign that produces 111 recorded findings against its own harness is not a". Finding count updated from 113 to 116 on 2026-09-12, when O114 (the isolation proof lay in the writable area of the thing being checked), O115 (STRICT_REAL_AGENT_E2E, at the fourth attempt) and O116 (the planner was never told how its own criteria are executed) were recorded; the earlier wording was: "campaign that produces 113 recorded findings against its own harness is not a". Finding count updated from 116 to 118 on 2026-09-12, when O117 (the first development node through the product's own control plane, and the gate that measured the wrong tree) and O118 (an environment dependence only the external CI could see) were recorded; the earlier wording was: "campaign that produces 116 recorded findings against its own harness is not a". Finding count updated from 118 to 119 on 2026-09-12, when O119 (a run's own specification was written into the repository it checks) was recorded; the earlier wording was: "campaign that produces 118 recorded findings against its own harness is not a". Finding count updated from 119 to 120 on 2026-09-12, when O120 (a human could unblock a node but not abandon one) was recorded; the earlier wording was: "campaign that produces 119 recorded findings against its own harness is not a". Finding count updated from 120 to 121 on 2026-09-12, when O121 (a gate that cannot answer is not red) was recorded; the earlier wording was: "campaign that produces 120 recorded findings against its own harness is not a". Finding count updated from 121 to 122 on 2026-09-12, when O122 (an acceptance was discarded by a later block) was recorded; the earlier wording was: "campaign that produces 121 recorded findings against its own harness is not a". Finding count updated from 122 to 123 on 2026-09-12, when O123 (a renamed gate made the project permanently unclosable) was recorded; the earlier wording was: "campaign that produces 122 recorded findings against its own harness is not a". Finding count updated from 123 to 124 on 2026-09-13, when O124 (the self-hosting campaign reached its fixpoint, and what it cost) was recorded; the earlier wording was: "campaign that produces 123 recorded findings against its own harness is not a". Finding count updated from 124 to 125 on 2026-09-13, when O125 (the planner writes, and its own prompt forbids it) was recorded; the earlier wording was: "campaign that produces 124 recorded findings against its own harness is not a". Finding count updated from 125 to 126 on 2026-09-13, when O126 (role capabilities became an enforced policy rather than a request) was recorded; the earlier wording was: "campaign that produces 125 recorded findings against its own harness is not a". Finding count updated from 126 to 127 on 2026-09-13, when O127 (a planner that had answered was reported as waiting) was recorded; the earlier wording was: "campaign that produces 126 recorded findings against its own harness is not a".
 
 **C-133**
 
@@ -1002,7 +1311,7 @@ Evidence:
 - `receiptcount:d8=26` -- resolvability: **LOCAL_ONLY** (resolved by the orchestrating agent session, 2026-09-10)
 - `run:d8/1` -- resolvability: **LOCAL_ONLY** (resolved by the orchestrating agent session, 2026-09-10)
 
-Note: Catalogued during the rc2 correction cycle. The figure is not left free-standing in prose: it is bound to its source by a checker that fails the release gate on drift, which is the defect class that made this cycle necessary. Figure updated from 94 to 95 on 2026-09-10, when finding O95 was recorded; the earlier wording was "48 specifications, 45 merges and 94 recorded findings**, across five calendar". Anchor re-derived on 2026-09-10 (similarity 0.97); the earlier wording was: "48 specifications, 45 merges and 95 recorded findings**, across five calendar". What changed in the rc2 cycle: the specification count (48 basenames -> 51 distinct contents) and the attribution columns (now counted without merge commits). The statement itself was not withdrawn. Finding count updated from 95 to 96 on 2026-09-10, when finding O96 was recorded; the earlier wording was "51 specifications, 45 merges and 95 recorded findings**, across five calendar". Anchor re-derived on 2026-09-10 (similarity 0.99) after finding O97: the attribution figures are now measured at a named commit rather than at HEAD, because the commit that writes them changes them. The earlier wording was: "51 specifications, 45 merges and 96 recorded findings**, across five calendar".
+Note: Catalogued during the rc2 correction cycle. The figure is not left free-standing in prose: it is bound to its source by a checker that fails the release gate on drift, which is the defect class that made this cycle necessary. Figure updated from 94 to 95 on 2026-09-10, when finding O95 was recorded; the earlier wording was "48 specifications, 45 merges and 94 recorded findings**, across five calendar". Anchor re-derived on 2026-09-10 (similarity 0.97); the earlier wording was: "48 specifications, 45 merges and 95 recorded findings**, across five calendar". What changed in the rc2 cycle: the specification count (48 basenames -> 51 distinct contents) and the attribution columns (now counted without merge commits). The statement itself was not withdrawn. Finding count updated from 95 to 96 on 2026-09-10, when finding O96 was recorded; the earlier wording was "51 specifications, 45 merges and 95 recorded findings**, across five calendar". Anchor re-derived on 2026-09-10 (similarity 0.99) after finding O97: the attribution figures are now measured at a named commit rather than at HEAD, because the commit that writes them changes them. The earlier wording was: "51 specifications, 45 merges and 96 recorded findings**, across five calendar". Finding count updated to 98 on 2026-09-10 (O98 recorded); the earlier wording was "51 specifications, 45 merges and 97 recorded findings**, across five calendar". Finding count updated to 99 on 2026-09-11 (O99 recorded); the earlier wording was "51 specifications, 45 merges and 98 recorded findings**, across five calendar". Finding count updated to 100 on 2026-09-11 (O100 recorded); the earlier wording was "51 specifications, 45 merges and 99 recorded findings**, across five calendar". Finding count updated to 101 on 2026-09-11 (O101 recorded); the earlier wording was "51 specifications, 45 merges and 100 recorded findings**, across five calendar". Anchor re-derived on 2026-09-11 (similarity 0.99) when the finding count advanced and limit 6 was corrected; the earlier wording was "51 specifications, 45 merges and 101 recorded findings**, across five calendar". Finding count updated from 105 to 111 on 2026-09-11, when findings O106-O111 were recorded (the meta-evidence rule layer and five defects an adversarial double review found in the isolation evidence path); the earlier wording was: "51 specifications, 45 merges and 105 recorded findings**, across five calendar". Finding count updated from 111 to 113 on 2026-09-11, when O112 (a red baseline is not automatically a demonstrated increment) and O113 (the first STRICT run's isolation claim was unevidenced) were recorded; the earlier wording was: "51 specifications, 45 merges and 111 recorded findings**, across five calendar". Finding count updated from 113 to 116 on 2026-09-12, when O114 (the isolation proof lay in the writable area of the thing being checked), O115 (STRICT_REAL_AGENT_E2E, at the fourth attempt) and O116 (the planner was never told how its own criteria are executed) were recorded; the earlier wording was: "51 specifications, 45 merges and 113 recorded findings**, across five calendar". Finding count updated from 116 to 118 on 2026-09-12, when O117 (the first development node through the product's own control plane, and the gate that measured the wrong tree) and O118 (an environment dependence only the external CI could see) were recorded; the earlier wording was: "51 specifications, 45 merges and 116 recorded findings**, across five calendar". Finding count updated from 118 to 119 on 2026-09-12, when O119 (a run's own specification was written into the repository it checks) was recorded; the earlier wording was: "51 specifications, 45 merges and 118 recorded findings**, across five calendar". Finding count updated from 119 to 120 on 2026-09-12, when O120 (a human could unblock a node but not abandon one) was recorded; the earlier wording was: "51 specifications, 45 merges and 119 recorded findings**, across five calendar". Finding count updated from 120 to 121 on 2026-09-12, when O121 (a gate that cannot answer is not red) was recorded; the earlier wording was: "51 specifications, 45 merges and 120 recorded findings**, across five calendar". Finding count updated from 121 to 122 on 2026-09-12, when O122 (an acceptance was discarded by a later block) was recorded; the earlier wording was: "51 specifications, 45 merges and 121 recorded findings**, across five calendar". Finding count updated from 122 to 123 on 2026-09-12, when O123 (a renamed gate made the project permanently unclosable) was recorded; the earlier wording was: "51 specifications, 45 merges and 122 recorded findings**, across five calendar". Finding count updated from 123 to 124 on 2026-09-13, when O124 (the self-hosting campaign reached its fixpoint, and what it cost) was recorded; the earlier wording was: "51 specifications, 45 merges and 123 recorded findings**, across five calendar". Finding count updated from 124 to 125 on 2026-09-13, when O125 (the planner writes, and its own prompt forbids it) was recorded; the earlier wording was: "51 specifications, 45 merges and 124 recorded findings**, across five calendar". Finding count updated from 125 to 126 on 2026-09-13, when O126 (role capabilities became an enforced policy rather than a request) was recorded; the earlier wording was: "51 specifications, 45 merges and 125 recorded findings**, across five calendar". Finding count updated from 126 to 127 on 2026-09-13, when O127 (a planner that had answered was reported as waiting) was recorded; the earlier wording was: "51 specifications, 45 merges and 126 recorded findings**, across five calendar".
 
 **C-139**
 
@@ -1018,7 +1327,7 @@ Evidence:
 - `receiptcount:d8=26` -- resolvability: **LOCAL_ONLY** (resolved by the orchestrating agent session, 2026-09-10)
 - `run:d8/1` -- resolvability: **LOCAL_ONLY** (resolved by the orchestrating agent session, 2026-09-10)
 
-Note: Catalogued during the rc2 correction cycle. The figure is not left free-standing in prose: it is bound to its source by a checker that fails the release gate on drift, which is the defect class that made this cycle necessary. Figure updated from 94 to 95 on 2026-09-10, when finding O95 was recorded; the earlier wording was "decisions against 65 runs, 48 specifications, 45 merges and 94 findings. The". Anchor re-derived on 2026-09-10 (similarity 0.97); the earlier wording was: "decisions against 65 runs, 48 specifications, 45 merges and 95 findings. The". What changed in the rc2 cycle: the specification count (48 basenames -> 51 distinct contents) and the attribution columns (now counted without merge commits). The statement itself was not withdrawn. Finding count updated from 95 to 96 on 2026-09-10, when finding O96 was recorded; the earlier wording was "decisions against 65 runs, 51 specifications, 45 merges and 95 findings. The". Anchor re-derived on 2026-09-10 (similarity 0.99) after finding O97: the attribution figures are now measured at a named commit rather than at HEAD, because the commit that writes them changes them. The earlier wording was: "decisions against 65 runs, 51 specifications, 45 merges and 96 findings. The".
+Note: Catalogued during the rc2 correction cycle. The figure is not left free-standing in prose: it is bound to its source by a checker that fails the release gate on drift, which is the defect class that made this cycle necessary. Figure updated from 94 to 95 on 2026-09-10, when finding O95 was recorded; the earlier wording was "decisions against 65 runs, 48 specifications, 45 merges and 94 findings. The". Anchor re-derived on 2026-09-10 (similarity 0.97); the earlier wording was: "decisions against 65 runs, 48 specifications, 45 merges and 95 findings. The". What changed in the rc2 cycle: the specification count (48 basenames -> 51 distinct contents) and the attribution columns (now counted without merge commits). The statement itself was not withdrawn. Finding count updated from 95 to 96 on 2026-09-10, when finding O96 was recorded; the earlier wording was "decisions against 65 runs, 51 specifications, 45 merges and 95 findings. The". Anchor re-derived on 2026-09-10 (similarity 0.99) after finding O97: the attribution figures are now measured at a named commit rather than at HEAD, because the commit that writes them changes them. The earlier wording was: "decisions against 65 runs, 51 specifications, 45 merges and 96 findings. The". Finding count updated to 98 on 2026-09-10 (O98 recorded); the earlier wording was "decisions against 65 runs, 51 specifications, 45 merges and 97 findings. The". Finding count updated to 99 on 2026-09-11 (O99 recorded); the earlier wording was "decisions against 65 runs, 51 specifications, 45 merges and 98 findings. The". Finding count updated to 100 on 2026-09-11 (O100 recorded); the earlier wording was "decisions against 65 runs, 51 specifications, 45 merges and 99 findings. The". Finding count updated to 101 on 2026-09-11 (O101 recorded); the earlier wording was "decisions against 65 runs, 51 specifications, 45 merges and 100 findings. The". Anchor re-derived on 2026-09-11 (similarity 0.99) when the finding count advanced and limit 6 was corrected; the earlier wording was "decisions against 65 runs, 51 specifications, 45 merges and 101 findings. The". Finding count updated from 105 to 111 on 2026-09-11, when findings O106-O111 were recorded (the meta-evidence rule layer and five defects an adversarial double review found in the isolation evidence path); the earlier wording was: "decisions against 65 runs, 51 specifications, 45 merges and 105 findings. The". Finding count updated from 111 to 113 on 2026-09-11, when O112 (a red baseline is not automatically a demonstrated increment) and O113 (the first STRICT run's isolation claim was unevidenced) were recorded; the earlier wording was: "decisions against 65 runs, 51 specifications, 45 merges and 111 findings. The". Finding count updated from 113 to 116 on 2026-09-12, when O114 (the isolation proof lay in the writable area of the thing being checked), O115 (STRICT_REAL_AGENT_E2E, at the fourth attempt) and O116 (the planner was never told how its own criteria are executed) were recorded; the earlier wording was: "decisions against 65 runs, 51 specifications, 45 merges and 113 findings. The". Finding count updated from 116 to 118 on 2026-09-12, when O117 (the first development node through the product's own control plane, and the gate that measured the wrong tree) and O118 (an environment dependence only the external CI could see) were recorded; the earlier wording was: "decisions against 65 runs, 51 specifications, 45 merges and 116 findings. The". Finding count updated from 118 to 119 on 2026-09-12, when O119 (a run's own specification was written into the repository it checks) was recorded; the earlier wording was: "decisions against 65 runs, 51 specifications, 45 merges and 118 findings. The". Finding count updated from 119 to 120 on 2026-09-12, when O120 (a human could unblock a node but not abandon one) was recorded; the earlier wording was: "decisions against 65 runs, 51 specifications, 45 merges and 119 findings. The". Finding count updated from 120 to 121 on 2026-09-12, when O121 (a gate that cannot answer is not red) was recorded; the earlier wording was: "decisions against 65 runs, 51 specifications, 45 merges and 120 findings. The". Finding count updated from 121 to 122 on 2026-09-12, when O122 (an acceptance was discarded by a later block) was recorded; the earlier wording was: "decisions against 65 runs, 51 specifications, 45 merges and 121 findings. The". Finding count updated from 122 to 123 on 2026-09-12, when O123 (a renamed gate made the project permanently unclosable) was recorded; the earlier wording was: "decisions against 65 runs, 51 specifications, 45 merges and 122 findings. The". Finding count updated from 123 to 124 on 2026-09-13, when O124 (the self-hosting campaign reached its fixpoint, and what it cost) was recorded; the earlier wording was: "decisions against 65 runs, 51 specifications, 45 merges and 123 findings. The". Finding count updated from 124 to 125 on 2026-09-13, when O125 (the planner writes, and its own prompt forbids it) was recorded; the earlier wording was: "decisions against 65 runs, 51 specifications, 45 merges and 124 findings. The". Finding count updated from 125 to 126 on 2026-09-13, when O126 (role capabilities became an enforced policy rather than a request) was recorded; the earlier wording was: "decisions against 65 runs, 51 specifications, 45 merges and 125 findings. The". Finding count updated from 126 to 127 on 2026-09-13, when O127 (a planner that had answered was reported as waiting) was recorded; the earlier wording was: "decisions against 65 runs, 51 specifications, 45 merges and 126 findings. The".
 
 **C-141**
 
@@ -1067,6 +1376,2170 @@ Evidence:
 - `run:d8/1` -- resolvability: **LOCAL_ONLY** (resolved by the orchestrating agent session, 2026-09-10)
 
 Note: Catalogued during the rc3 correction cycle (finding O97).
+
+**C-147**
+
+Note: Measured on 2026-09-11 by running git rev-parse --show-toplevel in the same arena directory inside and outside the Linux sandbox backend. verify_limit_6 in src/hoh/sandbox.py returns both measurements; the test demands they differ. Withdrawn on 2026-09-11. This statement said the sandbox closed limit 6, measured by comparing `git rev-parse --show-toplevel` inside and outside isolation. The measurement was real; the conclusion drawn from it was wrong in both directions. The common case had been closed since 2026-09-08 by GIT_CEILING_DIRECTORIES (finding O30), so the sandbox did not close it -- and what remained open was narrower: the ceiling is an environment variable the checked command can remove, which `env -u GIT_CEILING_DIRECTORIES git rev-parse --show-toplevel` does. The replacement passage at docs/LIMITATIONS.md gives all three regimes with their exit codes, and C-150..C-153 carry the measurements. Kept rather than deleted because a corrected claim whose former wording has vanished is indistinguishable from one that was never made.
+
+**C-148**
+
+Note: Measured on 2026-09-11 by running git rev-parse --show-toplevel in the same arena directory inside and outside the Linux sandbox backend. verify_limit_6 in src/hoh/sandbox.py returns both measurements; the test demands they differ. Withdrawn on 2026-09-11. This statement said the sandbox closed limit 6, measured by comparing `git rev-parse --show-toplevel` inside and outside isolation. The measurement was real; the conclusion drawn from it was wrong in both directions. The common case had been closed since 2026-09-08 by GIT_CEILING_DIRECTORIES (finding O30), so the sandbox did not close it -- and what remained open was narrower: the ceiling is an environment variable the checked command can remove, which `env -u GIT_CEILING_DIRECTORIES git rev-parse --show-toplevel` does. The replacement passage at docs/LIMITATIONS.md gives all three regimes with their exit codes, and C-150..C-153 carry the measurements. Kept rather than deleted because a corrected claim whose former wording has vanished is indistinguishable from one that was never made.
+
+**C-149**
+
+Note: The real end-to-end run this sentence describes was executed against an isolated fixture repository in a scratch root, deliberately not inside this repository: pointing a first real resume test at the VeriHarness codebase itself would have made the blast radius of a mistake the project under test. Its receipts therefore do not resolve here, and no evidence form in this ledger can verify a run that lives outside the tree the ledger covers. Marked unsupported rather than cited against receipts that are not here -- which is the same rule this ledger applies to every other claim whose evidence it cannot reach. The mechanism the run exercised is separately covered by the suite (tests/test_orchestrator_parity.py and tests/test_project_resume.py); what is unsupported here is specifically the claim that it was done for real, with those numbers.
+
+**C-150**
+
+Evidence:
+- `test:tests/test_sandbox.py::test_limit_6_im_echten_runner_pfad` -- resolvability: **PUBLIC**
+
+Note: Measured on 2026-09-11 through run_check itself, in three regimes: the ceiling in place, the check removing it, and the check removing it inside the sandbox. The test asserts all three, including that the ancestor repository is still reachable in the middle case -- if that stops holding, the gap has moved and the test says so.
+
+**C-151**
+
+Evidence:
+- `test:tests/test_sandbox.py::test_limit_6_im_echten_runner_pfad` -- resolvability: **PUBLIC**
+
+Note: Measured on 2026-09-11 through run_check itself, in three regimes: the ceiling in place, the check removing it, and the check removing it inside the sandbox. The test asserts all three, including that the ancestor repository is still reachable in the middle case -- if that stops holding, the gap has moved and the test says so.
+
+**C-152**
+
+Evidence:
+- `test:tests/test_sandbox.py::test_limit_6_im_echten_runner_pfad` -- resolvability: **PUBLIC**
+
+Note: Measured on 2026-09-11 through run_check itself, in three regimes: the ceiling in place, the check removing it, and the check removing it inside the sandbox. The test asserts all three, including that the ancestor repository is still reachable in the middle case -- if that stops holding, the gap has moved and the test says so.
+
+**C-153**
+
+Evidence:
+- `test:tests/test_sandbox.py::test_limit_6_im_echten_runner_pfad` -- resolvability: **PUBLIC**
+
+Note: Measured on 2026-09-11 through run_check itself, in three regimes: the ceiling in place, the check removing it, and the check removing it inside the sandbox. The test asserts all three, including that the ancestor repository is still reachable in the middle case -- if that stops holding, the gap has moved and the test says so.
+
+**C-154**
+
+Evidence:
+- `file:tools/evidence_index.py:102` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/evidence_index.py from the evidence tree it describes. LOCAL_ONLY on purpose: the tree is not in the public export, because its receipts carry absolute machine paths and redacting them would break the digests they carry. Anyone holding the tree can re-derive this line; a mismatch is a gate failure. Re-anchored 2026-09-13: a third tree (the planner capability boundary) was added to the index, so the generated sentence now says 'the first two trees'. The figure of 36 files is unchanged and still refers to the same two trees.
+
+**C-155**
+
+Evidence:
+- `file:tools/evidence_index.py:102` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/evidence_index.py from the evidence tree it describes. LOCAL_ONLY on purpose: the tree is not in the public export, because its receipts carry absolute machine paths and redacting them would break the digests they carry. Anyone holding the tree can re-derive this line; a mismatch is a gate failure.
+
+**C-156**
+
+Evidence:
+- `file:tools/evidence_index.py:102` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/evidence_index.py from the evidence tree it describes. LOCAL_ONLY on purpose: the tree is not in the public export, because its receipts carry absolute machine paths and redacting them would break the digests they carry. Anyone holding the tree can re-derive this line; a mismatch is a gate failure.
+
+**C-157**
+
+Evidence:
+- `file:tools/evidence_index.py:102` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/evidence_index.py from the evidence tree it describes. LOCAL_ONLY on purpose: the tree is not in the public export, because its receipts carry absolute machine paths and redacting them would break the digests they carry. Anyone holding the tree can re-derive this line; a mismatch is a gate failure.
+
+**C-158**
+
+Evidence:
+- `file:tools/evidence_index.py:102` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/evidence_index.py from the evidence tree it describes. LOCAL_ONLY on purpose: the tree is not in the public export, because its receipts carry absolute machine paths and redacting them would break the digests they carry. Anyone holding the tree can re-derive this line; a mismatch is a gate failure.
+
+**C-159**
+
+Evidence:
+- `file:tools/evidence_index.py:102` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/evidence_index.py from the evidence tree it describes. LOCAL_ONLY on purpose: the tree is not in the public export, because its receipts carry absolute machine paths and redacting them would break the digests they carry. Anyone holding the tree can re-derive this line; a mismatch is a gate failure.
+
+**C-160**
+
+Evidence:
+- `file:tools/evidence_index.py:102` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/evidence_index.py from the evidence tree it describes. LOCAL_ONLY on purpose: the tree is not in the public export, because its receipts carry absolute machine paths and redacting them would break the digests they carry. Anyone holding the tree can re-derive this line; a mismatch is a gate failure.
+
+**C-161**
+
+Evidence:
+- `file:tools/evidence_index.py:102` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/evidence_index.py from the evidence tree it describes. LOCAL_ONLY on purpose: the tree is not in the public export, because its receipts carry absolute machine paths and redacting them would break the digests they carry. Anyone holding the tree can re-derive this line; a mismatch is a gate failure.
+
+**C-162**
+
+Evidence:
+- `file:tools/evidence_index.py:102` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/evidence_index.py from the evidence tree it describes. LOCAL_ONLY on purpose: the tree is not in the public export, because its receipts carry absolute machine paths and redacting them would break the digests they carry. Anyone holding the tree can re-derive this line; a mismatch is a gate failure.
+
+**C-163**
+
+Evidence:
+- `file:tools/evidence_index.py:102` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/evidence_index.py from the evidence tree it describes. LOCAL_ONLY on purpose: the tree is not in the public export, because its receipts carry absolute machine paths and redacting them would break the digests they carry. Anyone holding the tree can re-derive this line; a mismatch is a gate failure.
+
+**C-164**
+
+Evidence:
+- `file:tools/evidence_index.py:102` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/evidence_index.py from the evidence tree it describes. LOCAL_ONLY on purpose: the tree is not in the public export, because its receipts carry absolute machine paths and redacting them would break the digests they carry. Anyone holding the tree can re-derive this line; a mismatch is a gate failure.
+
+**C-165**
+
+Evidence:
+- `file:tools/evidence_index.py:102` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/evidence_index.py from the evidence tree it describes. LOCAL_ONLY on purpose: the tree is not in the public export, because its receipts carry absolute machine paths and redacting them would break the digests they carry. Anyone holding the tree can re-derive this line; a mismatch is a gate failure.
+
+**C-166**
+
+Evidence:
+- `file:tools/evidence_index.py:102` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/evidence_index.py from the evidence tree it describes. LOCAL_ONLY on purpose: the tree is not in the public export, because its receipts carry absolute machine paths and redacting them would break the digests they carry. Anyone holding the tree can re-derive this line; a mismatch is a gate failure.
+
+**C-167**
+
+Evidence:
+- `file:tools/evidence_index.py:102` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/evidence_index.py from the evidence tree it describes. LOCAL_ONLY on purpose: the tree is not in the public export, because its receipts carry absolute machine paths and redacting them would break the digests they carry. Anyone holding the tree can re-derive this line; a mismatch is a gate failure.
+
+**C-168**
+
+Evidence:
+- `file:tools/evidence_index.py:102` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/evidence_index.py from the evidence tree it describes. LOCAL_ONLY on purpose: the tree is not in the public export, because its receipts carry absolute machine paths and redacting them would break the digests they carry. Anyone holding the tree can re-derive this line; a mismatch is a gate failure.
+
+**C-169**
+
+Evidence:
+- `file:tools/evidence_index.py:102` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/evidence_index.py from the evidence tree it describes. LOCAL_ONLY on purpose: the tree is not in the public export, because its receipts carry absolute machine paths and redacting them would break the digests they carry. Anyone holding the tree can re-derive this line; a mismatch is a gate failure.
+
+**C-170**
+
+Evidence:
+- `file:tools/evidence_index.py:102` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/evidence_index.py from the evidence tree it describes. LOCAL_ONLY on purpose: the tree is not in the public export, because its receipts carry absolute machine paths and redacting them would break the digests they carry. Anyone holding the tree can re-derive this line; a mismatch is a gate failure.
+
+**C-171**
+
+Evidence:
+- `file:tools/evidence_index.py:102` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/evidence_index.py from the evidence tree it describes. LOCAL_ONLY on purpose: the tree is not in the public export, because its receipts carry absolute machine paths and redacting them would break the digests they carry. Anyone holding the tree can re-derive this line; a mismatch is a gate failure.
+
+**C-172**
+
+Evidence:
+- `file:tools/evidence_index.py:102` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/evidence_index.py from the evidence tree it describes. LOCAL_ONLY on purpose: the tree is not in the public export, because its receipts carry absolute machine paths and redacting them would break the digests they carry. Anyone holding the tree can re-derive this line; a mismatch is a gate failure.
+
+**C-173**
+
+Evidence:
+- `file:tools/evidence_index.py:102` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/evidence_index.py from the evidence tree it describes. LOCAL_ONLY on purpose: the tree is not in the public export, because its receipts carry absolute machine paths and redacting them would break the digests they carry. Anyone holding the tree can re-derive this line; a mismatch is a gate failure.
+
+**C-174**
+
+Evidence:
+- `file:tools/evidence_index.py:102` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/evidence_index.py from the evidence tree it describes. LOCAL_ONLY on purpose: the tree is not in the public export, because its receipts carry absolute machine paths and redacting them would break the digests they carry. Anyone holding the tree can re-derive this line; a mismatch is a gate failure.
+
+**C-175**
+
+Evidence:
+- `file:tools/benchmark.py:606` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from the cells in dogfood/benchmark/results/, which are not in the public export. Anyone holding them can re-derive this line. Re-anchored 2026-09-13: the generator line now names the campaign and its directory, because a replication writes beside v1 rather than over it.
+
+**C-176**
+
+Evidence:
+- `file:tools/benchmark.py:606` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from the cells in dogfood/benchmark/results/, which are not in the public export. Anyone holding them can re-derive this line.
+
+**C-177**
+
+Evidence:
+- `file:tools/benchmark.py:606` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from the cells in dogfood/benchmark/results/, which are not in the public export. Anyone holding them can re-derive this line.
+
+**C-178**
+
+Evidence:
+- `file:tools/benchmark.py:606` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from the cells in dogfood/benchmark/results/, which are not in the public export. Anyone holding them can re-derive this line.
+
+**C-179**
+
+Evidence:
+- `file:tools/benchmark.py:606` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from the cells in dogfood/benchmark/results/, which are not in the public export. Anyone holding them can re-derive this line.
+
+**C-180**
+
+Evidence:
+- `file:tools/benchmark.py:606` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from the cells in dogfood/benchmark/results/, which are not in the public export. Anyone holding them can re-derive this line.
+
+**C-181**
+
+Evidence:
+- `file:tools/benchmark.py:606` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from the cells in dogfood/benchmark/results/, which are not in the public export. Anyone holding them can re-derive this line.
+
+**C-182**
+
+Evidence:
+- `file:tools/benchmark.py:606` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from the cells in dogfood/benchmark/results/, which are not in the public export. Anyone holding them can re-derive this line.
+
+**C-183**
+
+Evidence:
+- `file:tools/benchmark.py:606` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from the cells in dogfood/benchmark/results/, which are not in the public export. Anyone holding them can re-derive this line.
+
+**C-184**
+
+Evidence:
+- `file:tools/benchmark.py:606` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from the cells in dogfood/benchmark/results/, which are not in the public export. Anyone holding them can re-derive this line.
+
+**C-185**
+
+Evidence:
+- `file:tools/benchmark.py:606` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from the cells in dogfood/benchmark/results/, which are not in the public export. Anyone holding them can re-derive this line.
+
+**C-186**
+
+Evidence:
+- `file:tools/benchmark.py:606` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from the cells in dogfood/benchmark/results/, which are not in the public export. Anyone holding them can re-derive this line.
+
+**C-187**
+
+Evidence:
+- `file:tools/benchmark.py:606` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from the cells in dogfood/benchmark/results/, which are not in the public export. Anyone holding them can re-derive this line.
+
+**C-188**
+
+Evidence:
+- `file:tools/benchmark.py:606` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from the cells in dogfood/benchmark/results/, which are not in the public export. Anyone holding them can re-derive this line.
+
+**C-189**
+
+Evidence:
+- `file:tools/benchmark.py:606` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from the cells in dogfood/benchmark/results/, which are not in the public export. Anyone holding them can re-derive this line.
+
+**C-190**
+
+Evidence:
+- `file:tools/benchmark.py:606` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from the cells in dogfood/benchmark/results/, which are not in the public export. Anyone holding them can re-derive this line.
+
+**C-191**
+
+Evidence:
+- `file:tools/benchmark.py:606` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from the cells in dogfood/benchmark/results/, which are not in the public export. Anyone holding them can re-derive this line.
+
+**C-192**
+
+Evidence:
+- `file:tools/benchmark.py:606` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from the cells in dogfood/benchmark/results/, which are not in the public export. Anyone holding them can re-derive this line.
+
+**C-193**
+
+Evidence:
+- `file:tools/benchmark.py:606` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from the cells in dogfood/benchmark/results/, which are not in the public export. Anyone holding them can re-derive this line.
+
+**C-194**
+
+Evidence:
+- `file:tools/benchmark.py:606` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from the cells in dogfood/benchmark/results/, which are not in the public export. Anyone holding them can re-derive this line.
+
+**C-195**
+
+Evidence:
+- `file:tools/benchmark.py:606` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from the cells in dogfood/benchmark/results/, which are not in the public export. Anyone holding them can re-derive this line.
+
+**C-196**
+
+Evidence:
+- `file:docs/BENCHMARK_RESULTS.md:28` -- resolvability: **PUBLIC**
+- `file:tools/benchmark.py:606` -- resolvability: **PUBLIC**
+
+Note: The cell count is the one docs/BENCHMARK_RESULTS.md reports from the cells in dogfood/benchmark/results/, which are not in the public export. PRE-O125-CLOSURE is a status label for that campaign, not a measurement.
+
+**C-197**
+
+Evidence:
+- `file:docs/BENCHMARK_RESULTS.md:36` -- resolvability: **PUBLIC**
+- `file:DOGFOOD_LEDGER.md:1` -- resolvability: **PUBLIC**
+
+Note: The per-cell reasons in the exclusion table of this same document name 'planner waits for an approval' for four of five arm-C cells. O127 in DOGFOOD_LEDGER.md is the finding that a finished planner pane was read that way.
+
+**C-198**
+
+Evidence:
+- `file:tools/evidence_index.py:96` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/evidence_index.py over dogfood/planner-confinement/, which is not in the public export. Anyone holding the tree can re-derive the digest; a mismatch is a gate failure. Re-anchored 2026-09-13 after two adversarial reviews rewrote the measurement: the tree gained an arena manifest and a telemetry audit and its digest moved. Re-anchored 2026-09-13 when dogfood/planner-confinement/ was reinstalled from run cfnfib7a, the first confinement run under the fixed policy wiring; the previous run's record is kept beside it under a timestamped name. Re-anchored 2026-09-13 when dogfood/planner-confinement/ was reinstalled from run cfnfib8a, the second confinement run under the fixed wiring and the first whose dispatch records carry the configured model; the earlier runs' records are kept beside it under timestamped names.
+
+**C-199**
+
+Evidence:
+- `file:dogfood/planner-confinement/SUMMARY.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-13)
+- `file:tools/confinement_evidence.py:1` -- resolvability: **PUBLIC**
+
+Note: Read by tools/confinement_evidence.py out of run cfnfib5w's own artifacts and generated into this table by tools/evidence_index.py. LOCAL_ONLY: the run tree names the worktree it ran in.
+
+**C-200**
+
+Evidence:
+- `file:dogfood/planner-confinement/SUMMARY.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-13)
+- `file:tools/confinement_evidence.py:1` -- resolvability: **PUBLIC**
+
+Note: Read by tools/confinement_evidence.py out of run cfnfib5w's own artifacts and generated into this table by tools/evidence_index.py. LOCAL_ONLY: the run tree names the worktree it ran in.
+
+**C-201**
+
+Evidence:
+- `file:dogfood/planner-confinement/SUMMARY.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-13)
+- `file:tools/confinement_evidence.py:1` -- resolvability: **PUBLIC**
+
+Note: Read by tools/confinement_evidence.py out of run cfnfib5w's own artifacts and generated into this table by tools/evidence_index.py. LOCAL_ONLY: the run tree names the worktree it ran in.
+
+**C-202**
+
+Evidence:
+- `file:dogfood/planner-confinement/SUMMARY.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-13)
+- `file:tools/confinement_evidence.py:1` -- resolvability: **PUBLIC**
+
+Note: Read by tools/confinement_evidence.py out of run cfnfib5w's own artifacts and generated into this table by tools/evidence_index.py. LOCAL_ONLY: the run tree names the worktree it ran in.
+
+**C-203**
+
+Evidence:
+- `file:dogfood/planner-confinement/SUMMARY.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-13)
+- `file:tools/confinement_evidence.py:1` -- resolvability: **PUBLIC**
+
+Note: Read by tools/confinement_evidence.py out of run cfnfib5w's own artifacts and generated into this table by tools/evidence_index.py. LOCAL_ONLY: the run tree names the worktree it ran in. Re-anchored 2026-09-13 when dogfood/planner-confinement/ was reinstalled from run cfnfib7a, the first confinement run under the fixed policy wiring; the previous run's record is kept beside it under a timestamped name.
+
+**C-204**
+
+Evidence:
+- `file:dogfood/planner-confinement/SUMMARY.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-13)
+- `file:tools/confinement_evidence.py:1` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/evidence_index.py from the installed evidence tree, which is not in the public export. Re-anchored 2026-09-13 when dogfood/planner-confinement/ was reinstalled from run cfnfib8a, the second confinement run under the fixed wiring and the first whose dispatch records carry the configured model; the earlier runs' records are kept beside it under timestamped names.
+
+**C-205**
+
+Evidence:
+- `file:dogfood/planner-confinement/SUMMARY.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-13)
+- `file:tools/confinement_evidence.py:1` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/evidence_index.py from the installed evidence tree, which is not in the public export. Re-anchored 2026-09-13 when dogfood/planner-confinement/ was reinstalled from run cfnfib7a, the first confinement run under the fixed policy wiring; the previous run's record is kept beside it under a timestamped name.
+
+**C-206**
+
+Evidence:
+- `file:DOGFOOD_LEDGER.md:1` -- resolvability: **PUBLIC**
+- `file:tests/test_policy_wiring.py:1` -- resolvability: **PUBLIC**
+
+Note: The 840 is the count an adversarial reviewer reported after setting protected=() for the planner in a copy of the tree and running the suite without four files that read repository-root artifacts. It is recorded in O129 of DOGFOOD_LEDGER.md and is the reason tests/test_policy_wiring.py exists.
+
+**C-207**
+
+Evidence:
+- `file:dogfood/planner-confinement/SUMMARY.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-13)
+
+Note: cfnfib7a is the first confinement run under the fixed policy wiring; its SUMMARY.json carries the verdict and every metric named around it. Re-anchored 2026-09-13: the sentence it described reported the previous run's NOT_VERIFIED status and was superseded when cfnfib7a measured the fixed wiring.
+
+**C-208**
+
+Evidence:
+- `file:dogfood/planner-confinement/SUMMARY.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-13)
+- `file:dogfood/planner-confinement/telemetry.jsonl:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-13)
+
+Note: planner_dispatches_with_an_armed_witness and planner_dispatches are read from the witnessed_trees field of the run's own dispatch records. Re-anchored 2026-09-13 for the same reason as C-207.
+
+**C-209**
+
+Evidence:
+- `file:dogfood/planner-confinement/README.md:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-13)
+- `file:DOGFOOD_LEDGER.md:1` -- resolvability: **PUBLIC**
+
+Note: cfnfib6a is a real Herdr+HoH run; its receipts and logs are in the run tree and its findings are recorded in O130 of DOGFOOD_LEDGER.md.
+
+**C-210**
+
+Evidence:
+- `file:dogfood/planner-confinement/README.md:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-13)
+- `file:DOGFOOD_LEDGER.md:1` -- resolvability: **PUBLIC**
+
+Note: Both receipts for check K1 of iteration 1 carry the same command and the same trailing ImportError in their transcripts.
+
+**C-211**
+
+Evidence:
+- `file:src/hoh/runner.py:1` -- resolvability: **PUBLIC**
+
+Note: INFRA_EXIT_CODES in src/hoh/runner.py is exactly {124, 126, 127}, and the receipts for K1 record exit code 1.
+
+**C-212**
+
+Evidence:
+- `file:src/hoh/runner.py:1` -- resolvability: **PUBLIC**
+
+Note: ENV_ALLOWLIST and the PYTHONNOUSERSITE assignment are both in src/hoh/runner.py's _env; neither removes the interpreter's own site-packages.
+
+**C-213**
+
+Evidence:
+- `file:src/hoh/capability.py:1` -- resolvability: **PUBLIC**
+- `file:DOGFOOD_LEDGER.md:1` -- resolvability: **PUBLIC**
+
+Note: Measured by an adversarial reviewer against git_state_digest: a commit inside one dispatch window and a reset back to the previous head return the same digest. Recorded in O129's review findings.
+
+**C-214**
+
+Evidence:
+- `file:src/hoh/capability.py:1` -- resolvability: **PUBLIC**
+
+Note: Measured by an adversarial reviewer with tree_digest over this repository's own working tree; the figures are that measurement, on this machine.
+
+**C-215**
+
+Evidence:
+- `file:src/hoh/capability.py:1` -- resolvability: **PUBLIC**
+
+Note: Follows from the same measurement: the witness compares a digest taken before the dispatch with one taken after, so any writer active in that window changes the second.
+
+**C-216**
+
+Evidence:
+- `file:tools/export_manifest.py:1` -- resolvability: **PUBLIC**
+
+Note: The count is what `python3 tools/export_manifest.py check` reports as U2b failures on this tree, and it is re-derivable by running it.
+
+**C-217**
+
+Evidence:
+- `file:dogfood/benchmark/results-v2/parse_duration.C.1.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-13)
+- `file:tools/benchmark.py:91` -- resolvability: **PUBLIC**
+
+Note: The 18 is counted from the two telemetry.jsonl files of the cell's own run tree (9 for the node, 9 for the repair node); the 9 is what the cell recorded under the old constant.
+
+**C-218**
+
+Evidence:
+- `file:tools/benchmark.py:91` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from the cells of this campaign; a figure marked 'asserted, not counted' is the pre-2026-09-13 constant and says so in the cell.
+
+**C-219**
+
+Evidence:
+- `file:tools/benchmark.py:91` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from the cells of this campaign; a figure marked 'asserted, not counted' is the pre-2026-09-13 constant and says so in the cell.
+
+**C-220**
+
+Evidence:
+- `file:tools/benchmark.py:91` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from the cells of this campaign; a figure marked 'asserted, not counted' is the pre-2026-09-13 constant and says so in the cell.
+
+**C-221**
+
+Evidence:
+- `file:tools/benchmark.py:91` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from the cells of this campaign; a figure marked 'asserted, not counted' is the pre-2026-09-13 constant and says so in the cell.
+
+**C-222**
+
+Evidence:
+- `file:tools/benchmark.py:91` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from the cells of this campaign; a figure marked 'asserted, not counted' is the pre-2026-09-13 constant and says so in the cell.
+
+**C-223**
+
+Evidence:
+- `file:tools/benchmark.py:91` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from the cells of this campaign; a figure marked 'asserted, not counted' is the pre-2026-09-13 constant and says so in the cell.
+
+**C-224**
+
+Evidence:
+- `file:tools/benchmark.py:91` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from the cells of this campaign; a figure marked 'asserted, not counted' is the pre-2026-09-13 constant and says so in the cell.
+
+**C-225**
+
+Evidence:
+- `file:tools/benchmark.py:91` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from the cells of this campaign; a figure marked 'asserted, not counted' is the pre-2026-09-13 constant and says so in the cell.
+
+**C-226**
+
+Evidence:
+- `file:tools/benchmark.py:91` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from the cells of this campaign; a figure marked 'asserted, not counted' is the pre-2026-09-13 constant and says so in the cell.
+
+**C-227**
+
+Evidence:
+- `file:tools/benchmark.py:91` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from the cells of this campaign; a figure marked 'asserted, not counted' is the pre-2026-09-13 constant and says so in the cell.
+
+**C-228**
+
+Evidence:
+- `file:tools/benchmark.py:91` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from the cells of this campaign; a figure marked 'asserted, not counted' is the pre-2026-09-13 constant and says so in the cell.
+
+**C-229**
+
+Evidence:
+- `file:tools/benchmark.py:91` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from the cells of this campaign; a figure marked 'asserted, not counted' is the pre-2026-09-13 constant and says so in the cell.
+
+**C-230**
+
+Evidence:
+- `file:tools/benchmark.py:91` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from the cells of this campaign; a figure marked 'asserted, not counted' is the pre-2026-09-13 constant and says so in the cell.
+
+**C-231**
+
+Evidence:
+- `file:tools/benchmark.py:91` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from the cells of this campaign; a figure marked 'asserted, not counted' is the pre-2026-09-13 constant and says so in the cell.
+
+**C-232**
+
+Evidence:
+- `file:tools/benchmark.py:91` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from the cells of this campaign; a figure marked 'asserted, not counted' is the pre-2026-09-13 constant and says so in the cell.
+
+**C-233**
+
+Evidence:
+- `file:tools/benchmark.py:91` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from the cells of this campaign; a figure marked 'asserted, not counted' is the pre-2026-09-13 constant and says so in the cell.
+
+**C-234**
+
+Evidence:
+- `file:tools/benchmark.py:91` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from the cells of this campaign; a figure marked 'asserted, not counted' is the pre-2026-09-13 constant and says so in the cell.
+
+**C-235**
+
+Evidence:
+- `file:tools/benchmark.py:91` -- resolvability: **PUBLIC**
+
+Note: Derived by the generator from the cells present in dogfood/benchmark/results-v2/ against the five tasks times three arms.
+
+**C-236**
+
+Evidence:
+- `file:tools/benchmark.py:91` -- resolvability: **PUBLIC**
+
+Note: Wallclock and budget for this cell, from the cell's own record.
+
+**C-237**
+
+Evidence:
+- `file:tools/benchmark.py:91` -- resolvability: **PUBLIC**
+
+Note: Wallclock and budget for this cell, from the cell's own record.
+
+**C-238**
+
+Evidence:
+- `file:DOGFOOD_LEDGER.md:1` -- resolvability: **PUBLIC**
+- `file:tools/benchmark.py:480` -- resolvability: **PUBLIC**
+
+Note: The gate command is in arm_c's Gates.run in tools/benchmark.py, and each task's base directory holds a single source file with no test; O137 in DOGFOOD_LEDGER.md records the RED/GREEN sequence observed in all three cells.
+
+**C-239**
+
+Evidence:
+- `file:DOGFOOD_LEDGER.md:1` -- resolvability: **PUBLIC**
+
+Note: Read out of the four v1 arm-C cells' own run trees: each holds a planner answer that parses as a DevelopmentPlan, with 5, 6, 4 and 3 acceptance criteria, while its state.json reads PLANNING/BLOCKED with 'planner waits for an approval'. The trees are in a temp directory and are not exported.
+
+**C-240**
+
+Evidence:
+- `file:tools/benchmark.py:91` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from this campaign's cells; the dispatch figure is counted from the run tree's own logs.
+
+**C-241**
+
+Evidence:
+- `file:tools/benchmark.py:91` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from this campaign's cells; the dispatch figure is counted from the run tree's own logs.
+
+**C-242**
+
+Evidence:
+- `file:tools/benchmark.py:660` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py by pairing each v2 cell with the v1 cell of the same task and arm; cells present in only one campaign are excluded from the table and from its count. Re-anchored 2026-09-13: the v1 column shows `(excluded)` for a cell with no final state, because the protocol excludes it from the correctness comparison rather than reporting its suite result as one.
+
+**C-243**
+
+Evidence:
+- `file:tools/benchmark.py:660` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py by pairing each v2 cell with the v1 cell of the same task and arm; cells present in only one campaign are excluded from the table and from its count. Re-anchored 2026-09-13: the v1 column shows `(excluded)` for a cell with no final state, because the protocol excludes it from the correctness comparison rather than reporting its suite result as one.
+
+**C-244**
+
+Evidence:
+- `file:tools/benchmark.py:660` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py by pairing each v2 cell with the v1 cell of the same task and arm; cells present in only one campaign are excluded from the table and from its count.
+
+**C-245**
+
+Evidence:
+- `file:tools/benchmark.py:660` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from this campaign's cells.
+
+**C-246**
+
+Evidence:
+- `file:tools/benchmark.py:91` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from this campaign's cells.
+
+**C-247**
+
+Evidence:
+- `file:tools/benchmark.py:91` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from this campaign's cells.
+
+**C-248**
+
+Evidence:
+- `file:tools/readiness.py:1` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/readiness.py; the row's own command column is how it is re-derived. A row changes only when the gate it names changes, which is exactly when a reader should have to notice.
+
+**C-249**
+
+Evidence:
+- `file:tools/readiness.py:1` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/readiness.py; the row's own command column is how it is re-derived. A row changes only when the gate it names changes, which is exactly when a reader should have to notice.
+
+**C-250**
+
+Evidence:
+- `file:tools/readiness.py:1` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/readiness.py; the row's own command column is how it is re-derived. A row changes only when the gate it names changes, which is exactly when a reader should have to notice.
+
+**C-251**
+
+Evidence:
+- `file:tools/readiness.py:1` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/readiness.py; the row's own command column is how it is re-derived. A row changes only when the gate it names changes, which is exactly when a reader should have to notice.
+
+**C-252**
+
+Evidence:
+- `file:tools/readiness.py:1` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/readiness.py; the row's own command column is how it is re-derived. A row changes only when the gate it names changes, which is exactly when a reader should have to notice.
+
+**C-253**
+
+Evidence:
+- `file:tools/readiness.py:1` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/readiness.py; the row's own command column is how it is re-derived. A row changes only when the gate it names changes, which is exactly when a reader should have to notice.
+
+**C-254**
+
+Evidence:
+- `file:tools/readiness.py:1` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/readiness.py; the row's own command column is how it is re-derived. A row changes only when the gate it names changes, which is exactly when a reader should have to notice.
+
+**C-255**
+
+Evidence:
+- `file:tools/readiness.py:1` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/readiness.py; the row's own command column is how it is re-derived. A row changes only when the gate it names changes, which is exactly when a reader should have to notice.
+
+**C-256**
+
+Evidence:
+- `file:tools/readiness.py:1` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/readiness.py; the row's own command column is how it is re-derived. A row changes only when the gate it names changes, which is exactly when a reader should have to notice.
+
+**C-257**
+
+Evidence:
+- `file:tools/readiness.py:1` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/readiness.py; the row's own command column is how it is re-derived. A row changes only when the gate it names changes, which is exactly when a reader should have to notice.
+
+**C-258**
+
+Evidence:
+- `file:tools/readiness.py:1` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/readiness.py; the row's own command column is how it is re-derived. A row changes only when the gate it names changes, which is exactly when a reader should have to notice.
+
+**C-259**
+
+Evidence:
+- `file:tools/readiness.py:1` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/readiness.py; the row's own command column is how it is re-derived. A row changes only when the gate it names changes, which is exactly when a reader should have to notice.
+
+**C-260**
+
+Evidence:
+- `file:tools/readiness.py:1` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/readiness.py; the row's own command column is how it is re-derived. A row changes only when the gate it names changes, which is exactly when a reader should have to notice.
+
+**C-261**
+
+Evidence:
+- `file:tools/readiness.py:1` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/readiness.py; the row's own command column is how it is re-derived. A row changes only when the gate it names changes, which is exactly when a reader should have to notice.
+
+**C-262**
+
+Evidence:
+- `file:tools/readiness.py:1` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/readiness.py; the row's own command column is how it is re-derived.
+
+**C-263**
+
+Evidence:
+- `file:tools/benchmark.py:91` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from this campaign's cells; a figure marked 'asserted, not counted' is the pre-2026-09-13 constant and says so in the cell.
+
+**C-264**
+
+Evidence:
+- `file:tools/benchmark.py:91` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from this campaign's cells; a figure marked 'asserted, not counted' is the pre-2026-09-13 constant and says so in the cell.
+
+**C-265**
+
+Evidence:
+- `file:tools/benchmark.py:91` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from this campaign's cells; a figure marked 'asserted, not counted' is the pre-2026-09-13 constant and says so in the cell.
+
+**C-266**
+
+Evidence:
+- `file:tools/benchmark.py:91` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from this campaign's cells; a figure marked 'asserted, not counted' is the pre-2026-09-13 constant and says so in the cell.
+
+**C-267**
+
+Evidence:
+- `file:tools/benchmark.py:91` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from this campaign's cells; a figure marked 'asserted, not counted' is the pre-2026-09-13 constant and says so in the cell.
+
+**C-268**
+
+Evidence:
+- `file:tools/benchmark.py:91` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from this campaign's cells; a figure marked 'asserted, not counted' is the pre-2026-09-13 constant and says so in the cell.
+
+**C-269**
+
+Evidence:
+- `file:tools/benchmark.py:91` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from this campaign's cells; a figure marked 'asserted, not counted' is the pre-2026-09-13 constant and says so in the cell.
+
+**C-270**
+
+Evidence:
+- `file:tools/benchmark.py:91` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from this campaign's cells; a figure marked 'asserted, not counted' is the pre-2026-09-13 constant and says so in the cell.
+
+**C-271**
+
+Evidence:
+- `file:tools/benchmark.py:91` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from this campaign's cells; a figure marked 'asserted, not counted' is the pre-2026-09-13 constant and says so in the cell.
+
+**C-272**
+
+Evidence:
+- `file:tools/benchmark.py:91` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from this campaign's cells; a figure marked 'asserted, not counted' is the pre-2026-09-13 constant and says so in the cell.
+
+**C-273**
+
+Evidence:
+- `file:tools/benchmark.py:91` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from this campaign's cells; a figure marked 'asserted, not counted' is the pre-2026-09-13 constant and says so in the cell.
+
+**C-274**
+
+Evidence:
+- `file:tools/benchmark.py:91` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from this campaign's cells; a figure marked 'asserted, not counted' is the pre-2026-09-13 constant and says so in the cell.
+
+**C-275**
+
+Evidence:
+- `file:tools/benchmark.py:91` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from this campaign's cells; a figure marked 'asserted, not counted' is the pre-2026-09-13 constant and says so in the cell.
+
+**C-276**
+
+Evidence:
+- `file:tools/benchmark.py:91` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from this campaign's cells; a figure marked 'asserted, not counted' is the pre-2026-09-13 constant and says so in the cell.
+
+**C-277**
+
+Evidence:
+- `file:tools/benchmark.py:91` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from this campaign's cells; a figure marked 'asserted, not counted' is the pre-2026-09-13 constant and says so in the cell.
+
+**C-278**
+
+Evidence:
+- `file:tools/benchmark.py:91` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from this campaign's cells; a figure marked 'asserted, not counted' is the pre-2026-09-13 constant and says so in the cell.
+
+**C-279**
+
+Evidence:
+- `file:tools/benchmark.py:91` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from this campaign's cells; a figure marked 'asserted, not counted' is the pre-2026-09-13 constant and says so in the cell.
+
+**C-280**
+
+Evidence:
+- `file:tools/benchmark.py:91` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from this campaign's cells; a figure marked 'asserted, not counted' is the pre-2026-09-13 constant and says so in the cell.
+
+**C-281**
+
+Evidence:
+- `file:tools/benchmark.py:91` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from this campaign's cells; a figure marked 'asserted, not counted' is the pre-2026-09-13 constant and says so in the cell.
+
+**C-282**
+
+Evidence:
+- `file:tools/benchmark.py:91` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from this campaign's cells; a figure marked 'asserted, not counted' is the pre-2026-09-13 constant and says so in the cell.
+
+**C-283**
+
+Evidence:
+- `file:tools/benchmark.py:91` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from this campaign's cells; a figure marked 'asserted, not counted' is the pre-2026-09-13 constant and says so in the cell.
+
+**C-284**
+
+Evidence:
+- `file:tools/benchmark.py:91` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from this campaign's cells; a figure marked 'asserted, not counted' is the pre-2026-09-13 constant and says so in the cell.
+
+**C-285**
+
+Evidence:
+- `file:tools/benchmark.py:91` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from this campaign's cells; a figure marked 'asserted, not counted' is the pre-2026-09-13 constant and says so in the cell.
+
+**C-286**
+
+Evidence:
+- `file:tools/benchmark.py:91` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from this campaign's cells; a figure marked 'asserted, not counted' is the pre-2026-09-13 constant and says so in the cell.
+
+**C-287**
+
+Evidence:
+- `file:tools/benchmark.py:91` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from this campaign's cells; a figure marked 'asserted, not counted' is the pre-2026-09-13 constant and says so in the cell.
+
+**C-288**
+
+Evidence:
+- `file:tools/benchmark.py:91` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from this campaign's cells; a figure marked 'asserted, not counted' is the pre-2026-09-13 constant and says so in the cell.
+
+**C-289**
+
+Evidence:
+- `file:tools/benchmark.py:91` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from this campaign's cells; a figure marked 'asserted, not counted' is the pre-2026-09-13 constant and says so in the cell.
+
+**C-290**
+
+Evidence:
+- `file:tools/benchmark.py:91` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from this campaign's cells; a figure marked 'asserted, not counted' is the pre-2026-09-13 constant and says so in the cell.
+
+**C-291**
+
+Evidence:
+- `file:tools/benchmark.py:91` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from this campaign's cells; a figure marked 'asserted, not counted' is the pre-2026-09-13 constant and says so in the cell.
+
+**C-292**
+
+Evidence:
+- `file:tools/benchmark.py:91` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from this campaign's cells; a figure marked 'asserted, not counted' is the pre-2026-09-13 constant and says so in the cell.
+
+**C-293**
+
+Evidence:
+- `file:tools/benchmark.py:91` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from this campaign's cells; a figure marked 'asserted, not counted' is the pre-2026-09-13 constant and says so in the cell.
+
+**C-294**
+
+Evidence:
+- `file:tools/benchmark.py:91` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from this campaign's cells; a figure marked 'asserted, not counted' is the pre-2026-09-13 constant and says so in the cell.
+
+**C-295**
+
+Evidence:
+- `file:tools/benchmark.py:91` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from this campaign's cells; a figure marked 'asserted, not counted' is the pre-2026-09-13 constant and says so in the cell.
+
+**C-296**
+
+Evidence:
+- `file:tools/benchmark.py:91` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from this campaign's cells; a figure marked 'asserted, not counted' is the pre-2026-09-13 constant and says so in the cell.
+
+**C-297**
+
+Evidence:
+- `file:tools/benchmark.py:91` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from this campaign's cells; a figure marked 'asserted, not counted' is the pre-2026-09-13 constant and says so in the cell.
+
+**C-298**
+
+Evidence:
+- `file:tools/benchmark.py:91` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from this campaign's cells; a figure marked 'asserted, not counted' is the pre-2026-09-13 constant and says so in the cell.
+
+**C-299**
+
+Evidence:
+- `file:tools/benchmark.py:91` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from this campaign's cells; a figure marked 'asserted, not counted' is the pre-2026-09-13 constant and says so in the cell.
+
+**C-300**
+
+Evidence:
+- `file:tools/benchmark.py:91` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from this campaign's cells; a figure marked 'asserted, not counted' is the pre-2026-09-13 constant and says so in the cell.
+
+**C-301**
+
+Evidence:
+- `file:tools/benchmark.py:91` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from this campaign's cells; a figure marked 'asserted, not counted' is the pre-2026-09-13 constant and says so in the cell.
+
+**C-302**
+
+Evidence:
+- `file:tools/benchmark.py:91` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from campaign v2's cells. The same row text also appears in v1's report for the same task and arm, which is why this entry names its own document.
+
+**C-303**
+
+Evidence:
+- `file:tools/benchmark.py:91` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from campaign v2's cells. The same row text also appears in v1's report for the same task and arm, which is why this entry names its own document.
+
+**C-304**
+
+Evidence:
+- `file:tools/benchmark.py:91` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from campaign v2's cells. The same row text also appears in v1's report for the same task and arm, which is why this entry names its own document.
+
+**C-305**
+
+Evidence:
+- `file:tools/benchmark.py:91` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from campaign v2's cells. The same row text also appears in v1's report for the same task and arm, which is why this entry names its own document.
+
+**C-306**
+
+Evidence:
+- `file:tools/benchmark.py:91` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/benchmark.py from campaign v2's cells. The same row text also appears in v1's report for the same task and arm, which is why this entry names its own document.
+
+**C-307**
+
+Evidence:
+- `file:tools/repetition_plan.py:1` -- resolvability: **PUBLIC**
+
+Note: Counted by tools/repetition_plan.py from the cells' own recounted dispatch figures against the budget the frozen protocol names; the three cells are listed in its cells_over_budget_and_not_stopped.
+
+**C-308**
+
+Evidence:
+- `file:dogfood/budget-enforcement/BUDGET_EVIDENCE.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-13)
+
+Note: Measured by tools/budget_evidence.py: control K1 shows dispatches 1..9 reaching the provider under a ceiling of 9, K2 shows the tenth refused with the budget named, and the falsifier shows both controls going red when enforcement is removed. Superseded within the same uncommitted change on 2026-09-13: this entry anchored the first v3 declaration, which was replaced by the pre-registration before any v3 cell ran and before either version was committed. The id is kept with the statement it now anchors rather than renumbered, so that nothing in the ledger points at text that never reached a commit.
+
+**C-309**
+
+Evidence:
+- `file:tools/repetition_plan.py:1` -- resolvability: **PUBLIC**
+
+Note: tools/repetition_plan.py --campaign v2 lists five arm-C cells in cells_over_budget_and_not_stopped; three of them recounted 18 against a stated 9, which is the factor of two. Superseded within the same uncommitted change on 2026-09-13: this entry anchored the first v3 declaration, which was replaced by the pre-registration before any v3 cell ran and before either version was committed. The id is kept with the statement it now anchors rather than renumbered, so that nothing in the ledger points at text that never reached a commit.
+
+**C-310**
+
+Evidence:
+- `file:dogfood/budget-enforcement/BUDGET_EVIDENCE.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-13)
+
+Note: Measured by tools/budget_evidence.py: K1 shows the ninth call reaching the provider under a ceiling of nine, K2 the tenth refused with the budget named, K3 the count persisted before each call, K4 a separate interpreter reading the same spend, and the falsifier shows every control going red once enforcement is removed. Re-anchored on 2026-09-13 from the declaration line (dispatch_budget = 9 per run, hard, enforced) to the sentence that states the claim: the declaration is a figure fixed in advance and is now carried by a not_claims entry.
+
+**C-311**
+
+Evidence:
+- `file:tools/repetition_plan.py:1` -- resolvability: **PUBLIC**
+
+Note: tools/repetition_plan.py reads the frozen protocol commit and returns protocol_repetition_requirement = NOT_DETERMINABLE, with the two readings of 'where the budget allows' quoted in its `why`.
+
+**C-312**
+
+Evidence:
+- `file:tools/repetition_plan.py:1` -- resolvability: **PUBLIC**
+
+Note: v2's budget was defined and not enforced: budget_rule = VIOLATED with five arm-C cells in cells_over_budget_and_not_stopped and five arm-A cells in cells_whose_spend_is_unknown.
+
+**C-313**
+
+Evidence:
+- `file:dogfood/benchmark/results-v2/slug_pair.B.1.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-13)
+
+Note: The v2 result file for slug_pair arm B records its own checks green and the hidden suite red on 'ahnlich-ja' != 'hnlich-ja'; it is the single false accept in the campaign and was reproduced independently (O141).
+
+**C-314**
+
+Evidence:
+- `file:dogfood/budget-enforcement/BUDGET_EVIDENCE.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-13)
+
+Note: DispatchRecord.provider_calls is written per record by Controller.note_dispatch; tools/budget_evidence.py reads the fixture run's log and reports refusal_lines with provider_calls = 0 and failure_class BUDGET_EXHAUSTED.
+
+**C-315**
+
+Evidence:
+- `file:dogfood/budget-enforcement/BUDGET_EVIDENCE.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-13)
+
+Note: Control K3: the fixture dispatcher reads state.json from disk on every call and records the count it finds; the measurement counter_seen_on_disk_per_call is 1..N, so each charge was persisted before its call.
+
+**C-316**
+
+Evidence:
+- `file:dogfood/benchmark/results/to_roman.A.1.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-13)
+
+Note: Every arm-A cell in campaigns v1 and v2 records dispatches = 1 in its arm_detail; tools/benchmark.py's arm_a makes one provider call and has no loop above it. §"Matched budget" says A gets nine turns, and that arm was never built.
+
+**C-317**
+
+Evidence:
+- `file:tools/benchmark.py:1` -- resolvability: **PUBLIC**
+
+Note: arm_a in tools/benchmark.py makes one provider call and has no loop above it; arm_b passes --max-dispatches 9 and arm_c constructs HohRunLauncher with dispatch_budget=9.
+
+**C-318**
+
+Evidence:
+- `file:dogfood/benchmark/results/to_roman.A.1.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-13)
+
+Note: Every *.A.*.json under dogfood/benchmark/results and results-v2 records dispatches = 1 in its arm_detail.
+
+**C-319**
+
+Evidence:
+- `file:dogfood/benchmark/results/to_roman.A.1.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-13)
+
+Note: Campaign v1 and campaign v2 both report arm A passing the hidden suite in 5 of 5 cells; the per-cell hidden_suite.passed fields carry it.
+
+**C-320**
+
+Evidence:
+- `file:tools/readiness.py:1` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/readiness.py; the row's own command column is how it is re-derived.
+
+**C-321**
+
+Evidence:
+- `file:tools/readiness.py:1` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/readiness.py; the row's own command column is how it is re-derived.
+
+**C-322**
+
+Evidence:
+- `file:tools/readiness.py:1` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/readiness.py; the row's own command column is how it is re-derived.
+
+**C-323**
+
+Evidence:
+- `file:tools/export_manifest.py:1` -- resolvability: **PUBLIC**
+
+Note: python3 tools/export_manifest.py check exits 0 and its closing line reports '9 acknowledged reference(s) in 2 document(s)'; no U2b finding remains. The twelve references in living documents were rewritten to name the internal document without a path.
+
+**C-324**
+
+Evidence:
+- `discriminated:a03/2=2/3` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+- `run:a03/2` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Recomputed on 2026-09-14 by pairing every a03-i2 receipt under runs/a03/receipts with its -basis twin: three checks carry both (K6 basis 0 -> candidate 0, K7 1 -> 0, K8 1 -> 0), and two of the three differ. This is the same 2 of 3 claim C-050 states. Cited in the ledger's own receipt form rather than as a file, the same way C-050 states the ratio: the source is a set of receipt pairs, and naming one file out of it would misstate where the number came from.
+
+**C-325**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/to_roman.C.3.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for to_roman/C/3 under "What each cell cost, counted" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-326**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/ledger_apply.A.1.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for ledger_apply/A/1 under "What each cell cost, counted" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-327**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/ledger_apply.A.2.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for ledger_apply/A/2 under "What each cell cost, counted" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-328**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/ledger_apply.A.3.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for ledger_apply/A/3 under "What each cell cost, counted" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-329**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/ledger_apply.B.1.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for ledger_apply/B/1 under "What each cell cost, counted" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-330**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/ledger_apply.B.2.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for ledger_apply/B/2 under "What each cell cost, counted" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-331**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/ledger_apply.B.3.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for ledger_apply/B/3 under "What each cell cost, counted" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-332**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/ledger_apply.C.1.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for ledger_apply/C/1 under "What each cell cost, counted" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-333**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/ledger_apply.C.2.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for ledger_apply/C/2 under "What each cell cost, counted" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-334**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/ledger_apply.C.3.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for ledger_apply/C/3 under "What each cell cost, counted" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-335**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/parse_duration.A.1.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for parse_duration/A/1 under "What each cell cost, counted" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-336**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/parse_duration.A.2.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for parse_duration/A/2 under "What each cell cost, counted" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-337**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/parse_duration.A.3.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for parse_duration/A/3 under "What each cell cost, counted" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-338**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/parse_duration.B.1.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for parse_duration/B/1 under "What each cell cost, counted" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-339**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/parse_duration.B.2.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for parse_duration/B/2 under "What each cell cost, counted" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-340**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/parse_duration.B.3.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for parse_duration/B/3 under "What each cell cost, counted" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-341**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/parse_duration.C.1.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for parse_duration/C/1 under "What each cell cost, counted" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-342**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/parse_duration.C.2.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for parse_duration/C/2 under "What each cell cost, counted" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-343**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/parse_duration.C.3.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for parse_duration/C/3 under "What each cell cost, counted" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-344**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/retry_backoff.A.1.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for retry_backoff/A/1 under "What each cell cost, counted" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-345**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/retry_backoff.A.2.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for retry_backoff/A/2 under "What each cell cost, counted" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-346**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/retry_backoff.A.3.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for retry_backoff/A/3 under "What each cell cost, counted" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-347**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/retry_backoff.B.1.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for retry_backoff/B/1 under "What each cell cost, counted" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-348**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/retry_backoff.B.2.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for retry_backoff/B/2 under "What each cell cost, counted" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-349**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/retry_backoff.B.3.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for retry_backoff/B/3 under "What each cell cost, counted" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-350**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/retry_backoff.C.1.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for retry_backoff/C/1 under "What each cell cost, counted" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-351**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/retry_backoff.C.2.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for retry_backoff/C/2 under "What each cell cost, counted" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-352**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/retry_backoff.C.3.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for retry_backoff/C/3 under "What each cell cost, counted" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-353**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/slug_pair.A.1.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for slug_pair/A/1 under "What each cell cost, counted" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-354**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/slug_pair.A.2.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for slug_pair/A/2 under "What each cell cost, counted" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-355**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/slug_pair.A.3.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for slug_pair/A/3 under "What each cell cost, counted" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-356**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/slug_pair.B.1.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for slug_pair/B/1 under "What each cell cost, counted" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-357**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/slug_pair.B.2.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for slug_pair/B/2 under "What each cell cost, counted" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-358**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/slug_pair.B.3.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for slug_pair/B/3 under "What each cell cost, counted" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-359**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/slug_pair.C.1.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for slug_pair/C/1 under "What each cell cost, counted" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-360**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/slug_pair.C.2.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for slug_pair/C/2 under "What each cell cost, counted" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-361**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/slug_pair.C.3.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for slug_pair/C/3 under "What each cell cost, counted" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-362**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/to_roman.A.1.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for to_roman/A/1 under "What each cell cost, counted" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-363**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/to_roman.A.2.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for to_roman/A/2 under "What each cell cost, counted" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-364**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/to_roman.A.3.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for to_roman/A/3 under "What each cell cost, counted" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-365**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/to_roman.B.1.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for to_roman/B/1 under "What each cell cost, counted" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-366**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/to_roman.B.2.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for to_roman/B/2 under "What each cell cost, counted" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-367**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/to_roman.B.3.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for to_roman/B/3 under "What each cell cost, counted" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-368**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/to_roman.C.1.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for to_roman/C/1 under "What each cell cost, counted" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-369**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/to_roman.C.2.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for to_roman/C/2 under "What each cell cost, counted" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-370**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/ledger_apply.A.1.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for ledger_apply/A/1 under "Every repetition, as it ran" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-371**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/ledger_apply.A.2.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for ledger_apply/A/2 under "Every repetition, as it ran" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-372**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/ledger_apply.A.3.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for ledger_apply/A/3 under "Every repetition, as it ran" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-373**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/ledger_apply.B.1.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for ledger_apply/B/1 under "Every repetition, as it ran" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-374**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/ledger_apply.B.2.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for ledger_apply/B/2 under "Every repetition, as it ran" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-375**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/ledger_apply.B.3.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for ledger_apply/B/3 under "Every repetition, as it ran" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-376**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/ledger_apply.C.1.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for ledger_apply/C/1 under "Every repetition, as it ran" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-377**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/ledger_apply.C.2.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for ledger_apply/C/2 under "Every repetition, as it ran" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-378**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/ledger_apply.C.3.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for ledger_apply/C/3 under "Every repetition, as it ran" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-379**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/parse_duration.A.1.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for parse_duration/A/1 under "Every repetition, as it ran" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-380**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/parse_duration.A.2.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for parse_duration/A/2 under "Every repetition, as it ran" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-381**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/parse_duration.A.3.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for parse_duration/A/3 under "Every repetition, as it ran" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-382**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/parse_duration.B.1.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for parse_duration/B/1 under "Every repetition, as it ran" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-383**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/parse_duration.B.2.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for parse_duration/B/2 under "Every repetition, as it ran" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-384**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/parse_duration.B.3.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for parse_duration/B/3 under "Every repetition, as it ran" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-385**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/parse_duration.C.1.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for parse_duration/C/1 under "Every repetition, as it ran" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-386**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/parse_duration.C.2.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for parse_duration/C/2 under "Every repetition, as it ran" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-387**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/parse_duration.C.3.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for parse_duration/C/3 under "Every repetition, as it ran" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-388**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/retry_backoff.A.1.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for retry_backoff/A/1 under "Every repetition, as it ran" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-389**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/retry_backoff.A.2.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for retry_backoff/A/2 under "Every repetition, as it ran" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-390**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/retry_backoff.A.3.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for retry_backoff/A/3 under "Every repetition, as it ran" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-391**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/retry_backoff.B.1.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for retry_backoff/B/1 under "Every repetition, as it ran" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-392**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/retry_backoff.B.2.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for retry_backoff/B/2 under "Every repetition, as it ran" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-393**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/retry_backoff.B.3.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for retry_backoff/B/3 under "Every repetition, as it ran" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-394**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/retry_backoff.C.1.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for retry_backoff/C/1 under "Every repetition, as it ran" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-395**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/retry_backoff.C.2.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for retry_backoff/C/2 under "Every repetition, as it ran" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-396**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/retry_backoff.C.3.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for retry_backoff/C/3 under "Every repetition, as it ran" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-397**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/slug_pair.A.1.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for slug_pair/A/1 under "Every repetition, as it ran" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-398**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/slug_pair.A.2.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for slug_pair/A/2 under "Every repetition, as it ran" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-399**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/slug_pair.A.3.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for slug_pair/A/3 under "Every repetition, as it ran" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-400**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/slug_pair.B.1.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for slug_pair/B/1 under "Every repetition, as it ran" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-401**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/slug_pair.B.2.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for slug_pair/B/2 under "Every repetition, as it ran" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-402**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/slug_pair.B.3.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for slug_pair/B/3 under "Every repetition, as it ran" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-403**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/slug_pair.C.1.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for slug_pair/C/1 under "Every repetition, as it ran" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-404**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/slug_pair.C.2.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for slug_pair/C/2 under "Every repetition, as it ran" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-405**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/slug_pair.C.3.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for slug_pair/C/3 under "Every repetition, as it ran" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-406**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/to_roman.A.1.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for to_roman/A/1 under "Every repetition, as it ran" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-407**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/to_roman.A.2.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for to_roman/A/2 under "Every repetition, as it ran" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-408**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/to_roman.A.3.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for to_roman/A/3 under "Every repetition, as it ran" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-409**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/to_roman.B.1.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for to_roman/B/1 under "Every repetition, as it ran" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-410**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/to_roman.B.2.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for to_roman/B/2 under "Every repetition, as it ran" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-411**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/to_roman.B.3.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for to_roman/B/3 under "Every repetition, as it ran" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-412**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/to_roman.C.1.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for to_roman/C/1 under "Every repetition, as it ran" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-413**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/to_roman.C.2.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for to_roman/C/2 under "Every repetition, as it ran" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-414**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/to_roman.C.3.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for to_roman/C/3 under "Every repetition, as it ran" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-415**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/ledger_apply.A.1.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for ledger_apply/A over its three repetitions under "Per (task, arm), over its repetitions" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-416**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/ledger_apply.B.1.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for ledger_apply/B over its three repetitions under "Per (task, arm), over its repetitions" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-417**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/ledger_apply.C.1.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for ledger_apply/C over its three repetitions under "Per (task, arm), over its repetitions" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-418**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/parse_duration.A.1.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for parse_duration/A over its three repetitions under "Per (task, arm), over its repetitions" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-419**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/parse_duration.B.1.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for parse_duration/B over its three repetitions under "Per (task, arm), over its repetitions" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-420**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/parse_duration.C.1.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for parse_duration/C over its three repetitions under "Per (task, arm), over its repetitions" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-421**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/retry_backoff.A.1.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for retry_backoff/A over its three repetitions under "Per (task, arm), over its repetitions" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-422**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/retry_backoff.B.1.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for retry_backoff/B over its three repetitions under "Per (task, arm), over its repetitions" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-423**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/retry_backoff.C.1.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for retry_backoff/C over its three repetitions under "Per (task, arm), over its repetitions" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-424**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/slug_pair.A.1.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for slug_pair/A over its three repetitions under "Per (task, arm), over its repetitions" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-425**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/slug_pair.B.1.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for slug_pair/B over its three repetitions under "Per (task, arm), over its repetitions" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-426**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/slug_pair.C.1.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for slug_pair/C over its three repetitions under "Per (task, arm), over its repetitions" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-427**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/to_roman.A.1.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for to_roman/A over its three repetitions under "Per (task, arm), over its repetitions" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-428**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/to_roman.B.1.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for to_roman/B over its three repetitions under "Per (task, arm), over its repetitions" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-429**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/to_roman.C.1.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for to_roman/C over its three repetitions under "Per (task, arm), over its repetitions" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-430**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/ledger_apply.A.1.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for ledger_apply/A over its three repetitions under "Cost" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-431**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/ledger_apply.B.1.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for ledger_apply/B over its three repetitions under "Cost" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-432**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/ledger_apply.C.1.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for ledger_apply/C over its three repetitions under "Cost" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-433**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/parse_duration.A.1.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for parse_duration/A over its three repetitions under "Cost" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-434**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/parse_duration.B.1.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for parse_duration/B over its three repetitions under "Cost" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-435**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/parse_duration.C.1.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for parse_duration/C over its three repetitions under "Cost" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-436**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/retry_backoff.A.1.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for retry_backoff/A over its three repetitions under "Cost" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-437**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/retry_backoff.B.1.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for retry_backoff/B over its three repetitions under "Cost" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-438**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/retry_backoff.C.1.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for retry_backoff/C over its three repetitions under "Cost" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-439**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/slug_pair.A.1.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for slug_pair/A over its three repetitions under "Cost" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-440**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/slug_pair.B.1.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for slug_pair/B over its three repetitions under "Cost" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-441**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/slug_pair.C.1.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for slug_pair/C over its three repetitions under "Cost" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-442**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/to_roman.A.1.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for to_roman/A over its three repetitions under "Cost" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-443**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/to_roman.B.1.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for to_roman/B over its three repetitions under "Cost" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-444**
+
+Evidence:
+- `file:dogfood/benchmark/results-v3/to_roman.C.1.json:1` -- resolvability: **LOCAL_ONLY** (resolved by the main orchestrator, 2026-09-14)
+
+Note: Row for to_roman/C over its three repetitions under "Cost" in campaign v3's generated results. The reporter formats; it computes nothing the cells do not carry.
+
+**C-445**
+
+Evidence:
+- `file:docs/BENCHMARK_RESULTS_v3.md:1` -- resolvability: **PUBLIC**
+
+Note: Read from campaign v3's 45 cell files and reported in docs/BENCHMARK_RESULTS_v3.md; tests/test_v3_aggregation_agreement.py re-derives the same figures from the cells without importing the reporter and requires both to agree.
+
+**C-446**
+
+Evidence:
+- `file:docs/BENCHMARK_RESULTS_v3.md:1` -- resolvability: **PUBLIC**
+
+Note: Read from campaign v3's 45 cell files and reported in docs/BENCHMARK_RESULTS_v3.md; tests/test_v3_aggregation_agreement.py re-derives the same figures from the cells without importing the reporter and requires both to agree.
+
+**C-447**
+
+Evidence:
+- `file:docs/BENCHMARK_RESULTS_v3.md:1` -- resolvability: **PUBLIC**
+
+Note: Read from campaign v3's 45 cell files and reported in docs/BENCHMARK_RESULTS_v3.md; tests/test_v3_aggregation_agreement.py re-derives the same figures from the cells without importing the reporter and requires both to agree.
+
+**C-448**
+
+Evidence:
+- `file:docs/BENCHMARK_RESULTS_v3.md:1` -- resolvability: **PUBLIC**
+
+Note: Read from campaign v3's 45 cell files and reported in docs/BENCHMARK_RESULTS_v3.md; tests/test_v3_aggregation_agreement.py re-derives the same figures from the cells without importing the reporter and requires both to agree.
+
+**C-449**
+
+Evidence:
+- `file:docs/BENCHMARK_RESULTS_v3.md:1` -- resolvability: **PUBLIC**
+
+Note: Read from campaign v3's 45 cell files and reported in docs/BENCHMARK_RESULTS_v3.md; tests/test_v3_aggregation_agreement.py re-derives the same figures from the cells without importing the reporter and requires both to agree.
+
+**C-450**
+
+Evidence:
+- `file:docs/BENCHMARK_RESULTS_v3.md:1` -- resolvability: **PUBLIC**
+
+Note: Read from campaign v3's 45 cell files and reported in docs/BENCHMARK_RESULTS_v3.md; tests/test_v3_aggregation_agreement.py re-derives the same figures from the cells without importing the reporter and requires both to agree.
+
+**C-451**
+
+Evidence:
+- `file:tools/readiness.py:1` -- resolvability: **PUBLIC**
+
+Note: Generated by tools/readiness.py; the row's own command column is how it is re-derived.
+
+**C-452**
+
+Evidence:
+- `file:tools/check_claims.py:1` -- resolvability: **PUBLIC**
+
+Note: Measured by materialising the INCLUDE set of EXPORT_MANIFEST.json into a clean checkout and running python3 tools/check_claims.py check all there, before and after the change to _ist_ausgeschlossen.
+
+**C-453**
+
+Evidence:
+- `file:tools/check_claims.py:1` -- resolvability: **PUBLIC**
+
+Note: Measured by materialising the INCLUDE set of EXPORT_MANIFEST.json into a clean checkout and running python3 tools/check_claims.py check all there, before and after the change to _ist_ausgeschlossen.
+
+**C-454**
+
+Evidence:
+- `file:tools/check_claims.py:1` -- resolvability: **PUBLIC**
+
+Note: Measured by materialising the INCLUDE set of EXPORT_MANIFEST.json into a clean checkout and running python3 tools/check_claims.py check all there, before and after the change to _ist_ausgeschlossen.
 
 ## Not claims
 
@@ -1134,8 +3607,8 @@ Number-bearing sentences from README.md and docs/** that were judged not to be p
 | docs/QUELLENCHECK.md:17 | Q11 — https://docs.lmcache.ai/getting_started/quickstart/offload_kv_cache.html sowie https://docs.lmcache.ai/mp/index.html — Erste Seite kennzeichnet In-Process-Modus als deprecated. MP-Übersicht beschreibt separaten Dienst, nennt zugleich Dev-Branch-Voraussetzung. Deswegen kein ungeprüfter Standard-Rollout aus diesem Chat. | citation-verification table row, not a claim about this software's own behavior |
 | docs/QUELLENCHECK.md:18 | Q12 — https://docs.sglang.io/docs/advanced_features/hicache_best_practices sowie https://docs.sglang.io/docs/advanced_features/session_radix_cache — Offizielle Dokumentation zu hierarchischem Cache bzw. Session-Referenzen. Session-ID ersetzt nicht den vollständigen vorgesehenen Prompt. Fortgeschrittene Features nicht automatisch als lokal vorhanden oder release-stabil behandeln. | citation-verification table row, not a claim about this software's own behavior |
 | docs/RECOVERY.md:10 | Handoff §7, the founding design note this project builds from, states the governing rule directly: *"On resume, first reconcile the existing task/endpoint identity and liveness: a running worker is re-attached, a demonstrably finished one is evaluated, an unclear state blocks. ⟦Handoff §7, the founding design note this project builds from, states the⟧ | internal design-note section reference (Handoff §7), not a numeric measurement claim |
-| docs/LIMITATIONS.md:317 | There is no `.git` inside the arena (see limit 6) and no predecessor tree to diff against, so a check command has no way to ask "is this smaller than it was", "did this only add lines", or any other question phrased as a comparison to what came before -- that class of assertion has to be expressed outside the acceptance-check loop entirely, by whoever is comparing runs after the fact. ⟦`.git` inside the arena (see limit 6) and no predecessor tree to diff⟧ | internal cross-reference to another limit's heading number within this same document ('see limit 6'), the same category as the methodology's already-catalogued ordinal cross-references ('step 2', 'measured property 3') -- it points back to an already-excluded numbered heading, not a measurement |
-| docs/LIMITATIONS.md:368 | The second is acceptance-governing: the controller's own `discriminates` flag, which is `True` only when the base run failed to meet the expected exit code *and* the candidate met it -- a stricter, directional condition, not a mere difference. For one iteration in this project's history the two diverge outright: the receipt-derived count was **5 of 13**, while the acceptance-governing `discriminates` flag was 0, because that iteration was an outage with no QA verdict at all -- there was no acceptance decision for the flag to be true about, regardless of how many receipt pairs happened to differ. Quoting "5 of 13" as if it answered the same question as the controller's flag would misstate what that iteration's evidence actually supports. ⟦differ. Quoting "5 of 13" as if it answered the same question as the⟧ | restates, in a warning against misquoting it, the '5 of 13' figure already recorded as a measurement at docs/LIMITATIONS.md:204 (claim C-058) -- not an independent new measurement |
+| docs/LIMITATIONS.md:401 | There is no `.git` inside the arena (see limit 6) and no predecessor tree to diff against, so a check command has no way to ask "is this smaller than it was", "did this only add lines", or any other question phrased as a comparison to what came before -- that class of assertion has to be expressed outside the acceptance-check loop entirely, by whoever is comparing runs after the fact. ⟦`.git` inside the arena (see limit 6) and no predecessor tree to diff⟧ | internal cross-reference to another limit's heading number within this same document ('see limit 6'), the same category as the methodology's already-catalogued ordinal cross-references ('step 2', 'measured property 3') -- it points back to an already-excluded numbered heading, not a measurement |
+| docs/LIMITATIONS.md:452 | The second is acceptance-governing: the controller's own `discriminates` flag, which is `True` only when the base run failed to meet the expected exit code *and* the candidate met it -- a stricter, directional condition, not a mere difference. For one iteration in this project's history the two diverge outright: the receipt-derived count was **5 of 13**, while the acceptance-governing `discriminates` flag was 0, because that iteration was an outage with no QA verdict at all -- there was no acceptance decision for the flag to be true about, regardless of how many receipt pairs happened to differ. Quoting "5 of 13" as if it answered the same question as the controller's flag would misstate what that iteration's evidence actually supports. ⟦differ. Quoting "5 of 13" as if it answered the same question as the⟧ | restates, in a warning against misquoting it, the '5 of 13' figure already recorded as a measurement at docs/LIMITATIONS.md:204 (claim C-058) -- not an independent new measurement |
 | policy/README.md:14 | It never showed locally, because stage 1 exists on the development machine. 3. ⟦showed locally, because stage 1 exists on the development machine.⟧ | ordinal cross-reference to the numbered pattern-search-stage list above ('stage 1' = Operator), not a numeric measurement claim |
 | policy/README.md:18 | Shipping the files in stage 2 is part of the packaging step; before that a built wheel does **not** contain them. ⟦Shipping the files in stage 2 is part of the packaging step; before that a⟧ | ordinal cross-reference to the numbered pattern-search-stage list above ('stage 2' = Package), not a numeric measurement claim |
 | policy/README.md:36 | Found by an adversarial reviewer at the step-0 gate of the dogfood run. ⟦reviewer at the step-0 gate of the dogfood run.⟧ | internal gate-name reference ('step-0 gate'), not a numeric measurement claim, matching the existing bulk reason for internal finding/gate/milestone identifiers |
@@ -1173,8 +3646,8 @@ Number-bearing sentences from README.md and docs/** that were judged not to be p
 | paper/AUDIT.md:46 | **Claims against code.** For every claim id whose `CLAIMS.json` evidence names a `file:` or `test:` location, this audit confirmed the named file exists, and, where the ledger records an `anchor_digest` (a normalised content hash of the cited line -- `docs/LIMITATIONS.md` §6/§8's own content-anchoring mechanism, the one `d4c` built after the coverage-anchor break this paper's own §1 instance two describes), that the digest still resolves to exactly one line in the current file. ⟦break this paper's own §1 instance two describes), that the digest still⟧ | internal section cross-reference (§1 of this paper's own instance-two narrative), not a numeric measurement claim |
 | paper/AUDIT.md:48 | It independently reimplements that digest check (`sha256` of the line with internal whitespace collapsed) rather than trusting `tools/check_claims.py`'s `check evidence` subcommand, because that subcommand's own `file:` resolution is a bare line-count range check (`resolve_evidence` in `tools/check_claims.py`, around line 328-343: "does the line number fall inside the file", nothing about content) -- it would not have caught a citation whose line drifted to different content. ⟦reimplements that digest check (`sha256` of the line with internal⟧ | names the sha256 hash algorithm; the digit is part of an algorithm name, not a measurement |
 | paper/AUDIT.md:57 | Several (all under `docs/LIMITATIONS.md`, which grew when limits 13-16 were merged in after these claims were anchored) carry a *stale line number* in their `evidence`/`where` field -- the recorded line no longer holds the cited sentence -- but the content-digest still resolves uniquely elsewhere in the same file, so the citation is intact; only the human-readable line pointer drifted. ⟦(all under `docs/LIMITATIONS.md`, which grew when limits 13-16 were merged in⟧ | cross-references docs/LIMITATIONS.md's own limit numbers 13-16 (identifiers for that document's limit entries), not a numeric measurement claim |
-| paper/AUDIT.md:77 | Of the 38 numbers `paper/NUMBERS.md`'s own table catalogues, 3 are independently recomputable inside this checkout (the two structural ordinals, and the "3 contradictory license statements" figure, recomputed by counting the distinct rows of `dogfood/specs/d2b-licenses.md`'s own table rather than by re-reading `docs/LIMITATIONS.md`'s restatement of the same figure). ⟦catalogues, 3 are independently recomputable inside this checkout (the two⟧ | self-tally over paper/AUDIT.md's own Numbers-table verdicts (RESOLVED vs NOT_CHECKED), mechanically checked by tools/audit_refs.py's summary-consistency check (out of this run's scope); not independently re-derived here |
-| paper/AUDIT.md:78 | Of the 38 numbers `paper/NUMBERS.md`'s own table catalogues, 3 are independently recomputable inside this checkout (the two structural ordinals, and the "3 contradictory license statements" figure, recomputed by counting the distinct rows of `dogfood/specs/d2b-licenses.md`'s own table rather than by re-reading `docs/LIMITATIONS.md`'s restatement of the same figure). ⟦structural ordinals, and the "3 contradictory license statements" figure,⟧ | restates the '3 contradictory license statements' figure, already recorded under claim C-052 in CLAIMS.json |
+| paper/AUDIT.md:77 | Of the 38 numbers `paper/NUMBERS.md`'s own table catalogues, 3 are independently recomputable inside this checkout (the two structural ordinals, and the "3 contradictory license statements" figure, recomputed by counting the distinct rows of the internal *d2b-licenses* specification's own table rather than by re-reading `docs/LIMITATIONS.md`'s restatement of the same figure). ⟦catalogues, 3 are independently recomputable inside this checkout (the two⟧ | self-tally over paper/AUDIT.md's own Numbers-table verdicts (RESOLVED vs NOT_CHECKED), mechanically checked by tools/audit_refs.py's summary-consistency check (out of this run's scope); not independently re-derived here |
+| paper/AUDIT.md:78 | Of the 38 numbers `paper/NUMBERS.md`'s own table catalogues, 3 are independently recomputable inside this checkout (the two structural ordinals, and the "3 contradictory license statements" figure, recomputed by counting the distinct rows of the internal *d2b-licenses* specification's own table rather than by re-reading `docs/LIMITATIONS.md`'s restatement of the same figure). ⟦structural ordinals, and the "3 contradictory license statements" figure,⟧ | restates the '3 contradictory license statements' figure, already recorded under claim C-052 in CLAIMS.json |
 | paper/AUDIT.md:82 | The remaining 35 need either `runs/` (gitignored, absent from this checkout -- confirmed: `runs/` does not exist here, O33) or `.git` history (absent from an arena by construction, O31; also not invoked here by design even though this particular checkout happens to have `.git`, because the resolver must behave identically inside an arena that has neither). ⟦from this checkout -- confirmed: `runs/` does not exist here, O33) or `.git`⟧ | names internal finding id O33 and restates that runs/ is absent from this checkout -- a structural fact already enforced by this project's own environment-gap mechanism (tools/check_claims.py's _runs_root_missing()), not an independent new measurement |
 | paper/AUDIT.md:83 | The remaining 35 need either `runs/` (gitignored, absent from this checkout -- confirmed: `runs/` does not exist here, O33) or `.git` history (absent from an arena by construction, O31; also not invoked here by design even though this particular checkout happens to have `.git`, because the resolver must behave identically inside an arena that has neither). ⟦history (absent from an arena by construction, O31; also not invoked here by⟧ | names internal finding id O31, not a numeric measurement claim |
 | paper/AUDIT.md:92 | One incidental finding, not a row (out of `coverage`'s scope, which is limited to what `paper/NUMBERS.md`'s table already catalogues): that table does not carry a separate entry for the digit "3" in the paper's own §3 sentence "Its second iteration: 2 of 3 such checks differed, the candidate was accepted again..." (a03 iteration 2, C-050) -- it catalogues the "2" but not the "3" of that same ratio, even though both digits appear in `POSITION_PAPER.md`'s prose. ⟦sentence "Its second iteration: 2 of 3 such checks differed, the candidate⟧ | quotes paper/POSITION_PAPER.md's own §3 sentence verbatim as context for the finding recorded at paper/AUDIT.md:91; the quoted ratio (2 of 3) is already recorded under claim C-050 elsewhere in this ledger |
@@ -1183,34 +3656,34 @@ Number-bearing sentences from README.md and docs/** that were judged not to be p
 | paper/AUDIT.md:97 | Flagged for the operator below as a `paper/NUMBERS.md` maintenance item; it does not create a missing row in this audit because criterion 1 scopes coverage to what `NUMBERS.md` already lists, not to an independent re-derivation of `NUMBERS.md`'s own completeness. ⟦audit because criterion 1 scopes coverage to what `NUMBERS.md` already lists,⟧ | names 'criterion 1' as an internal reference to tools/audit_refs.py's own coverage criterion, not a numeric measurement claim |
 | paper/AUDIT.md:100 | **a02 mentions.** Re-parsed independently (whitespace-normalised, `\ba02\b`): 5 mentions, matching the plan's stated count exactly (the plan said not to trust that figure and to recount -- recounted, and it holds). ⟦**a02 mentions.** Re-parsed independently (whitespace-normalised,⟧ | names the a02 run identifier while describing this audit's own re-parse method, not a numeric measurement claim |
 | paper/AUDIT.md:105 | **a02 mentions.** Re-parsed independently (whitespace-normalised, `\ba02\b`): 5 mentions, matching the plan's stated count exactly (the plan said not to trust that figure and to recount -- recounted, and it holds). Every one sits in language that marks it invalidated or names it as the counter-example the section is making (`RESOLVED`); none reads as unqualified support for `a02`'s original claim. `a03` (`A03_NACHWEIS.md`) is consistently named as the corrected replacement. ⟦support for `a02`'s original claim. `a03` (`A03_NACHWEIS.md`) is consistently⟧ | names the a03 run identifier and the A03_NACHWEIS.md document, not a numeric measurement claim |
-| paper/AUDIT.md:108 | **External citations.** One `source Q<n>` token in the paper: `source Q2`, citing `docs/QUELLENCHECK.md` row Q2. ⟦**External citations.** One `source Q<n>` token in the paper: `source Q2`,⟧ | external citation index (source Q2, resolved in docs/QUELLENCHECK.md), matching this ledger's established bulk not_claims category for Q-indexed citations |
-| paper/AUDIT.md:109 | **External citations.** One `source Q<n>` token in the paper: `source Q2`, citing `docs/QUELLENCHECK.md` row Q2. Marked `EXTERNAL` per the specification: the URL and read-date are well-formed and quoted, but this is a dated read of a third party's repository, not something this checkout can re-fetch (no network access here) or otherwise reproduce. ⟦citing `docs/QUELLENCHECK.md` row Q2. Marked `EXTERNAL` per the⟧ | external citation index (Q2, resolved in docs/QUELLENCHECK.md), continuation of paper/AUDIT.md:108 |
-| paper/AUDIT.md:115 | **Overclaim vocabulary.** Searched the whitespace-normalised paper for the exact vocabulary `dogfood/specs/d5-paper.md`'s own criterion 10 names: unqualified superlative, "proves", "guarantees", "fully autonomous", "production-ready", "solves", "verifies that", "ensures correctness", "cannot fail" (word-boundary matches, so "solves" does not fire on "re**solves**"). ⟦exact vocabulary `dogfood/specs/d5-paper.md`'s own criterion 10 names:⟧ | names 'criterion 10' as an internal reference to dogfood/specs/d5-paper.md's own overclaim-vocabulary criterion, not a numeric measurement claim |
-| paper/AUDIT.md:125 | **Commit references and run/receipt references.** Searched `paper/POSITION_PAPER.md` for hex-looking commit shas (7-40 hex characters) and for specific `runs/...` receipt-style path references. ⟦`paper/POSITION_PAPER.md` for hex-looking commit shas (7-40 hex characters)⟧ | defines the hex-commit-sha search pattern (7-40 characters) used by this audit's own methodology; not a measurement |
-| paper/AUDIT.md:130 | **Commit references and run/receipt references.** Searched `paper/POSITION_PAPER.md` for hex-looking commit shas (7-40 hex characters) and for specific `runs/...` receipt-style path references. Found **none** -- the paper discusses `runs/` only as a directory/concept (11 mentions, all about its absence or its role, none naming a specific run's receipt file), and never quotes a commit sha in its own prose (several `CLAIMS.json` claim *texts* do carry commit shas, e.g. C-049's `e348be3fab0b`, but those live in the ledger, not in the paper's own words, so they are not a paper citation to audit). `tools/audit_refs.py`'s `coverage` check does not gate on these two categories for exactly this reason -- there is nothing of this shape to find in this specific paper -- and this document says so plainly rather than manufacturing rows for citations that do not exist. ⟦*texts* do carry commit shas, e.g. C-049's `e348be3fab0b`, but those live in⟧ | cites claim C-049's own commit-hash text (e348be3fab0b), already recorded in CLAIMS.json |
+| paper/AUDIT.md:108 | **External citations.** One `source Q<n>` token in the paper: `source Q2`, citing the internal *Quellencheck* row Q2. ⟦**External citations.** One `source Q<n>` token in the paper: `source Q2`,⟧ | external citation index (source Q2, resolved in docs/QUELLENCHECK.md), matching this ledger's established bulk not_claims category for Q-indexed citations |
+| paper/AUDIT.md:109 | **External citations.** One `source Q<n>` token in the paper: `source Q2`, citing the internal *Quellencheck* row Q2. Marked `EXTERNAL` per the specification: the URL and read-date are well-formed and quoted, but this is a dated read of a third party's repository, not something this checkout can re-fetch (no network access here) or otherwise reproduce. ⟦citing the internal *Quellencheck* row Q2. Marked `EXTERNAL` per the⟧ | external citation index (Q2, resolved in docs/QUELLENCHECK.md), continuation of paper/AUDIT.md:108 |
+| paper/AUDIT.md:115 | **Overclaim vocabulary.** Searched the whitespace-normalised paper for the exact vocabulary the internal *d5-paper* specification's own criterion 10 names: unqualified superlative, "proves", "guarantees", "fully autonomous", "production-ready", "solves", "verifies that", "ensures correctness", "cannot fail" (word-boundary matches, so "solves" does not fire on "re**solves**"). ⟦exact vocabulary the internal *d5-paper* specification's own criterion 10 names:⟧ | names 'criterion 10' as an internal reference to dogfood/specs/d5-paper.md's own overclaim-vocabulary criterion, not a numeric measurement claim |
+| paper/AUDIT.md:125 | **Commit references and run/receipt references.** Searched `paper/POSITION_PAPER.md` for hex-looking commit shas (7-40 hex characters) and for specific the runs tree receipt-style path references. ⟦`paper/POSITION_PAPER.md` for hex-looking commit shas (7-40 hex characters)⟧ | defines the hex-commit-sha search pattern (7-40 characters) used by this audit's own methodology; not a measurement |
+| paper/AUDIT.md:130 | **Commit references and run/receipt references.** Searched `paper/POSITION_PAPER.md` for hex-looking commit shas (7-40 hex characters) and for specific the runs tree receipt-style path references. Found **none** -- the paper discusses `runs/` only as a directory/concept (11 mentions, all about its absence or its role, none naming a specific run's receipt file), and never quotes a commit sha in its own prose (several `CLAIMS.json` claim *texts* do carry commit shas, e.g. C-049's `e348be3fab0b`, but those live in the ledger, not in the paper's own words, so they are not a paper citation to audit). `tools/audit_refs.py`'s `coverage` check does not gate on these two categories for exactly this reason -- there is nothing of this shape to find in this specific paper -- and this document says so plainly rather than manufacturing rows for citations that do not exist. ⟦*texts* do carry commit shas, e.g. C-049's `e348be3fab0b`, but those live in⟧ | cites claim C-049's own commit-hash text (e348be3fab0b), already recorded in CLAIMS.json |
 | paper/AUDIT.md:137 | ## Claim id citations (47 rows) ⟦## Claim id citations (47 rows)⟧ | table heading naming this section's own row count (47 rows), matching the '47 claim ids cited' figure already addressed at paper/AUDIT.md:38; a structural section label, not an independent measurement |
 | paper/AUDIT.md:258 | None found in `paper/POSITION_PAPER.md` (searched for 7-40 character hex sequences in the whitespace-normalised text). ⟦None found in `paper/POSITION_PAPER.md` (searched for 7-40 character hex⟧ | defines the hex-commit-sha search pattern (7-40 characters); not a measurement, restates the definition at paper/AUDIT.md:125 |
 | paper/AUDIT.md:276 | **Needs `runs/` only (O33 -- gitignored, absent from the candidate snapshot), 28 rows:** ⟦**Needs `runs/` only (O33 -- gitignored, absent from the candidate snapshot), 28 rows:**⟧ | names internal finding id O33 and this section's own '28 rows' sub-tally, matching the length of the list given at paper/AUDIT.md:277 (independently counted by the d4e developer on 2026-09-10: 28 items); not an independent new measurement beyond what that list already enumerates |
-| paper/AUDIT.md:277 | NUMBER 0 (C-059), NUMBER 0 (C-073), NUMBER 2 (C-050), NUMBER 3 (C-048), NUMBER 3 (C-034), NUMBER 5 (C-019), NUMBER 5 (C-048), NUMBER 6 (C-026), NUMBER 7 (C-031), NUMBER 8 (C-038), NUMBER 9 (C-026), NUMBER 9 (C-034), NUMBER 9 (C-043), NUMBER 10 (C-043), NUMBER 11 (C-021), NUMBER 11 (C-038), NUMBER 13 (C-019), NUMBER 13 (C-031), NUMBER 18 (C-033), NUMBER 21 (C-047), NUMBER 28 (C-061), NUMBER 32 (C-042), NUMBER 36 (C-023), NUMBER 37 (C-037), NUMBER 37 (C-073), NUMBER 48 (C-018), NUMBER 52 (C-028), NUMBER 52 (C-061). ⟦NUMBER 0 (C-059), NUMBER 0 (C-073), NUMBER 2 (C-050), NUMBER 3 (C-048), NUMBER 3 (C-034), NUMBER 5 (C-019), NUMBER 5 (C-048), NUMBER 6 (C-026), NUMBER 7 (C-031), NUMBER 8 (C-038), NUMBER 9 (C-026), NUMBER 9 (C-034), NUMBER 9 (C-043), NUMBER 10 (C-043), NUMBER 11 (C-021), NUMBER 11 (C-038), NUMBER 13 (C-019), NUMBER 13 (C-031), NUMBER 18 (C-033), NUMBER 21 (C-047), NUMBER 28 (C-061), NUMBER 32 (C-042), NUMBER 36 (C-023), NUMBER 37 (C-037), NUMBER 37 (C-073), NUMBER 48 (C-018), NUMBER 52 (C-028), NUMBER 52 (C-061).⟧ | enumerates, by claim id, exactly the NUMBER rows already recorded individually in CLAIMS.json (C-018..C-073 range); a list of existing claim-id references, not a new measurement |
+| paper/AUDIT.md:278 | NUMBER 0 (C-059), NUMBER 0 (C-073), NUMBER 2 (C-050), NUMBER 3 (C-050), NUMBER 3 (C-048), NUMBER 3 (C-034), NUMBER 5 (C-019), NUMBER 5 (C-048), NUMBER 6 (C-026), NUMBER 7 (C-031), NUMBER 8 (C-038), NUMBER 9 (C-026), NUMBER 9 (C-034), NUMBER 9 (C-043), NUMBER 10 (C-043), NUMBER 11 (C-021), NUMBER 11 (C-038), NUMBER 13 (C-019), NUMBER 13 (C-031), NUMBER 18 (C-033), NUMBER 21 (C-047), NUMBER 28 (C-061), NUMBER 32 (C-042), NUMBER 36 (C-023), NUMBER 37 (C-037), NUMBER 37 (C-073), NUMBER 48 (C-018), NUMBER 52 (C-028), NUMBER 52 (C-061). ⟦NUMBER 0 (C-059), NUMBER 0 (C-073), NUMBER 2 (C-050), NUMBER 3 (C-050), NUMBER 3 (C-048), NUMBER 3 (C-034), NUMBER 5 (C-019), NUMBER 5 (C-048), NUMBER 6 (C-026), NUMBER 7 (C-031), NUMBER 8 (C-038), NUMBER 9 (C-026), NUMBER 9 (C-034), NUMBER 9 (C-043), NUMBER 10 (C-043), NUMBER 11 (C-021), NUMBER 11 (C-038), NUMBER 13 (C-019), NUMBER 13 (C-031), NUMBER 18 (C-033), NUMBER 21 (C-047), NUMBER 28 (C-061), NUMBER 32 (C-042), NUMBER 36 (C-023), NUMBER 37 (C-037), NUMBER 37 (C-073), NUMBER 48 (C-018), NUMBER 52 (C-028), NUMBER 52 (C-061).⟧ | enumerates, by claim id, exactly the NUMBER rows already recorded individually in CLAIMS.json (C-018..C-073 range); a list of existing claim-id references, not a new measurement |
 | paper/AUDIT.md:283 | **Needs `.git` only (O31 -- no `.git` inside an arena, and this tool does not invoke git even where `.git` happens to be present), 6 rows:** ⟦**Needs `.git` only (O31 -- no `.git` inside an arena, and this tool does not⟧ | names internal finding id O31, not a numeric measurement claim |
 | paper/AUDIT.md:284 | **Needs `.git` only (O31 -- no `.git` inside an arena, and this tool does not invoke git even where `.git` happens to be present), 6 rows:** ⟦invoke git even where `.git` happens to be present), 6 rows:**⟧ | this section's own '6 rows' sub-tally, matching the length of the list given at paper/AUDIT.md:285 (independently counted by the d4e developer on 2026-09-10: 6 items); not an independent new measurement beyond what that list already enumerates |
 | paper/AUDIT.md:285 | NUMBER 0 (C-056), NUMBER 2 (C-054), NUMBER 3 (C-015), NUMBER 4 (C-015), NUMBER 5 (C-053), NUMBER 9 (C-015). ⟦NUMBER 0 (C-056), NUMBER 2 (C-054), NUMBER 3 (C-015), NUMBER 4 (C-015), NUMBER 5 (C-053), NUMBER 9 (C-015).⟧ | enumerates, by claim id, exactly the NUMBER rows already recorded individually in CLAIMS.json; a list of existing claim-id references, not a new measurement |
 | paper/AUDIT.md:289 | Confirm with `git log --format='%s' -- tests/ src/ \| grep '^HoH '` (the commit-count rows; this is the exact command `docs/LIMITATIONS.md:172` itself names) and by inspecting the two merge commits behind the license and coverage-anchor incidents (the `C-054`/`C-055` rows) directly in `git log`. ⟦coverage-anchor incidents (the `C-054`/`C-055` rows) directly in `git log`.⟧ | cites claims C-054 and C-055, already recorded in CLAIMS.json |
 | paper/AUDIT.md:291 | **Needs both `runs/` and `.git`, 1 row:** NUMBER 2 (C-055). ⟦**Needs both `runs/` and `.git`, 1 row:** NUMBER 2 (C-055).⟧ | identifies the single row needing both runs/ and .git (NUMBER 2, C-055), already recorded under claim C-055 in CLAIMS.json; the count of 1 is the length of this same line's own list |
 | paper/AUDIT.md:301 | `NUMBERS.md`'s own table does not carry a row for the digit "3" in "2 of 3" (a03 iteration 2, C-050's denominator), even though that digit appears in the paper's prose alongside the "2" the table does catalogue. ⟦C-050's denominator), even though that digit appears in the paper's prose⟧ | continuation of the finding recorded as INVALIDATED at paper/AUDIT.md:300 -- see that entry and paper/AUDIT.md:91 for the evidence and explanation; also restates claim C-050, already recorded in CLAIMS.json |
-| paper/AUDIT.md:308 | RESOLVED — 58 | self-tally: paper/AUDIT.md's own Summary table reports 58 RESOLVED verdicts among its rows; mechanically checked by tools/audit_refs.py's summary-consistency check, out of this run's scope to modify or independently re-verify here |
+| paper/AUDIT.md:309 | RESOLVED — 60 | self-tally: paper/AUDIT.md's own Summary table reports 58 RESOLVED verdicts among its rows; mechanically checked by tools/audit_refs.py's summary-consistency check, out of this run's scope to modify or independently re-verify here |
 | paper/AUDIT.md:309 | MISMATCH — 0 | self-tally: paper/AUDIT.md's own Summary table reports 0 MISMATCH verdicts among its rows; mechanically checked by tools/audit_refs.py's summary-consistency check, out of this run's scope to modify or independently re-verify here |
 | paper/AUDIT.md:310 | MISSING — 0 | self-tally: paper/AUDIT.md's own Summary table reports 0 MISSING verdicts among its rows; mechanically checked by tools/audit_refs.py's summary-consistency check, out of this run's scope to modify or independently re-verify here |
 | paper/AUDIT.md:311 | EXTERNAL — 1 | self-tally: paper/AUDIT.md's own Summary table reports 1 EXTERNAL verdict among its rows; mechanically checked by tools/audit_refs.py's summary-consistency check, out of this run's scope to modify or independently re-verify here |
-| paper/AUDIT.md:312 | NOT_CHECKED — 35 | self-tally: paper/AUDIT.md's own Summary table reports 35 NOT_CHECKED verdicts among its rows; mechanically checked by tools/audit_refs.py's summary-consistency check, out of this run's scope to modify or independently re-verify here |
-| paper/AUDIT.md:313 | **Total rows** — **94** | self-tally: paper/AUDIT.md's own Summary table reports 94 total rows; mechanically checked by tools/audit_refs.py's summary-consistency check, out of this run's scope to modify or independently re-verify here |
-| paper/AUDIT.md:315 | 58 rows resolved cleanly (47 claim-id lookups, all of them confirmed against current code/docs where their evidence names a file or test; 3 recomputed numbers; 5 `a02` mentions, all correctly marked invalidated; 3 overclaim-vocabulary hits, all hedged or quoted-and-negated). 35 rows are honestly `NOT_CHECKED` -- every one of the 35 remaining numbers, each because recomputing it needs `runs/` and/or `.git`, neither of which this checkout's own resolver touches. 1 row is `EXTERNAL` (the one dated external citation). ⟦58 rows resolved cleanly (47 claim-id lookups, all of them⟧ | restates paper/AUDIT.md's own Summary-table figures (58 resolved, 47 claim-id lookups, 3 recomputed numbers, 5 a02 mentions) in prose; self-tally, see paper/AUDIT.md:308/313 |
-| paper/AUDIT.md:317 | 58 rows resolved cleanly (47 claim-id lookups, all of them confirmed against current code/docs where their evidence names a file or test; 3 recomputed numbers; 5 `a02` mentions, all correctly marked invalidated; 3 overclaim-vocabulary hits, all hedged or quoted-and-negated). 35 rows are honestly `NOT_CHECKED` -- every one of the 35 remaining numbers, each because recomputing it needs `runs/` and/or `.git`, neither of which this checkout's own resolver touches. 1 row is `EXTERNAL` (the one dated external citation). ⟦test; 3 recomputed numbers; 5 `a02` mentions, all correctly marked⟧ | restates paper/AUDIT.md's own Summary-table figures (3 recomputed numbers, 5 a02 mentions) in prose; self-tally, see paper/AUDIT.md:308/311-313 |
-| paper/AUDIT.md:318 | 58 rows resolved cleanly (47 claim-id lookups, all of them confirmed against current code/docs where their evidence names a file or test; 3 recomputed numbers; 5 `a02` mentions, all correctly marked invalidated; 3 overclaim-vocabulary hits, all hedged or quoted-and-negated). 35 rows are honestly `NOT_CHECKED` -- every one of the 35 remaining numbers, each because recomputing it needs `runs/` and/or `.git`, neither of which this checkout's own resolver touches. 1 row is `EXTERNAL` (the one dated external citation). ⟦invalidated; 3 overclaim-vocabulary hits, all hedged or quoted-and-negated).⟧ | restates paper/AUDIT.md's own Summary-table figure (3 overclaim-vocabulary hits) in prose; self-tally |
-| paper/AUDIT.md:319 | 58 rows resolved cleanly (47 claim-id lookups, all of them confirmed against current code/docs where their evidence names a file or test; 3 recomputed numbers; 5 `a02` mentions, all correctly marked invalidated; 3 overclaim-vocabulary hits, all hedged or quoted-and-negated). 35 rows are honestly `NOT_CHECKED` -- every one of the 35 remaining numbers, each because recomputing it needs `runs/` and/or `.git`, neither of which this checkout's own resolver touches. 1 row is `EXTERNAL` (the one dated external citation). ⟦35 rows are honestly `NOT_CHECKED` -- every one of the 35 remaining⟧ | restates paper/AUDIT.md's own Summary-table figure (35 NOT_CHECKED rows) in prose; self-tally, see paper/AUDIT.md:81/86/273's notes for the related discrepancy |
-| paper/AUDIT.md:321 | 58 rows resolved cleanly (47 claim-id lookups, all of them confirmed against current code/docs where their evidence names a file or test; 3 recomputed numbers; 5 `a02` mentions, all correctly marked invalidated; 3 overclaim-vocabulary hits, all hedged or quoted-and-negated). 35 rows are honestly `NOT_CHECKED` -- every one of the 35 remaining numbers, each because recomputing it needs `runs/` and/or `.git`, neither of which this checkout's own resolver touches. 1 row is `EXTERNAL` (the one dated external citation). ⟦which this checkout's own resolver touches. 1 row is `EXTERNAL` (the one⟧ | restates paper/AUDIT.md's own Summary-table figure (1 EXTERNAL row) in prose; self-tally |
-| paper/AUDIT.md:325 | That is the honest result, reported plainly rather than manufactured: this audit looked at all 94 citations it could extract and is reporting exactly what came back, including the 35 it could not check and why. ⟦audit looked at all 94 citations it could extract and is reporting exactly⟧ | restates paper/AUDIT.md's own Summary-table figure (94 total citations) in prose; self-tally, see paper/AUDIT.md:313 |
-| paper/AUDIT.md:326 | That is the honest result, reported plainly rather than manufactured: this audit looked at all 94 citations it could extract and is reporting exactly what came back, including the 35 it could not check and why. ⟦what came back, including the 35 it could not check and why.⟧ | restates paper/AUDIT.md's own Summary-table figure (35 rows it could not check) in prose; self-tally, see paper/AUDIT.md:312 |
+| paper/AUDIT.md:313 | NOT_CHECKED — 34 | self-tally: paper/AUDIT.md's own Summary table reports 35 NOT_CHECKED verdicts among its rows; mechanically checked by tools/audit_refs.py's summary-consistency check, out of this run's scope to modify or independently re-verify here |
+| paper/AUDIT.md:314 | **Total rows** — **95** | self-tally: paper/AUDIT.md's own Summary table reports 94 total rows; mechanically checked by tools/audit_refs.py's summary-consistency check, out of this run's scope to modify or independently re-verify here |
+| paper/AUDIT.md:316 | 60 rows resolved cleanly (47 claim-id lookups, all of them confirmed against current code/docs where their evidence names a file or test; 5 recomputed numbers; 5 `a02` mentions, all correctly marked invalidated; 3 overclaim-vocabulary hits, all hedged or quoted-and-negated). 34 rows are honestly `NOT_CHECKED` -- every one of the 34 remaining numbers, each because recomputing it needs `runs/` and/or `.git`, neither of which this checkout's own resolver touches. 1 row is `EXTERNAL` (the one dated external citation). ⟦60 rows resolved cleanly (47 claim-id lookups, all of them⟧ | restates paper/AUDIT.md's own Summary-table figures (58 resolved, 47 claim-id lookups, 3 recomputed numbers, 5 a02 mentions) in prose; self-tally, see paper/AUDIT.md:308/313 |
+| paper/AUDIT.md:318 | 60 rows resolved cleanly (47 claim-id lookups, all of them confirmed against current code/docs where their evidence names a file or test; 5 recomputed numbers; 5 `a02` mentions, all correctly marked invalidated; 3 overclaim-vocabulary hits, all hedged or quoted-and-negated). 34 rows are honestly `NOT_CHECKED` -- every one of the 34 remaining numbers, each because recomputing it needs `runs/` and/or `.git`, neither of which this checkout's own resolver touches. 1 row is `EXTERNAL` (the one dated external citation). ⟦test; 5 recomputed numbers; 5 `a02` mentions, all correctly marked⟧ | restates paper/AUDIT.md's own Summary-table figures (3 recomputed numbers, 5 a02 mentions) in prose; self-tally, see paper/AUDIT.md:308/311-313 |
+| paper/AUDIT.md:318 | 60 rows resolved cleanly (47 claim-id lookups, all of them confirmed against current code/docs where their evidence names a file or test; 5 recomputed numbers; 5 `a02` mentions, all correctly marked invalidated; 3 overclaim-vocabulary hits, all hedged or quoted-and-negated). 34 rows are honestly `NOT_CHECKED` -- every one of the 34 remaining numbers, each because recomputing it needs `runs/` and/or `.git`, neither of which this checkout's own resolver touches. 1 row is `EXTERNAL` (the one dated external citation). ⟦invalidated; 3 overclaim-vocabulary hits, all hedged or quoted-and-negated).⟧ | restates paper/AUDIT.md's own Summary-table figure (3 overclaim-vocabulary hits) in prose; self-tally |
+| paper/AUDIT.md:320 | 60 rows resolved cleanly (47 claim-id lookups, all of them confirmed against current code/docs where their evidence names a file or test; 5 recomputed numbers; 5 `a02` mentions, all correctly marked invalidated; 3 overclaim-vocabulary hits, all hedged or quoted-and-negated). 34 rows are honestly `NOT_CHECKED` -- every one of the 34 remaining numbers, each because recomputing it needs `runs/` and/or `.git`, neither of which this checkout's own resolver touches. 1 row is `EXTERNAL` (the one dated external citation). ⟦34 rows are honestly `NOT_CHECKED` -- every one of the 34 remaining⟧ | restates paper/AUDIT.md's own Summary-table figure (35 NOT_CHECKED rows) in prose; self-tally, see paper/AUDIT.md:81/86/273's notes for the related discrepancy |
+| paper/AUDIT.md:321 | 60 rows resolved cleanly (47 claim-id lookups, all of them confirmed against current code/docs where their evidence names a file or test; 5 recomputed numbers; 5 `a02` mentions, all correctly marked invalidated; 3 overclaim-vocabulary hits, all hedged or quoted-and-negated). 34 rows are honestly `NOT_CHECKED` -- every one of the 34 remaining numbers, each because recomputing it needs `runs/` and/or `.git`, neither of which this checkout's own resolver touches. 1 row is `EXTERNAL` (the one dated external citation). ⟦which this checkout's own resolver touches. 1 row is `EXTERNAL` (the one⟧ | restates paper/AUDIT.md's own Summary-table figure (1 EXTERNAL row) in prose; self-tally |
+| paper/AUDIT.md:326 | That is the honest result, reported plainly rather than manufactured: this audit looked at all 95 citations it could extract and is reporting exactly what came back, including the 34 it could not check and why. ⟦audit looked at all 95 citations it could extract and is reporting exactly⟧ | restates paper/AUDIT.md's own Summary-table figure (94 total citations) in prose; self-tally, see paper/AUDIT.md:313 |
+| paper/AUDIT.md:327 | That is the honest result, reported plainly rather than manufactured: this audit looked at all 95 citations it could extract and is reporting exactly what came back, including the 34 it could not check and why. ⟦what came back, including the 34 it could not check and why.⟧ | restates paper/AUDIT.md's own Summary-table figure (35 rows it could not check) in prose; self-tally, see paper/AUDIT.md:312 |
 | paper/AUDIT.md:302 | `NUMBERS.md`'s own table does not carry a row for the digit "3" in "2 of 3" (a03 iteration 2, C-050's denominator), even though that digit appears in the paper's prose alongside the "2" the table does catalogue. ⟦alongside the "2" the table does catalogue.⟧ | continuation of the finding recorded as INVALIDATED at paper/AUDIT.md:300 -- see that entry and paper/AUDIT.md:91 for the evidence and explanation; restates the '2' figure already recorded under claim C-050 in CLAIMS.json |
 | paper/FIGURES.md:6 | ## Figure 1 — per-run correctness composes; post-merge correctness does not ⟦## Figure 1 — per-run correctness composes; post-merge correctness does not⟧ | figure heading uses 'Figure 1' as a structural label numbering this document's own diagrams, not a numeric measurement claim |
 | paper/FIGURES.md:8 | Illustrates §1 of the position paper: two runs, each independently receipt-verified against its own base, merge into a state neither run's own acceptance criteria ever examined. ⟦Illustrates §1 of the position paper: two runs, each independently⟧ | internal section cross-reference (§1 of paper/POSITION_PAPER.md), not a numeric measurement claim |
@@ -1219,7 +3692,7 @@ Number-bearing sentences from README.md and docs/** that were judged not to be p
 | paper/FIGURES.md:36 | Illustrates §6 of the position paper and `docs/LIMITATIONS.md` limit 11: a candidate arena is materialized with `git archive <tree>`, which snapshots exactly the tracked tree and nothing else. ⟦Illustrates §6 of the position paper and `docs/LIMITATIONS.md` limit 11: a⟧ | internal section cross-reference (§6 of paper/POSITION_PAPER.md) and cross-reference to docs/LIMITATIONS.md's own limit 11; not a new numeric measurement |
 | paper/FIGURES.md:43 | `runs/` is gitignored, so it is absent from that snapshot before a check command ever runs, independent of what the check tries to assert -- two historical counts (a `git archive` entry count and a per-run criterion-failure count) that `CLAIMS.json` marks unsupported rather than confirmed, since this checkout's evidence forms cannot positively re-derive either one on their own (C-056, C-057). ⟦cannot positively re-derive either one on their own (C-056, C-057).⟧ | cites claims C-056 and C-057, already recorded as UNSUPPORTED historical counts in CLAIMS.json; not an independent new claim |
 | paper/NUMBERS.md:13 | `CLAIMS.json`'s own coverage is `README.md` and `docs/**`, plus the mandatory `a02` invalidation entries and a fixed set of unflattering measured findings (see `POSITION_PAPER.md` §0). ⟦`a02` invalidation entries and a fixed set of unflattering measured findings⟧ | names the a02 run identifier while describing CLAIMS.json's own declared coverage rule, not a numeric measurement claim |
-| paper/NUMBERS.md:14 | `CLAIMS.json`'s own coverage is `README.md` and `docs/**`, plus the mandatory `a02` invalidation entries and a fixed set of unflattering measured findings (see `POSITION_PAPER.md` §0). Numbers sourced to `dogfood/ABSCHLUSSBERICHT.md` or `DOGFOOD_LEDGER.md` below therefore carry a plain-text source, not a claim id, because the ledger does not cover those documents -- listing them this way, rather than inventing a claim id for them, is the honest gap the specification for this draft asks for. ⟦(see `POSITION_PAPER.md` §0). Numbers sourced to `dogfood/ABSCHLUSSBERICHT.md`⟧ | internal section cross-reference (§0 of paper/POSITION_PAPER.md), not a numeric measurement claim |
+| paper/NUMBERS.md:14 | `CLAIMS.json`'s own coverage is `README.md` and `docs/**`, plus the mandatory `a02` invalidation entries and a fixed set of unflattering measured findings (see `POSITION_PAPER.md` §0). Numbers sourced to the internal *Abschlussbericht* or `DOGFOOD_LEDGER.md` below therefore carry a plain-text source, not a claim id, because the ledger does not cover those documents -- listing them this way, rather than inventing a claim id for them, is the honest gap the specification for this draft asks for. ⟦(see `POSITION_PAPER.md` §0). Numbers sourced to the internal *Abschlussbericht*⟧ | internal section cross-reference (§0 of paper/POSITION_PAPER.md), not a numeric measurement claim |
 | paper/NUMBERS.md:22 | 0 — C-056 — `docs/LIMITATIONS.md`: `git archive HEAD` yields 0 entries under `runs/`. | table row cross-referencing claim C-056, already recorded in CLAIMS.json; this table indexes existing claims by number rather than asserting an independent new measurement |
 | paper/NUMBERS.md:23 | 0 — C-059 — `docs/LIMITATIONS.md` limit 12's own illustration: d1 iteration 1's acceptance-governing `discriminates` flag was 0, because that iteration was an outage with no QA verdict. | table row cross-referencing claim C-059, already recorded in CLAIMS.json; this table indexes existing claims by number rather than asserting an independent new measurement |
 | paper/NUMBERS.md:24 | 0 — C-073 — `docs/LIMITATIONS.md` limit 16: `hoh resume-quota`, run over this project's full history, reported 0 runs identified as quota-blocked. | table row cross-referencing claim C-073, already recorded in CLAIMS.json; this table indexes existing claims by number rather than asserting an independent new measurement |
@@ -1260,7 +3733,7 @@ Number-bearing sentences from README.md and docs/** that were judged not to be p
 | paper/NUMBERS.md:59 | 52 — C-028 — Dogfood run d2b recorded 52 receipt files under `runs/d2b/receipts/` across its two iterations. | table row cross-referencing claim C-028, already recorded in CLAIMS.json; this table indexes existing claims by number rather than asserting an independent new measurement |
 | paper/NUMBERS.md:60 | 52 — C-061 — `docs/LIMITATIONS.md` limit 6: 28 of 52 candidate arenas carried the leftover directory. | table row cross-referencing claim C-061, already recorded in CLAIMS.json; this table indexes existing claims by number rather than asserting an independent new measurement |
 | paper/NUMBERS.md:68 | These appear in `POSITION_PAPER.md`'s prose but are not measurements this paper makes: they are versions (such as the installed Herdr binary's own version number), ISO dates, and identifiers this project names rather than measures -- claim ids, internal finding ids, guard-finding ids, and run ids such as `d2c2` and `a03`. None of these are excluded from the table above by accident: `POSITION_PAPER.md`'s own acceptance check strips exactly this category before extracting numbers, and this table follows the same rule rather than padding itself with non-measurements. ⟦such as `d2c2` and `a03`. None of these are excluded from the table above by⟧ | names run identifiers (d2c2, a03) as examples of this project's own run-naming convention, not a numeric measurement claim |
-| paper/POSITION_PAPER.md:31 | `CLAIMS.json`'s own coverage is declared, not universal: it catalogues every number-bearing sentence in `README.md` and `docs/**`, plus the two mandatory `a02` invalidation entries and a fixed set of unflattering measured findings -- it does **not** extend to `dogfood/ABSCHLUSSBERICHT.md`, `DOGFOOD_LEDGER.md`, or `PROVENANCE.md`. ⟦`README.md` and `docs/**`, plus the two mandatory `a02` invalidation entries⟧ | describes CLAIMS.json's own declared coverage scope (README.md + docs/**, plus the a02 invalidations and five mandated findings), already stated in CLAIMS.json's own methodology section; not an independent measurement of this paper. |
+| paper/POSITION_PAPER.md:31 | `CLAIMS.json`'s own coverage is declared, not universal: it catalogues every number-bearing sentence in `README.md` and `docs/**`, plus the two mandatory `a02` invalidation entries and a fixed set of unflattering measured findings -- it does **not** extend to the internal *Abschlussbericht*, `DOGFOOD_LEDGER.md`, or `PROVENANCE.md`. ⟦`README.md` and `docs/**`, plus the two mandatory `a02` invalidation entries⟧ | describes CLAIMS.json's own declared coverage scope (README.md + docs/**, plus the a02 invalidations and five mandated findings), already stated in CLAIMS.json's own methodology section; not an independent measurement of this paper. |
 | paper/POSITION_PAPER.md:69 | **Instance one, found by a human.** Runs `d1` and `d2` each passed their own independently verified acceptance criteria. ⟦**Instance one, found by a human.** Runs `d1` and `d2` each passed their own⟧ | names the run ids d1 and d2 as identifiers introducing the instance-one narrative below, already covered as claim C-017; not itself a numeric measurement. |
 | paper/POSITION_PAPER.md:76 | **Instance one, found by a human.** Runs `d1` and `d2` each passed their own independently verified acceptance criteria. Per-run, receipt-bound evidence was, at the time, treated as sufficient to keep this project's public statements about itself consistent -- and that treatment turned out to be unsupported: `LICENSE` said no license had been chosen, `pyproject.toml` said Apache-2.0, and `CITATION.cff` said `UNVERIFIED`, three simultaneously contradictory statements about the project's own licence, left standing after two individually honest runs merged (C-017). `CLAIMS.json` records that sufficiency claim as unsupported rather than confirmed, because no evidence form in its schema can positively verify a project-wide consistency property from per-run receipts alone -- a person noticed the contradiction, not a check. ⟦two individually honest runs merged (C-017). `CLAIMS.json` records that⟧ | restates claim C-017's own finding, already carried in CLAIMS.json. |
 | paper/POSITION_PAPER.md:85 | `tools/check_claims.py`'s own checker went from exit 0 on the candidate alone to reporting failures naming five specific statements on the combined state, minutes after the merge that created the break. ⟦exit 0 on the candidate alone to reporting failures naming five specific⟧ | scene-setting narrative for the O41 coverage-anchor break, whose measured figures are recorded below as claims C-052..C-054; the exit-code digit here is part of that same already-recorded account, not an independent measurement. |
@@ -1269,11 +3742,11 @@ Number-bearing sentences from README.md and docs/** that were judged not to be p
 | paper/POSITION_PAPER.md:91 | **Neither run was wrong** on its own"* terms (C-052..C-054) -- a historical count over merges that have since been resolved, which no evidence form in this ledger's schema can independently re-verify, so `CLAIMS.json` marks it unsupported rather than confirmed, even though the underlying narrative is not disputed. ⟦**Neither run was wrong** on its own"* terms (C-052..C-054) -- a historical⟧ | restates claims C-052..C-054 (explicit cite in the text). |
 | paper/POSITION_PAPER.md:102 | Both instances share the same structure, and it is worth naming why that structure recurs: each run was checked against its own base, its own scope, and its own evidence, and each check passed honestly. A reader who treats "every run in this history was individually verified" as "the current merged state is verified" is making a claim this project's own evidence does not support (C-017). A failure mode that only a careful human catches is a different risk from one a check catches automatically after the fact, and this project has now measured one instance of each. ⟦support (C-017). A failure mode that only a careful human catches is a⟧ | restates claim C-017's own finding (explicit cite). |
 | paper/POSITION_PAPER.md:208 | This project's own adversarial review found exactly that shape of finding: a check command could overwrite a *foreign* run's preservation suite from inside the object nominally under verification, reproduced at severity high (tracked internally as B-G1), while a source comment covering that exact code path had called the class "structurally impossible." The operator closed this gap, alongside four related guard gaps in the same review pass, none of it feature work. ⟦severity high (tracked internally as B-G1), while a source comment covering⟧ | names an internal finding id (B-G1) the paper's own §2 text (lines 117-121) states is outside CLAIMS.json's declared coverage; not a numeric measurement claim. |
-| paper/POSITION_PAPER.md:213 | `CLAIMS.json` does not carry a claim id for the B-G1 finding itself: the finding lives in `dogfood/ABSCHLUSSBERICHT.md`'s point D and in the non-numeric half of `docs/LIMITATIONS.md`'s discussion of arena isolation, neither of which the ledger's own coverage extends to (see §0). ⟦`CLAIMS.json` does not carry a claim id for the B-G1 finding itself: the⟧ | explicit self-description: 'CLAIMS.json does not carry a claim id for the B-G1 finding itself... neither of which the ledger's own coverage extends to' -- states the ledger's own declared-coverage boundary, not a new measurement. |
-| paper/POSITION_PAPER.md:216 | `CLAIMS.json` does not carry a claim id for the B-G1 finding itself: the finding lives in `dogfood/ABSCHLUSSBERICHT.md`'s point D and in the non-numeric half of `docs/LIMITATIONS.md`'s discussion of arena isolation, neither of which the ledger's own coverage extends to (see §0). What the ledger does carry, and what motivates taking B-G1 seriously rather than as an isolated incident, is the project's own standing position on the guard that sits beside it, a claim `CLAIMS.json` marks unsupported rather than confirmed because no evidence form in its schema can positively prove a negative about a hostile plan: *"the guard around acceptance-check commands is a tripwire against accidents, not a security boundary against a deliberately hostile plan"* (C-016) -- explicitly disclaimed, not merely unproven, and this project's own evidence forms record it as such precisely because a pattern denylist on a string a shell reinterprets afterward is not watertight in principle. B-G1 is a demonstration of exactly the class of failure that disclaimer warns about, found in the one channel whose compromise would make every other statement in this paper unreliable: the channel that decides what counts as a receipt. ⟦neither of which the ledger's own coverage extends to (see §0). What the⟧ | continuation of the explicit out-of-coverage statement above (see §0 section reference). |
+| paper/POSITION_PAPER.md:213 | `CLAIMS.json` does not carry a claim id for the B-G1 finding itself: the finding lives in the internal *Abschlussbericht*'s point D and in the non-numeric half of `docs/LIMITATIONS.md`'s discussion of arena isolation, neither of which the ledger's own coverage extends to (see §0). ⟦`CLAIMS.json` does not carry a claim id for the B-G1 finding itself: the⟧ | explicit self-description: 'CLAIMS.json does not carry a claim id for the B-G1 finding itself... neither of which the ledger's own coverage extends to' -- states the ledger's own declared-coverage boundary, not a new measurement. |
+| paper/POSITION_PAPER.md:216 | `CLAIMS.json` does not carry a claim id for the B-G1 finding itself: the finding lives in the internal *Abschlussbericht*'s point D and in the non-numeric half of `docs/LIMITATIONS.md`'s discussion of arena isolation, neither of which the ledger's own coverage extends to (see §0). What the ledger does carry, and what motivates taking B-G1 seriously rather than as an isolated incident, is the project's own standing position on the guard that sits beside it, a claim `CLAIMS.json` marks unsupported rather than confirmed because no evidence form in its schema can positively prove a negative about a hostile plan: *"the guard around acceptance-check commands is a tripwire against accidents, not a security boundary against a deliberately hostile plan"* (C-016) -- explicitly disclaimed, not merely unproven, and this project's own evidence forms record it as such precisely because a pattern denylist on a string a shell reinterprets afterward is not watertight in principle. B-G1 is a demonstration of exactly the class of failure that disclaimer warns about, found in the one channel whose compromise would make every other statement in this paper unreliable: the channel that decides what counts as a receipt. ⟦neither of which the ledger's own coverage extends to (see §0). What the⟧ | continuation of the explicit out-of-coverage statement above (see §0 section reference). |
 | paper/POSITION_PAPER.md:217 | What the ledger does carry, and what motivates taking B-G1 seriously rather than as an isolated incident, is the project's own standing position on the guard that sits beside it, a claim `CLAIMS.json` marks unsupported rather than confirmed because no evidence form in its schema can positively prove a negative about a hostile plan: *"the guard around acceptance-check commands is a tripwire against accidents, not a security boundary against a deliberately hostile plan"* (C-016) -- explicitly disclaimed, not merely unproven, and this project's own evidence forms record it as such precisely because a pattern denylist on a string a shell reinterprets afterward is not watertight in principle. ⟦ledger does carry, and what motivates taking B-G1 seriously rather than as an⟧ | continuation of the B-G1 out-of-coverage narrative; internal finding-id reference. |
 | paper/POSITION_PAPER.md:223 | What the ledger does carry, and what motivates taking B-G1 seriously rather than as an isolated incident, is the project's own standing position on the guard that sits beside it, a claim `CLAIMS.json` marks unsupported rather than confirmed because no evidence form in its schema can positively prove a negative about a hostile plan: *"the guard around acceptance-check commands is a tripwire against accidents, not a security boundary against a deliberately hostile plan"* (C-016) -- explicitly disclaimed, not merely unproven, and this project's own evidence forms record it as such precisely because a pattern denylist on a string a shell reinterprets afterward is not watertight in principle. ⟦plan"* (C-016) -- explicitly disclaimed, not merely unproven, and this⟧ | restates claim C-016's own finding (explicit cite). |
-| paper/POSITION_PAPER.md:226 | `CLAIMS.json` does not carry a claim id for the B-G1 finding itself: the finding lives in `dogfood/ABSCHLUSSBERICHT.md`'s point D and in the non-numeric half of `docs/LIMITATIONS.md`'s discussion of arena isolation, neither of which the ledger's own coverage extends to (see §0). What the ledger does carry, and what motivates taking B-G1 seriously rather than as an isolated incident, is the project's own standing position on the guard that sits beside it, a claim `CLAIMS.json` marks unsupported rather than confirmed because no evidence form in its schema can positively prove a negative about a hostile plan: *"the guard around acceptance-check commands is a tripwire against accidents, not a security boundary against a deliberately hostile plan"* (C-016) -- explicitly disclaimed, not merely unproven, and this project's own evidence forms record it as such precisely because a pattern denylist on a string a shell reinterprets afterward is not watertight in principle. B-G1 is a demonstration of exactly the class of failure that disclaimer warns about, found in the one channel whose compromise would make every other statement in this paper unreliable: the channel that decides what counts as a receipt. ⟦principle. B-G1 is a demonstration of exactly the class of failure that⟧ | internal finding-id reference (B-G1), continuation of the out-of-coverage narrative. |
+| paper/POSITION_PAPER.md:226 | `CLAIMS.json` does not carry a claim id for the B-G1 finding itself: the finding lives in the internal *Abschlussbericht*'s point D and in the non-numeric half of `docs/LIMITATIONS.md`'s discussion of arena isolation, neither of which the ledger's own coverage extends to (see §0). What the ledger does carry, and what motivates taking B-G1 seriously rather than as an isolated incident, is the project's own standing position on the guard that sits beside it, a claim `CLAIMS.json` marks unsupported rather than confirmed because no evidence form in its schema can positively prove a negative about a hostile plan: *"the guard around acceptance-check commands is a tripwire against accidents, not a security boundary against a deliberately hostile plan"* (C-016) -- explicitly disclaimed, not merely unproven, and this project's own evidence forms record it as such precisely because a pattern denylist on a string a shell reinterprets afterward is not watertight in principle. B-G1 is a demonstration of exactly the class of failure that disclaimer warns about, found in the one channel whose compromise would make every other statement in this paper unreliable: the channel that decides what counts as a receipt. ⟦principle. B-G1 is a demonstration of exactly the class of failure that⟧ | internal finding-id reference (B-G1), continuation of the out-of-coverage narrative. |
 | paper/POSITION_PAPER.md:237 | **`a02`, invalidated, appears here only as the counter-example it is.** Its original report claimed nine of ten criteria demonstrated a genuine increment against the predecessor state. ⟦**`a02`, invalidated, appears here only as the counter-example it is.** Its⟧ | names the run id a02, introducing the paragraph about claims C-011/C-012 below; not itself a new measurement. |
 | paper/POSITION_PAPER.md:243 | **`a02`, invalidated, appears here only as the counter-example it is.** Its original report claimed nine of ten criteria demonstrated a genuine increment against the predecessor state. That claim is invalidated: for the iteration in question, only one criterion actually ran against the base, under an acceptance-governing `discriminates` default that had been *applied* rather than *earned*, with zero base receipts on disk to support the other nine (C-011). A dependent summary elsewhere in the project's own acceptance report repeated the stale nine-of-ten figure without the correction attached and is invalidated for the same reason, left stale when the row above it was fixed (C-012). Both citations above are invalidated, and the correction -- not the original figure -- is what this paper treats as informative: a `discriminates` flag that is stamped rather than measured is not evidence, regardless of how confident the surrounding prose sounds. ⟦(C-011). A dependent summary elsewhere in the project's own acceptance⟧ | restates claim C-011's own finding (explicit cite). |
 | paper/POSITION_PAPER.md:246 | That claim is invalidated: for the iteration in question, only one criterion actually ran against the base, under an acceptance-governing `discriminates` default that had been *applied* rather than *earned*, with zero base receipts on disk to support the other nine (C-011). A dependent summary elsewhere in the project's own acceptance report repeated the stale nine-of-ten figure without the correction attached and is invalidated for the same reason, left stale when the row above it was fixed (C-012). Both citations above are invalidated, and the correction -- not the original figure -- is what this paper treats as informative: a `discriminates` flag that is stamped rather than measured is not evidence, regardless of how confident the surrounding prose sounds. ⟦fixed (C-012). Both citations above are invalidated, and the correction --⟧ | restates claim C-012's own finding (explicit cite). |
@@ -1316,12 +3789,12 @@ Number-bearing sentences from README.md and docs/** that were judged not to be p
 | paper/POSITION_PAPER.md:390 | Third, and the concrete, measured consequence of nesting the arena inside this project's own working tree rather than a separate filesystem: until 2026-09-08, the runner also redirected a check's `TMPDIR` into that same arena, and that redirection has already produced one real defect in the candidate binding -- `is_git_repo` in `src/hoh/workspace.py` once answered a question about the *outer* repository instead of the arena subdirectory, precisely because pytest's own temp-directory redirection landed inside the nested arena. The measurement behind the fix: 28 of 52 candidate arenas in this project's own history carried a leftover `pytest-of-<user>/` directory from an earlier check before the redirection was corrected -- a count over past, mostly no-longer-existing arenas that `CLAIMS.json` itself records as unsupported rather than confirmed, since this checkout cannot positively re-derive a historical population it does not still hold (C-061). This is the same defect the project's own bug ledger tracks as K11, fixed by the operator with two accompanying tests, under the project's narrow exception for repairing a reproduced defect in `src/hoh/`. ⟦re-derive a historical population it does not still hold (C-061). This is⟧ | restates claim C-061's own finding (explicit cite). |
 | paper/POSITION_PAPER.md:391 | This is the same defect the project's own bug ledger tracks as K11, fixed by the operator with two accompanying tests, under the project's narrow exception for repairing a reproduced defect in `src/hoh/`. ⟦the same defect the project's own bug ledger tracks as K11, fixed by the⟧ | internal finding-id reference (K11), naming an internal bug-ledger identifier, not a numeric measurement. |
 | paper/POSITION_PAPER.md:397 | Run `d2c2`'s second iteration passed all ten of ten criteria, and was rejected anyway: the controller's own reasoning, recorded verbatim in the project's dogfood accounting, is that no criterion demonstrated the increment, because every one of them was already green on the predecessor state. ⟦Run `d2c2`'s second iteration passed all ten of ten criteria, and was⟧ | names the run id d2c2, introducing a narrative the paper's own text (line 305) says CLAIMS.json carries no claim id for (recorded in dogfood/ABSCHLUSSBERICHT.md's run table instead, outside declared coverage). |
-| paper/POSITION_PAPER.md:401 | Run `d2c2`'s second iteration passed all ten of ten criteria, and was rejected anyway: the controller's own reasoning, recorded verbatim in the project's dogfood accounting, is that no criterion demonstrated the increment, because every one of them was already green on the predecessor state. `CLAIMS.json` does not carry a claim id for `d2c2`: it is recorded in `dogfood/ABSCHLUSSBERICHT.md`'s run table, not in `README.md` or `docs/**`, so this paper reports its numbers -- ten of ten criteria passing, zero of them discriminating in the acceptance-governing sense -- as sourced to that document rather than as ledger-verified (see §0). ⟦state. `CLAIMS.json` does not carry a claim id for `d2c2`: it is recorded in⟧ | explicit self-description: 'CLAIMS.json does not carry a claim id for d2c2... it is recorded in dogfood/ABSCHLUSSBERICHT.md's run table, not in README.md or docs/**' -- states the ledger's own declared-coverage boundary. |
-| paper/POSITION_PAPER.md:405 | `CLAIMS.json` does not carry a claim id for `d2c2`: it is recorded in `dogfood/ABSCHLUSSBERICHT.md`'s run table, not in `README.md` or `docs/**`, so this paper reports its numbers -- ten of ten criteria passing, zero of them discriminating in the acceptance-governing sense -- as sourced to that document rather than as ledger-verified (see §0). ⟦document rather than as ledger-verified (see §0).⟧ | section reference (§0), continuation of the out-of-coverage framing for the d2c2 narrative. |
+| paper/POSITION_PAPER.md:401 | Run `d2c2`'s second iteration passed all ten of ten criteria, and was rejected anyway: the controller's own reasoning, recorded verbatim in the project's dogfood accounting, is that no criterion demonstrated the increment, because every one of them was already green on the predecessor state. `CLAIMS.json` does not carry a claim id for `d2c2`: it is recorded in the internal *Abschlussbericht*'s run table, not in `README.md` or `docs/**`, so this paper reports its numbers -- ten of ten criteria passing, zero of them discriminating in the acceptance-governing sense -- as sourced to that document rather than as ledger-verified (see §0). ⟦state. `CLAIMS.json` does not carry a claim id for `d2c2`: it is recorded in⟧ | explicit self-description: 'CLAIMS.json does not carry a claim id for d2c2... it is recorded in dogfood/ABSCHLUSSBERICHT.md's run table, not in README.md or docs/**' -- states the ledger's own declared-coverage boundary. |
+| paper/POSITION_PAPER.md:405 | `CLAIMS.json` does not carry a claim id for `d2c2`: it is recorded in the internal *Abschlussbericht*'s run table, not in `README.md` or `docs/**`, so this paper reports its numbers -- ten of ten criteria passing, zero of them discriminating in the acceptance-governing sense -- as sourced to that document rather than as ledger-verified (see §0). ⟦document rather than as ledger-verified (see §0).⟧ | section reference (§0), continuation of the out-of-coverage framing for the d2c2 narrative. |
 | paper/POSITION_PAPER.md:409 | The same mechanism is independently visible inside a ledger-covered run, which is the closest this paper can come to corroborating it by claim id: `d1`'s second iteration carried a criterion the plan had listed as new work, `K11`, which the controller itself flagged as not discriminating, in its own words, because it "was already green on the last accepted state and therefore does not demonstrate the increment" -- the plan's own framing lost to the measurement. ⟦`d1`'s second iteration carried a criterion the plan had listed as new work,⟧ | names the run id d1 and its iteration, introducing a K11-criterion narrative the paper's own text (line 317) says CLAIMS.json carries no claim id for. |
 | paper/POSITION_PAPER.md:410 | The same mechanism is independently visible inside a ledger-covered run, which is the closest this paper can come to corroborating it by claim id: `d1`'s second iteration carried a criterion the plan had listed as new work, `K11`, which the controller itself flagged as not discriminating, in its own words, because it "was already green on the last accepted state and therefore does not demonstrate the increment" -- the plan's own framing lost to the measurement. ⟦`K11`, which the controller itself flagged as not discriminating, in its own⟧ | internal finding-id reference (K11), continuation. |
-| paper/POSITION_PAPER.md:413 | The same mechanism is independently visible inside a ledger-covered run, which is the closest this paper can come to corroborating it by claim id: `d1`'s second iteration carried a criterion the plan had listed as new work, `K11`, which the controller itself flagged as not discriminating, in its own words, because it "was already green on the last accepted state and therefore does not demonstrate the increment" -- the plan's own framing lost to the measurement. `CLAIMS.json` does not carry a claim id for this `K11` detail: it is recorded in `dogfood/ABSCHLUSSBERICHT.md`, not in `README.md` or `docs/**`, so this paper reports it as sourced to that document rather than as ledger-verified (see §0). `d2c2`'s rejection is the same rule applied to an entire iteration rather than a single criterion inside one: an iteration that changes nothing measurable cannot be accepted, regardless of how many of its criteria pass. ⟦to the measurement. `CLAIMS.json` does not carry a claim id for this `K11`⟧ | explicit self-description: 'CLAIMS.json does not carry a claim id for this K11 detail... recorded in dogfood/ABSCHLUSSBERICHT.md' -- states the ledger's own declared-coverage boundary. |
-| paper/POSITION_PAPER.md:416 | The same mechanism is independently visible inside a ledger-covered run, which is the closest this paper can come to corroborating it by claim id: `d1`'s second iteration carried a criterion the plan had listed as new work, `K11`, which the controller itself flagged as not discriminating, in its own words, because it "was already green on the last accepted state and therefore does not demonstrate the increment" -- the plan's own framing lost to the measurement. `CLAIMS.json` does not carry a claim id for this `K11` detail: it is recorded in `dogfood/ABSCHLUSSBERICHT.md`, not in `README.md` or `docs/**`, so this paper reports it as sourced to that document rather than as ledger-verified (see §0). `d2c2`'s rejection is the same rule applied to an entire iteration rather than a single criterion inside one: an iteration that changes nothing measurable cannot be accepted, regardless of how many of its criteria pass. This is the direct countermeasure to the failure mode behind §3's invalidated `a02` evidence -- a stamped `discriminates` flag with no measurement behind it -- observed here in ordinary operation rather than argued for in the abstract. ⟦than as ledger-verified (see §0). `d2c2`'s rejection is the same rule⟧ | section reference (§0) and run id (d2c2), continuation of the out-of-coverage framing. |
+| paper/POSITION_PAPER.md:413 | The same mechanism is independently visible inside a ledger-covered run, which is the closest this paper can come to corroborating it by claim id: `d1`'s second iteration carried a criterion the plan had listed as new work, `K11`, which the controller itself flagged as not discriminating, in its own words, because it "was already green on the last accepted state and therefore does not demonstrate the increment" -- the plan's own framing lost to the measurement. `CLAIMS.json` does not carry a claim id for this `K11` detail: it is recorded in the internal *Abschlussbericht*, not in `README.md` or `docs/**`, so this paper reports it as sourced to that document rather than as ledger-verified (see §0). `d2c2`'s rejection is the same rule applied to an entire iteration rather than a single criterion inside one: an iteration that changes nothing measurable cannot be accepted, regardless of how many of its criteria pass. ⟦to the measurement. `CLAIMS.json` does not carry a claim id for this `K11`⟧ | explicit self-description: 'CLAIMS.json does not carry a claim id for this K11 detail... recorded in dogfood/ABSCHLUSSBERICHT.md' -- states the ledger's own declared-coverage boundary. |
+| paper/POSITION_PAPER.md:416 | The same mechanism is independently visible inside a ledger-covered run, which is the closest this paper can come to corroborating it by claim id: `d1`'s second iteration carried a criterion the plan had listed as new work, `K11`, which the controller itself flagged as not discriminating, in its own words, because it "was already green on the last accepted state and therefore does not demonstrate the increment" -- the plan's own framing lost to the measurement. `CLAIMS.json` does not carry a claim id for this `K11` detail: it is recorded in the internal *Abschlussbericht*, not in `README.md` or `docs/**`, so this paper reports it as sourced to that document rather than as ledger-verified (see §0). `d2c2`'s rejection is the same rule applied to an entire iteration rather than a single criterion inside one: an iteration that changes nothing measurable cannot be accepted, regardless of how many of its criteria pass. This is the direct countermeasure to the failure mode behind §3's invalidated `a02` evidence -- a stamped `discriminates` flag with no measurement behind it -- observed here in ordinary operation rather than argued for in the abstract. ⟦than as ledger-verified (see §0). `d2c2`'s rejection is the same rule⟧ | section reference (§0) and run id (d2c2), continuation of the out-of-coverage framing. |
 | paper/POSITION_PAPER.md:420 | This is the direct countermeasure to the failure mode behind §3's invalidated `a02` evidence -- a stamped `discriminates` flag with no measurement behind it -- observed here in ordinary operation rather than argued for in the abstract. ⟦failure mode behind §3's invalidated `a02` evidence -- a stamped⟧ | section reference (§3) and run id (a02), continuation -- refers back to the already-invalidated claims C-011/C-012. |
 | paper/POSITION_PAPER.md:429 | Three runs in a row improved on a human-written specification, each in a different way, and `CLAIMS.json` does not carry claim ids for any of the three (they are recorded in `DOGFOOD_LEDGER.md`, outside the ledger's declared coverage): run `d4c` replaced a defective differential criterion -- one that had been anchoring coverage to line numbers, the exact mechanism behind instance two of §1 -- with a comparison against a per-claim content digest computed at plan time; this content-anchoring field, `anchor_digest`, is now a required field on every entry in `CLAIMS.json` itself, independently verifiable by reading the ledger's own schema. ⟦declared coverage): run `d4c` replaced a defective differential criterion --⟧ | names the run id d4c, continuing the explicit out-of-coverage statement begun two lines above ('CLAIMS.json does not carry claim ids for any of the three... recorded in DOGFOOD_LEDGER.md, outside the ledger's declared coverage'). |
 | paper/POSITION_PAPER.md:431 | Three runs in a row improved on a human-written specification, each in a different way, and `CLAIMS.json` does not carry claim ids for any of the three (they are recorded in `DOGFOOD_LEDGER.md`, outside the ledger's declared coverage): run `d4c` replaced a defective differential criterion -- one that had been anchoring coverage to line numbers, the exact mechanism behind instance two of §1 -- with a comparison against a per-claim content digest computed at plan time; this content-anchoring field, `anchor_digest`, is now a required field on every entry in `CLAIMS.json` itself, independently verifiable by reading the ledger's own schema. ⟦behind instance two of §1 -- with a comparison against a per-claim content⟧ | section reference (§1), continuation of the out-of-coverage narrative. |
@@ -1337,7 +3810,7 @@ Number-bearing sentences from README.md and docs/** that were judged not to be p
 | paper/POSITION_PAPER.md:488 | **Operator fixes** -- work a human found, fixed, and tested, never a loop role dispatch: eleven core defects (K1 through K11, one of them K11 of §6, fixed with two tests), five guard gaps including B-G1 of §2, six named observations resolved by diagnosis rather than by code change, the translation of this project's source text that made the loop's own documentation-only scope possible in the first place, and the git merges that consolidated accepted candidates into `master`. ⟦fixed with two tests), five guard gaps including B-G1 of §2, six named⟧ | internal finding-id reference (B-G1) and section reference (§2); names identifiers rather than measuring. |
 | paper/POSITION_PAPER.md:506 | A sentence like "evidence pressure changed what the loop wrote where it did not know" is true, per §4, and is the stronger and more defensible claim of the two. ⟦pressure changed what the loop wrote where it did not know" is true, per §4,⟧ | section reference (§4). |
 | paper/POSITION_PAPER.md:513 | Its repository license is MIT, with the copyright line "Copyright (c) 2026 Hyoung Yan," read directly from the repository's own `LICENSE` file. ⟦2026 Hyoung Yan," read directly from the repository's own `LICENSE` file.⟧ | cites an upstream source already resolved by index (Q2) in docs/QUELLENCHECK.md, per this same paper's own §10 text two lines below; restates an already-resolved external citation, not an independent measurement. |
-| paper/POSITION_PAPER.md:521 | `HoH-lite`, a lightweight variant announced in that repository's own README, remains only announced there and was not shipped as of the check this project performed (`docs/QUELLENCHECK.md`, source Q2); this project therefore claims no dependency on an installable HoH package, because at the time of that check there was none to depend on. ⟦(`docs/QUELLENCHECK.md`, source Q2); this project therefore claims no⟧ | explicit citation index (Q2), resolved in docs/QUELLENCHECK.md; internal handoff prose citing an upstream source by index, not a numeric measurement claim. |
+| paper/POSITION_PAPER.md:521 | `HoH-lite`, a lightweight variant announced in that repository's own README, remains only announced there and was not shipped as of the check this project performed (the internal *Quellencheck*, source Q2); this project therefore claims no dependency on an installable HoH package, because at the time of that check there was none to depend on. ⟦(the internal *Quellencheck*, source Q2); this project therefore claims no⟧ | explicit citation index (Q2), resolved in docs/QUELLENCHECK.md; internal handoff prose citing an upstream source by index, not a numeric measurement claim. |
 | paper/POSITION_PAPER.md:554 | This list corresponds to `docs/LIMITATIONS.md` and is complete against it: as of 2026-09-10, that file held sixteen numbered limits, and this section carries a statement for every one of them -- fourteen of the sixteen as the items below, and the remaining two (limits 9 and 12) in the body of this paper itself, at length, where they are already treated (limit 9 in §1 and §1.1, on per-run versus merged state and the closure layer above it, limit 12 in §0's and §3's `discriminates`-terminology definitions). ⟦items below, and the remaining two (limits 9 and 12) in the body of this⟧ | ordinal cross-reference to docs/LIMITATIONS.md's own limit numbers (9 and 12), already-excluded structural numbering per this ledger's methodology. |
 | paper/POSITION_PAPER.md:555 | This list corresponds to `docs/LIMITATIONS.md` and is complete against it: as of 2026-09-10, that file held sixteen numbered limits, and this section carries a statement for every one of them -- fourteen of the sixteen as the items below, and the remaining two (limits 9 and 12) in the body of this paper itself, at length, where they are already treated (limit 9 in §1 and §1.1, on per-run versus merged state and the closure layer above it, limit 12 in §0's and §3's `discriminates`-terminology definitions). ⟦paper itself, at length, where they are already treated (limit 9 in §1 and⟧ | section references (§1) and ordinal cross-reference (limit 9), continuation. |
 | paper/POSITION_PAPER.md:556 | This list corresponds to `docs/LIMITATIONS.md` and is complete against it: as of 2026-09-10, that file held sixteen numbered limits, and this section carries a statement for every one of them -- fourteen of the sixteen as the items below, and the remaining two (limits 9 and 12) in the body of this paper itself, at length, where they are already treated (limit 9 in §1 and §1.1, on per-run versus merged state and the closure layer above it, limit 12 in §0's and §3's `discriminates`-terminology definitions). ⟦§1.1, on per-run versus merged state and the closure layer above it, limit 12⟧ | section references (§0, §3) and ordinal cross-reference (limit 12), continuation. |
@@ -1615,12 +4088,12 @@ Number-bearing sentences from README.md and docs/** that were judged not to be p
 | RC_GATE.md:42 | `paper/REVIEW_CONSOLIDATED.md` — the consolidation of both reviews — `D7-K` | table row naming `paper/REVIEW_CONSOLIDATED.md` (already a declared claim surface in this ledger) and its producing role identifier (`D7-K`); an identifier reference, not a measurement. |
 | RC_GATE.md:45 | It does not second-guess `DEC-R4`; whether any one of the seven should be public is a question for a person, not something this document resolves. ⟦It does not second-guess `DEC-R4`; whether any one of the seven should be⟧ | internal decision-id cross-reference (`DEC-R4`), continuation of line 28's provenance statement; not a measurement. |
 | RC_GATE.md:59 | Tests vollständig grün — `PASS` — `python3 -m pytest -q` -> `479 passed` in `39.40s`, exit `0`, run fresh in this working tree at HEAD `77e483e` (2026-09-10). This is the working-tree regime, not a materialized export artifact -- see `clean install grün` below, which this run's own scope does not build. Supplementary, same run: `ruff check --select F,E9 src tests tools` -> `All checks passed!`, exit `0`. | restates this run's own dated pytest/ruff invocation at a named HEAD, the kind of frozen, dated snapshot this gate document exists to record by its own stated methodology (this document's baseline note, lines 9-15); a point-in-time re-confirmation of the project's own already-established pytest/ruff acceptance practice (`CONTRIBUTING.md`, already a declared claim surface), not an independently re-verifiable claim. |
-| RC_GATE.md:60 | clean install grün — `NOT_RUN` — Not measured by this run: building a wheel and installing it into a fresh venv is operator work, outside this run's declared scope (`RELEASE_NOTES.md`, `RC_GATE.md`, and the `0.1.0-rc1` section of `CHANGELOG.md` only). `dogfood/ABSCHLUSSBERICHT.md` Section H records earlier passes of this condition, but at HEADs that predate this one by dozens of merged commits; restating those here as current would be exactly the kind of stale claim this document exists to avoid. | restates that this NOT_RUN row's earlier passes are recorded at `dogfood/ABSCHLUSSBERICHT.md:1628` (Section H, 'Release Candidate Checklist'), at HEADs predating this one -- a cross-reference to already-recorded history, explicitly flagged in the row itself as stale if restated as current; not a fresh measurement. |
-| RC_GATE.md:62 | keine privaten Pfade/Secrets — `PASS` — `scan_include_for_leaks()` from `tools/export_manifest.py`, called as a plain Python function (no shell, no `git`) against a fresh `derive()` of this tree at HEAD `77e483e`: `79` `INCLUDE`-classified entries out of `202` derived entries scanned for home-directory-style paths (needle assembled at runtime rather than spelled literally, the same discipline this document's own criterion 13 requires), private/loopback IPv4 address ranges, and token-shaped strings -- `0` findings. The file-set and address decisions this condition also depends on are settled, not open: `DEC-R1`, `DEC-R1a`, `DEC-R2`, and `DEC-R3` are all closed per the operator's own decision log (`dogfood/ABSCHLUSSBERICHT.md`), none of them reopened since. | restates a fresh re-run of `scan_include_for_leaks()` and the already-closed decisions `DEC-R1`, `DEC-R1a`, `DEC-R2`, `DEC-R3` recorded in the operator's own decision log at `dogfood/ABSCHLUSSBERICHT.md:2315`; a dated point-in-time re-confirmation of already-settled decisions, not a new independent claim. |
-| RC_GATE.md:63 | README Quickstart funktioniert — `NOT_RUN` — Not measured by this run: the walkthrough only "runs through," rather than merely parses, with Herdr running (`HERDR_ENV=1`) and three role-session dispatches (planner, developer, QA) -- none of which this run invokes. `dogfood/ABSCHLUSSBERICHT.md` Section H records the commands in both `README.md` and `examples/minimal/README.md` as checked syntactically against the current CLI, never as executed end to end. | restates that `dogfood/ABSCHLUSSBERICHT.md:1662` already records the underlying check (syntactic parsing, not end-to-end execution) for `README.md` and `examples/minimal/README.md`; a cross-reference to already-recorded history, not a fresh measurement. |
+| RC_GATE.md:60 | clean install grün — `NOT_RUN` — Not measured by this run: building a wheel and installing it into a fresh venv is operator work, outside this run's declared scope (`RELEASE_NOTES.md`, `RC_GATE.md`, and the `0.1.0-rc1` section of `CHANGELOG.md` only). the internal *Abschlussbericht* Section H records earlier passes of this condition, but at HEADs that predate this one by dozens of merged commits; restating those here as current would be exactly the kind of stale claim this document exists to avoid. **[measured 2026-09-10, after this gate was written]** `tools/clean_install_check.py` now builds a wheel and an sdist from a clean copy, installs the wheel into a fresh virtual environment, runs the console script, reads the packaged policy back out of the install, and calls the guard: harmless command allowed, `nvidia-smi` refused with `HouseRuleViolation`. Result: 0 red steps, exit `0`. Its negative control removes the `package-data` declaration and requires the check to go red -- the wheel then still builds, installs and answers `--help`, and only the guard step fails, which is exactly the defect run `d1` fixed. The `NOT_RUN` above stands as what **this run** measured; it is not rewritten. | restates that this NOT_RUN row's earlier passes are recorded at `dogfood/ABSCHLUSSBERICHT.md:1628` (Section H, 'Release Candidate Checklist'), at HEADs predating this one -- a cross-reference to already-recorded history, explicitly flagged in the row itself as stale if restated as current; not a fresh measurement. Extended on 2026-09-10 by addition: the condition was measured after this gate was written, and the result is appended rather than replacing the NOT_RUN, which stands as what that run itself measured. |
+| RC_GATE.md:62 | keine privaten Pfade/Secrets — `PASS` — `scan_include_for_leaks()` from `tools/export_manifest.py`, called as a plain Python function (no shell, no `git`) against a fresh `derive()` of this tree at HEAD `77e483e`: `79` `INCLUDE`-classified entries out of `202` derived entries scanned for home-directory-style paths (needle assembled at runtime rather than spelled literally, the same discipline this document's own criterion 13 requires), private/loopback IPv4 address ranges, and token-shaped strings -- `0` findings. The file-set and address decisions this condition also depends on are settled, not open: `DEC-R1`, `DEC-R1a`, `DEC-R2`, and `DEC-R3` are all closed per the operator's own decision log (the internal *Abschlussbericht*), none of them reopened since. | restates a fresh re-run of `scan_include_for_leaks()` and the already-closed decisions `DEC-R1`, `DEC-R1a`, `DEC-R2`, `DEC-R3` recorded in the operator's own decision log at `dogfood/ABSCHLUSSBERICHT.md:2315`; a dated point-in-time re-confirmation of already-settled decisions, not a new independent claim. |
+| RC_GATE.md:63 | README Quickstart funktioniert — `NOT_RUN` — Not measured by this run: the walkthrough only "runs through," rather than merely parses, with Herdr running (`HERDR_ENV=1`) and three role-session dispatches (planner, developer, QA) -- none of which this run invokes. the internal *Abschlussbericht* Section H records the commands in both `README.md` and `examples/minimal/README.md` as checked syntactically against the current CLI, never as executed end to end. | restates that `dogfood/ABSCHLUSSBERICHT.md:1662` already records the underlying check (syntactic parsing, not end-to-end execution) for `README.md` and `examples/minimal/README.md`; a cross-reference to already-recorded history, not a fresh measurement. |
 | RC_GATE.md:64 | Claims Ledger vollständig — `PASS` — `python3 tools/check_claims.py check all`, run fresh at HEAD `77e483e`: exit `1`, `57` problem(s), every one of them tagged `ENVIRONMENT GAP` (`grep -c '^FAIL:'` and `grep -c 'ENVIRONMENT GAP'` on the same output both return `57`; zero unmarked). That `57` matches, counted independently from `CLAIMS.json` itself, the number of `receipt:`/`run:`/`receiptcount:`/`discriminated:` evidence references among its `122` claims. Measured against `check all`'s own shape rule (every reported failure `ENVIRONMENT GAP`-marked, the marked count equal to the number of `runs/`-dependent evidence references, no unmarked failure) rather than exit `0`, which is unreachable in any checkout without a `runs/` tree (O38). Supplementary, same run: `check coverage` -> `OK: every number-bearing sentence is covered`, exit `0`; `check a02` -> `OK: no claim resting on run a02 is SUPPORTED`, exit `0`; `check resolvability`, `check schema`, `check ids` all exit `0`. | restates this run's own dated invocation of `python3 tools/check_claims.py check all` against this very ledger -- a self-referential, dated snapshot of the exact command and ledger this file (`CLAIMS.json`) already is; treating it as a fresh claim about this ledger would recurse into the ledger asserting itself, the same reason `paper/AUDIT.md`'s own mechanically-generated verification tables are excluded from that surface's scope. |
-| RC_GATE.md:65 | Position Paper QA grün — `PASS` — Position paper (`D5`): accepted candidate `d5-i2` at iteration `2`, `14` of `14` criteria PASS, receipt `d5-i2-a1-AC01` exit `0`. Citation-and-numbers audit (`D6`): accepted candidate `d6-i2` at iteration `2`, `10` of `10` criteria PASS, receipt `d6-i2-a1-K1` exit `0`. Both from `dogfood/ABSCHLUSSBERICHT.md` Section B's run-trace table. | restates D5's and D6's acceptance figures (`14`/`14` at `dogfood/ABSCHLUSSBERICHT.md:222`, `10`/`10` at `dogfood/ABSCHLUSSBERICHT.md:406`), both rows of Section B's run-trace table; already-recorded history, not a fresh measurement. |
-| RC_GATE.md:66 | Double Review ohne offenen HIGH — `PASS` — Two independent reviews ran as separate `hoh run`s, per `dogfood/D7_REVIEW_AUFTRAG.md`'s revised (2026-09-08) design: `REVIEW_A` (run `d7-a`, accepted candidate `d7-a-i1`, receipt `d7-a-i1-a1-K1` exit `0`) and `REVIEW_B` (run `d7-b`, accepted candidate `d7-b-i2`, receipt `d7-b-i2-a1-K1` exit `0`) -- neither saw the other's context or findings before both finished. `REVIEW_CONSOLIDATED` (run `d7-k2`, candidate `d7-k2-i1`) then merged both, repairing nothing itself, per its own Findings table in `paper/REVIEW_CONSOLIDATED.md`. That table's severity column carries `8` raw HIGH findings; its classification column splits them `4` BLOCKER and `4` DOCUMENTED_LIMITATION. The `4` BLOCKER findings are each closed: `A-01` by loop run `d7r` (commit `d4ded2b`), `A-02` also by loop run `d7r` (commit `d4ded2b`), `B-04` by loop run `d7w` (commit `8dec6c3`), and `B-01` by loop run `d7x` (commit `fdedbb5`) -- verified directly in this tree, not taken on the commit messages' word alone (see the disposition table below). The `4` DOCUMENTED_LIMITATION findings (`B-05` through `B-08`) are the check-command-guard tripwire class disclaimed at `docs/LIMITATIONS.md` limit `4` and claim `C-016`, verified against a fresh positive control of `7` of `7` naive escape shapes still `BLOCKED`. `5` MEDIUM findings are TRACKED, none release-blocking. As of this HEAD no BLOCKER is open; the four remaining HIGH findings stand disclosed and disclaimed, not absent. | restates `paper/REVIEW_CONSOLIDATED.md`'s own Findings table counts (`8` HIGH, `4` BLOCKER, `4` DOCUMENTED_LIMITATION, `5` MEDIUM) and the positive-control figure (`7`/`7`) already disclaimed at `docs/LIMITATIONS.md` limit 4 / claim `C-016`, plus the revised two-reviewer design at `dogfood/D7_REVIEW_AUFTRAG.md:33`; a consolidation-table restatement, already covered by the declared claim surfaces `paper/REVIEW_CONSOLIDATED.md` and `docs/LIMITATIONS.md`, not a new independent measurement. |
+| RC_GATE.md:65 | Position Paper QA grün — `PASS` — Position paper (`D5`): accepted candidate `d5-i2` at iteration `2`, `14` of `14` criteria PASS, receipt `d5-i2-a1-AC01` exit `0`. Citation-and-numbers audit (`D6`): accepted candidate `d6-i2` at iteration `2`, `10` of `10` criteria PASS, receipt `d6-i2-a1-K1` exit `0`. Both from the internal *Abschlussbericht* Section B's run-trace table. | restates D5's and D6's acceptance figures (`14`/`14` at `dogfood/ABSCHLUSSBERICHT.md:222`, `10`/`10` at `dogfood/ABSCHLUSSBERICHT.md:406`), both rows of Section B's run-trace table; already-recorded history, not a fresh measurement. |
+| RC_GATE.md:66 | Double Review ohne offenen HIGH — `PASS` — Two independent reviews ran as separate `hoh run`s, per the internal *D7-Review-Auftrag*'s revised (2026-09-08) design: `REVIEW_A` (run `d7-a`, accepted candidate `d7-a-i1`, receipt `d7-a-i1-a1-K1` exit `0`) and `REVIEW_B` (run `d7-b`, accepted candidate `d7-b-i2`, receipt `d7-b-i2-a1-K1` exit `0`) -- neither saw the other's context or findings before both finished. `REVIEW_CONSOLIDATED` (run `d7-k2`, candidate `d7-k2-i1`) then merged both, repairing nothing itself, per its own Findings table in `paper/REVIEW_CONSOLIDATED.md`. That table's severity column carries `8` raw HIGH findings; its classification column splits them `4` BLOCKER and `4` DOCUMENTED_LIMITATION. The `4` BLOCKER findings are each closed: `A-01` by loop run `d7r` (commit `d4ded2b`), `A-02` also by loop run `d7r` (commit `d4ded2b`), `B-04` by loop run `d7w` (commit `8dec6c3`), and `B-01` by loop run `d7x` (commit `fdedbb5`) -- verified directly in this tree, not taken on the commit messages' word alone (see the disposition table below). The `4` DOCUMENTED_LIMITATION findings (`B-05` through `B-08`) are the check-command-guard tripwire class disclaimed at `docs/LIMITATIONS.md` limit `4` and claim `C-016`, verified against a fresh positive control of `7` of `7` naive escape shapes still `BLOCKED`. `5` MEDIUM findings are TRACKED, none release-blocking. As of this HEAD no BLOCKER is open; the four remaining HIGH findings stand disclosed and disclaimed, not absent. | restates `paper/REVIEW_CONSOLIDATED.md`'s own Findings table counts (`8` HIGH, `4` BLOCKER, `4` DOCUMENTED_LIMITATION, `5` MEDIUM) and the positive-control figure (`7`/`7`) already disclaimed at `docs/LIMITATIONS.md` limit 4 / claim `C-016`, plus the revised two-reviewer design at `dogfood/D7_REVIEW_AUFTRAG.md:33`; a consolidation-table restatement, already covered by the declared claim surfaces `paper/REVIEW_CONSOLIDATED.md` and `docs/LIMITATIONS.md`, not a new independent measurement. |
 | RC_GATE.md:67 | Git status sauber — `NOT_RUN` — Operator row, per O30: the check directory this run's own documents are graded in has no `.git` of its own, so no criterion in this run can call `git status` -- and this development worktree's own status will change the moment this run's documents are committed on top of the HEAD named above. To be filled in by the operator, as a porcelain line count, after that commit. | internal decision/observation-id cross-reference (O30), explaining why this row is NOT_RUN inside a check arena with no `.git`; not a measurement. |
 | RC_GATE.md:69 | Repository-Adresse — `PASS` — **Operatorzeile, ausgefuellt am 2026-09-10.** Der Host wurde bei `DEC-R3` ausdruecklich NICHT entschieden, deshalb trug `pyproject.toml` bis hierher den RFC-2606-Platzhalter `example.invalid`. Mit der Freigabe zur Veroeffentlichung ist er entschieden: `[project.urls]` traegt jetzt `Repository = "https://github.com/SKZL-AI/veriharness"`. Der Platzhalter war kein Versehen, sondern die ehrliche Form einer offenen Entscheidung -- und diese Zeile ist ihr Abschluss. | cites the standard reference RFC 2606 (reserved, unresolvable example domains) while explaining why this row is NOT_RUN and out of this run's declared scope (`pyproject.toml`, `CITATION.cff`); a standards citation, not a measurement about HoH. |
 | RC_GATE.md:77 | `A-01` — HIGH — BLOCKER — loop run `d7r`, commit `d4ded2b` -- `paper/POSITION_PAPER.md` §9 now reads "the six of the seven accepted dogfood runs," matching the §3 table it used to contradict | table row restating finding `A-01`'s closure, already recorded in `paper/REVIEW_CONSOLIDATED.md`'s own Findings table and closed by loop run `d7r`; a disposition-table restatement, already covered by the declared claim surface `paper/REVIEW_CONSOLIDATED.md`, not a new independent measurement. |
@@ -1638,20 +4111,20 @@ Number-bearing sentences from README.md and docs/** that were judged not to be p
 | RELEASE_NOTES.md:156 | - This run (`hoh-d8`) added three release-candidate documents -- this file, `RC_GATE.md`, and a new section in `CHANGELOG.md` -- and nothing else: no file under `src/hoh/`, `tests/`, or `tools/` changed to produce them, and no file this release candidate reports on (including all seven files the `paper` manifest rule publishes) was edited by this run. - The position paper (`paper/POSITION_PAPER.md`) and its citation-and-numbers audit (`paper/AUDIT.md`) each passed their own QA gate: `D5` accepted the paper at its second iteration, `14` of `14` criteria; `D6` accepted the audit at its second iteration, `10` of `10` criteria. - Two independent reviews of the release candidate -- `paper/REVIEW_A.md` and `paper/REVIEW_B.md`, run as separate sessions that never saw each other's findings before both finished -- found eight HIGH-severity findings between them, consolidated without repair in `paper/REVIEW_CONSOLIDATED.md`. ⟦audit at its second iteration, `10` of `10` criteria.⟧ | restates D6's acceptance figure (`10` of `10` criteria), already recorded at `dogfood/ABSCHLUSSBERICHT.md:406` (Section B's run-trace table) and restated identically at `RC_GATE.md`'s 'Position Paper QA grün' row; a downstream restatement, not a new independent measurement. |
 | RELEASE_NOTES.md:161 | The four classified BLOCKER are now closed: `A-01` and `A-02` were corrected by loop run `d7r`, `B-04` by loop run `d7w`, and `B-01` by loop run `d7x` -- none of them by the operator. ⟦four classified BLOCKER are now closed: `A-01` and `A-02` were corrected by⟧ | restates the BLOCKER-finding closures (`A-01`, `A-02`), already recorded in `paper/REVIEW_CONSOLIDATED.md`'s Findings table and restated in this ledger's own `RC_GATE.md` disposition-table entries (lines 77-78); a downstream restatement, not a new independent measurement. |
 | RELEASE_NOTES.md:162 | The four classified BLOCKER are now closed: `A-01` and `A-02` were corrected by loop run `d7r`, `B-04` by loop run `d7w`, and `B-01` by loop run `d7x` -- none of them by the operator. ⟦loop run `d7r`, `B-04` by loop run `d7w`, and `B-01` by loop run `d7x` --⟧ | restates the BLOCKER-finding closures (`B-04`, `B-01`), already recorded in `paper/REVIEW_CONSOLIDATED.md`'s Findings table and restated in this ledger's own `RC_GATE.md` disposition-table entries (lines 79-80); a downstream restatement, not a new independent measurement. |
-| RELEASE_NOTES.md:166 | The remaining four are classified DOCUMENTED_LIMITATION and were not fixed by either the loop or the operator: they are a disclosed, disclaimed property of the check-command guard, not a silent gap (see `docs/LIMITATIONS.md`, limit 4). - Eleven core HoH defects and five guard gaps found during this campaign's own dogfooding were fixed **at the orchestrator level** -- by the orchestrating agent session working outside a run, not by a person typing and not by an HoH developer role -- under a narrow, declared exception to the rule that the loop may not touch `src/hoh/` or `tests/`; the full accounting, defect by defect, is `dogfood/ABSCHLUSSBERICHT.md` point D. ⟦guard, not a silent gap (see `docs/LIMITATIONS.md`, limit 4).⟧ | cross-reference to `docs/LIMITATIONS.md` limit 4 (an existing declared claim surface in this ledger), naming where the underlying disclaimer already lives, and to the full defect accounting at `dogfood/ABSCHLUSSBERICHT.md:906` (Section D); not a fresh measurement. |
+| RELEASE_NOTES.md:166 | The remaining four are classified DOCUMENTED_LIMITATION and were not fixed by either the loop or the operator: they are a disclosed, disclaimed property of the check-command guard, not a silent gap (see `docs/LIMITATIONS.md`, limit 4). - Eleven core HoH defects and five guard gaps found during this campaign's own dogfooding were fixed **at the orchestrator level** -- by the orchestrating agent session working outside a run, not by a person typing and not by an HoH developer role -- under a narrow, declared exception to the rule that the loop may not touch `src/hoh/` or `tests/`; the full accounting, defect by defect, is the internal *Abschlussbericht* point D. ⟦guard, not a silent gap (see `docs/LIMITATIONS.md`, limit 4).⟧ | cross-reference to `docs/LIMITATIONS.md` limit 4 (an existing declared claim surface in this ledger), naming where the underlying disclaimer already lives, and to the full defect accounting at `dogfood/ABSCHLUSSBERICHT.md:906` (Section D); not a fresh measurement. |
 | RELEASE_NOTES.md:216 | Measured over the non-merge commits reachable from the mainline: `tests/` has 70 commits, 19 of them arriving via run branches across three run-authored files; `src/hoh/` has 49 commits, one of which arrived via a run branch -- run `d1` adding `src/hoh/policy/dangerous-patterns.txt` and `src/hoh/policy/house-rules-patterns.txt` so an installed wheel could execute an acceptance check at all. What survives, and is worth saying: **no run has ever added or edited a line of Python under `src/`.** HoH's own logic was never written by a run. See `docs/LIMITATIONS.md` limit 8, and finding `O94` for how the overstatement was found. ⟦logic was never written by a run. See `docs/LIMITATIONS.md` limit 8, and⟧ | cross-reference to `docs/LIMITATIONS.md` limit 8 (an existing declared claim surface in this ledger); not a fresh measurement. |
 | RELEASE_NOTES.md:246 | **Publication happened afterwards**, once the release closure was complete: `v0.1.0-rc1` was tagged and pushed on a human decision that this run neither made nor was permitted to make. ⟦`v0.1.0-rc1` was tagged and pushed on a human decision that this run neither⟧ | restates the release version tag `v0.1.0-rc1` from this document's own title while describing what the operator published after run D8 closed; not a measurement. Re-anchored on 2026-09-10: the sentence this entry previously pointed at said the candidate "is not a public release", which was true when D8 wrote it and false once the operator published. The entry follows the version mention to its successor sentence rather than being dropped. |
-| docs/LIMITATIONS.md:303 | **What remains open is the part that cannot be closed by adding invariants.** `U1`-`U5` are a *named list*, extended each time a composition failure taught this project a new one. ⟦`U1`-`U5` are a *named list*, extended each time a composition failure taught⟧ | names the union invariants U1..U5 as identifiers of the gate, not as a measurement; the digits are part of their names. |
+| docs/LIMITATIONS.md:387 | **What remains open is the part that cannot be closed by adding invariants.** `U1`-`U5` are a *named list*, extended each time a composition failure taught this project a new one. ⟦`U1`-`U5` are a *named list*, extended each time a composition failure taught⟧ | names the union invariants U1..U5 as identifiers of the gate, not as a measurement; the digits are part of their names. |
 | RELEASE_NOTES.md:240 | **Run `D8`, which produced this document, published nothing.** It created no tag, made no push, added no remote and never called `hoh deliver` -- those were outside its declared scope, and `RC_GATE.md`'s "What this run did not do" records that boundary as it stood when the gate was measured. ⟦**Run `D8`, which produced this document, published nothing.** It created no⟧ | names run `D8` as a run identifier while stating the scope boundary that run observed; the digit is part of the run id, not a measurement. |
 | README.md:88 | Human policy authority — Policy limits, non-delegated decisions, irreversible external actions — 7 governance decisions; the public release | describes the architecture or the rc2 correction itself, not a numeric measurement claim |
 | docs/ARCHITECTURE.md:49 | That gap is precisely why the global closure layer described in `docs/LIMITATIONS.md` §9 exists: the invariants `U1`-`U5` and the post-DAG closure pass are what check the orchestrator's own composition decisions, because the per-run loop structurally cannot. ⟦closure layer described in `docs/LIMITATIONS.md` §9 exists: the invariants⟧ | describes the architecture or the rc2 correction itself, not a numeric measurement claim |
 | docs/ARCHITECTURE.md:50 | That gap is precisely why the global closure layer described in `docs/LIMITATIONS.md` §9 exists: the invariants `U1`-`U5` and the post-DAG closure pass are what check the orchestrator's own composition decisions, because the per-run loop structurally cannot. ⟦`U1`-`U5` and the post-DAG closure pass are what check the orchestrator's own⟧ | describes the architecture or the rc2 correction itself, not a numeric measurement claim |
 | docs/LIMITATIONS.md:45 | A human decided seven things -- `DEC-R1`, `DEC-R1a`, `DEC-R2`, `DEC-R3`, `DEC-R4`, `DEC-R5`, `DEC-R6`: the project's public name, which files the export carries, how one class of reference is dispositioned, and whether to publish. ⟦`DEC-R6`: the project's public name, which files the export carries, how one⟧ | describes the architecture or the rc2 correction itself, not a numeric measurement claim |
-| docs/LIMITATIONS.md:187 | The earlier form was "no run has ever added or edited a line inside `src/`", and it is false: run `d1` added `src/hoh/policy/dangerous-patterns.txt` and `src/hoh/policy/house-rules-patterns.txt` -- packaged copies of the guard pattern lists, so that an installed wheel could run an acceptance check at all -- and that commit reached the mainline through the ordinary merge of the accepted candidate `d1-i2`. ⟦edited a line inside `src/`", and it is false: run `d1` added⟧ | describes the architecture or the rc2 correction itself, not a numeric measurement claim |
-| docs/LIMITATIONS.md:193 | The earlier form was "no run has ever added or edited a line inside `src/`", and it is false: run `d1` added `src/hoh/policy/dangerous-patterns.txt` and `src/hoh/policy/house-rules-patterns.txt` -- packaged copies of the guard pattern lists, so that an installed wheel could run an acceptance check at all -- and that commit reached the mainline through the ordinary merge of the accepted candidate `d1-i2`. It is one commit against 49 non-merge commits touching `src/hoh/`; the other 48 were written outside any run. It contains no `.py` file, which is why the corrected claim still says something worth saying. But "a run wrote nothing under `src/`" was not true, and a reader checking it against the commit history would have caught this document in an overstatement about its own discipline. ⟦touching `src/hoh/`; the other 48 were written outside any run. It contains no `.py` file, which⟧ | describes the architecture or the rc2 correction itself, not a numeric measurement claim |
-| docs/LIMITATIONS.md:274 | **The invariants are one of two layers, and the second one is what actually caught the last two failures.** `U1`-`U5` check the merged tree. Above them sits a closure layer that checks the *process*: semantic dependency measurement between runs that are candidates to proceed in parallel, the claims/export/ global-state invariants, and a post-DAG pass that runs after every planned run has been merged. When any of those fail, the failure does not stop the release -- it generates a new repair run, which goes through the ordinary loop and must itself be accepted, after which closure is attempted again. ⟦caught the last two failures.** `U1`-`U5` check the merged tree. Above them⟧ | describes the architecture or the rc2 correction itself, not a numeric measurement claim |
-| docs/LIMITATIONS.md:290 | The DAG went terminal after run `D8`; the global gates then found two real composition and export defects in the merged state, which became repair runs `d8b` and `d8c`; only after those were accepted and closure re-ran clean did the candidate qualify. ⟦DAG went terminal after run `D8`; the global gates then found two real⟧ | describes the architecture or the rc2 correction itself, not a numeric measurement claim |
-| docs/LIMITATIONS.md:292 | The DAG went terminal after run `D8`; the global gates then found two real composition and export defects in the merged state, which became repair runs `d8b` and `d8c`; only after those were accepted and closure re-ran clean did the candidate qualify. ⟦`d8b` and `d8c`; only after those were accepted and closure re-ran clean did⟧ | describes the architecture or the rc2 correction itself, not a numeric measurement claim |
+| docs/LIMITATIONS.md:271 | The earlier form was "no run has ever added or edited a line inside `src/`", and it is false: run `d1` added `src/hoh/policy/dangerous-patterns.txt` and `src/hoh/policy/house-rules-patterns.txt` -- packaged copies of the guard pattern lists, so that an installed wheel could run an acceptance check at all -- and that commit reached the mainline through the ordinary merge of the accepted candidate `d1-i2`. ⟦edited a line inside `src/`", and it is false: run `d1` added⟧ | describes the architecture or the rc2 correction itself, not a numeric measurement claim |
+| docs/LIMITATIONS.md:277 | The earlier form was "no run has ever added or edited a line inside `src/`", and it is false: run `d1` added `src/hoh/policy/dangerous-patterns.txt` and `src/hoh/policy/house-rules-patterns.txt` -- packaged copies of the guard pattern lists, so that an installed wheel could run an acceptance check at all -- and that commit reached the mainline through the ordinary merge of the accepted candidate `d1-i2`. It is one commit against 49 non-merge commits touching `src/hoh/`; the other 48 were written outside any run. It contains no `.py` file, which is why the corrected claim still says something worth saying. But "a run wrote nothing under `src/`" was not true, and a reader checking it against the commit history would have caught this document in an overstatement about its own discipline. ⟦touching `src/hoh/`; the other 48 were written outside any run. It contains no `.py` file, which⟧ | describes the architecture or the rc2 correction itself, not a numeric measurement claim |
+| docs/LIMITATIONS.md:358 | **The invariants are one of two layers, and the second one is what actually caught the last two failures.** `U1`-`U5` check the merged tree. Above them sits a closure layer that checks the *process*: semantic dependency measurement between runs that are candidates to proceed in parallel, the claims/export/ global-state invariants, and a post-DAG pass that runs after every planned run has been merged. When any of those fail, the failure does not stop the release -- it generates a new repair run, which goes through the ordinary loop and must itself be accepted, after which closure is attempted again. ⟦caught the last two failures.** `U1`-`U5` check the merged tree. Above them⟧ | describes the architecture or the rc2 correction itself, not a numeric measurement claim |
+| docs/LIMITATIONS.md:374 | The DAG went terminal after run `D8`; the global gates then found two real composition and export defects in the merged state, which became repair runs `d8b` and `d8c`; only after those were accepted and closure re-ran clean did the candidate qualify. ⟦DAG went terminal after run `D8`; the global gates then found two real⟧ | describes the architecture or the rc2 correction itself, not a numeric measurement claim |
+| docs/LIMITATIONS.md:376 | The DAG went terminal after run `D8`; the global gates then found two real composition and export defects in the merged state, which became repair runs `d8b` and `d8c`; only after those were accepted and closure re-ran clean did the candidate qualify. ⟦`d8b` and `d8c`; only after those were accepted and closure re-ran clean did⟧ | describes the architecture or the rc2 correction itself, not a numeric measurement claim |
 | paper/POSITION_PAPER.md:117 | **Failure observation.** Two merges of individually correct runs left the combined state inconsistent (C-017, C-052..C-054). 2. ⟦   combined state inconsistent (C-017, C-052..C-054).⟧ | describes the architecture or the rc2 correction itself, not a numeric measurement claim |
 | paper/POSITION_PAPER.md:121 | **Hypothesis.** Per-run evidence does not compose. Acceptance is a property of a candidate against its base; consolidation is a different state, and no check in the loop ranges over it. 3. **Union gate.** Five invariants (`U1`-`U5`) evaluated over the merged tree rather than any single run's base -- licence agreement, no shipped file referencing an unshipped one, built artifact matching repository claims, every evidence reference resolving, and suite plus linter green on the combined state. Two of the five are the two failures above, added because they happened. 4. ⟦3. **Union gate.** Five invariants (`U1`-`U5`) evaluated over the merged tree⟧ | describes the architecture or the rc2 correction itself, not a numeric measurement claim |
 | paper/POSITION_PAPER.md:146 | **The prospective instance.** That distinction did work during this release rather than describing work. The DAG went terminal after run `D8`. The global gates then found two real defects in the merged state -- a composition failure and an export failure -- neither of which any individual run had been wrong about. They became repair runs `d8b` and `d8c`; only after both were accepted and closure re-ran clean did the candidate qualify. ⟦rather than describing work. The DAG went terminal after run `D8`. The global⟧ | describes the architecture or the rc2 correction itself, not a numeric measurement claim |
@@ -1681,7 +4154,7 @@ Number-bearing sentences from README.md and docs/** that were judged not to be p
 | RELEASE_NOTES.md:212 | Measured over the non-merge commits reachable from the mainline: `tests/` has 70 commits, 19 of them arriving via run branches across three run-authored files; `src/hoh/` has 49 commits, one of which arrived via a run branch -- run `d1` adding `src/hoh/policy/dangerous-patterns.txt` and `src/hoh/policy/house-rules-patterns.txt` so an installed wheel could execute an acceptance check at all. ⟦commits, one of which arrived via a run branch -- run `d1` adding⟧ | describes the architecture or the rc2 correction itself, not a numeric measurement claim |
 | RELEASE_NOTES.md:217 | See `docs/LIMITATIONS.md` limit 8, and finding `O94` for how the overstatement was found. ⟦finding `O94` for how the overstatement was found.⟧ | describes the architecture or the rc2 correction itself, not a numeric measurement claim |
 | RELEASE_NOTES.md:249 | **Publication happened afterwards**, once the release closure was complete: `v0.1.0-rc1` was tagged and pushed on a human decision that this run neither made nor was permitted to make. The orchestrating agent session prepared and verified the export; the decision to publish it was reserved from delegation and taken by a person. `v0.1.0-rc2` follows the same split. Those two sentences are deliberately kept apart, because one is a statement about a run and the other about a person, and collapsing them is the exact class of claim this project exists to keep separate. `RC_GATE.md` reports the gate condition by condition, including the rows only the operator can fill in. ⟦and taken by a person. `v0.1.0-rc2` follows the same split. Those two sentences are deliberately kept apart, because⟧ | describes the architecture or the rc2 correction itself, not a numeric measurement claim |
-| README.md:126 | A campaign that produces 97 recorded findings against its own harness is not a campaign that went smoothly. The findings themselves live in the development repository's working ledger, which does not ship; what ships is the subset that became a standing limit, written out in full in `docs/LIMITATIONS.md` rather than summarised. Limits 8 and 9 there are both findings from this campaign that were never fully closed. ⟦rather than summarised. Limits 8 and 9 there are both findings from this⟧ | names which two limits in docs/LIMITATIONS.md originate as unclosed findings of this campaign; a pointer into a shipped document, not a measurement |
+| README.md:126 | A campaign that produces 127 recorded findings against its own harness is not a campaign that went smoothly. The findings themselves live in the development repository's working ledger, which does not ship; what ships is the subset that became a standing limit, written out in full in `docs/LIMITATIONS.md` rather than summarised. Limits 8 and 9 there are both findings from this campaign that were never fully closed. ⟦rather than summarised. Limits 8 and 9 there are both findings from this⟧ | names which two limits in docs/LIMITATIONS.md originate as unclosed findings of this campaign; a pointer into a shipped document, not a measurement |
 | README.md:185 | Where those fixes repaired a defect this campaign found in HoH itself -- eleven core defects and five guard gaps -- each was declared as an exception and carries a test; the remainder of the 48 direct commits is ordinary development that predates or sits outside that accounting, and this README does not claim otherwise. ⟦declared as an exception and carries a test; the remainder of the 48 direct⟧ | describes which authority produced the release-gate tooling, not a numeric measurement |
 | README.md:142 | Measured over the non-merge commits reachable from the mainline **of the development repository, at commit `30ff053`** -- a merge commit is the *taking* of a run branch, not a direct write, so counting one as "written directly" would invert what it shows. ⟦development repository, at commit `30ff053`** -- a merge commit is the *taking*⟧ | names the commit the attribution figures are measured at, and discloses that the table counts commits to paths it lives in; a statement about the measurement, not a measurement |
 | README.md:157 | Naming that commit is not pedantry, and the first published version of this table got three of its five rows wrong for want of it. The table counts commits to paths the table itself lives in, so **the commit that writes these numbers changes them**, and a count taken "now" is stale the moment it is written down. A measurement of a tree has to name the tree. ⟦table got three of its five rows wrong for want of it. The table counts commits⟧ | names the commit the attribution figures are measured at, and discloses that the table counts commits to paths it lives in; a statement about the measurement, not a measurement |
@@ -1692,4 +4165,185 @@ Number-bearing sentences from README.md and docs/** that were judged not to be p
 | RELEASE_NOTES.md:10 | ## What rc3 corrects ⟦## What rc3 corrects⟧ | describes the rc3 correction and how it was found, not a numeric measurement |
 | RELEASE_NOTES.md:24 | rc3 therefore: ⟦rc3 therefore:⟧ | describes the rc3 correction and how it was found, not a numeric measurement |
 | RELEASE_NOTES.md:35 | **One claim flipped, and it is worth naming rather than quietly restating.** rc2 reported `paper/` as 9/9/**0** -- nothing written to the position paper outside a run. That was true until sections 1.1 and 1.2 were written directly by the orchestrating session to produce rc2 itself. The column now reads 1, and the README names which commit it is. ⟦by the orchestrating session to produce rc2 itself. The column now reads 1, and⟧ | describes the rc3 correction and how it was found, not a numeric measurement |
+| docs/LIMITATIONS.md:186 | **What the sandbox added here, stated precisely, because the first version of this paragraph was wrong in both directions.** ⟦**What the sandbox added here, stated precisely, because the first version of⟧ | marks the passage that replaced a withdrawn claim about the sandbox closing limit 6; a heading for a correction, not a measurement |
+| docs/LIMITATIONS.md:218 | That is the same family as limit 4, with the difference that this one read like a boundary. ⟦That is the same family as limit 4, with the difference that this one read like⟧ | describes what the sandbox contributes to this limit and what it does not, not a measurement |
+| docs/LIMITATIONS.md:476 | ## 12a. A criterion whose own file the candidate added discriminates trivially ⟦## 12a. A criterion whose own file the candidate added discriminates trivially⟧ | section heading of a named, tracked limitation, not a numeric measurement claim |
+| docs/LIMITATIONS.md:478 | The acceptance-governing condition in limitation 12 -- red on the predecessor, green on the candidate -- has a hole that this project's own STRICT acceptance run walked straight into. ⟦The acceptance-governing condition in limitation 12 -- red on the predecessor,⟧ | a back-reference to limitation 12, not a numeric measurement claim |
+| docs/LIMITATIONS.md:484 | python3 -m unittest discover -s tests -p 'test_roman.py' ⟦python3 -m unittest discover -s tests -p 'test_roman.py'⟧ | the acceptance-check command of this project's own STRICT run, quoted verbatim |
+| docs/LIMITATIONS.md:486 | Exit 0 on the candidate. On the baseline, exit 5: ⟦Exit 0 on the candidate. On the baseline, exit 5:⟧ | reports the two exit codes of one measured pair; the figures are the receipt's own and are carried by the claim on the following quoted output |
+| docs/LIMITATIONS.md:488 | Ran 0 tests in 0.000s ⟦Ran 0 tests in 0.000s⟧ | verbatim output of the baseline check, quoted as evidence rather than asserted |
+| docs/LIMITATIONS.md:499 | `hoh.runner.artefactual_reason()` detects the signatures with which a test runner says it executed nothing (exit 5, `NO TESTS RAN`, `FileNotFoundError`, `collected 0 items`) and the controller records them on the run state, so the weakness is visible in the evidence and to any gate that reads it. ⟦runner says it executed nothing (exit 5, `NO TESTS RAN`, `FileNotFoundError`,⟧ | names the signatures the detector looks for, which are strings in src/hoh/runner.py rather than a measurement |
+| docs/LIMITATIONS.md:500 | `hoh.runner.artefactual_reason()` detects the signatures with which a test runner says it executed nothing (exit 5, `NO TESTS RAN`, `FileNotFoundError`, `collected 0 items`) and the controller records them on the run state, so the weakness is visible in the evidence and to any gate that reads it. ⟦`collected 0 items`) and the controller records them on the run state, so the⟧ | describes where the detector writes its result, not a measured quantity |
+| docs/BENCHMARK_PROTOCOL.md:3 | `docs/LIMITATIONS.md` limit 2 has said since the first release that this project has **no baseline of any kind**. ⟦`docs/LIMITATIONS.md` limit 2 has said since the first release that this⟧ | a back-reference to limitation 2, not a numeric measurement claim |
+| docs/BENCHMARK_PROTOCOL.md:31 | * **Primary: dispatches.** Each arm gets at most **9 role dispatches per task**. ⟦* **Primary: dispatches.** Each arm gets at most **9 role dispatches per⟧ | states the dispatch budget the protocol fixes for itself, a design parameter rather than a measured result |
+| docs/BENCHMARK_PROTOCOL.md:48 | **`to_roman`** — a pure function with a specified table and two boundary errors. Nothing composes; the only question is correctness. 2. **`parse_duration`** — a parser with ambiguous input ("1m" as minutes or metres) that the specification deliberately under-determines. Tests the handling of a specification that cannot be satisfied as written. 3. ⟦2. **`parse_duration`** — a parser with ambiguous input ("1m" as minutes or⟧ | names one of the five tasks and the failure mode it targets, a design parameter rather than a measured result |
+| docs/BENCHMARK_PROTOCOL.md:85 | * The primary comparison is `false_accepts` per task, A vs B vs C. * The secondary comparison is `composition_defects`, B vs C, on tasks 3 and 4 only — the two where composition exists. ⟦* The secondary comparison is `composition_defects`, B vs C, on tasks 3 and 4⟧ | names which arms and tasks the secondary comparison covers, a design parameter fixed before any run |
+| docs/BENCHMARK_PROTOCOL.md:86 | * The primary comparison is `false_accepts` per task, A vs B vs C. * The secondary comparison is `composition_defects`, B vs C, on tasks 3 and 4 only — the two where composition exists. Reporting it on task 1 would be reporting noise. * **No significance test.** Five tasks and few repetitions cannot support one, and computing a p-value over six data points would be decoration. The result is a table of counts, with every run listed. * **Every run is kept**, including the ones that fail for reasons that have nothing to do with the arm — a provider outage, a rate limit, a machine problem. ⟦only — the two where composition exists. Reporting it on task 1 would be⟧ | continues the preceding line's statement about which tasks the comparison covers |
+| docs/BENCHMARK_PROTOCOL.md:99 | * Repetitions: **3 per (task, arm)** where the budget allows, 1 where it does not. ⟦* Repetitions: **3 per (task, arm)** where the budget allows, 1 where it does⟧ | states the repetition count the protocol fixes for itself, a design parameter rather than a measured result |
+| docs/BENCHMARK_PROTOCOL.md:117 | Limit 1 is untouched by this benchmark and stays open. * **That arm A is the strongest baseline available.** It is *a* baseline: a competent agent with no harness. ⟦1 is untouched by this benchmark and stays open.⟧ | a back-reference to limitation 1, restating that this benchmark does not touch it |
+| docs/BENCHMARK_PROTOCOL.md:178 | Until that file exists, the honest status of limit 2 is unchanged: **no baseline of any kind exists**, and no comparative claim may be made. ⟦Until that file exists, the honest status of limit 2 is unchanged: **no⟧ | a back-reference to limitation 2, restating its unchanged status rather than asserting a new figure |
+| docs/ROUTING.md:55 | **Per-role quality, in a form that is not self-reported.** Receipts per dispatch, criteria that discriminate, and — since O112 — how many of those discriminate only because the criterion's own file was absent from the baseline. ⟦dispatch, criteria that discriminate, and — since O112 — how many of those⟧ | a back-reference to finding O112, not a numeric measurement claim |
+| docs/ROUTING.md:61 | A role that produces many criteria and few behavioural discriminators is producing volume. 4. **A matched budget.** Two configurations are comparable only if they were allowed the same resources, which is the same requirement the benchmark in `docs/LIMITATIONS.md` limit 2 is blocked on. Routing and the benchmark are the same measurement problem seen from two sides. ⟦`docs/LIMITATIONS.md` limit 2 is blocked on. Routing and the benchmark are⟧ | a back-reference to limitation 2, not a numeric measurement claim |
+| docs/LIMITATIONS.md:517 | ## 12b. The planner's read-only contract is a sentence, not a boundary ⟦## 12b. The planner's read-only contract is a sentence, not a boundary⟧ | quotes the planner prompt's own wording verbatim; the numbers are part of the quoted contract, not an assertion about HoH |
+| docs/LIMITATIONS.md:533 | Bash(cd .../scratchpad && mv duration.py durati...) K1 exit= 1 / K2 exit= 1 / K3 exit= 1 Confirmed: all three checks pass (exit 0) against a correct reference implementation and correctly fail (exit 1) against the current stub ⟦K1 exit= 1 / K2 exit= 1 / K3 exit= 1⟧ | reproduces a transcript line from a measured run, quoted as evidence rather than asserted |
+| docs/LIMITATIONS.md:534 | Bash(cd .../scratchpad && mv duration.py durati...) K1 exit= 1 / K2 exit= 1 / K3 exit= 1 Confirmed: all three checks pass (exit 0) against a correct reference implementation and correctly fail (exit 1) against the current stub ⟦Confirmed: all three checks pass (exit 0) against a correct reference⟧ | continues the quoted transcript |
+| docs/LIMITATIONS.md:535 | Bash(cd .../scratchpad && mv duration.py durati...) K1 exit= 1 / K2 exit= 1 / K3 exit= 1 Confirmed: all three checks pass (exit 0) against a correct reference implementation and correctly fail (exit 1) against the current stub ⟦implementation and correctly fail (exit 1) against the current stub⟧ | continues the quoted transcript |
+| docs/LIMITATIONS.md:114 | **Arm A -- a plain agent, no harness -- passed all five hidden suites.** Including the composition task, where a plausible implementation is correct once and wrong when applied twice, and the task where a weak test suite lets a wrong implementation through. Between 20 and 114 seconds each. ⟦wrong implementation through. Between 20 and 114 seconds each.⟧ | a back-reference to another limitation or to the results document, not a numeric measurement claim of its own |
+| docs/LIMITATIONS.md:127 | * **These five tasks do not discriminate between the arms.** That is a finding about the benchmark's design, not a verdict on any arm. A task a competent agent finishes in twenty seconds cannot show what verification adds. * **The B-vs-C comparison is not supported at all.** Four arm-C cells and one arm-B cell stopped at an interactive permission prompt, five attempts each -- the planner running shell commands it is not supposed to run (limitation 12b). One data point is not a comparison and is not offered as one. ⟦12b). One data point is not a comparison and is not offered as one.⟧ | a back-reference to another limitation or to the results document, not a numeric measurement claim of its own |
+| docs/LIMITATIONS.md:575 | **Corrected while building the countermeasure.** The planner does *not* have write access to the repository or the candidate: A03 has given it a copy of its own since 2026-09-08, and the `mv` in the transcript hit that copy. ⟦write access to the repository or the candidate: A03 has given it a copy of its⟧ | names the date A03's planner copy was introduced -- a provenance reference to an existing mechanism, not a measurement claim |
+| docs/BENCHMARK_PROTOCOL.md:124 | ## Campaign v2: a replication, declared before it runs ⟦## Campaign v2: a replication, declared before it runs⟧ | pre-declares the shape of a campaign that has not run; a protocol statement fixed in advance, not a measurement |
+| docs/BENCHMARK_PROTOCOL.md:126 | Campaign `v1` ran before three defects in this harness were found and fixed. ⟦Campaign `v1` ran before three defects in this harness were found and fixed.⟧ | pre-declares the shape of a campaign that has not run; a protocol statement fixed in advance, not a measurement |
+| docs/BENCHMARK_PROTOCOL.md:129 | A campaign whose failures are dominated by a defect measures the defect, not the method — so v1 stays as it is, marked `PRE-O125-CLOSURE`, and this section fixes the shape of the replication **before** it runs, for the same reason the original protocol was frozen before the first arm. ⟦defect, not the method — so v1 stays as it is, marked `PRE-O125-CLOSURE`, and⟧ | pre-declares the shape of a campaign that has not run; a protocol statement fixed in advance, not a measurement |
+| docs/BENCHMARK_PROTOCOL.md:133 | campaign_id = v2 protocol_version = 2 status = DECLARED, not yet run ⟦campaign_id       = v2⟧ | pre-declares the shape of a campaign that has not run; a protocol statement fixed in advance, not a measurement |
+| docs/BENCHMARK_PROTOCOL.md:134 | campaign_id = v2 protocol_version = 2 status = DECLARED, not yet run ⟦protocol_version  = 2⟧ | pre-declares the shape of a campaign that has not run; a protocol statement fixed in advance, not a measurement |
+| docs/BENCHMARK_PROTOCOL.md:145 | **The one named intervention.** The planner capability boundary (O125/O126), together with the two defects found while closing it: the blocked-pane misreading (O127) and the telemetry wiring (O128). These are named here, in advance, as the difference between v1 and v2. Nothing else about the harness may be changed between the campaigns for the purpose of improving the result, and any change that does happen is listed in the v2 results document whether or not it looks relevant. ⟦misreading (O127) and the telemetry wiring (O128). These are named here, in⟧ | pre-declares the shape of a campaign that has not run; a protocol statement fixed in advance, not a measurement |
+| docs/BENCHMARK_PROTOCOL.md:146 | **The one named intervention.** The planner capability boundary (O125/O126), together with the two defects found while closing it: the blocked-pane misreading (O127) and the telemetry wiring (O128). These are named here, in advance, as the difference between v1 and v2. Nothing else about the harness may be changed between the campaigns for the purpose of improving the result, and any change that does happen is listed in the v2 results document whether or not it looks relevant. ⟦advance, as the difference between v1 and v2. Nothing else about the harness⟧ | pre-declares the shape of a campaign that has not run; a protocol statement fixed in advance, not a measurement |
+| docs/BENCHMARK_PROTOCOL.md:148 | Nothing else about the harness may be changed between the campaigns for the purpose of improving the result, and any change that does happen is listed in the v2 results document whether or not it looks relevant. ⟦and any change that does happen is listed in the v2 results document whether or⟧ | pre-declares the shape of a campaign that has not run; a protocol statement fixed in advance, not a measurement |
+| docs/BENCHMARK_PROTOCOL.md:152 | **No result-dependent analysis change.** The comparison, the exclusions and the reporting are those already fixed above. If v2 looks worse than v1, that is the finding and it is published in the same detail. If v2's arm C still stops on approvals, the fix did not work, and that is a harness defect to report, not a cell to drop. ⟦reporting are those already fixed above. If v2 looks worse than v1, that is the⟧ | pre-declares the shape of a campaign that has not run; a protocol statement fixed in advance, not a measurement |
+| docs/BENCHMARK_PROTOCOL.md:153 | **No result-dependent analysis change.** The comparison, the exclusions and the reporting are those already fixed above. If v2 looks worse than v1, that is the finding and it is published in the same detail. If v2's arm C still stops on approvals, the fix did not work, and that is a harness defect to report, not a cell to drop. ⟦finding and it is published in the same detail. If v2's arm C still stops on⟧ | pre-declares the shape of a campaign that has not run; a protocol statement fixed in advance, not a measurement |
+| docs/BENCHMARK_PROTOCOL.md:159 | Where it does not, the order of priority is fixed now and not renegotiated later: **first the four arm-C cells that O127 stopped in v1** (`parse_duration`, `retry_backoff`, `slug_pair`, `to_roman`), then the remaining C cells, then B, then A. ⟦**first the four arm-C cells that O127 stopped in v1** (`parse_duration`,⟧ | pre-declares the shape of a campaign that has not run; a protocol statement fixed in advance, not a measurement |
+| docs/BENCHMARK_PROTOCOL.md:161 | **Repetitions.** Three per (task, arm) where quota allows, as above. Where it does not, the order of priority is fixed now and not renegotiated later: **first the four arm-C cells that O127 stopped in v1** (`parse_duration`, `retry_backoff`, `slug_pair`, `to_roman`), then the remaining C cells, then B, then A. A partial v2 reports exactly which cells ran and compares only those against their v1 counterparts. ⟦then A. A partial v2 reports exactly which cells ran and compares only those⟧ | pre-declares the shape of a campaign that has not run; a protocol statement fixed in advance, not a measurement |
+| docs/BENCHMARK_PROTOCOL.md:162 | A partial v2 reports exactly which cells ran and compares only those against their v1 counterparts. ⟦against their v1 counterparts.⟧ | pre-declares the shape of a campaign that has not run; a protocol statement fixed in advance, not a measurement |
+| docs/BENCHMARK_PROTOCOL.md:164 | **What a green v2 would and would not license.** It would license the sentence "in campaign v2, arm C produced *n* final states where v1 produced one". ⟦**What a green v2 would and would not license.** It would license the sentence⟧ | pre-declares the shape of a campaign that has not run; a protocol statement fixed in advance, not a measurement |
+| docs/BENCHMARK_PROTOCOL.md:165 | **What a green v2 would and would not license.** It would license the sentence "in campaign v2, arm C produced *n* final states where v1 produced one". It would not license "VeriHarness performs better than a plain agent": five tasks on one machine with one provider cannot support that sentence, and §"What this cannot establish" above applies to v2 unchanged. ⟦"in campaign v2, arm C produced *n* final states where v1 produced one". It⟧ | pre-declares the shape of a campaign that has not run; a protocol statement fixed in advance, not a measurement |
+| docs/BENCHMARK_PROTOCOL.md:168 | It would not license "VeriHarness performs better than a plain agent": five tasks on one machine with one provider cannot support that sentence, and §"What this cannot establish" above applies to v2 unchanged. ⟦cannot establish" above applies to v2 unchanged.⟧ | pre-declares the shape of a campaign that has not run; a protocol statement fixed in advance, not a measurement |
+| docs/BENCHMARK_PROTOCOL.md:176 | Campaign v2 is declared in the section above and has not run. ⟦Campaign v2 is declared in the section above and has not run.⟧ | pre-declares the shape of a campaign that has not run; a protocol statement fixed in advance, not a measurement |
+| docs/BENCHMARK_PROTOCOL.md:179 | Until that file exists, the honest status of limit 2 is unchanged: **no baseline of any kind exists**, and no comparative claim may be made. ⟦baseline of any kind exists**, and no comparative claim may be made.⟧ | restates limitation 2's current status after the superseded sentence above it; a back-reference, not a new figure |
+| docs/BENCHMARK_RESULTS.md:7 | ## Campaign `v1`, status `PRE-O125-CLOSURE` ⟦## Campaign `v1`, status `PRE-O125-CLOSURE`⟧ | a campaign label and its status, not a measurement |
+| docs/BENCHMARK_RESULTS.md:9 | This campaign ran **before** the planner capability boundary (O125, O126) and before the blocked-pane misreading (O127) were fixed. ⟦This campaign ran **before** the planner capability boundary (O125,⟧ | states that the campaign predates three fixes and is kept unrepaired; a policy statement about the campaign, not a figure |
+| docs/BENCHMARK_RESULTS.md:10 | This campaign ran **before** the planner capability boundary (O125, O126) and before the blocked-pane misreading (O127) were fixed. It is kept exactly as it was measured: no cell was re-run, no number was repaired, and no cell was reinterpreted in the light of what was learned afterwards. A benchmark edited after its result is known is not a benchmark. ⟦O126) and before the blocked-pane misreading (O127) were fixed. It is⟧ | states that the campaign predates three fixes and is kept unrepaired; a policy statement about the campaign, not a figure |
+| docs/BENCHMARK_PROTOCOL.md:182 | *Superseded on 2026-09-13, and kept because this project corrects by addition rather than by overwriting.* That file now exists. Limit 2's current status is that a baseline exists and it does **not** favour this harness: arm A, a plain agent with no control plane, produced the most passing cells. No comparative claim in this project's favour may be made from it either. ⟦rather than by overwriting.* That file now exists. Limit 2's current status is⟧ | marks the sentence above it as superseded and says why it is kept; a provenance note about this document, not a measurement |
+| docs/LIMITATIONS.md:643 | ## 12c. A criterion that never executed in either state is reported as failed ⟦## 12c. A criterion that never executed in either state is reported as failed⟧ | a section heading naming the limitation, not a measurement |
+| docs/LIMITATIONS.md:646 | A criterion is red on the predecessor and green on the candidate: that is this project's definition of demonstrating an increment. Limit 12a covers the case where the predecessor was red only because the criterion's own file was not there yet. This is the other end of it. ⟦project's definition of demonstrating an increment. Limit 12a covers the case⟧ | restates the project's own definition of demonstrating an increment and points at limit 12a; a back-reference, not a new figure |
+| docs/LIMITATIONS.md:675 | **Not silently folded into `artefactual_reason()`.** That function describes a *baseline* that executed nothing while the candidate was green; here neither side executed. Stretching it to cover both would make one number mean two things, which is exactly limit 12's complaint one level down. Naming the class and leaving it open is the honest option until the verdict machinery can carry a third state through `_parse_qa`. ⟦things, which is exactly limit 12's complaint one level down. Naming the class⟧ | argues why this class is not folded into artefactual_reason; a design rationale, not a measurement |
+| docs/LIMITATIONS.md:660 | not accepted: K1 ⟦not accepted: K1⟧ | a verbatim quotation of the run's own reported reason, shown in order to be discussed; the measurement claims about that run are the two prose lines above it |
+| docs/LIMITATIONS.md:644 | The number that took two reviews to get right is the last one: **the witness was armed for 2 of 2 planner dispatches**, read out of the dispatch records rather than derived from the controller's source. How much a witness covered is a property of the dispatch, because the protected set is built from what exists when it starts; an earlier run accepted in an iteration where that set was empty, and its `0 violations` was a true statement about nothing. A run whose records do not carry the number is now reported as unreadable, never as zero. The evidence is in `dogfood/planner-confinement/`. ⟦empty, and its `0 violations` was a true statement about nothing. A run whose⟧ | explains why a run without the witness-coverage field is reported as unreadable rather than as zero; a rule about how the measurement reads, not a figure |
+| docs/LIMITATIONS.md:695 | ## 12d. The witness compares two moments, and QA works where it watches ⟦## 12d. The witness compares two moments, and QA works where it watches⟧ | a section heading naming the limitation, not a measurement |
+| docs/LIMITATIONS.md:709 | **QA's working directory is the arena root, which is also where the arenas are.** That is the shape limit 12b objects to for the planner, and it has not been fixed for QA. ⟦are.** That is the shape limit 12b objects to for the planner, and it has not⟧ | points back at limit 12b and says the same shape is unfixed for QA; a cross-reference and a statement of scope, not a figure |
+| docs/LIMITATIONS.md:821 | `hoh amend <run-id> --spec-file <new> --kind <k> --actor <who> --reason <why> [--affects K1,K2]` records a change instead of forbidding one. What it does: ⟦[--affects K1,K2]` records a change instead of forbidding one. What it does:⟧ | describes what the new command does; a statement about the feature, not a measurement |
+| docs/LIMITATIONS.md:825 | * the old text is **parked and stays readable** -- `park_and_amend` renames it with its own digest in the name, so "what did this run promise when iteration 3 was accepted" has an answer; * the chain is stored beside the state in `amendments.json`, and it validates continuously: an amendment whose `from_digest` is not where the chain left off is refused, because a chain with a gap cannot say what was promised at any point in it; * the run's own `spec_digest` moves with the chain, so a *recorded* amendment does not block -- and an unrecorded edit still does, which is the protection this entry was about; * an acceptance-affecting amendment names the criteria it touches, their receipts are marked as belonging to a superseded specification, and **the controller withholds acceptance** until each of them has been planned *and* measured again. ⟦iteration 3 was accepted" has an answer;⟧ | continues the sentence above about the parked old text remaining readable; a description of the mechanism, not a figure |
+| docs/EVIDENCE_INDEX.md:109 | The tree digests and the copy digests are the parts an outside reader cannot check. The reasoning they support travels with the evidence tree, in a README beside these files, and is therefore not exported either -- naming its path here would be a reference nobody could follow. What *is* exported is limitation 12b, which carries the same argument in `docs/LIMITATIONS.md`. ⟦follow. What *is* exported is limitation 12b, which carries the same⟧ | says which document carries the argument for a reader without the evidence tree; a pointer, not a measurement |
+| docs/LIMITATIONS.md:731 | ## 12e. Twenty-one published references point at documents the export does not carry ⟦## 12e. Twenty-one published references point at documents the export does not carry⟧ | a section heading naming the limitation |
+| docs/LIMITATIONS.md:750 | The release notes and the RC gate document do the same, and this file does it twice itself, in the entry about the specification that could not be corrected in place (limit 15). ⟦specification that could not be corrected in place (limit 15).⟧ | names which entry this file's own two citations sit in; a cross-reference, not a figure |
+| docs/BENCHMARK_PROTOCOL.md:177 | **2026-09-13, after cell 1 of v2 (`parse_duration/C`).** The `dispatches` figure was `min(iterations * 3, DISPATCH_BUDGET)`: a constant in arm C, a ceiling-clipped estimate in arm B. ⟦**2026-09-13, after cell 1 of v2 (`parse_duration/C`).** The `dispatches`⟧ | dates the instrument change and names the cell after which it was made; a declaration of provenance, not a figure |
+| docs/BENCHMARK_PROTOCOL.md:178 | **2026-09-13, after cell 1 of v2 (`parse_duration/C`).** The `dispatches` figure was `min(iterations * 3, DISPATCH_BUDGET)`: a constant in arm C, a ceiling-clipped estimate in arm B. ⟦figure was `min(iterations * 3, DISPATCH_BUDGET)`: a constant in arm C, a⟧ | quotes the expression the figure used to come from; a description of the code, not a measurement |
+| docs/BENCHMARK_PROTOCOL.md:187 | What this changes and what it does not: it changes a *reported cost*, in the direction unfavourable to arms B and C. It changes no outcome metric -- `hidden_suite`, `false_accept` and `produced_final_state` are untouched -- and it changes no comparison. Campaign v1's cells keep the constant they were measured with; `docs/BENCHMARK_RESULTS.md` says what that column means there. ⟦it changes no comparison. Campaign v1's cells keep the constant they were⟧ | states what the change does and does not affect; a scoping statement about the protocol, not a figure |
+| docs/BENCHMARK_PROTOCOL.md:190 | Also after cell 1: the orchestrator's unclassifiable-verdict branch now carries the launcher's detail into the halt reason. ⟦Also after cell 1: the orchestrator's unclassifiable-verdict branch now⟧ | names a second change to what a log records; a declaration, not a measurement |
+| docs/BENCHMARK_PROTOCOL.md:192 | That is a change to what a *log* says, not to what an arm does, and it was made because cell 1 could not be diagnosed without it. ⟦*log* says, not to what an arm does, and it was made because cell 1 could not⟧ | explains why that change was made; a rationale, not a figure |
+| docs/BENCHMARK_PROTOCOL.md:170 | ## Changes made to the instrument after v2 began, declared ⟦## Changes made to the instrument after v2 began, declared⟧ | a section heading naming what follows |
+| docs/BENCHMARK_RESULTS.md:3 | Generated by `python3 tools/benchmark.py report --campaign v1 --write` from the cells in `dogfood/benchmark/results/`. ⟦Generated by `python3 tools/benchmark.py report --campaign v1 --write` from⟧ | generator prose or a table frame; says how the document was produced, not what was measured |
+| docs/BENCHMARK_RESULTS.md:4 | Generated by `python3 tools/benchmark.py report --campaign v1 --write` from the cells in `dogfood/benchmark/results/`. The protocol in `docs/BENCHMARK_PROTOCOL.md` was committed before the first arm ran and is not re-decidable here. ⟦the cells in `dogfood/benchmark/results/`. The protocol in `docs/BENCHMARK_PROTOCOL.md`⟧ | generator prose or a table frame; says how the document was produced, not what was measured |
+| docs/BENCHMARK_RESULTS.md:5 | The protocol in `docs/BENCHMARK_PROTOCOL.md` was committed before the first arm ran and is not re-decidable here. ⟦was committed before the first arm ran and is not re-decidable here.⟧ | generator prose or a table frame; says how the document was produced, not what was measured |
+| docs/BENCHMARK_RESULTS.md:28 | ## What each cell cost, counted ⟦## What each cell cost, counted⟧ | generator prose or a table frame; says how the document was produced, not what was measured |
+| docs/BENCHMARK_RESULTS.md:30 | One line per dispatch in the run's own log. Where a cell was recorded before the figure was counted rather than asserted, both numbers are shown -- the recorded one is kept, and the file as it stood is parked beside the cell. ⟦One line per dispatch in the run's own log. Where a cell was recorded⟧ | generator prose or a table frame; says how the document was produced, not what was measured |
+| docs/BENCHMARK_RESULTS.md:31 | Where a cell was recorded before the figure was counted rather than asserted, both numbers are shown -- the recorded one is kept, and the file as it stood is parked beside the cell. ⟦before the figure was counted rather than asserted, both numbers are⟧ | generator prose or a table frame; says how the document was produced, not what was measured |
+| docs/BENCHMARK_RESULTS.md:32 | Where a cell was recorded before the figure was counted rather than asserted, both numbers are shown -- the recorded one is kept, and the file as it stood is parked beside the cell. ⟦shown -- the recorded one is kept, and the file as it stood is parked⟧ | generator prose or a table frame; says how the document was produced, not what was measured |
+| docs/BENCHMARK_RESULTS.md:33 | Where a cell was recorded before the figure was counted rather than asserted, both numbers are shown -- the recorded one is kept, and the file as it stood is parked beside the cell. ⟦beside the cell.⟧ | generator prose or a table frame; says how the document was produced, not what was measured |
+| docs/BENCHMARK_RESULTS.md:35 | task — arm — dispatches — budget — over budget | generator prose or a table frame; says how the document was produced, not what was measured |
+| docs/BENCHMARK_RESULTS.md:36 | --- — --- — --- — --- — --- | generator prose or a table frame; says how the document was produced, not what was measured |
+| docs/BENCHMARK_RESULTS.md:56 | --- — --- — --- — --- | generator prose or a table frame; says how the document was produced, not what was measured |
+| docs/BENCHMARK_RESULTS.md:68 | --- — --- | generator prose or a table frame; says how the document was produced, not what was measured |
+| docs/BENCHMARK_RESULTS.md:91 | task — arm — seconds — dispatches | generator prose or a table frame; says how the document was produced, not what was measured |
+| docs/BENCHMARK_RESULTS_v2.md:3 | Generated by `python3 tools/benchmark.py report --campaign v2 --write` from the cells in `dogfood/benchmark/results-v2/`. ⟦Generated by `python3 tools/benchmark.py report --campaign v2 --write` from⟧ | generator prose or a table frame; says how the document was produced, not what was measured |
+| docs/BENCHMARK_RESULTS_v2.md:4 | Generated by `python3 tools/benchmark.py report --campaign v2 --write` from the cells in `dogfood/benchmark/results-v2/`. The protocol in `docs/BENCHMARK_PROTOCOL.md` was committed before the first arm ran and is not re-decidable here. ⟦the cells in `dogfood/benchmark/results-v2/`. The protocol in `docs/BENCHMARK_PROTOCOL.md`⟧ | generator prose or a table frame; says how the document was produced, not what was measured |
+| docs/BENCHMARK_RESULTS_v2.md:7 | ## Campaign `v2`, the declared replication ⟦## Campaign `v2`, the declared replication⟧ | a campaign heading |
+| docs/BENCHMARK_RESULTS_v2.md:13 | The protocol fixed this campaign's shape before it ran: the same five tasks, the same hidden suites, the same budget rule, the same outcome metrics, the same exclusion rule, and one named intervention -- the planner capability boundary and the two defects found while closing it. Campaign v1 is untouched and is reported separately. ⟦it. Campaign v1 is untouched and is reported separately.⟧ | states that v1 is untouched and reported apart; a policy statement about the campaigns, not a figure |
+| docs/BENCHMARK_RESULTS_v2.md:17 | **A partial campaign is reported as partial.** The cells that ran are named, the ones that did not are named, and only the cells present on both sides may be compared with v1. Reporting a subset as if it were the campaign is the thing the protocol was frozen to prevent. ⟦both sides may be compared with v1. Reporting a subset as if it were⟧ | restates the protocol's rule against reporting a subset as the whole; a rule, not a measurement |
+| docs/LIMITATIONS.md:754 | The exact list is not reproduced here, and that is not coyness: naming those paths in this entry would *add* dangling references to an entry about dangling references, which is what the first version of it did. `python3 tools/export_manifest.py check` prints them, and it is the same command the count above comes from. ⟦references, which is what the first version of it did. `python3⟧ | explains why the exact paths are not reproduced in this entry; a note about the entry, not a measurement |
+| docs/BENCHMARK_RESULTS.md:24 | The four cells' run trees still hold a valid plan in `answers/i1-a0-planner.json` -- 5, 6, 4 and 3 acceptance criteria respectively -- written while the run state says `PLANNING / BLOCKED / planner waits for an approval`. ⟦6, 4 and 3 acceptance criteria respectively -- written while the run⟧ | continues the sentence above it, which carries the measurement |
+| docs/BENCHMARK_RESULTS_v2.md:36 | ## Against campaign v1, cell by cell ⟦## Against campaign v1, cell by cell⟧ | a section heading |
+| docs/BENCHMARK_RESULTS_v2.md:38 | task — arm — v1 final state — v2 final state — v1 hidden — v2 hidden | a table header naming the columns |
+| docs/BENCHMARK_RESULTS_v2.md:45 | Cells that ran in only one campaign are not in this table and are not counted anywhere in it. ⟦campaign are not in this table and are not counted anywhere in it.⟧ | explains the table's own exclusion rule; a rule, not a measurement |
+| docs/BENCHMARK_RESULTS_v2.md:47 | `(excluded)` is the protocol's own rule, not a missing number: an arm that produced no final state says nothing about the method, so its suite result is not reported as a correctness outcome. ⟦`(excluded)` is the protocol's own rule, not a missing number: an arm⟧ | explains the table's own exclusion rule; a rule, not a measurement |
+| docs/BENCHMARK_RESULTS_v2.md:48 | `(excluded)` is the protocol's own rule, not a missing number: an arm that produced no final state says nothing about the method, so its suite result is not reported as a correctness outcome. ⟦that produced no final state says nothing about the method, so its⟧ | explains the table's own exclusion rule; a rule, not a measurement |
+| docs/BENCHMARK_RESULTS_v2.md:49 | `(excluded)` is the protocol's own rule, not a missing number: an arm that produced no final state says nothing about the method, so its suite result is not reported as a correctness outcome. The suite did run -- arm C's tree exists whatever the orchestrator did -- and what it measured was a state the arm never finished. ⟦suite result is not reported as a correctness outcome. The suite did⟧ | explains the table's own exclusion rule; a rule, not a measurement |
+| docs/BENCHMARK_RESULTS_v2.md:50 | The suite did run -- arm C's tree exists whatever the orchestrator did -- and what it measured was a state the arm never finished. ⟦run -- arm C's tree exists whatever the orchestrator did -- and what⟧ | explains the table's own exclusion rule; a rule, not a measurement |
+| docs/BENCHMARK_RESULTS_v2.md:51 | The suite did run -- arm C's tree exists whatever the orchestrator did -- and what it measured was a state the arm never finished. ⟦it measured was a state the arm never finished.⟧ | explains the table's own exclusion rule; a rule, not a measurement |
+| docs/READINESS.md:8 | Measured at `394473a` on 2026-09-14. ⟦Measured at `394473a` on 2026-09-14.⟧ | a table frame, a provenance line, or the reason a row is advisory; the measurement is in the row itself |
+| docs/READINESS.md:12 | condition — state — measured — command | a table frame, a provenance line, or the reason a row is advisory; the measurement is in the row itself |
+| docs/READINESS.md:13 | --- — --- — --- — --- | a table frame, a provenance line, or the reason a row is advisory; the measurement is in the row itself |
+| docs/READINESS.md:36 | * **`budget_enforcement`** — the controls pass on a build with enforcement removed unless the falsifiers say otherwise, so they are part of the row and not a footnote under it. One of them deletes only the per-dispatch check, which is the mutant an earlier version of this instrument survived. * **`post_o143_closure`** — an operational regression test, not a benchmark: it asks only whether the closure path still works when the ceiling is not the binding constraint. Its budget is measured from campaign v2 and is not raised after a failed attempt -- previous attempts are parked beside the artifact so a sequence of them stays visible. * **`telemetry_on_real_dispatches`** — a field gap is a defect on the run that has it and another run filling it repairs nothing, so any gap blocks; an unobserved shape blocks only while no run has observed it, because a campaign in which nothing failed cannot be asked to produce a failure record. * **`benchmark_v3_preregistration`** — drift before the campaign starts is a re-freeze; drift during it invalidates the campaign; drift after it is a repair, and it counts only while every moved file is named with a reason, changed after the last cell, and the raw results still hash to what they did. * **`benchmark_v2_historical`** — historical and advisory: v2 is an immutable dataset, its matched budget was not matched during the runs, and no step available today changes that. ⟦* **`budget_enforcement`** — the controls pass on a build with enforcement removed unless the falsifiers say otherwise, so they are part of the row and not a footnote under it. One of them deletes only the per-dispatch check, which is the mutant an earlier version of this instrument survived.⟧ | a table frame, a provenance line, or the reason a row is advisory; the measurement is in the row itself |
+| docs/READINESS.md:37 | * **`budget_enforcement`** — the controls pass on a build with enforcement removed unless the falsifiers say otherwise, so they are part of the row and not a footnote under it. One of them deletes only the per-dispatch check, which is the mutant an earlier version of this instrument survived. * **`post_o143_closure`** — an operational regression test, not a benchmark: it asks only whether the closure path still works when the ceiling is not the binding constraint. Its budget is measured from campaign v2 and is not raised after a failed attempt -- previous attempts are parked beside the artifact so a sequence of them stays visible. * **`telemetry_on_real_dispatches`** — a field gap is a defect on the run that has it and another run filling it repairs nothing, so any gap blocks; an unobserved shape blocks only while no run has observed it, because a campaign in which nothing failed cannot be asked to produce a failure record. * **`benchmark_v3_preregistration`** — drift before the campaign starts is a re-freeze; drift during it invalidates the campaign; drift after it is a repair, and it counts only while every moved file is named with a reason, changed after the last cell, and the raw results still hash to what they did. * **`benchmark_v2_historical`** — historical and advisory: v2 is an immutable dataset, its matched budget was not matched during the runs, and no step available today changes that. A blocking row over it could never be satisfied, and a gate that cannot be satisfied puts pressure on re-interpreting the dataset -- the one thing freezing a protocol forbids. ⟦* **`post_o143_closure`** — an operational regression test, not a benchmark: it asks only whether the closure path still works when the ceiling is not the binding constraint. Its budget is measured from campaign v2 and is not raised after a failed attempt -- previous attempts are parked beside the artifact so a sequence of them stays visible.⟧ | a table frame, a provenance line, or the reason a row is advisory; the measurement is in the row itself |
+| docs/READINESS.md:38 | Its budget is measured from campaign v2 and is not raised after a failed attempt -- previous attempts are parked beside the artifact so a sequence of them stays visible. * **`telemetry_on_real_dispatches`** — a field gap is a defect on the run that has it and another run filling it repairs nothing, so any gap blocks; an unobserved shape blocks only while no run has observed it, because a campaign in which nothing failed cannot be asked to produce a failure record. * **`benchmark_v3_preregistration`** — drift before the campaign starts is a re-freeze; drift during it invalidates the campaign; drift after it is a repair, and it counts only while every moved file is named with a reason, changed after the last cell, and the raw results still hash to what they did. * **`benchmark_v2_historical`** — historical and advisory: v2 is an immutable dataset, its matched budget was not matched during the runs, and no step available today changes that. ⟦* **`telemetry_on_real_dispatches`** — a field gap is a defect on the run that has it and another run filling it repairs nothing, so any gap blocks; an unobserved shape blocks only while no run has observed it, because a campaign in which nothing failed cannot be asked to produce a failure record.⟧ | a table frame, a provenance line, or the reason a row is advisory; the measurement is in the row itself |
+| docs/READINESS.md:39 | Its budget is measured from campaign v2 and is not raised after a failed attempt -- previous attempts are parked beside the artifact so a sequence of them stays visible. * **`telemetry_on_real_dispatches`** — a field gap is a defect on the run that has it and another run filling it repairs nothing, so any gap blocks; an unobserved shape blocks only while no run has observed it, because a campaign in which nothing failed cannot be asked to produce a failure record. * **`benchmark_v3_preregistration`** — drift before the campaign starts is a re-freeze; drift during it invalidates the campaign; drift after it is a repair, and it counts only while every moved file is named with a reason, changed after the last cell, and the raw results still hash to what they did. * **`benchmark_v2_historical`** — historical and advisory: v2 is an immutable dataset, its matched budget was not matched during the runs, and no step available today changes that. ⟦* **`benchmark_v3_preregistration`** — drift before the campaign starts is a re-freeze; drift during it invalidates the campaign; drift after it is a repair, and it counts only while every moved file is named with a reason, changed after the last cell, and the raw results still hash to what they did.⟧ | a table frame, a provenance line, or the reason a row is advisory; the measurement is in the row itself |
+| docs/READINESS.md:40 | One of them deletes only the per-dispatch check, which is the mutant an earlier version of this instrument survived. * **`post_o143_closure`** — an operational regression test, not a benchmark: it asks only whether the closure path still works when the ceiling is not the binding constraint. Its budget is measured from campaign v2 and is not raised after a failed attempt -- previous attempts are parked beside the artifact so a sequence of them stays visible. * **`telemetry_on_real_dispatches`** — a field gap is a defect on the run that has it and another run filling it repairs nothing, so any gap blocks; an unobserved shape blocks only while no run has observed it, because a campaign in which nothing failed cannot be asked to produce a failure record. * **`benchmark_v3_preregistration`** — drift before the campaign starts is a re-freeze; drift during it invalidates the campaign; drift after it is a repair, and it counts only while every moved file is named with a reason, changed after the last cell, and the raw results still hash to what they did. * **`benchmark_v2_historical`** — historical and advisory: v2 is an immutable dataset, its matched budget was not matched during the runs, and no step available today changes that. A blocking row over it could never be satisfied, and a gate that cannot be satisfied puts pressure on re-interpreting the dataset -- the one thing freezing a protocol forbids. `benchmark_v3` carries the release question. * **`benchmark_v3`** — the campaign a release may rest on: pre-registered, run under an enforced budget, complete. A campaign that produced every result file while violating the protocol is FAIL here, because the files are not what is being asked about. * **`export_manifest`** — the dangling references are limitation 12e: published documents citing internal ones. ⟦* **`benchmark_v2_historical`** — historical and advisory: v2 is an immutable dataset, its matched budget was not matched during the runs, and no step available today changes that. A blocking row over it could never be satisfied, and a gate that cannot be satisfied puts pressure on re-interpreting the dataset -- the one thing freezing a protocol forbids. `benchmark_v3` carries the release question.⟧ | a table frame, a provenance line, or the reason a row is advisory; the measurement is in the row itself |
+| docs/READINESS.md:41 | A blocking row over it could never be satisfied, and a gate that cannot be satisfied puts pressure on re-interpreting the dataset -- the one thing freezing a protocol forbids. `benchmark_v3` carries the release question. * **`benchmark_v3`** — the campaign a release may rest on: pre-registered, run under an enforced budget, complete. A campaign that produced every result file while violating the protocol is FAIL here, because the files are not what is being asked about. * **`export_manifest`** — the dangling references are limitation 12e: published documents citing internal ones. Advisory, because none of them is a false claim -- what a reader loses is the ability to follow a citation. * **`attribution`** — the ratio is not a gate -- it is reported so that nobody has to take the phase's own description of itself on trust. * **`paper_audit`** — `coverage` is red on a maintenance item paper/AUDIT.md itself flags and explains: paper/NUMBERS.md catalogues the 2 of a '2 of 3' ratio and not the 3. ⟦* **`benchmark_v3`** — the campaign a release may rest on: pre-registered, run under an enforced budget, complete. A campaign that produced every result file while violating the protocol is FAIL here, because the files are not what is being asked about.⟧ | a table frame, a provenance line, or the reason a row is advisory; the measurement is in the row itself |
+| docs/READINESS.md:42 | `benchmark_v3` carries the release question. * **`benchmark_v3`** — the campaign a release may rest on: pre-registered, run under an enforced budget, complete. A campaign that produced every result file while violating the protocol is FAIL here, because the files are not what is being asked about. * **`export_manifest`** — the dangling references are limitation 12e: published documents citing internal ones. Advisory, because none of them is a false claim -- what a reader loses is the ability to follow a citation. * **`attribution`** — the ratio is not a gate -- it is reported so that nobody has to take the phase's own description of itself on trust. * **`paper_audit`** — `coverage` is red on a maintenance item paper/AUDIT.md itself flags and explains: paper/NUMBERS.md catalogues the 2 of a '2 of 3' ratio and not the 3. It is a documented, deliberately deferred operator item, not an unexamined failure. * **`external_ci`** — the sandbox line is read from its step, not its job: a green job whose relevant step was skipped has measured nothing, and UNSUPPORTED_ENVIRONMENT is that state rather than a pass. * **`routing`** — a disposition, not an open question: the condition for revisiting it is named and was checked. ⟦* **`export_manifest`** — the dangling references are limitation 12e: published documents citing internal ones. Advisory, because none of them is a false claim -- what a reader loses is the ability to follow a citation.⟧ | a table frame, a provenance line, or the reason a row is advisory; the measurement is in the row itself |
+| docs/READINESS.md:43 | Advisory, because none of them is a false claim -- what a reader loses is the ability to follow a citation. * **`attribution`** — the ratio is not a gate -- it is reported so that nobody has to take the phase's own description of itself on trust. * **`paper_audit`** — `coverage` is red on a maintenance item paper/AUDIT.md itself flags and explains: paper/NUMBERS.md catalogues the 2 of a '2 of 3' ratio and not the 3. ⟦* **`attribution`** — the ratio is not a gate -- it is reported so that nobody has to take the phase's own description of itself on trust.⟧ | a table frame, a provenance line, or the reason a row is advisory; the measurement is in the row itself |
+| docs/READINESS.md:44 | A campaign that produced every result file while violating the protocol is FAIL here, because the files are not what is being asked about. * **`export_manifest`** — the dangling references are limitation 12e: published documents citing internal ones. Advisory, because none of them is a false claim -- what a reader loses is the ability to follow a citation. * **`attribution`** — the ratio is not a gate -- it is reported so that nobody has to take the phase's own description of itself on trust. * **`paper_audit`** — `coverage` is red on a maintenance item paper/AUDIT.md itself flags and explains: paper/NUMBERS.md catalogues the 2 of a '2 of 3' ratio and not the 3. It is a documented, deliberately deferred operator item, not an unexamined failure. * **`external_ci`** — the sandbox line is read from its step, not its job: a green job whose relevant step was skipped has measured nothing, and UNSUPPORTED_ENVIRONMENT is that state rather than a pass. * **`routing`** — a disposition, not an open question: the condition for revisiting it is named and was checked. ⟦* **`paper_audit`** — `coverage` is red on a maintenance item paper/AUDIT.md itself flags and explains: paper/NUMBERS.md catalogues the 2 of a '2 of 3' ratio and not the 3. It is a documented, deliberately deferred operator item, not an unexamined failure.⟧ | a table frame, a provenance line, or the reason a row is advisory; the measurement is in the row itself |
+| docs/BENCHMARK_PROTOCOL.md:218 | **The dispatch budget was defined and never enforced.** This document says a run that exceeds it "is stopped and recorded as `BUDGET_EXHAUSTED`", and that arm C's repair-node dispatches count. Neither happened: three of campaign v2's five arm-C cells spent 18 against 9 and halted normally. That is an instrument defect, not a protocol gap -- but it means those cells did not have the matched resource this benchmark is named after, and a future campaign has to enforce the rule rather than report it. ⟦arm C's repair-node dispatches count. Neither happened: three of campaign v2's⟧ | continues the sentence below it, which carries the measurement |
+| docs/BENCHMARK_PROTOCOL.md:224 | **A v3 may define both properly.** Neither is retro-specified here. Writing a sharper rule into this file now and treating it as though it had been pre-registered is exactly the move freezing a protocol exists to prevent. ⟦**A v3 may define both properly.** Neither is retro-specified here. Writing a⟧ | states that neither gap is retro-specified here; a rule about this document, not a figure |
+| docs/BENCHMARK_PROTOCOL.md:202 | campaign_id = v3 protocol_version = 3 status = DECLARED, not yet run ⟦campaign_id       = v3⟧ | pre-declares the shape of a campaign that has not run; a protocol statement fixed in advance, not a measurement |
+| docs/BENCHMARK_PROTOCOL.md:203 | campaign_id = v3 protocol_version = 3 status = DECLARED, not yet run ⟦protocol_version  = 3⟧ | pre-declares the shape of a campaign that has not run; a protocol statement fixed in advance, not a measurement |
+| docs/BENCHMARK_PROTOCOL.md:195 | ## Campaign v3: pre-registered in full, before the first dispatch ⟦## Campaign v3: pre-registered in full, before the first dispatch⟧ | a section heading naming the pre-registered campaign. Superseded within the same uncommitted change on 2026-09-13: this entry anchored the first v3 declaration, which was replaced by the pre-registration before any v3 cell ran and before either version was committed. The id is kept with the statement it now anchors rather than renumbered, so that nothing in the ledger points at text that never reached a commit. |
+| docs/BENCHMARK_PROTOCOL.md:213 | tasks = to_roman, parse_duration, ledger_apply, slug_pair, retry_backoff (5, unchanged) arms = A, B, C (3, unchanged) repetitions = 3 per (task, arm), without exception planned_runs = 5 x 3 x 3 = 45 dispatch_budget = 9 per cell, hard, enforced max_campaign_cost = 45 x 9 = 405 role dispatches (a ceiling, not a forecast: arm A spends 1 by construction) hidden_suite = unchanged; it is the verdict and no arm sees it primary_metric = false_accept (an arm's own checks green, hidden suite red) secondary_metrics = final outcome, hidden-suite result, dispatches measured, budget exhausted, repairs, human decisions, wallclock, provider failures, ambiguity, final correctness stopping_rule = a cell stops at BUDGET_EXHAUSTED or at its arm's own terminal state, whichever comes first analysis = per (task, arm) aggregation over the 3 repetitions ⟦slug_pair, retry_backoff               (5, unchanged)⟧ | pre-declares the tasks of a campaign that has not run, by the directory names a tool can check; a protocol statement fixed in advance, not a measurement. Superseded within the same uncommitted change on 2026-09-13: this entry anchored the first v3 declaration, which was replaced by the pre-registration before any v3 cell ran and before either version was committed. The id is kept with the statement it now anchors rather than renumbered, so that nothing in the ledger points at text that never reached a commit. |
+| docs/BENCHMARK_PROTOCOL.md:215 | tasks = to_roman, parse_duration, ledger_apply, slug_pair, retry_backoff (5, unchanged) arms = A, B, C (3, unchanged) repetitions = 3 per (task, arm), without exception planned_runs = 5 x 3 x 3 = 45 dispatch_budget = 9 per cell, hard, enforced max_campaign_cost = 45 x 9 = 405 role dispatches (a ceiling, not a forecast: arm A spends 1 by construction) hidden_suite = unchanged; it is the verdict and no arm sees it primary_metric = false_accept (an arm's own checks green, hidden suite red) secondary_metrics = final outcome, hidden-suite result, dispatches measured, budget exhausted, repairs, human decisions, wallclock, provider failures, ambiguity, final correctness stopping_rule = a cell stops at BUDGET_EXHAUSTED or at its arm's own terminal state, whichever comes first analysis = per (task, arm) aggregation over the 3 repetitions ⟦repetitions           = 3 per (task, arm), without exception⟧ | pre-declares the repetition rule of a campaign that has not run; a protocol statement fixed in advance, not a measurement. Superseded within the same uncommitted change on 2026-09-13: this entry anchored the first v3 declaration, which was replaced by the pre-registration before any v3 cell ran and before either version was committed. The id is kept with the statement it now anchors rather than renumbered, so that nothing in the ledger points at text that never reached a commit. |
+| docs/BENCHMARK_PROTOCOL.md:216 | tasks = to_roman, parse_duration, ledger_apply, slug_pair, retry_backoff (5, unchanged) arms = A, B, C (3, unchanged) repetitions = 3 per (task, arm), without exception planned_runs = 5 x 3 x 3 = 45 dispatch_budget = 9 per cell, hard, enforced max_campaign_cost = 45 x 9 = 405 role dispatches (a ceiling, not a forecast: arm A spends 1 by construction) hidden_suite = unchanged; it is the verdict and no arm sees it primary_metric = false_accept (an arm's own checks green, hidden suite red) secondary_metrics = final outcome, hidden-suite result, dispatches measured, budget exhausted, repairs, human decisions, wallclock, provider failures, ambiguity, final correctness stopping_rule = a cell stops at BUDGET_EXHAUSTED or at its arm's own terminal state, whichever comes first analysis = per (task, arm) aggregation over the 3 repetitions ⟦planned_runs          = 5 x 3 x 3 = 45⟧ | pre-declares the planned number of runs; arithmetic over the declaration above it, not a measurement. Superseded within the same uncommitted change on 2026-09-13: this entry anchored the first v3 declaration, which was replaced by the pre-registration before any v3 cell ran and before either version was committed. The id is kept with the statement it now anchors rather than renumbered, so that nothing in the ledger points at text that never reached a commit. |
+| docs/BENCHMARK_PROTOCOL.md:218 | tasks = to_roman, parse_duration, ledger_apply, slug_pair, retry_backoff (5, unchanged) arms = A, B, C (3, unchanged) repetitions = 3 per (task, arm), without exception planned_runs = 5 x 3 x 3 = 45 dispatch_budget = 9 per cell, hard, enforced max_campaign_cost = 45 x 9 = 405 role dispatches (a ceiling, not a forecast: arm A spends 1 by construction) hidden_suite = unchanged; it is the verdict and no arm sees it primary_metric = false_accept (an arm's own checks green, hidden suite red) secondary_metrics = final outcome, hidden-suite result, dispatches measured, budget exhausted, repairs, human decisions, wallclock, provider failures, ambiguity, final correctness stopping_rule = a cell stops at BUDGET_EXHAUSTED or at its arm's own terminal state, whichever comes first analysis = per (task, arm) aggregation over the 3 repetitions ⟦max_campaign_cost     = 45 x 9 = 405 role dispatches (a ceiling, not a⟧ | pre-declares the campaign's maximum cost as a ceiling; arithmetic over the declaration above it, not a forecast and not a measurement |
+| docs/BENCHMARK_PROTOCOL.md:228 | tasks = to_roman, parse_duration, ledger_apply, slug_pair, retry_backoff (5, unchanged) arms = A, B, C (3, unchanged) repetitions = 3 per (task, arm), without exception planned_runs = 5 x 3 x 3 = 45 dispatch_budget = 9 per cell, hard, enforced max_campaign_cost = 45 x 9 = 405 role dispatches (a ceiling, not a forecast: arm A spends 1 by construction) hidden_suite = unchanged; it is the verdict and no arm sees it primary_metric = false_accept (an arm's own checks green, hidden suite red) secondary_metrics = final outcome, hidden-suite result, dispatches measured, budget exhausted, repairs, human decisions, wallclock, provider failures, ambiguity, final correctness stopping_rule = a cell stops at BUDGET_EXHAUSTED or at its arm's own terminal state, whichever comes first analysis = per (task, arm) aggregation over the 3 repetitions ⟦analysis              = per (task, arm) aggregation over the 3 repetitions⟧ | pre-declares how a campaign that has not run will be analysed; fixed in advance so it cannot be chosen afterwards. Superseded within the same uncommitted change on 2026-09-13: this entry anchored the first v3 declaration, which was replaced by the pre-registration before any v3 cell ran and before either version was committed. The id is kept with the statement it now anchors rather than renumbered, so that nothing in the ledger points at text that never reached a commit. |
+| docs/BENCHMARK_PROTOCOL.md:230 | **`repetitions = 3` is unconditional.** Not "three where the budget allows": that phrasing is what made v2's repetition requirement undecidable, and it is not repeated here in any form. ⟦**`repetitions = 3` is unconditional.** Not "three where the budget allows":⟧ | pre-declares that the repetition rule carries no condition; a rule about this document, not a figure. Superseded within the same uncommitted change on 2026-09-13: this entry anchored the first v3 declaration, which was replaced by the pre-registration before any v3 cell ran and before either version was committed. The id is kept with the statement it now anchors rather than renumbered, so that nothing in the ledger points at text that never reached a commit. |
+| docs/BENCHMARK_PROTOCOL.md:197 | v2 measured what it measured and keeps its findings. This section fixes the shape of a third campaign **before** any of its cells runs, and it exists because v2 exposed two things this document could not deliver: a repetition rule nothing could decide, and a matched budget nothing could enforce. ⟦v2 measured what it measured and keeps its findings. This section fixes the⟧ | states that v2 keeps its findings and that this section fixes a shape in advance; a policy statement, not a measurement |
+| docs/BENCHMARK_PROTOCOL.md:199 | This section fixes the shape of a third campaign **before** any of its cells runs, and it exists because v2 exposed two things this document could not deliver: a repetition rule nothing could decide, and a matched budget nothing could enforce. ⟦because v2 exposed two things this document could not deliver: a repetition⟧ | names the two gaps v2 exposed; a back-reference to findings recorded elsewhere, not a new figure |
+| docs/BENCHMARK_PROTOCOL.md:214 | tasks = to_roman, parse_duration, ledger_apply, slug_pair, retry_backoff (5, unchanged) arms = A, B, C (3, unchanged) repetitions = 3 per (task, arm), without exception planned_runs = 5 x 3 x 3 = 45 dispatch_budget = 9 per cell, hard, enforced max_campaign_cost = 45 x 9 = 405 role dispatches (a ceiling, not a forecast: arm A spends 1 by construction) hidden_suite = unchanged; it is the verdict and no arm sees it primary_metric = false_accept (an arm's own checks green, hidden suite red) secondary_metrics = final outcome, hidden-suite result, dispatches measured, budget exhausted, repairs, human decisions, wallclock, provider failures, ambiguity, final correctness stopping_rule = a cell stops at BUDGET_EXHAUSTED or at its arm's own terminal state, whichever comes first analysis = per (task, arm) aggregation over the 3 repetitions ⟦arms                  = A, B, C                                (3, unchanged)⟧ | pre-declares the arms of a campaign that has not run; unchanged from the frozen design above |
+| docs/BENCHMARK_PROTOCOL.md:232 | **`repetitions = 3` is unconditional.** Not "three where the budget allows": that phrasing is what made v2's repetition requirement undecidable, and it is not repeated here in any form. A campaign that cannot afford 45 runs reports the cells it ran and names the ones it did not. It is **partial**, and it is never re-declared afterwards as a design with fewer repetitions. ⟦not repeated here in any form. A campaign that cannot afford 45 runs reports⟧ | states how a campaign that cannot afford its declared runs is reported; a rule about this document, not a figure |
+| docs/BENCHMARK_PROTOCOL.md:236 | **No superiority claim from three repetitions.** n=3 per cell is enough to show a false accept happening more than once and not enough to compare means. ⟦**No superiority claim from three repetitions.** n=3 per cell is enough to⟧ | states what three repetitions do not license; a restriction on future reporting, not a measurement |
+| docs/BENCHMARK_PROTOCOL.md:239 | A better average in one arm is reported as what it is -- three runs -- and §"What this cannot establish" applies to v3 unchanged. ⟦§"What this cannot establish" applies to v3 unchanged.⟧ | points at another section of this document; a cross-reference, not a figure |
+| docs/BENCHMARK_PROTOCOL.md:305 | benchmark_v3_protocol_commit = recorded in docs/benchmarks/v3/PREREGISTRATION.json benchmark_v3_instrument_commit = recorded in the same file ⟦benchmark_v3_protocol_commit    = recorded in⟧ | names the file that carries the frozen protocol commit; a pointer, not a figure |
+| docs/BENCHMARK_PROTOCOL.md:307 | benchmark_v3_protocol_commit = recorded in docs/benchmarks/v3/PREREGISTRATION.json benchmark_v3_instrument_commit = recorded in the same file ⟦benchmark_v3_instrument_commit  = recorded in the same file⟧ | names the file that carries the frozen instrument commit; a pointer, not a figure |
+| docs/BENCHMARK_PROTOCOL.md:289 | **If the instrument turns out to be broken mid-campaign**, it is not repaired mid-campaign. The runs that exist are preserved and marked `INVALIDATED` or `PARTIAL` with the finding recorded, the repair is made afterwards, and a new campaign (`v3.1` or `v4`) is pre-registered and started from zero. A dataset half-measured with one instrument and half with another is not a dataset. ⟦campaign (`v3.1` or `v4`) is pre-registered and started from zero. A dataset⟧ | states what happens to a campaign whose instrument turns out to be broken; a procedure fixed in advance, not a measurement |
+| docs/BENCHMARK_PROTOCOL.md:292 | ### No leakage from v2's result ⟦### No leakage from v2's result⟧ | a section heading naming the leakage rule |
+| docs/BENCHMARK_PROTOCOL.md:302 | * **No task-specific change to `slug_pair`** -- not to its specification, its visible tests, its hidden suite, or its acceptance criteria -- for the purpose of making that false accept appear or disappear. * Only generic product changes that were independently justified and frozen before v3 started may take effect during it. * If v3 does not reproduce the false accept, that is a result about n=3, not evidence that it was fixed. ⟦before v3 started may take effect during it.⟧ | states which product changes may take effect during the campaign; a rule about the campaign, not a figure |
+| docs/BENCHMARK_PROTOCOL.md:303 | * **No task-specific change to `slug_pair`** -- not to its specification, its visible tests, its hidden suite, or its acceptance criteria -- for the purpose of making that false accept appear or disappear. * Only generic product changes that were independently justified and frozen before v3 started may take effect during it. * If v3 does not reproduce the false accept, that is a result about n=3, not evidence that it was fixed. ⟦* If v3 does not reproduce the false accept, that is a result about n=3, not⟧ | states what a non-reproduction at n=3 would and would not mean; a restriction on future reporting, not a measurement |
+| docs/BENCHMARK_PROTOCOL.md:306 | ### What a completed v3 would license, and what it would not ⟦### What a completed v3 would license, and what it would not⟧ | a section heading naming what a completed campaign would license |
+| docs/LIMITATIONS.md:796 | ## 13a. A dispatch is charged before the provider answers, and a crash does not refund it ⟦## 13a. A dispatch is charged before the provider answers, and a crash does not refund it⟧ | a section heading naming the limitation |
+| docs/LIMITATIONS.md:818 | ## 13b. One shared budget assumes the runs under it do not overlap ⟦## 13b. One shared budget assumes the runs under it do not overlap⟧ | a section heading naming the limitation |
+| docs/BENCHMARK_PROTOCOL.md:217 | tasks = to_roman, parse_duration, ledger_apply, slug_pair, retry_backoff (5, unchanged) arms = A, B, C (3, unchanged) repetitions = 3 per (task, arm), without exception planned_runs = 5 x 3 x 3 = 45 dispatch_budget = 9 per cell, hard, enforced max_campaign_cost = 45 x 9 = 405 role dispatches (a ceiling, not a forecast: arm A spends 1 by construction) hidden_suite = unchanged; it is the verdict and no arm sees it primary_metric = false_accept (an arm's own checks green, hidden suite red) secondary_metrics = final outcome, hidden-suite result, dispatches measured, budget exhausted, repairs, human decisions, wallclock, provider failures, ambiguity, final correctness stopping_rule = a cell stops at BUDGET_EXHAUSTED or at its arm's own terminal state, whichever comes first analysis = per (task, arm) aggregation over the 3 repetitions ⟦dispatch_budget       = 9 per cell, hard, enforced⟧ | pre-declares the ceiling of a campaign that has not run, and names the unit it is spent in (a cell, not a run). That it is enforced rather than described is claimed in prose below it (C-310) and measured by tools/budget_evidence.py |
+| docs/BENCHMARK_PROTOCOL.md:248 | The direction of that asymmetry is named too, because it does not point the convenient way: more turns could only help arm A, so a campaign in which A matches or beats the harnessed arms is **robust** to it, and one in which A loses is not evidence that the harness is better. v3 does not repair the asymmetry -- rebuilding arm A now would break comparability with v1 and v2, which is a worse trade -- it declares it, and any v3 comparison carries it. ⟦loses is not evidence that the harness is better. v3 does not repair the⟧ | states what a campaign under the declared asymmetry would and would not license; a restriction on future reporting, not a measurement |
+| docs/BENCHMARK_PROTOCOL.md:249 | The direction of that asymmetry is named too, because it does not point the convenient way: more turns could only help arm A, so a campaign in which A matches or beats the harnessed arms is **robust** to it, and one in which A loses is not evidence that the harness is better. v3 does not repair the asymmetry -- rebuilding arm A now would break comparability with v1 and v2, which is a worse trade -- it declares it, and any v3 comparison carries it. ⟦asymmetry -- rebuilding arm A now would break comparability with v1 and v2,⟧ | states why the asymmetry is declared rather than repaired; a decision about this campaign, not a figure |
+| docs/BENCHMARK_PROTOCOL.md:250 | The direction of that asymmetry is named too, because it does not point the convenient way: more turns could only help arm A, so a campaign in which A matches or beats the harnessed arms is **robust** to it, and one in which A loses is not evidence that the harness is better. v3 does not repair the asymmetry -- rebuilding arm A now would break comparability with v1 and v2, which is a worse trade -- it declares it, and any v3 comparison carries it. ⟦which is a worse trade -- it declares it, and any v3 comparison carries it.⟧ | states that any v3 comparison carries the asymmetry; a rule about future reporting, not a figure |
+| docs/LIMITATIONS.md:1075 | Campaign v3 declares the asymmetry rather than repairing it: rebuilding arm A into a nine-turn loop would make v3's arm A incomparable with v1's and v2's, and a benchmark that changes its baseline between campaigns cannot replicate anything. ⟦Campaign v3 declares the asymmetry rather than repairing it: rebuilding arm A⟧ | states what campaign v3 does about the asymmetry; a decision about the campaign, not a measurement |
+| docs/LIMITATIONS.md:1076 | Campaign v3 declares the asymmetry rather than repairing it: rebuilding arm A into a nine-turn loop would make v3's arm A incomparable with v1's and v2's, and a benchmark that changes its baseline between campaigns cannot replicate anything. ⟦into a nine-turn loop would make v3's arm A incomparable with v1's and v2's,⟧ | states why the arm is not rebuilt; a decision about the campaign, not a measurement |
+| docs/LIMITATIONS.md:1078 | Campaign v3 declares the asymmetry rather than repairing it: rebuilding arm A into a nine-turn loop would make v3's arm A incomparable with v1's and v2's, and a benchmark that changes its baseline between campaigns cannot replicate anything. The declaration is in the v3 pre-registration, and any comparison drawn from v3 carries it. ⟦anything. The declaration is in the v3 pre-registration, and any comparison⟧ | states where the declaration lives and what a comparison carries; a rule about reporting, not a figure |
+| docs/LIMITATIONS.md:1079 | The declaration is in the v3 pre-registration, and any comparison drawn from v3 carries it. ⟦drawn from v3 carries it.⟧ | continues the preceding rule about reporting; not a figure |
+| docs/BENCHMARK_PROTOCOL.md:236 | `python3 tools/budget_evidence.py` measures it and reproduces the record, which this project keeps in its internal evidence tree and the export does not carry (limitation 12e). ⟦and the export does not carry (limitation 12e).⟧ | points at limitation 12e for where the record lives; a cross-reference, not a figure |
+| docs/READINESS.md:45 | It is a documented, deliberately deferred operator item, not an unexamined failure. * **`external_ci`** — the sandbox line is read from its step, not its job: a green job whose relevant step was skipped has measured nothing, and UNSUPPORTED_ENVIRONMENT is that state rather than a pass. * **`routing`** — a disposition, not an open question: the condition for revisiting it is named and was checked. ⟦* **`external_ci`** — the sandbox line is read from its step, not its job: a green job whose relevant step was skipped has measured nothing, and UNSUPPORTED_ENVIRONMENT is that state rather than a pass.⟧ | a table frame, a provenance line, or the reason a row is advisory; the measurement is in the row itself |
+| docs/BENCHMARK_PROTOCOL.md:219 | tasks = to_roman, parse_duration, ledger_apply, slug_pair, retry_backoff (5, unchanged) arms = A, B, C (3, unchanged) repetitions = 3 per (task, arm), without exception planned_runs = 5 x 3 x 3 = 45 dispatch_budget = 9 per cell, hard, enforced max_campaign_cost = 45 x 9 = 405 role dispatches (a ceiling, not a forecast: arm A spends 1 by construction) hidden_suite = unchanged; it is the verdict and no arm sees it primary_metric = false_accept (an arm's own checks green, hidden suite red) secondary_metrics = final outcome, hidden-suite result, dispatches measured, budget exhausted, repairs, human decisions, wallclock, provider failures, ambiguity, final correctness stopping_rule = a cell stops at BUDGET_EXHAUSTED or at its arm's own terminal state, whichever comes first analysis = per (task, arm) aggregation over the 3 repetitions ⟦forecast: arm A spends 1 by construction)⟧ | continues the maximum-cost declaration and names why it is a ceiling rather than a forecast; a statement about the design, not a measurement |
+| docs/LIMITATIONS.md:1081 | ## 13c. A retry's own bookkeeping is the one write the capability witness cannot attribute ⟦## 13c. A retry's own bookkeeping is the one write the capability witness cannot attribute⟧ | a section heading naming the limitation |
+| docs/BENCHMARK_PROTOCOL.md:321 | The registration cannot be inside its own digest set, and the repetition count is read out of that commit -- so without this, rewriting one field turned a 45-run design into a 15-run design with no drift signal; 3. is the registration itself committed and unmodified? 4. was it frozen from a clean working tree? ⟦45-run design into a 15-run design with no drift signal;⟧ | describes what the freeze check exists to prevent, as a rule about this campaign's own procedure; not a measurement |
+| docs/BENCHMARK_PROTOCOL.md:348 | A pre-flight result is never reported as a v3 result, and a v3 cell is never satisfied by one. ⟦as a v3 result, and a v3 cell is never satisfied by one.⟧ | states that a pre-flight cell is not a campaign cell; a rule about what may be reported, not a measurement |
+| docs/EVIDENCE_INDEX.md:127 | *d2b-licenses* — the internal specification for the licence and third-party review — `THIRD_PARTY_NOTICES.md` and `LICENSE` | names an internal working document and where its substance is published; a pointer, not a figure |
+| docs/EVIDENCE_INDEX.md:128 | *d4-claims* — the internal specification for the claims ledger — `CLAIMS.md` and the ledger's own methodology section in `CLAIMS.json` | names an internal working document and where its substance is published; a pointer, not a figure |
+| docs/EVIDENCE_INDEX.md:129 | *d5-paper* and *d5l-limits-from-the-file* — the internal specifications for the position paper and for deriving its limitations from measured files — `paper/POSITION_PAPER.md` and `docs/LIMITATIONS.md` | names two internal working documents and where their substance is published; a pointer, not a figure |
+| docs/EVIDENCE_INDEX.md:131 | *D7-Review-Auftrag* — the brief given to the independent reviewers of the release candidate — `paper/REVIEW_A.md` and `paper/REVIEW_B.md`, which are their reports | names an internal working document and where its substance is published; a pointer, not a figure |
+| docs/EVIDENCE_INDEX.md:132 | the run evidence trees — receipts, run states and answers from the acceptance runs — the three sections above, and `docs/LIMITATIONS.md` limit 12e | names the unpublished evidence trees and where they are described; a pointer to the sections above, not a figure |
+| docs/LIMITATIONS.md:897 | Run `D5`'s criterion 6 required, verbatim, "all twelve limitations" -- the line stands recorded today in the internal *d5-paper* specification -- at a point when `docs/LIMITATIONS.md` held 12 limits. By the time that run actually ran, run `d3e` had already merged limit 13 and limit 14, and the file held 14; that mismatch, and this same digest mechanism as its cause, is recorded in the internal *d5l-limits-from-the-file* specification. The running specification could not be corrected in place -- the same immutability this entry describes applied to it too -- so the fix did not happen inside that run; it became a separate one. ⟦the internal *d5l-limits-from-the-file* specification. The running specification could⟧ | continues the sentence above it, naming the internal specification the limitation is about; the statement's figures are carried by the claim on the preceding line |
+| paper/AUDIT.md:79 | Of the 38 numbers `paper/NUMBERS.md`'s own table catalogues, 3 are independently recomputable inside this checkout (the two structural ordinals, and the "3 contradictory license statements" figure, recomputed by counting the distinct rows of the internal *d2b-licenses* specification's own table rather than by re-reading `docs/LIMITATIONS.md`'s restatement of the same figure). ⟦recomputed by counting the distinct rows of the internal *d2b-licenses* specification's⟧ | continues the sentence above it, naming the internal specification a figure was recomputed from; the figure itself is carried by the claim on the preceding line |
+| docs/LIMITATIONS.md:792 | `tools/export_manifest.py` records the two documents in `U2B_ANERKANNT` with the reason, prints every acknowledged reference on every run, and `tests/test_export_manifest.py` pins the list so it cannot grow without a test changing with it. ⟦`U2B_ANERKANNT` with the reason, prints every acknowledged reference on every⟧ | names the data structure and the test that hold the acknowledgement list; a pointer to mechanism, not a figure |
+| paper/AUDIT.md:329 | **Updated 2026-09-14.** Two rows moved and one was added. `NUMBER 2 (C-050)` had been `NOT_CHECKED` since O33 on the stated ground that `runs/` was absent; it is present in this checkout, so the ratio was recomputed from `runs/a03/receipts` -- three checks of a03 iteration 2 carry both a `-basis` and a candidate receipt, and two of the three have differing exit codes. The denominator got the row it never had (`NUMBER 3 (C-050)`), which is what the `coverage` check had been red about since before the benchmark it cites had run. ⟦**Updated 2026-09-14.** Two rows moved and one was added. `NUMBER 2 (C-050)`⟧ | opens the update note and says what changed; a statement about this document's own history, not a measurement |
+| paper/AUDIT.md:330 | `NUMBER 2 (C-050)` had been `NOT_CHECKED` since O33 on the stated ground that `runs/` was absent; it is present in this checkout, so the ratio was recomputed from `runs/a03/receipts` -- three checks of a03 iteration 2 carry both a `-basis` and a candidate receipt, and two of the three have differing exit codes. ⟦had been `NOT_CHECKED` since O33 on the stated ground that `runs/` was absent;⟧ | states why a row had stood NOT_CHECKED; provenance of the change, not a figure |
+| paper/AUDIT.md:334 | The denominator got the row it never had (`NUMBER 3 (C-050)`), which is what the `coverage` check had been red about since before the benchmark it cites had run. ⟦denominator got the row it never had (`NUMBER 3 (C-050)`), which is what the⟧ | states which row was added and which check had been red; provenance of the change, not a figure |
+| paper/AUDIT.md:336 | `NUMBER 2 (C-050)` had been `NOT_CHECKED` since O33 on the stated ground that `runs/` was absent; it is present in this checkout, so the ratio was recomputed from `runs/a03/receipts` -- three checks of a03 iteration 2 carry both a `-basis` and a candidate receipt, and two of the three have differing exit codes. The denominator got the row it never had (`NUMBER 3 (C-050)`), which is what the `coverage` check had been red about since before the benchmark it cites had run. The counts above are the recount, not an edit: `python3 tools/audit_refs.py summary-consistency` compares them against the table and was what caught the stale pair. ⟦run. The counts above are the recount, not an edit: `python3⟧ | names the command that recounted the summary; a pointer to mechanism, not a figure |
+| docs/BENCHMARK_RESULTS_v3.md:7 | ## Campaign `v3`, pre-registered in full before the first dispatch ⟦## Campaign `v3`, pre-registered in full before the first dispatch⟧ | generated prose or a table frame in the campaign's results document: it says how the document was produced, what the campaign licenses and what it does not, or it is a header row. The measurements are the cell rows, which carry their own claims |
+| docs/BENCHMARK_RESULTS_v3.md:10 | The design was frozen in `docs/BENCHMARK_PROTOCOL.md` and bound to a commit before any cell ran: 5 tasks x 3 arms x 3 repetitions, unconditionally, with nine role dispatches per **cell** -- shared by a node and its repair nodes, and enforced rather than described. ⟦a commit before any cell ran: 5 tasks x 3 arms x 3 repetitions,⟧ | generated prose or a table frame in the campaign's results document: it says how the document was produced, what the campaign licenses and what it does not, or it is a header row. The measurements are the cell rows, which carry their own claims |
+| docs/BENCHMARK_RESULTS_v3.md:21 | **Arm C reached no fixpoint in this campaign.** All fifteen arm-C cells end `BUDGET_EXHAUSTED` and none closes: the primary node spends the nine, the gate is not green, the repair node it spawns is refused for want of budget. Campaign v2's arm C closed five of five -- with a separate nine per *run*, so eighteen per cell. That closure was bought with twice the declared resource, and this is what the same control plane does under the rule the protocol actually writes down. ⟦is refused for want of budget. Campaign v2's arm C closed five of⟧ | generated prose or a table frame in the campaign's results document: it says how the document was produced, what the campaign licenses and what it does not, or it is a header row. The measurements are the cell rows, which carry their own claims |
+| docs/BENCHMARK_RESULTS_v3.md:35 | **The one false accept reproduced v2's.** `slug_pair`, arm B, repetition 1: its own criteria green, the hidden suite red -- the same task, the same arm, the same shape as the single false accept campaign v2 found. ⟦**The one false accept reproduced v2's.** `slug_pair`, arm B,⟧ | generated prose or a table frame in the campaign's results document: it says how the document was produced, what the campaign licenses and what it does not, or it is a header row. The measurements are the cell rows, which carry their own claims |
+| docs/BENCHMARK_RESULTS_v3.md:36 | **The one false accept reproduced v2's.** `slug_pair`, arm B, repetition 1: its own criteria green, the hidden suite red -- the same task, the same arm, the same shape as the single false accept campaign v2 found. ⟦repetition 1: its own criteria green, the hidden suite red -- the⟧ | generated prose or a table frame in the campaign's results document: it says how the document was produced, what the campaign licenses and what it does not, or it is a header row. The measurements are the cell rows, which carry their own claims |
+| docs/BENCHMARK_RESULTS_v3.md:38 | **The one false accept reproduced v2's.** `slug_pair`, arm B, repetition 1: its own criteria green, the hidden suite red -- the same task, the same arm, the same shape as the single false accept campaign v2 found. One of three repetitions. n=3 carries no rate; what it carries is that v2's finding was not a one-off. ⟦campaign v2 found. One of three repetitions. n=3 carries no rate;⟧ | generated prose or a table frame in the campaign's results document: it says how the document was produced, what the campaign licenses and what it does not, or it is a header row. The measurements are the cell rows, which carry their own claims |
+| docs/BENCHMARK_RESULTS_v3.md:39 | One of three repetitions. n=3 carries no rate; what it carries is that v2's finding was not a one-off. ⟦what it carries is that v2's finding was not a one-off.⟧ | generated prose or a table frame in the campaign's results document: it says how the document was produced, what the campaign licenses and what it does not, or it is a header row. The measurements are the cell rows, which carry their own claims |
+| docs/BENCHMARK_RESULTS_v3.md:44 | That is declared in the protocol and in `docs/LIMITATIONS.md` limit 17, and it points the inconvenient way: more turns could only help arm A, so a campaign in which A matches the harnessed arms is robust to it, and one in which A lost would not be evidence for the harness. ⟦limit 17, and it points the inconvenient way: more turns could⟧ | generated prose or a table frame in the campaign's results document: it says how the document was produced, what the campaign licenses and what it does not, or it is a header row. The measurements are the cell rows, which carry their own claims |
+| docs/BENCHMARK_RESULTS_v3.md:49 | **45 of 15 cells have run.** ⟦**45 of 15 cells have run.**⟧ | generated prose or a table frame in the campaign's results document: it says how the document was produced, what the campaign licenses and what it does not, or it is a header row. The measurements are the cell rows, which carry their own claims |
+| docs/BENCHMARK_RESULTS_v3.md:51 | ## Against campaign v1, cell by cell ⟦## Against campaign v1, cell by cell⟧ | generated prose or a table frame in the campaign's results document: it says how the document was produced, what the campaign licenses and what it does not, or it is a header row. The measurements are the cell rows, which carry their own claims |
+| docs/BENCHMARK_RESULTS_v3.md:53 | task — arm — v1 final state — v2 final state — v1 hidden — v2 hidden | generated prose or a table frame in the campaign's results document: it says how the document was produced, what the campaign licenses and what it does not, or it is a header row. The measurements are the cell rows, which carry their own claims |
+| docs/BENCHMARK_RESULTS_v3.md:101 | 45 cell(s) appear on both sides. Cells that ran in only one campaign are not in this table and are not counted anywhere in it. ⟦45 cell(s) appear on both sides. Cells that ran in only one⟧ | generated prose or a table frame in the campaign's results document: it says how the document was produced, what the campaign licenses and what it does not, or it is a header row. The measurements are the cell rows, which carry their own claims |
+| docs/BENCHMARK_RESULTS_v3.md:168 | A field that does not exist for an arm is `-`, never 0: a zero that means "not applicable" cannot be told apart from one that was measured. ⟦field that does not exist for an arm is `-`, never 0: a zero that⟧ | generated prose or a table frame in the campaign's results document: it says how the document was produced, what the campaign licenses and what it does not, or it is a header row. The measurements are the cell rows, which carry their own claims |
+| docs/BENCHMARK_RESULTS_v3.md:116 | Provider calls, summed from the `provider_calls` field each dispatch record carries -- not a count of log lines. A line is not a call in either direction: a role that retried twice writes one line for three calls, and a role refused at the budget writes one line for none (O144). Where a cell was recorded before the figure was counted rather than asserted, both numbers are shown -- the recorded one is kept, and the file as it stood is parked beside the cell. ⟦(O144). Where a cell was recorded before the figure was counted⟧ | generated prose: it names the ledger entry that established why a log line is not a provider call, and explains how the column beside it is computed. Not a measurement |
+| docs/LIMITATIONS.md:819 | ## 12f. The local no-online-sync rule protects measurements, and does not gate the sanitised public export ⟦## 12f. The local no-online-sync rule protects measurements, and does not gate the sanitised public export⟧ | a section heading naming the limitation |
+| docs/LIMITATIONS.md:829 | It is the same concern that keeps those trees out of the export (limit 12e) and the reason `tools/export_manifest.py` scans every INCLUDE file for home paths, private addresses and token-shaped strings. ⟦It is the same concern that keeps those trees out of the export (limit 12e) and⟧ | points at limit 12e and at the export tool's own leak scan as the same concern; a cross-reference, not a figure |
+| docs/READINESS.md:46 | It is a documented, deliberately deferred operator item, not an unexamined failure. * **`external_ci`** — the sandbox line is read from its step, not its job: a green job whose relevant step was skipped has measured nothing, and UNSUPPORTED_ENVIRONMENT is that state rather than a pass. * **`routing`** — a disposition, not an open question: the condition for revisiting it is named and was checked. ⟦* **`routing`** — a disposition, not an open question: the condition for revisiting it is named and was checked.⟧ | a table frame, a provenance line, or the reason a row is advisory; the measurement is in the row itself |
+| docs/LIMITATIONS.md:850 | ## 19. `benchmark_v3 = PASS` is a statement about the campaign, not about the product ⟦## 19. `benchmark_v3 = PASS` is a statement about the campaign, not about the product⟧ | states what the campaign's PASS does not license, or how two of its numbers must not be compared; a restriction on reporting, not a measurement |
+| docs/LIMITATIONS.md:881 | Arm C never claimed it: under the budget the protocol declares, every one of its fifteen cells ran out of dispatches before closing. `slug_pair/C/3` is the case that shows the difference -- its hidden suite is red and no claim of success was made, which is a miss rather than a false pass. Quoting `0 false accepts` for arm C beside arm B's `1` compares *answered wrongly once* with *never answered*. ⟦is a miss rather than a false pass. Quoting `0 false accepts` for arm C beside⟧ | states what the campaign's PASS does not license, or how two of its numbers must not be compared; a restriction on reporting, not a measurement |
+| docs/LIMITATIONS.md:882 | Quoting `0 false accepts` for arm C beside arm B's `1` compares *answered wrongly once* with *never answered*. ⟦arm B's `1` compares *answered wrongly once* with *never answered*.⟧ | states what the campaign's PASS does not license, or how two of its numbers must not be compared; a restriction on reporting, not a measurement |
+| docs/LIMITATIONS.md:895 | Whether that repair path still reaches closure when the budget is sufficient is a separate question with separate evidence (`post_o143_closure`), because a ceiling that refuses too early is indistinguishable from one that refuses correctly. ⟦question with separate evidence (`post_o143_closure`), because a ceiling that⟧ | states what the campaign's PASS does not license, or how two of its numbers must not be compared; a restriction on reporting, not a measurement |
+| docs/READINESS.md:48 | It is a documented, deliberately deferred operator item, not an unexamined failure. * **`external_ci`** — the sandbox line is read from its step, not its job: a green job whose relevant step was skipped has measured nothing, and UNSUPPORTED_ENVIRONMENT is that state rather than a pass. * **`routing`** — a disposition, not an open question: the condition for revisiting it is named and was checked. ⟦* **`routing`** — a disposition, not an open question: the condition for revisiting it is named and was checked.⟧ | a table frame, a provenance line, or the reason a row is advisory; the measurement is in the row itself |
+| docs/LIMITATIONS.md:1157 | The checks that **do** hold in a published clone are `check schema` and `check ids`, and `check all`'s own shape rule: every failure it reports carries an environment-gap marker, **except the rendering difference this entry is about**. That rule, not an exit code of zero, is what a reader can verify here. `check coverage` exits 1 in a clone as well; what holds there is the same shape rule, every one of its failures marked. ⟦here. `check coverage` exits 1 in a clone as well; what holds there is the⟧ | states which check exits non-zero in a clone and what holds there instead; a rule about reading the tool's output, not a figure |
 

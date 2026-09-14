@@ -2149,3 +2149,32 @@ def test_sentences_in_scope_docstring_is_accurate_and_negative_control_rejected(
         "negative control: the original no-exerciser/eleven-entries wording "
         "must be rejected by this same check, or criterion 10 is vacuous"
     )
+
+
+def test_a_claim_quoting_a_source_line_is_still_checked_against_it():
+    """The narrowing must not have removed the rule it narrowed.
+
+    `audit_refs claims-against-code` demands a claim's anchor line appear in
+    its first cited file. That is right for a claim that *quotes* source -- a
+    moved source makes the quotation stale -- and a category error for a prose
+    claim whose evidence is the program that produced a number. Only the second
+    case was excused, and this pins that the first still fires.
+    """
+    import importlib.util
+    import sys as _sys
+    from pathlib import Path as _Path
+
+    wurzel = _Path(__file__).resolve().parent.parent
+    spec = importlib.util.spec_from_file_location(
+        "audit_refs_probe", wurzel / "tools" / "audit_refs.py")
+    mod = importlib.util.module_from_spec(spec)
+    _sys.modules.setdefault("audit_refs_probe", mod)
+    spec.loader.exec_module(mod)
+
+    quelle = __import__("inspect").getsource(mod.cmd_claims_against_code)
+    assert "hier_verankert" in quelle, "the rule lost its discriminator"
+    assert 'claim.get("where", "").split(":")[0] == path' in quelle, (
+        "the rule no longer asks whether the claim is anchored in the file it "
+        "cites, so it either fires on everything or on nothing")
+    assert "anchor_digest no longer resolves anywhere in" in quelle, (
+        "the rule itself is gone, not narrowed")

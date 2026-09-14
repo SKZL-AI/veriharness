@@ -25,7 +25,7 @@ system's own top layer as if it were external supervision.
 
 Measured on the campaign that produced this release: **65 runs carrying 1,988
 receipts (880 of them control runs), 100 iterations that produced receipts,
-51 specifications, 45 merges and 97 recorded findings**, across five calendar
+51 specifications, 45 merges and 127 recorded findings**, across five calendar
 days and 3.5 days of elapsed wall-clock -- and the position paper, the claims
 ledger, the release documents and the export machinery among the artifacts
 produced.
@@ -44,7 +44,7 @@ in this campaign was escalated **by rule, not by necessity**. A human decided
 seven things -- `DEC-R1`, `DEC-R1a`, `DEC-R2`, `DEC-R3`, `DEC-R4`, `DEC-R5`,
 `DEC-R6`: the project's public name, which files the export carries, how one
 class of reference is dispositioned, and whether to publish. Seven governance
-decisions against 65 runs, 51 specifications, 45 merges and 97 findings. The
+decisions against 65 runs, 51 specifications, 45 merges and 127 findings. The
 same orchestration configured with those policies delegated in advance would
 have resolved them itself. That is a statement about the design, not a
 measurement: this deployment did not run that way, so it is listed here as
@@ -56,8 +56,44 @@ failure modes this campaign actually hit -- budget exhaustion, a role harness
 whose credential had expired, a lost tool directory after a power cut, a
 composition failure between two individually correct runs -- behave when nobody
 is reachable for a week. A human *was* reachable throughout and answered those
-seven times. Nothing here shows an orchestrator surviving its own restart, or a
-provider outage, without one.
+seven times.
+
+**One half of that sentence has since been measured, and it is worth separating
+from the half that has not.** Until 2026-09-11 this paragraph also said
+"nothing here shows an orchestrator surviving its own restart". That is no
+longer true. A real run was driven by the control plane and killed twice with
+`os._exit(9)` -- once after a candidate was accepted but before the merge, once
+after the merge but before global closure -- and a fresh process, holding
+nothing but the persisted state, resumed correctly both times: it read the run
+record rather than re-dispatching, merged exactly once, and reached a fixpoint.
+Five distinct process ids, and the run's own write sequence unchanged across
+the resume, so nothing was re-run.
+
+**A second measurement, made on 2026-09-11, goes further and is worth stating
+exactly.** A run reached its fixpoint with **no human action at all** after it
+was started: a real dispatch, a candidate accepted, four deliberate process
+kills at the boundaries where a resume can lose or repeat work, a global gate
+deliberately red on the merged state, a repair node created and specified
+automatically, a real repair dispatch, and a second closure that reached
+`RC_CLOSED`. Six processes, four kills, zero interventions -- and checked
+against the repository rather than the harness's own log: five commits, every
+candidate landed exactly once.
+
+What that still does **not** establish is the rest of this paragraph, and the
+gap is one of scale rather than kind. The run took minutes, not days. It had
+one planned node, one repair, and a five-file fixture. A provider outage across
+a long idle period, an orchestrator restarted many times, and the accumulation
+of small ambiguities over weeks all remain untested. The approval authority
+that let it proceed unattended was configured in advance; a deployment without
+one still blocks at a trust prompt, deliberately.
+
+And one thing is worth saying because the first attempt at that run failed:
+the deadlock it hit was found by the fault injection, not by reasoning. Killing
+the process between marking a node as running and dispatching it left a run
+that existed and had never begun, which the controller called unclassifiable
+and halted on -- every round, indefinitely. That is the shape of failure this
+kind of test exists to find, and it is a reason to treat "it worked once
+unattended" as a beginning rather than a result.
 
 `Budgets.max_wallclock_seconds` and `max_iterations` exist and are enforced
 (`RunState.budget_exhausted` in `src/hoh/contracts.py`), but an enforced ceiling
@@ -65,16 +101,42 @@ is not the same claim as demonstrated multi-month reliability under it. Anyone
 evaluating HoH for long-horizon use should treat that gap as open, and should
 not read "five days orchestrated" as evidence for the month that follows.
 
-## 2. No baseline, no matched-budget comparison
+## 2. A baseline now exists, and it does not favour the harness
 
-There is no matched-budget comparison against a plain agent working the same
-specification without HoH's plan/develop/verify loop around it, and no
-baseline run of any kind exists in this repository's evidence. It is
-therefore not demonstrated that the same number of role-run dollars spent
-without HoH's overhead would produce a worse (or better) outcome. The
-project's claim is about what gets caught before acceptance, not about being
-more cost-effective than an unsupervised agent -- that comparison has not
-been run.
+This limitation used to read: no baseline of any kind exists. One does now,
+under a protocol committed before the first arm ran
+(`docs/BENCHMARK_PROTOCOL.md`), and the result is reported here rather than
+somewhere more flattering.
+
+**Arm A -- a plain agent, no harness -- passed all five hidden suites.**
+Including the composition task, where a plausible implementation is correct
+once and wrong when applied twice, and the task where a weak test suite lets a
+wrong implementation through. Between 20 and 114 seconds each.
+
+Arm B, one HoH run, passed four of five; the fifth produced no final state.
+Arm C, the full control plane, produced a final state once in five.
+
+Two readings, and the honest one is the first:
+
+* **These five tasks do not discriminate between the arms.** That is a finding
+  about the benchmark's design, not a verdict on any arm. A task a competent
+  agent finishes in twenty seconds cannot show what verification adds.
+* **The B-vs-C comparison is not supported at all.** Four arm-C cells and one
+  arm-B cell stopped at an interactive permission prompt, five attempts each --
+  the planner running shell commands it is not supposed to run (limitation
+  12b). One data point is not a comparison and is not offered as one.
+
+So what is now demonstrated is narrower than the limitation's old wording
+suggested was missing, and in the opposite direction: on tasks of this size,
+an unsupervised agent did the work correctly every time. Nothing here shows
+the harness catching something the plain agent got wrong, because on these
+tasks the plain agent got nothing wrong.
+
+What remains untested is the case the project is actually about: work large
+enough that a single agent's self-report is not trustworthy, and composition
+across several accepted increments. Designing tasks that reach it is open, and
+`docs/BENCHMARK_RESULTS.md` carries the full table, every excluded cell and
+the reason it stopped.
 
 ## 3. Provider cost is not measured
 
@@ -98,6 +160,25 @@ size-limited output -- narrows the blast radius; none of it is a substitute
 for a real OS sandbox (namespaces, seccomp, network isolation). Do not point
 HoH's acceptance checks at a plan you do not already trust.
 
+**Since 2026-09-11 there is an OS sandbox, and it does not close this limit.**
+`src/hoh/sandbox.py` provides filesystem and network isolation through Linux
+namespaces: the candidate mounted read-only, a separate writable scratch area,
+no network, an environment that is not inherited. Measured, not asserted -- a
+command inside it cannot read a file outside the declared binds, and
+`/proc/net/route` shows zero routes. What that changes is *how far a command
+can reach*. It does not make a pattern denylist sound, and a command the
+denylist does not name is still allowed to do whatever it does. The honest
+statement is that the blast radius shrinks to the sandbox, not that the guard
+became a security boundary.
+
+Two further qualifications, because "we added a sandbox" is exactly the kind
+of sentence that gets over-read. The sandbox is **not yet the path acceptance
+checks take**: it exists, is tested, and is selectable, and `runner.py` does
+not use it, so no check in this project's own history has run inside one. And
+it fails closed by construction -- asking for isolation the backend cannot
+provide raises rather than quietly running unsandboxed, because a sandbox that
+silently degrades is worse than none.
+
 ## 5. The `{ARENA}` placeholder and the runner's real path can diverge
 
 A check command that needs the path of the object under test writes the
@@ -111,6 +192,14 @@ string that gets executed. In the cases this project has exercised, that gap
 has not produced an escape, but the guard's own reasoning and the runner's
 own behavior are not, and are not claimed to be, verifying the identical
 string.
+
+**The sandbox added in 2026-09-11 does not touch this one at all**, and it is
+worth saying so next to the sentence rather than leaving a reader to infer it.
+The divergence is two different strings inside HoH's own code -- the guard
+reasons about the command with the placeholder replaced by the literal
+`"ARENA"`, the runner substitutes the real absolute path -- and no amount of
+isolation makes two different strings equal. Isolation reduces what the
+divergence can cost. It does not remove the divergence.
 
 ## 6. The arena is nested inside the project's own git working tree
 
@@ -139,6 +228,47 @@ question about the *outer* repository instead of the arena subdirectory
 precisely because pytest's own temp-directory redirection landed inside
 this nested arena. The nesting is a structural fact of how this project
 runs itself today, not something the arena isolation removes.
+
+**What the sandbox added here, stated precisely, because the first version of
+this paragraph was wrong in both directions.**
+
+It said the sandbox closed this failure. It did not, because the common case
+was already closed: since 2026-09-08 `_env` sets `GIT_CEILING_DIRECTORIES` to
+the arena's parent, and with that in place `git rev-parse --show-toplevel`
+inside an arena exits `128` instead of naming the ancestor repository. A
+sandbox was not needed for that and is not what fixed it.
+
+What *was* still open is narrower and sharper than this limit's own wording
+suggests. The mitigation is an environment variable, and the thing it
+constrains is a shell command that can remove it. Measured through `run_check`
+itself:
+
+| Regime | Exit | Answer |
+|---|---|---|
+| Ceiling set, no sandbox | `128` | prevented |
+| **The check removes the ceiling**, no sandbox | `0` | **names the ancestor repository** |
+| The check removes the ceiling, sandboxed | `128` | prevented |
+
+`env -u GIT_CEILING_DIRECTORIES git rev-parse --show-toplevel` climbs straight
+back out, and the command guard does not catch it: there is no absolute path
+and no `..` in that command for it to object to.
+
+So the sandbox's contribution is to make the boundary **structural rather than
+configured** -- there is no parent `.git` to find, so removing a variable
+accomplishes nothing. That is worth having, and it is a smaller claim than
+"closed".
+
+The general lesson is worth more than the instance. A mitigation that consists
+of an environment variable is not enforceable against the thing it constrains,
+because the constrained process inherits the environment meant to limit it.
+That is the same family as limit 4, with the difference that this one read like
+a boundary.
+
+Two things this still does not mean. `STRICT` isolation is available and is not
+the default, so most checks continue to run the historical way. And the nesting
+itself is unchanged: the arena still sits inside the project's working tree.
+What the sandbox removes is the parent `.git` that git climbs to, not the
+structure that makes climbing possible.
 
 A second, independent instance of the same class of failure is directly
 reproducible on any materialized arena, without needing pytest at all: an
@@ -369,6 +499,304 @@ differ. Quoting "5 of 13" as if it answered the same question as the
 controller's flag would misstate what that iteration's evidence actually
 supports.
 
+## 12a. A criterion whose own file the candidate added discriminates trivially
+
+The acceptance-governing condition in limitation 12 -- red on the predecessor,
+green on the candidate -- has a hole that this project's own STRICT acceptance
+run walked straight into.
+
+The accepted candidate had exactly one discriminating criterion:
+
+    python3 -m unittest discover -s tests -p 'test_roman.py'
+
+Exit 0 on the candidate. On the baseline, exit 5:
+
+    Ran 0 tests in 0.000s
+
+    NO TESTS RAN
+
+The baseline is red **because the test file is not there** -- it is part of the
+candidate. Every newly written test file discriminates in that sense, so the
+criterion demonstrates that the developer created a file, not that behaviour
+changed. In that particular run the increment was real; the evidence offered
+for it was not.
+
+`hoh.runner.artefactual_reason()` detects the signatures with which a test
+runner says it executed nothing (exit 5, `NO TESTS RAN`, `FileNotFoundError`,
+`collected 0 items`) and the controller records them on the run state, so the
+weakness is visible in the evidence and to any gate that reads it.
+
+**Nothing is subtracted.** What counts as a demonstrated increment is a
+semantic property of acceptance, and changing it belongs in a specification
+rather than in a defect fix -- a run whose only new criterion is a new test
+file would stop being acceptable, which may well be right and is not a change
+to make silently. So this stays open, tracked, and priority **high**: it
+weakens the single mechanism this project offers against a candidate that
+passes without changing anything.
+
+What works today, and what a spec author should do until it is closed: write
+the failing test *before* the run, in the baseline. Then the baseline fails
+with the behaviour's absence -- `NotImplementedError`, a wrong value, an
+assertion -- and the criterion demonstrates what it claims to. This project's
+third STRICT acceptance run is built that way.
+
+## 12b. The planner's read-only contract is a sentence, not a boundary
+
+The planner prompt says, in those words: *"This is a pure planning invocation:
+implement nothing, edit nothing, test nothing. You may **read** the project
+directory in order to ground the plan in the actual project -- you may not
+write there."*
+
+Nothing enforces it. The developer role gets an arena and a candidate binding;
+the planner gets a request.
+
+Measured, not inferred. Five benchmark cells stopped at an interactive
+permission prompt, each attempted five times, and the transcripts show the
+planner moving the file under test, writing a reference implementation, and
+executing the acceptance criteria it was drafting:
+
+    Bash(cd .../scratchpad && mv duration.py durati...)
+    K1 exit= 1 / K2 exit= 1 / K3 exit= 1
+    Confirmed: all three checks pass (exit 0) against a correct reference
+    implementation and correctly fail (exit 1) against the current stub
+
+What stopped it was the surrounding harness's permission gate, which is not
+part of HoH and is not present in every deployment.
+
+Two costs, and the second is the one that matters:
+
+* the criteria a planner has already tested against its own reference are
+  criteria it believes are green, which is precisely the mixing that keeping
+  planning and verification apart is supposed to prevent;
+* a planner that can write into the project can change the thing a later
+  criterion measures, and no binding in the run would show it.
+
+**Corrected while building the countermeasure.** The planner does *not* have
+write access to the repository or the candidate: A03 has given it a copy of its
+own since 2026-09-08, and the `mv` in the transcript hit that copy. What it
+does have is write access to the directory the copy sits in -- the **arena
+root** -- and the candidate arena for every iteration and attempt is a sibling
+there. That is the tree the acceptance checks run in.
+
+The placement has a documented reason: one directory up, the harness asks for
+trust once per run instead of once per iteration. The cost of it was not
+written down next to the reason.
+
+**Priority: high, and open.** The fix is structural -- the planner needs a
+directory that contains its copy and nothing else, and the roles need a
+capability policy that is enforced rather than requested.
+
+### What was built, and what two adversarial reviews then found (2026-09-13)
+
+`src/hoh/capability.py` gives every role a `RoleExecutionPolicy`: read and
+write scopes, git and process and network rights, an output channel, and a set
+of trees that must be byte-identical before and after the role runs. The
+planner got a directory of its own, so the candidate arenas stopped being
+siblings of its copy.
+
+Two independent reviewers were asked to refute the resulting claim. Both did.
+
+**The measurement did not measure what its metric names said.** Sixteen
+violations planted into a copy of a real run; thirteen came back clean.
+`planner_repo_mutations` never ran `git status`, so an implementation written
+straight into the working tree and left uncommitted scored a perfect run. The
+candidate arenas -- the trees the acceptance checks execute in, which is the
+whole subject of this limitation -- were compared only by directory *name*.
+`__pycache__` was excluded from every digest, and a `.pyc` whose header matches
+the source wins at import, so a stub could be made to pass its own criteria
+with nothing in the source changing.
+
+**The policy was not installed where it mattered.** Only the candidate arenas
+and `receipts/` were protected. The run's own directory was not, so a planner
+that emptied `checks.json` during its own dispatch removed the preservation
+suite and a real regression was accepted as a checkpoint -- reproduced end to
+end, with nothing noted anywhere. The repository was not, so a file the planner
+wrote into the live worktree landed inside the accepted candidate, because
+`snapshot()` binds the working tree rather than the commit.
+
+**Nothing tested the installation.** Setting `protected=()` for the planner --
+switching the detection half off entirely -- left the whole suite green at 840
+tests. `tests/test_capability.py` attacks the instrument and builds its
+protected trees by hand; no test called `Controller._policy_for`.
+
+All three are fixed: the digest excludes nothing but `.git` (and git's own
+history is watched separately through HEAD and refs, not the index); a single
+file can be protected, which `checks.json` needs and silently did not have;
+the run directory, the repository and the other roles' arenas are in the
+policies; and `tests/test_policy_wiring.py` pins the installation, including
+both reproductions and the positive controls that keep the boundary from
+simply forbidding everything.
+
+### Measured under the fixed wiring (2026-09-13)
+
+Run `cfnfib7a`, a real three-agent Herdr+HoH dispatch against the adversarial
+specification above, reports `planner_capability_boundary = VERIFIED`:
+`planner_repo_mutations`, `planner_git_mutations` and
+`planner_generated_implementation` all zero, the planner's plan valid, the
+developer's candidate landed and acceptance working. The instrument that says
+so catches seven planted violations, each on its own.
+
+The number that took two reviews to get right is the last one: **the witness
+was armed for 2 of 2 planner dispatches**, read out of the dispatch records
+rather than derived from the controller's source. How much a witness covered is
+a property of the dispatch, because the protected set is built from what exists
+when it starts; an earlier run accepted in an iteration where that set was
+empty, and its `0 violations` was a true statement about nothing. A run whose
+records do not carry the number is now reported as unreadable, never as zero.
+The evidence is in `dogfood/planner-confinement/`.
+
+**What stays open regardless.** This is detection, not prevention. An agent
+running as the same user can reach any path it can name. What the witness
+guarantees is that a run in which that happened cannot quietly produce a
+verdict -- and that is one run, one task, one machine, not a claim about a
+hostile planner.
+
+## 12c. A criterion that never executed in either state is reported as failed
+
+A criterion is red on the predecessor and green on the candidate: that is this
+project's definition of demonstrating an increment. Limit 12a covers the case
+where the predecessor was red only because the criterion's own file was not
+there yet. This is the other end of it.
+
+Measured on this project's own confinement run `cfnfib6a`. The criterion was
+`python3 -m unittest discover -s tests -t . -v`, and **both** receipts -- the
+baseline and the candidate -- end identically:
+
+    ImportError: Start directory is not importable: '.../tests'
+
+The interpreter on this machine carries a namespace package called `tests` in
+its own `site-packages`, which shadows the project-local directory. Nothing
+about `fib.py` could change that outcome. What the run reported was:
+
+    not accepted: K1
+
+True, and misleading. A criterion that fails at the same import boundary in
+both states has said nothing about the product. It is not red; it is
+**inconclusive**. HoH already has that state for the infrastructure exit codes
+`{124, 126, 127}`; here the exit code is 1 and the distinction is unavailable.
+
+The outcome was still safe -- an unproven criterion blocks acceptance, which is
+the direction this project errs in deliberately -- and the run's QA role
+diagnosed the collision independently and recorded it. But a reader of the
+result sees a product verdict where there was none.
+
+**Not silently folded into `artefactual_reason()`.** That function describes a
+*baseline* that executed nothing while the candidate was green; here neither
+side executed. Stretching it to cover both would make one number mean two
+things, which is exactly limit 12's complaint one level down. Naming the class
+and leaving it open is the honest option until the verdict machinery can carry
+a third state through `_parse_qa`.
+
+**Priority: medium, and open.** Related: the check environment is reduced, not
+empty. `ENV_ALLOWLIST` and `PYTHONNOUSERSITE=1` keep the operator's home and
+the user site directory out; the interpreter's own `site-packages` stay, and a
+module name collision there reaches the check.
+
+## 12d. The witness compares two moments, and QA works where it watches
+
+`CapabilityWitness` digests a role's protected trees before the dispatch and
+again after. Three things follow, and they are stated here rather than left to
+be found:
+
+**A change and its undo are one moment apart.** Measured: a commit inside a
+dispatch moves the git digest, and `git reset --hard HEAD~1` in the same
+dispatch moves it back. The witness sees the two endpoints and reports nothing.
+The unreachable object stays in the repository, so
+`tools/confinement_evidence.py` finds it afterwards with `git fsck` -- but that
+is a post-hoc measurement, not the fail-closed check.
+
+**QA's working directory is the arena root, which is also where the arenas
+are.** That is the shape limit 12b objects to for the planner, and it has not
+been fixed for QA. What was fixed is a false positive it caused: the arena root
+was watched for new children, and `pytest` run against the candidate -- the
+work QA is there to do -- left `.pytest_cache` beside the arenas and failed the
+iteration. The listing watch is therefore off for QA. Every arena except the
+one QA is reviewing is still digested in full; what is given up is noticing a
+*new* directory created during QA's dispatch. The alternative considered and
+rejected was a list of tool names to ignore, which is the growing exclusion
+list this project rejects in the arena-placement argument.
+
+**A full digest is cheap here and is not cheap everywhere.** Measured on this
+project's own tree at 979,952 files and 5.2 GB: 121 s cold, 51 s warm, per
+call, twice per planner and QA dispatch. The runs this harness has actually
+executed measure 0.001 s, because a candidate arena is small. A repository of
+research size in `repo_path` would make the witness the dominant cost of a
+dispatch, and over a 51-second window any concurrent writer in the tree is a
+finding. Nothing caps this yet.
+
+**Two runs over one repository interfere.** The lock is per run
+(`runs/<run_id>/.lock`), and the repository is in the protected set of the
+planner and QA. A second run's developer writing the shared worktree during
+the first run's planner dispatch therefore fails the first run. The message is
+honest -- "a protected tree changed *during* planner's dispatch", not "the
+planner changed it" -- but a run is blocked for something a role did not do.
+Nothing in HoH claims to support two concurrent runs over one repository, and
+now nothing pretends to either.
+
+**Priority: medium, and open.** The structural fix for the second point is the
+one the planner already got: a working directory containing what the role may
+see and nothing else.
+
+## 12e. Twenty-one published references point at documents the export does not carry
+
+The export gate checks something most projects do not: that a document which
+*is* published does not send a reader to a path that is *not*. Running it here
+reports 21 such references, and they are old rather than new:
+
+The five documents under `paper/` carry most of them, citing the internal
+working documents they were written against: a closing report, several run
+specifications, a source check. The release notes and the RC gate document do
+the same, and this file does it twice itself, in the entry about the
+specification that could not be corrected in place (limit 15).
+
+The exact list is not reproduced here, and that is not coyness: naming those
+paths in this entry would *add* dangling references to an entry about dangling
+references, which is what the first version of it did. `python3
+tools/export_manifest.py check` prints them, and it is the same command the
+count above comes from.
+
+None of these is a false claim. Each is a citation of provenance: *this
+statement came from that document*, and the document exists in the repository
+that produced the export. What a reader of the export gets is a reference they
+cannot follow, which is a different defect from a wrong number and a smaller
+one -- but it is the defect the gate is for, and it is reported rather than
+suppressed.
+
+Two honest options and neither is free: publish the cited documents, which
+means publishing working notes written for an audience of one and, for the
+`dogfood/specs/` files, absolute machine paths; or rewrite the citations as
+prose that names the document without linking it, which costs the reader the
+ability to ask for it. The second is what `docs/EVIDENCE_INDEX.md` now does
+about the confinement README, and it is what this entry recommends for the
+rest.
+
+**Priority: medium, and open.** It blocks nothing technically and it is the
+kind of thing that quietly stays broken, so it is written down with a count
+that a re-run can check: `python3 tools/export_manifest.py check`.
+
+### Closed on 2026-09-14, by the second option this entry recommended
+
+The twelve references in living documents -- the RC gate, the release notes,
+this file, and three files under `paper/` -- now name the internal document
+without a path. `docs/EVIDENCE_INDEX.md` carries a table of them: what each
+one is, and where its substance *is* published. A reader loses the ability to
+ask for the file by path and keeps the credit and the trail.
+
+The remaining nine are all in `paper/REVIEW_A.md` and `paper/REVIEW_B.md`, and
+they are **not** being rewritten. Those are two independent reviewers' reports,
+published as written. Editing a report so that its citations resolve would
+make it say something the reviewer did not write, which is a worse defect than
+a pointer that cannot be followed -- and one of B's own findings is *about*
+these very references, so its paths are the subject of the finding rather than
+pointers it offers. `tools/export_manifest.py` records the two documents in
+`U2B_ANERKANNT` with the reason, prints every acknowledged reference on every
+run, and `tests/test_export_manifest.py` pins the list so it cannot grow
+without a test changing with it.
+
+So: **0 unacknowledged, 9 acknowledged in 2 documents.** The count above is
+what the gate reported before this, and it is left standing rather than
+edited, because the entry is the record of what was found.
+
 ## 13. An iteration budget is charged when an iteration begins, and a state written by an older version keeps what that version charged
 
 The iteration counter that budgets check against is incremented when an
@@ -387,6 +815,123 @@ Measured: 2 runs in this project's own history carry an inflated counter for
 exactly this reason and stay blocked on resume -- their state files were
 written by a version whose charges the current version cannot safely
 reinterpret.
+
+## 12f. The local no-online-sync rule protects measurements, and does not gate the sanitised public export
+
+This project is developed under an operator house rule that says: no cloud or
+online sync, logging local, no measurements leave the machine. A session read
+that as a blanket block on pushing anything to a public repository, and
+reported the release sequence's push step as a hard gate needing a decision.
+**That reading was wrong and is corrected here rather than quietly dropped.**
+
+The rule protects *internal measurements and machine-local paths*: receipt
+trees carrying absolute home paths, run states naming worktrees, raw telemetry.
+It is the same concern that keeps those trees out of the export (limit 12e) and
+the reason `tools/export_manifest.py` scans every INCLUDE file for home paths,
+private addresses and token-shaped strings.
+
+It is not a block on the public artifact. The captain has separately authorised
+updating the public repository once `TECHNICALLY_STABLE_READY` is `YES` and the
+public closure is green. Those two things do not conflict, and the way to keep
+both is procedural rather than a judgement call:
+
+* never synchronise the internal working tree;
+* produce the **public export** and run the leak, path, manifest and claims
+  audits over it;
+* carry only INCLUDE-classified, public-safe artifacts;
+* do it from a separate public staging checkout that has the remote, not from
+  the tree that holds the run evidence;
+* and keep the stable tag, the GitHub release and any package-index upload as
+  their own separate approval, which they remain.
+
+What the rule forbids is pushing the measurements. What it does not forbid is
+publishing the product the measurements were about.
+
+## 19. `benchmark_v3 = PASS` is a statement about the campaign, not about the product
+
+The readiness row reads `PASS`. It is worth saying plainly what that does and
+does not assert, because the two are easy to run together and the difference
+is the whole point of having run the campaign.
+
+**What it means, and only this:** the campaign was pre-registered before the
+first dispatch; the exact registration bytes were bound in a commit before it;
+all 45 runs completed; the matched budget was valid, meaning no cell exceeded
+the ceiling the protocol declares; the raw data is complete; and the analysis
+is reproducible from the cell files by a second, independently written
+aggregation.
+
+**What it does not mean.** It says nothing about VeriHarness being better than
+a plain agent, nothing about it being more efficient, and nothing about the
+control plane reaching a fixpoint. The campaign's own numbers say the
+opposite of the last one.
+
+### What the campaign actually measured
+
+| arm | hidden suite | false accepts | end state |
+|---|---|---|---|
+| A -- plain agent | 15/15 PASS | 0 | answered |
+| B -- one `hoh run` | 14/15 PASS | 1 | 15/15 accepted |
+| C -- full control plane | 14/15 PASS | 0 | 15/15 `BUDGET_EXHAUSTED`, 0/15 `CLOSED` |
+
+**Arm C's zero false accepts is not a correctness result.** A false accept
+requires an arm to claim it is finished and be wrong. Arm C never claimed it:
+under the budget the protocol declares, every one of its fifteen cells ran out
+of dispatches before closing. `slug_pair/C/3` is the case that shows the
+difference -- its hidden suite is red and no claim of success was made, which
+is a miss rather than a false pass. Quoting `0 false accepts` for arm C beside
+arm B's `1` compares *answered wrongly once* with *never answered*.
+
+**Arm A, with one dispatch per cell, passed everything.** That is not a
+rounding detail. Arm A is single-shot by construction (limit 17), so it spent
+a ninth of what the harnessed arms were allowed, and it still produced the
+most passing cells and no false accept.
+
+**What the harness did demonstrate** is narrower and is worth stating on its
+own: arm B's verification kernel produced one measurable false accept on five
+small tasks, reproducing the same task and arm campaign v2 found, and arm C's
+control plane detected a red global gate and dispatched a repair node in every
+single cell -- it simply had no budget left to finish. Whether that repair
+path still reaches closure when the budget is sufficient is a separate
+question with separate evidence (`post_o143_closure`), because a ceiling that
+refuses too early is indistinguishable from one that refuses correctly.
+
+## 13a. A dispatch is charged before the provider answers, and a crash does not refund it
+
+The dispatch counter is incremented and **written to disk before the call goes
+out**, not after it returns. That is deliberate and it is the only order under
+which the budget survives a crash: a count that reaches disk only on a clean
+return is a count a killed process refunds, and a node that died after eight
+dispatches would come back with nine more.
+
+The cost of that order is stated here rather than discovered: a call that
+never reached the provider at all -- the process was killed in the moment
+between the charge and the call, the machine lost power, the harness failed to
+start the agent -- is charged anyway. Under a nine-dispatch ceiling a run that
+is interrupted twice that way has seven left, not nine. There is no automatic
+correction, because distinguishing "charged and never dialled" from "dialled
+and the answer was lost" would require a record written by the far side, and
+this project does not have one.
+
+What exists instead is visibility: `telemetry.jsonl` records
+`provider_calls` per dispatch record, so a charge that produced no call is
+`provider_calls: 0` on the line and can be counted by a reader.
+`tools/budget_evidence.py` control K3 measures the order itself.
+
+## 13b. One shared budget assumes the runs under it do not overlap
+
+`HohRunLauncher(dispatch_budget=N)` derives what a new run may spend by
+reading the persisted spend of every run under its root at the moment the run
+is started. `ProjectController` starts nodes one at a time, so under this
+project's own control plane the figure is exact.
+
+It is **not** a lock. Two launcher processes over the same root, or a caller
+that starts two runs concurrently, would each read the same remainder and each
+hand it out in full -- the classic read-then-write race, and the reason it is
+harmless today is a property of the caller rather than of the budget. Making
+it safe under concurrency would need the charge to be taken at start time
+rather than derived at prepare time, which is a different design and is not in
+v0.1.0. Anyone composing `HohRunLauncher` into a parallel scheduler has to
+serialise the starts.
 
 ## 14. A preservation promise over a shared artifact turns that artifact into a global lock
 
@@ -447,14 +992,62 @@ dispatch costs a run, not a quick correction inside one.
 
 The cost is this project's own. Run `D5`'s criterion 6 required, verbatim,
 "all twelve limitations" -- the line stands recorded today in
-`dogfood/specs/d5-paper.md` -- at a point when `docs/LIMITATIONS.md` held 12
+the internal *d5-paper* specification -- at a point when `docs/LIMITATIONS.md` held 12
 limits. By the time that run actually ran, run `d3e` had already merged limit
 13 and limit 14, and the file held 14; that mismatch, and this same digest
 mechanism as its cause, is recorded in
-`dogfood/specs/d5l-limits-from-the-file.md`. The running specification could
+the internal *d5l-limits-from-the-file* specification. The running specification could
 not be corrected in place -- the same immutability this entry describes applied
 to it too -- so the fix did not happen inside that run; it became a separate
 one.
+
+### There is a supported path now (2026-09-13), and it is not a shortcut
+
+`hoh amend <run-id> --spec-file <new> --kind <k> --actor <who> --reason <why>
+[--affects K1,K2]` records a change instead of forbidding one. What it does:
+
+* the old text is **parked and stays readable** -- `park_and_amend` renames it
+  with its own digest in the name, so "what did this run promise when
+  iteration 3 was accepted" has an answer;
+* the chain is stored beside the state in `amendments.json`, and it validates
+  continuously: an amendment whose `from_digest` is not where the chain left
+  off is refused, because a chain with a gap cannot say what was promised at
+  any point in it;
+* the run's own `spec_digest` moves with the chain, so a *recorded* amendment
+  does not block -- and an unrecorded edit still does, which is the protection
+  this entry was about;
+* an acceptance-affecting amendment names the criteria it touches, their
+  receipts are marked as belonging to a superseded specification, and **the
+  controller withholds acceptance** until each of them has been planned *and*
+  measured again. Planned and measured, not one or the other: a plan that
+  drops the criterion while QA mentions it anyway would otherwise satisfy the
+  gate by talking about it.
+
+`tests/test_amendment_e2e.py` drives that path on a real controller: an
+accepted candidate on the old text, an amendment naming its criterion, a
+second candidate refused for exactly that reason, and a third accepted once
+the criterion is re-measured. Its negative control is the refusal, and there
+is a positive control beside it -- a `CLARIFY` that affects nothing withholds
+nothing, because a feature that stopped every run would be one people route
+around.
+
+**What is still true.** Nothing here judges whether an amendment is honest.
+A person with commit access can always edit a file, and an amendment that
+narrows a criterion until a failing candidate passes is *recorded*, not
+prevented. The record names the author, the kind, the reason, the criteria and
+whether the change came after an acceptance; reading it is a person's job.
+
+And one thing the first version of this section claimed and could not deliver:
+that the amended criterion is measured "against the new text". It was not. A
+preserved criterion is frozen against redefinition -- correctly, it is how a
+plan is stopped from watering one down -- and an amendment's affected criteria
+are by construction ones that already passed, so all of them were frozen. The
+planner's new definition was silently discarded and the receipt recorded the
+pre-amendment command. An amendment now **reopens** its criteria: they leave
+the preservation suite, become fresh criteria that have to discriminate again,
+and the new definition is the one that counts. What remains a person's job is
+noticing an amendment whose "new" criterion is the old one retyped.
+
 
 ## 16. A usage-quota exhaustion is indistinguishable from a role that broke its contract
 
@@ -557,7 +1150,111 @@ built to remove. What is published is therefore the more readable of the two,
 and this entry is the disclosure that it cannot be reproduced from the
 published tree alone.
 
-The checks that **do** hold in a published clone are `check coverage`, `check
-schema` and `check ids`, and `check all`'s own shape rule: every failure it
-reports carries an environment-gap marker, and there is no unmarked one. That
-rule, not an exit code of zero, is what a reader can verify here.
+The checks that **do** hold in a published clone are `check schema` and `check
+ids`, and `check all`'s own shape rule: every failure it reports carries an
+environment-gap marker, **except the rendering difference this entry is
+about**. That rule, not an exit code of zero, is what a reader can verify
+here. `check coverage` exits 1 in a clone as well; what holds there is the
+same shape rule, every one of its failures marked.
+
+### Corrected 2026-09-14, by measurement rather than by re-reading
+
+The sentence above used to say there is *no* unmarked failure, and it invited
+a reader to check exactly that. Run against a real export tree it was wrong:
+167 of 329 failures carried no marker. Two different things had been reported
+as one. An **anchor** that cannot resolve because its file is absent was
+marked; an **evidence reference** to the very same absent file was not, and
+163 of the unmarked failures were that.
+
+The asymmetry had no justification, so the tool was changed rather than the
+claim weakened to fit it: `check_claims.py` now asks `EXPORT_MANIFEST.json`
+whether an absent path is classified `EXCLUDE`. If it is, the file was never
+shipped and the failure is an environment gap; if it is not, the evidence is
+genuinely missing and it stays a content defect, which is the direction that
+fails safe. Measured again afterwards: 4 unmarked lines, all four the single
+rendering difference described above.
+
+Worth stating plainly, because a claim that tells a reader how to verify it
+and then does not survive being verified is the worst kind to publish: this
+was found by building the export and running the check in it, which is the
+only place the claim was ever about.
+
+## 17. The benchmark's arms do not spend the matched budget symmetrically
+
+`docs/BENCHMARK_PROTOCOL.md` §"Matched budget" says each arm gets at most nine
+role dispatches per task and that "A gets nine turns". Arms B and C are given
+that ceiling and, since O144, enforced against it. **Arm A is single-shot.**
+`tools/benchmark.py`'s `arm_a` makes exactly one provider call: one agent turn
+with the specification and the repository, no loop above it. Every arm-A cell
+in campaigns v1 and v2 records one dispatch.
+
+So the budget is matched as a ceiling and not as an allocation, and the arm
+that is supposed to be the baseline anybody already has is given a ninth of
+what the harnessed arms may spend.
+
+The direction matters and is not the convenient one: more turns could only
+help arm A. A campaign in which A matches or beats B and C is therefore robust
+to the asymmetry -- which is what v1 and v2 found, A passing 5 of 5 in both.
+A campaign in which A lost would **not** be evidence that the harness is
+better, because A was not given the resource the protocol promised it.
+
+Campaign v3 declares the asymmetry rather than repairing it: rebuilding arm A
+into a nine-turn loop would make v3's arm A incomparable with v1's and v2's,
+and a benchmark that changes its baseline between campaigns cannot replicate
+anything. The declaration is in the v3 pre-registration, and any comparison
+drawn from v3 carries it.
+
+## 13c. A retry's own bookkeeping is the one write the capability witness cannot attribute
+
+`Controller._dispatch` takes a capability witness before a role runs and
+compares it afterwards. A transient retry has to charge a dispatch before
+calling the provider again, charging means persisting `state.json`, and
+`state.json` is one of the trees the witness protects -- so the controller's
+own bookkeeping would read as a violation by the role.
+
+The first attempt re-took the **whole** witness at that point, and an
+adversarial review broke it: a write into `checks.json` landing in the same
+window was folded into the new baseline, the run continued with a hijacked
+acceptance suite, and nothing was recorded. That is the defect class
+(O125/O129) the witness exists to catch.
+
+What exists now is `CapabilityWitness.neu_bezeugen`, which re-takes exactly
+the paths it is given. The controller gives it one: `state.json`. Every other
+protected tree keeps the baseline it was taken with, so a write anywhere else
+during a retry is still caught.
+
+**What is still uncovered**, stated here rather than left to be found: a write
+to `state.json` *itself*, by anyone, between the controller's write and the
+re-witness a few microseconds later. No digest can attribute that one -- the
+controller is rewriting the same file -- and the honest reading of a
+`state.json` digest during a retry is therefore "not attributable", not
+"unchanged". This is detection, not prevention, and `capability.py` says the
+same thing about itself one level down.
+
+## 18. The benchmark's instrument is frozen by digest; what it runs on is not
+
+`tools/prereg.py freeze` records a digest for every file that can change what
+a campaign measures, and `check` reports anything that moved. That establishes
+that the **files** were the same on the day of the first cell and the day of
+the last.
+
+It does not establish that the **instrument** was. Not frozen, and not
+freezable by this mechanism:
+
+* **The model.** `tools/benchmark.py` dispatches the harness profile
+  `claude`, which resolves to whatever that CLI chooses at run time. There is
+  no model pin anywhere in the benchmark path. A campaign spanning a provider
+  upgrade would measure two instruments and report one.
+* **The agent CLI itself**, its version and its defaults.
+* **Installed package versions.** `pyproject.toml` carries floors
+  (`pydantic>=2.0`), not a lockfile.
+* **Environment variables interpolated into role prompts**, most importantly
+  `HOH_HOUSE_RULES`: present or absent, it changes every prompt the arms
+  receive.
+
+The registration records all of these as they stood at the freeze --
+interpreter version, platform, package versions, `claude --version`, and a
+digest per prompt-relevant variable -- so that a reader can *see* whether they
+moved. Seeing is what this offers; guaranteeing is not. A campaign whose
+result matters should be run in one sitting, and one that was not should say
+so.

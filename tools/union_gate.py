@@ -115,6 +115,25 @@ def _oneline(text: str) -> str:
     return " ".join(text.split())
 
 
+def _failure_line(stdout: str, stderr: str) -> str:
+    """The informative last line of a command that failed.
+
+    stderr first, deliberately. The previous order preferred stdout, and on a
+    failed `pip wheel` that produced actively misleading diagnostics: pip
+    writes its progress to stdout and its error to stderr, so the reported
+    reason was "Preparing metadata (pyproject.toml): finished with status
+    'done'" -- a line that reads like success -- while the actual cause,
+    `BackendUnavailable: Cannot import 'setuptools.build_meta'`, sat unread on
+    stderr. A diagnostic that points away from the cause is worse than none,
+    because it gets believed.
+    """
+    return (
+        _tail_nonempty_line(stderr)
+        or _tail_nonempty_line(stdout)
+        or "no output"
+    )
+
+
 def _tail_nonempty_line(text: str) -> str | None:
     for line in reversed(text.splitlines()):
         if line.strip():
@@ -301,7 +320,7 @@ def build_wheel(repo_path: Path, work_dir: Path) -> WheelInfo:
         return WheelInfo(attempted=True, built=False, reason=f"pip wheel could not run: {exc}")
 
     if proc.returncode != 0:
-        tail = _tail_nonempty_line(proc.stdout) or _tail_nonempty_line(proc.stderr) or "no output"
+        tail = _failure_line(proc.stdout, proc.stderr)
         return WheelInfo(
             attempted=True, built=False, reason=f"pip wheel exited {proc.returncode}: {tail}",
             skipped_paths=tuple(skipped_paths),
@@ -549,7 +568,7 @@ def check_u4(repo_path: Path) -> Result:
     if proc.returncode == 0:
         return Result.ok()
 
-    finding = _tail_nonempty_line(proc.stdout) or _tail_nonempty_line(proc.stderr) or "no output"
+    finding = _failure_line(proc.stdout, proc.stderr)
     return Result.fail(f"check_claims.py check all exited {proc.returncode}: {finding!r}")
 
 
@@ -581,7 +600,7 @@ def check_u5(repo_path: Path) -> Result:
     except (OSError, subprocess.TimeoutExpired) as exc:
         return Result.fail(f"could not run pytest: {exc}")
     if pytest_proc.returncode != 0:
-        tail = _tail_nonempty_line(pytest_proc.stdout) or _tail_nonempty_line(pytest_proc.stderr) or "no output"
+        tail = _failure_line(pytest_proc.stdout, pytest_proc.stderr)
         return Result.fail(f"pytest: {tail}")
 
     subset = [name for name in ("src", "tests", "tools") if (repo_path / name).exists()]
@@ -613,7 +632,23 @@ def _format_line(n: int, result: Result) -> str:
     return f"U{n}: {result.status}: {detail}"
 
 
-def run_gate(repo_path: Path) -> tuple[list[Result], int]:
+def run_gate(
+    repo_path: Path, required: frozenset[int] | None = None
+) -> tuple[list[Result], int]:
+    """Runs U1..U5. `required` names invariants that must not merely skip.
+
+    SKIPPED never affects the exit code on its own, and that is right for the
+    regimes where an invariant genuinely cannot be checked -- U4 needs a
+    `runs/` tree, U3 needs to build a wheel, and an arena has neither. But it
+    means a gate can report exit 0 while an invariant checked nothing, which
+    is `NOT_RUN` counted as a pass one level down.
+
+    That is not hypothetical. On 2026-09-11 CI ran this gate in a fresh
+    virtual environment with no setuptools; `pip wheel --no-build-isolation`
+    could not import its backend, U3 skipped, and the gate exited 0 having
+    verified nothing about what the wheel ships. `--require` is how a caller
+    that *knows* an invariant should be checkable says so.
+    """
     with tempfile.TemporaryDirectory(prefix="union_gate_") as tmp:
         work_dir = Path(tmp)
         wheel_info = build_wheel(repo_path, work_dir)
@@ -624,8 +659,17 @@ def run_gate(repo_path: Path) -> tuple[list[Result], int]:
             check_u4(repo_path),
             check_u5(repo_path),
         ]
+    return results, _exit_for(results, required)
+
+
+def _exit_for(results: list[Result], required: frozenset[int] | None) -> int:
+    """The exit code for a set of results, factored out so it is testable
+    without running the gate -- which, through U5, runs the whole suite."""
     exit_code = 1 if any(r.status == STATUS_FAIL for r in results) else 0
-    return results, exit_code
+    for n in sorted(required or ()):
+        if 1 <= n <= len(results) and results[n - 1].status == STATUS_SKIPPED:
+            exit_code = 1
+    return exit_code
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
@@ -644,14 +688,48 @@ def build_arg_parser() -> argparse.ArgumentParser:
         default=".",
         help="the repository whose combined state is checked (default: '.')",
     )
+    parser.add_argument(
+        "--require",
+        default="",
+        metavar="N[,N...]",
+        help=(
+            "invariants that must actually run: a SKIPPED one among them fails "
+            "the gate. Use it wherever the environment is known to support the "
+            "check -- without it, an invariant that silently could not run "
+            "leaves the exit code green."
+        ),
+    )
     return parser
+
+
+def _parse_required(roh: str) -> frozenset[int]:
+    if not roh.strip():
+        return frozenset()
+    zahlen = set()
+    for teil in roh.replace("U", "").replace("u", "").split(","):
+        teil = teil.strip()
+        if not teil:
+            continue
+        if not teil.isdigit():
+            raise SystemExit(f"--require: {teil!r} is not an invariant number")
+        n = int(teil)
+        if not 1 <= n <= 5:
+            raise SystemExit(f"--require: U{n} does not exist; U1..U5 are defined")
+        zahlen.add(n)
+    return frozenset(zahlen)
 
 
 def main(argv: list[str] | None = None) -> int:
     args = build_arg_parser().parse_args(argv)
-    results, exit_code = run_gate(Path(args.repo_path))
+    required = _parse_required(args.require)
+    results, exit_code = run_gate(Path(args.repo_path), required)
     for i, result in enumerate(results, start=1):
         print(_format_line(i, result))
+        if i in required and results[i - 1].status == STATUS_SKIPPED:
+            print(
+                f"    U{i} was required to run and did not; a skipped invariant "
+                "verifies nothing, so this fails the gate rather than passing it"
+            )
     return exit_code
 
 
