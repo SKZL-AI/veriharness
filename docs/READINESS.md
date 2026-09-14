@@ -5,11 +5,9 @@ command that produced it, and the verdict is the conjunction of the
 rows rather than a judgement typed above them. A row this tool cannot
 evaluate is `NOT_RUN`, which is never a pass.
 
-Measured at `aa15bd8` on 2026-09-14.
+Measured at `5599533` on 2026-09-14.
 
-    TECHNICALLY_STABLE_READY = no
-
-Open, and each one blocking: external_ci.
+    TECHNICALLY_STABLE_READY = yes
 
 | condition | state | measured | command |
 |---|---|---|---|
@@ -30,7 +28,7 @@ Open, and each one blocking: external_ci.
 | `attribution` | PASS | 1 of 11 nodes through the product | `python3 tools/attribution.py` |
 | `evidence_index` | PASS | EVIDENCE_INDEX.md matches the trees it describes | `python3 tools/evidence_index.py` |
 | `paper_audit` | PASS | 8 of 8 checks | `python3 tools/audit_refs.py <each check>` |
-| `external_ci` | FAIL | the recorded run tested a different export: 6 path(s) differ beyond this gate's own reports (README.md, RELEASE_NOTES.md, dogfood/ATTRIBUTION.json). Re-export, re-run CI, record it again. | `python3 tools/exact_head_ci.py --run-id ID --export-commit SHA` |
+| `external_ci` | PASS | success on 545c1de109e5 (6 job(s)); sandbox_external_env = UNSUPPORTED_ENVIRONMENT | `python3 tools/exact_head_ci.py --run-id ID --export-commit SHA` |
 | `routing` | PASS | DEFERRED_ON_EVIDENCE | `read docs/ROUTING.md` |
 
 ## Why some rows are advisory
@@ -44,7 +42,7 @@ Open, and each one blocking: external_ci.
 * **`export_manifest`** — the dangling references are limitation 12e: published documents citing internal ones. Advisory, because none of them is a false claim -- what a reader loses is the ability to follow a citation.
 * **`attribution`** — the ratio is not a gate -- it is reported so that nobody has to take the phase's own description of itself on trust.
 * **`paper_audit`** — `coverage` is red on a maintenance item paper/AUDIT.md itself flags and explains: paper/NUMBERS.md catalogues the 2 of a '2 of 3' ratio and not the 3. It is a documented, deliberately deferred operator item, not an unexamined failure.
-* **`external_ci`** — a CI result is evidence about a set of bytes, not about a branch name; reusing it after the export changed would be citing a measurement of something else.
+* **`external_ci`** — the sandbox line is read from its step, not its job: a green job whose relevant step was skipped has measured nothing, and UNSUPPORTED_ENVIRONMENT is that state rather than a pass.
 * **`routing`** — a disposition, not an open question: the condition for revisiting it is named and was checked.
 
 ## What this does not decide

@@ -250,6 +250,16 @@
         "d8cc3ec23e1058cc2af40a5c47d58aa904bb64db"
       ],
       "why_not_the_product": "The second repair of O169: the tolerance rule was positional and position is the wrong property. Outside any run for the same reason the first repair was -- it changes the gate that decides whether this ledger is complete, and a run repairing the check that certifies its own accounting is the circularity every entry here exists to avoid."
+    },
+    {
+      "id": "v010-post-tag-boards",
+      "category": "MAIN_ORCHESTRATOR_DIRECT",
+      "is_development_node": false,
+      "commits": [
+        "55995335abb4536eb0a21fc517bf3442db0e2595",
+        "b12a1217de0d294df82eb6a2ae46a081b5112058"
+      ],
+      "why_not_the_product": "The two readiness boards around the post-tag correction: the one that reported external_ci red because correcting a published figure changed exported files after CI had run on them, and the one that reports it green again after the re-export, the re-run and the re-record. Running the gates and writing down what they returned is the orchestrator's act by construction; the board is the thing a run would have to be certified by."
     }
   ]
 }
