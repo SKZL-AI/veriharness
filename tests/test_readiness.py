@@ -335,7 +335,21 @@ def test_every_gate_shaped_tool_has_a_row():
     quelle = inspect.getsource(rd.zeilen) + "".join(
         inspect.getsource(getattr(rd, n)) for n in dir(rd)
         if n.startswith("zeile_"))
-    for name in sorted(werkzeuge - keine_gates):
+    # Distribution checks operate on a canonical artifact and installed copies,
+    # not on product readiness in a source checkout. Their gate surface is the
+    # publishing workflow. Require executable invocations there rather than
+    # pretending they are collectors or adding them to keine_gates.
+    distribution_gates = {
+        "distribution_release": "python control/tools/distribution_release.py archive",
+        "distribution_smoke": "python -I distribution_smoke.py",
+    }
+    workflow = (wurzel / ".github/workflows/publish-pypi.yml").read_text()
+    for name, invocation in distribution_gates.items():
+        assert name in werkzeuge
+        assert invocation in workflow, f"distribution gate {name} is not executed"
+    assert "needs: testpypi-smoke" in workflow
+    assert "name: pypi" in workflow
+    for name in sorted(werkzeuge - keine_gates - distribution_gates.keys()):
         assert name in quelle, (
             f"tools/{name}.py decides something and no readiness row runs it")
 
