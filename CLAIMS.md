@@ -490,6 +490,12 @@ d4e: `CLAIMS.json` now declares, for every `INCLUDE` path in `EXPORT_MANIFEST.js
 | C-460 | SUPPORTED | A fresh clone of this repository reports its passes and its environment-gap skips as two separate numbers that are never summed, each skip naming the withheld artifact and why. ⟦and its environment-gap skips as two separate numbers that are never summed,⟧ | README.md:272 |
 | C-461 | SUPPORTED | The planner's capability boundary is enforced by digest rather than requested in a prompt, and the instrument that measures it plants seven violations into throwaway copies and must catch each one -- **7 of 7**. ⟦seven violations into throwaway copies and must catch each one -- **7 of 7**.⟧ | README.md:285 |
 | C-462 | SUPPORTED | **And it found these things in itself.** The list is the product more than the software is: a benchmark whose reported cost was a constant written beside the result rather than a measurement; an enforced ceiling off by one, where `max_dispatches=9` bought eight provider calls because the counter incremented before the budget was consulted, with an existing test that passed against it because it only checked that *something* raised; a dispatch log counted one line per call, wrong in both directions; a budget a restart refunded; a capability witness that could be made to absorb a hostile write during a retry; a published claim that told readers how to verify it and did not survive that verification (167 of 329 failures in an export tree carried no environment-gap marker where the document promised none would); and three release gates that had no state in which they could fail -- one of them asking a remote the internal tree deliberately does not have, another comparing a tree against itself. ⟦survive that verification (167 of 329 failures in an export tree carried no⟧ | README.md:303 |
+| C-463 | SUPPORTED | The package requires Python >=3.11 and targets Linux; actual agent runs require Herdr. ⟦The package requires Python >=3.11 and targets Linux; actual agent runs require Herdr.⟧ | README.md:46 |
+| C-464 | SUPPORTED | Fresh PyPI installations passed the CLI, metadata, and policy checks on Python 3.11, 3.12, and 3.13. ⟦Fresh PyPI installations passed the CLI, metadata, and policy checks on Python 3.11, 3.12, and 3.13.⟧ | README.md:47 |
+| C-465 | SUPPORTED | The v0.1.0 distribution was published on 2026-09-15 from the unchanged release tag. ⟦The v0.1.0 distribution was published on 2026-09-15 from the unchanged release tag.⟧ | docs/READINESS.md:37 |
+| C-466 | SUPPORTED | TestPyPI, PyPI, and the existing GitHub release contain byte-identical wheel and sdist files. ⟦TestPyPI, PyPI, and the existing GitHub release contain byte-identical wheel and sdist files.⟧ | docs/READINESS.md:38 |
+| C-467 | SUPPORTED | Fresh PyPI installations passed on Python 3.11, 3.12, and 3.13; both PEP-740 attestations were verified. ⟦Fresh PyPI installations passed on Python 3.11, 3.12, and 3.13; both PEP-740 attestations were verified.⟧ | docs/READINESS.md:39 |
+| C-468 | SUPPORTED | Publication used OIDC Trusted Publishing through the protected `pypi` environment, with no long-lived PyPI token. ⟦Publication used OIDC Trusted Publishing through the protected `pypi` environment, with no long-lived PyPI token.⟧ | docs/READINESS.md:40 |
 
 ### Evidence and notes
 
@@ -3610,6 +3616,48 @@ Evidence:
 - `file:tests/test_export_gap_guard.py:1` -- resolvability: **PUBLIC**
 
 Note: 167 of 329 failures in an export tree carried no environment-gap marker where the published document promised none would -- the same figure C-452 records from docs/LIMITATIONS.md; the repair and its negative controls are in tools/check_claims.py and tests/test_export_gap_guard.py
+
+**C-463**
+
+Evidence:
+- `file:.github/releases/v0.1.0.json:1` -- resolvability: **PUBLIC**
+
+Note: Distribution evidence from the exact release workflow and independently checked public registry and GitHub downloads; historical runtime campaigns are outside this measurement.
+
+**C-464**
+
+Evidence:
+- `file:.github/releases/v0.1.0.json:1` -- resolvability: **PUBLIC**
+
+Note: Distribution evidence from the exact release workflow and independently checked public registry and GitHub downloads; historical runtime campaigns are outside this measurement.
+
+**C-465**
+
+Evidence:
+- `file:.github/releases/v0.1.0.json:1` -- resolvability: **PUBLIC**
+
+Note: Distribution evidence from the exact release workflow and independently checked public registry and GitHub downloads; historical runtime campaigns are outside this measurement.
+
+**C-466**
+
+Evidence:
+- `file:.github/releases/v0.1.0.json:1` -- resolvability: **PUBLIC**
+
+Note: Distribution evidence from the exact release workflow and independently checked public registry and GitHub downloads; historical runtime campaigns are outside this measurement.
+
+**C-467**
+
+Evidence:
+- `file:.github/releases/v0.1.0.json:1` -- resolvability: **PUBLIC**
+
+Note: Distribution evidence from the exact release workflow and independently checked public registry and GitHub downloads; historical runtime campaigns are outside this measurement.
+
+**C-468**
+
+Evidence:
+- `file:.github/releases/v0.1.0.json:1` -- resolvability: **PUBLIC**
+
+Note: Distribution evidence from the exact release workflow and independently checked public registry and GitHub downloads; historical runtime campaigns are outside this measurement.
 
 ## Not claims
 

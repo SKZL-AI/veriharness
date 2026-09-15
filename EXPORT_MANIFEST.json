@@ -2,6 +2,11 @@
   "schema": "hoh-export-manifest/1",
   "entries": [
     {
+      "path": ".github/releases/v0.1.0.json",
+      "decision": "INCLUDE",
+      "rule": "repo-meta"
+    },
+    {
       "path": ".github/workflows/ci.yml",
       "decision": "INCLUDE",
       "rule": "repo-meta"
