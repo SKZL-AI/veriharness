@@ -31,6 +31,16 @@ Measured at `5599533` on 2026-09-14.
 | `external_ci` | PASS | success on 545c1de109e5 (6 job(s)); sandbox_external_env = UNSUPPORTED_ENVIRONMENT | `python3 tools/exact_head_ci.py --run-id ID --export-commit SHA` |
 | `routing` | PASS | DEFERRED_ON_EVIDENCE | `read docs/ROUTING.md` |
 
+## Distribution verification after the historical readiness measurement
+
+The readiness table above remains the historical measurement at its stated commit.
+The v0.1.0 distribution was published on 2026-09-15 from the unchanged release tag.
+TestPyPI, PyPI, and the existing GitHub release contain byte-identical wheel and sdist files.
+Fresh PyPI installations passed on Python 3.11, 3.12, and 3.13; both PEP-740 attestations were verified.
+Publication used OIDC Trusted Publishing through the protected `pypi` environment, with no long-lived PyPI token.
+The [machine-readable distribution receipt](../.github/releases/v0.1.0.json) records hashes, job results, provenance, and verification scope.
+These distribution checks do not remeasure the historical agent campaigns or establish external sandbox support.
+
 ## Why some rows are advisory
 
 * **`budget_enforcement`** — the controls pass on a build with enforcement removed unless the falsifiers say otherwise, so they are part of the row and not a footnote under it. One of them deletes only the per-dispatch check, which is the mutant an earlier version of this instrument survived.

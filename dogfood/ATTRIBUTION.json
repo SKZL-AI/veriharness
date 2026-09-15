@@ -260,6 +260,26 @@
         "b12a1217de0d294df82eb6a2ae46a081b5112058"
       ],
       "why_not_the_product": "The two readiness boards around the post-tag correction: the one that reported external_ci red because correcting a published figure changed exported files after CI had run on them, and the one that reports it green again after the re-export, the re-run and the re-record. Running the gates and writing down what they returned is the orchestrator's act by construction; the board is the thing a run would have to be certified by."
+    },
+    {
+      "id": "v010-trusted-distribution",
+      "category": "MAIN_ORCHESTRATOR_DIRECT",
+      "is_development_node": false,
+      "commits": [
+        "8edb1a2a1af6fe07f2db5bdaedfa6d2e041c289d",
+        "e1300f959d40539887678c38a7f9093a48a9cd91",
+        "f144d4236baa43c7ede6e5677888788ca4a76d49"
+      ],
+      "why_not_the_product": "Owner-authorized registry publication and independent supply-chain verification. This changes the release trust boundary and records external publishing evidence, so it is orchestrator work rather than a product-accepted development node."
+    },
+    {
+      "id": "v010-distribution-receipt",
+      "category": "MAIN_ORCHESTRATOR_DIRECT",
+      "is_development_node": false,
+      "commits": [
+        "eefb60a6e994b2f9925a0227f41519290ecfe3be"
+      ],
+      "why_not_the_product": "Independent verification of public registry and release bytes, provenance, installation receipts, and documentation after publication; no agent campaign or product acceptance is claimed."
     }
   ]
 }

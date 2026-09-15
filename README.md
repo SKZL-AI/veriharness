@@ -29,6 +29,32 @@ trash.
 (sessions, panes, worktrees, restore) and what HoH owns (the plan, the
 evidence, acceptance, replanning, and objectives that span multiple runs).
 
+## Installation
+
+Install the command-line package from [PyPI](https://pypi.org/project/hoh/):
+
+```sh
+pip install hoh
+```
+
+To pin the current stable release:
+
+```sh
+pip install hoh==0.1.0
+```
+
+The package requires Python >=3.11 and targets Linux; actual agent runs require Herdr.
+Fresh PyPI installations passed the CLI, metadata, and policy checks on Python 3.11, 3.12, and 3.13.
+The [distribution receipt](.github/releases/v0.1.0.json) records the immutable source, publication workflow, and artifact hashes.
+
+For development, install an editable checkout:
+
+```sh
+git clone https://github.com/SKZL-AI/veriharness.git
+cd veriharness
+python -m pip install -e .
+```
+
 ## Running it: two commands, on purpose
 
 ```sh

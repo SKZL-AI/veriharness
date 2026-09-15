@@ -5343,6 +5343,78 @@
         "file:tests/test_export_gap_guard.py:1"
       ],
       "note": "167 of 329 failures in an export tree carried no environment-gap marker where the published document promised none would -- the same figure C-452 records from docs/LIMITATIONS.md; the repair and its negative controls are in tools/check_claims.py and tests/test_export_gap_guard.py"
+    },
+    {
+      "id": "C-463",
+      "text": "The package requires Python >=3.11 and targets Linux; actual agent runs require Herdr.",
+      "where": "README.md:46",
+      "anchor_digest": "02f233cf221c1e4c0746c4116b58d94ca03d7fc90818b4a24b284a2110dbcc42",
+      "anchor_context": "## Installation",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:.github/releases/v0.1.0.json:1"
+      ],
+      "note": "Distribution evidence from the exact release workflow and independently checked public registry and GitHub downloads; historical runtime campaigns are outside this measurement."
+    },
+    {
+      "id": "C-464",
+      "text": "Fresh PyPI installations passed the CLI, metadata, and policy checks on Python 3.11, 3.12, and 3.13.",
+      "where": "README.md:47",
+      "anchor_digest": "e4be612245121c0eaae1641f3d39ea6fc2cb0df498ff1ff93c96627d9a5ec758",
+      "anchor_context": "## Installation",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:.github/releases/v0.1.0.json:1"
+      ],
+      "note": "Distribution evidence from the exact release workflow and independently checked public registry and GitHub downloads; historical runtime campaigns are outside this measurement."
+    },
+    {
+      "id": "C-465",
+      "text": "The v0.1.0 distribution was published on 2026-09-15 from the unchanged release tag.",
+      "where": "docs/READINESS.md:37",
+      "anchor_digest": "2fdfa72bbe21b6d53e170b9cf89f57f32da717c1f50dd453956a8f95fadcedef",
+      "anchor_context": "## Distribution verification after the historical readiness measurement",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:.github/releases/v0.1.0.json:1"
+      ],
+      "note": "Distribution evidence from the exact release workflow and independently checked public registry and GitHub downloads; historical runtime campaigns are outside this measurement."
+    },
+    {
+      "id": "C-466",
+      "text": "TestPyPI, PyPI, and the existing GitHub release contain byte-identical wheel and sdist files.",
+      "where": "docs/READINESS.md:38",
+      "anchor_digest": "9b77c444a2d102917f311c7a30020dd04897891543706b5f43a00862a98d5cef",
+      "anchor_context": "## Distribution verification after the historical readiness measurement",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:.github/releases/v0.1.0.json:1"
+      ],
+      "note": "Distribution evidence from the exact release workflow and independently checked public registry and GitHub downloads; historical runtime campaigns are outside this measurement."
+    },
+    {
+      "id": "C-467",
+      "text": "Fresh PyPI installations passed on Python 3.11, 3.12, and 3.13; both PEP-740 attestations were verified.",
+      "where": "docs/READINESS.md:39",
+      "anchor_digest": "dc82c305996b7c7ca96b0624dcb3c0069c29c7266933a8ef50aa72d6ab96074f",
+      "anchor_context": "## Distribution verification after the historical readiness measurement",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:.github/releases/v0.1.0.json:1"
+      ],
+      "note": "Distribution evidence from the exact release workflow and independently checked public registry and GitHub downloads; historical runtime campaigns are outside this measurement."
+    },
+    {
+      "id": "C-468",
+      "text": "Publication used OIDC Trusted Publishing through the protected `pypi` environment, with no long-lived PyPI token.",
+      "where": "docs/READINESS.md:40",
+      "anchor_digest": "f9989f97e08637b6957a326b31b005ce055844e6070b1c334f506484b7ce4162",
+      "anchor_context": "## Distribution verification after the historical readiness measurement",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:.github/releases/v0.1.0.json:1"
+      ],
+      "note": "Distribution evidence from the exact release workflow and independently checked public registry and GitHub downloads; historical runtime campaigns are outside this measurement."
     }
   ],
   "not_claims": [
@@ -12798,6 +12870,11 @@
     "rationale": "O41: two disjoint runs never touched a common file, yet their union broke the coverage invariant because the old check globbed docs/** instead of reading a declaration. A prose note already said as much before O41 and did not prevent it (see docs/LIMITATIONS.md limit 9); this field is the same statement made machine-readable, in CLAIMS.json's own data, so a scheduler can read it without parsing prose."
   },
   "claim_surface_exclusions": [
+    {
+      "path": ".github/releases/v0.1.0.json",
+      "reason": "evidence-artifact",
+      "why": "Machine-readable distribution receipt, including public provenance and hash verification; the prose claims are registered in README.md and docs/READINESS.md."
+    },
     {
       "path": ".github/workflows/ci.yml",
       "reason": "pattern-data",

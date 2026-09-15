@@ -1,0 +1,224 @@
+{
+  "release": "v0.1.0",
+  "package": "hoh",
+  "version": "0.1.0",
+  "source_tag": "v0.1.0",
+  "source_commit": "a0b6af164be12817a69173ecc23f0b3e6c0ca2c7",
+  "tag_object": "f25ef7bffed2456b14c6d0fe488855d2c546ee55",
+  "workflow": ".github/workflows/publish-pypi.yml",
+  "workflow_run_id": "35002520170",
+  "sha256": {
+    "hoh-0.1.0-py3-none-any.whl": "1615b262c3489b8ea4f4577e7a5469dd36febbd0fc84c8bc4cc52f215f1f156b",
+    "hoh-0.1.0.tar.gz": "64a1a65270839e50afd2f134702458d7acaf0820c7ef1fdf723df3aede047b9b"
+  },
+  "schema": "veriharness-distribution-receipt/1",
+  "workflow_definition_commit": "f144d4236baa43c7ede6e5677888788ca4a76d49",
+  "workflow_run_url": "https://github.com/SKZL-AI/veriharness/actions/runs/35002520170",
+  "workflow_result": "PASS",
+  "testpypi_result": "PASS",
+  "production_pypi_result": "PASS",
+  "testpypi_url": "https://test.pypi.org/project/hoh/0.1.0/",
+  "pypi_url": "https://pypi.org/project/hoh/0.1.0/",
+  "github_release_url": "https://github.com/SKZL-AI/veriharness/releases/tag/v0.1.0",
+  "files": [
+    {
+      "filename": "hoh-0.1.0-py3-none-any.whl",
+      "sha256": "1615b262c3489b8ea4f4577e7a5469dd36febbd0fc84c8bc4cc52f215f1f156b",
+      "pypi_url": "https://files.pythonhosted.org/packages/69/e2/b574dcb38f34d2c2c6e0fe6c4feb6d36b66d1491335edf29ee04bac7780a/hoh-0.1.0-py3-none-any.whl",
+      "published_at": "2026-09-15T17:45:19.882559Z",
+      "github_asset_id": 566197425,
+      "github_url": "https://github.com/SKZL-AI/veriharness/releases/download/v0.1.0/hoh-0.1.0-py3-none-any.whl",
+      "github_download_sha256": "1615b262c3489b8ea4f4577e7a5469dd36febbd0fc84c8bc4cc52f215f1f156b",
+      "provenance_url": "https://pypi.org/integrity/hoh/0.1.0/hoh-0.1.0-py3-none-any.whl/provenance",
+      "publisher": {
+        "environment": "pypi",
+        "kind": "GitHub",
+        "repository": "SKZL-AI/veriharness",
+        "workflow": "publish-pypi.yml"
+      }
+    },
+    {
+      "filename": "hoh-0.1.0.tar.gz",
+      "sha256": "64a1a65270839e50afd2f134702458d7acaf0820c7ef1fdf723df3aede047b9b",
+      "pypi_url": "https://files.pythonhosted.org/packages/3f/00/7e4a36840ddcfacfb812c496f1646dff51266b3ad935460af88d889e9b6f/hoh-0.1.0.tar.gz",
+      "published_at": "2026-09-15T17:45:21.337258Z",
+      "github_asset_id": 566197427,
+      "github_url": "https://github.com/SKZL-AI/veriharness/releases/download/v0.1.0/hoh-0.1.0.tar.gz",
+      "github_download_sha256": "64a1a65270839e50afd2f134702458d7acaf0820c7ef1fdf723df3aede047b9b",
+      "provenance_url": "https://pypi.org/integrity/hoh/0.1.0/hoh-0.1.0.tar.gz/provenance",
+      "publisher": {
+        "environment": "pypi",
+        "kind": "GitHub",
+        "repository": "SKZL-AI/veriharness",
+        "workflow": "publish-pypi.yml"
+      }
+    }
+  ],
+  "github_assets_match": true,
+  "python_smoke": {
+    "3.11": {
+      "result": "PASS",
+      "checks": {
+        "version": "0.1.0",
+        "python": "3.11.16",
+        "import": "PASS",
+        "entry_point": "PASS",
+        "policy": "PASS",
+        "guard": "PASS",
+        "cli_list": "PASS",
+        "metadata": "PASS"
+      },
+      "source": "production PyPI only, fresh venv, no pip cache, isolated import outside checkout",
+      "job_url": "https://github.com/SKZL-AI/veriharness/actions/runs/35002520170/job/104496529475"
+    },
+    "3.12": {
+      "result": "PASS",
+      "checks": {
+        "version": "0.1.0",
+        "python": "3.12.14",
+        "import": "PASS",
+        "entry_point": "PASS",
+        "policy": "PASS",
+        "guard": "PASS",
+        "cli_list": "PASS",
+        "metadata": "PASS"
+      },
+      "source": "production PyPI only, fresh venv, no pip cache, isolated import outside checkout",
+      "job_url": "https://github.com/SKZL-AI/veriharness/actions/runs/35002520170/job/104496529454"
+    },
+    "3.13": {
+      "result": "PASS",
+      "checks": {
+        "version": "0.1.0",
+        "python": "3.13.15",
+        "import": "PASS",
+        "entry_point": "PASS",
+        "policy": "PASS",
+        "guard": "PASS",
+        "cli_list": "PASS",
+        "metadata": "PASS"
+      },
+      "source": "production PyPI only, fresh venv, no pip cache, isolated import outside checkout",
+      "job_url": "https://github.com/SKZL-AI/veriharness/actions/runs/35002520170/job/104496529496"
+    }
+  },
+  "trusted_publishing": true,
+  "long_lived_pypi_token_used": false,
+  "publication_timestamp": "2026-09-15T17:45:21.337258Z",
+  "attestations": {
+    "status": "VERIFIED",
+    "verifier": "pypi-attestations verify pypi --repository https://github.com/SKZL-AI/veriharness",
+    "artifacts": [
+      "hoh-0.1.0-py3-none-any.whl",
+      "hoh-0.1.0.tar.gz"
+    ],
+    "scope": "Cryptographic publisher attestations bind the uploaded file hashes to the publishing workflow on main. The separate identity/archive gates and build receipt bind those same bytes to the immutable source tag."
+  },
+  "production_environment": {
+    "name": "pypi",
+    "required_reviewer": "SKZL-AI",
+    "prevent_self_review": false,
+    "administrators_can_bypass": false,
+    "allowed_branch": "main",
+    "allowed_tag_pattern": "v*",
+    "secrets": []
+  },
+  "build_gates": {
+    "identity": "PASS",
+    "post_tag_runtime_diff": "PASS",
+    "twine": "PASS",
+    "archive_inspection": "PASS",
+    "official_clean_install": "PASS",
+    "wheel_smoke": "PASS",
+    "build_count": 1
+  },
+  "verification_scope": {
+    "distribution_only": true,
+    "historical_campaigns_rerun": false,
+    "external_sandbox_reverified": false,
+    "local_gpu_used": false,
+    "public_export_gaps": "Historical internal evidence is absent from the public export. Its claims and readiness records remain historical; publication does not claim to revalidate those missing sources."
+  },
+  "jobs": [
+    {
+      "name": "build",
+      "result": "success",
+      "url": "https://github.com/SKZL-AI/veriharness/actions/runs/35002520170/job/104494143735"
+    },
+    {
+      "name": "testpypi",
+      "result": "success",
+      "url": "https://github.com/SKZL-AI/veriharness/actions/runs/35002520170/job/104494308366"
+    },
+    {
+      "name": "testpypi-smoke",
+      "result": "success",
+      "url": "https://github.com/SKZL-AI/veriharness/actions/runs/35002520170/job/104494434312"
+    },
+    {
+      "name": "pypi",
+      "result": "success",
+      "url": "https://github.com/SKZL-AI/veriharness/actions/runs/35002520170/job/104494688553"
+    },
+    {
+      "name": "pypi-smoke (3.12)",
+      "result": "success",
+      "url": "https://github.com/SKZL-AI/veriharness/actions/runs/35002520170/job/104496529454"
+    },
+    {
+      "name": "pypi-smoke (3.11)",
+      "result": "success",
+      "url": "https://github.com/SKZL-AI/veriharness/actions/runs/35002520170/job/104496529475"
+    },
+    {
+      "name": "pypi-smoke (3.13)",
+      "result": "success",
+      "url": "https://github.com/SKZL-AI/veriharness/actions/runs/35002520170/job/104496529496"
+    }
+  ],
+  "package_metadata": {
+    "name": "hoh",
+    "version": "0.1.0",
+    "requires_python": ">=3.11",
+    "license_expression": "MIT",
+    "requires_dist": [
+      "pydantic>=2.0"
+    ],
+    "project_urls": {
+      "Repository": "https://github.com/SKZL-AI/veriharness"
+    },
+    "classifiers": [
+      "Development Status :: 3 - Alpha",
+      "Environment :: Console",
+      "Intended Audience :: Developers",
+      "Intended Audience :: Science/Research",
+      "Operating System :: POSIX :: Linux",
+      "Programming Language :: Python :: 3",
+      "Programming Language :: Python :: 3.11",
+      "Programming Language :: Python :: 3.12",
+      "Programming Language :: Python :: 3.13",
+      "Topic :: Software Development :: Quality Assurance",
+      "Topic :: Software Development :: Testing"
+    ]
+  },
+  "testpypi_sha256": {
+    "hoh-0.1.0-py3-none-any.whl": "1615b262c3489b8ea4f4577e7a5469dd36febbd0fc84c8bc4cc52f215f1f156b",
+    "hoh-0.1.0.tar.gz": "64a1a65270839e50afd2f134702458d7acaf0820c7ef1fdf723df3aede047b9b"
+  },
+  "testpypi_smoke": {
+    "version": "0.1.0",
+    "python": "3.12.14",
+    "import": "PASS",
+    "entry_point": "PASS",
+    "policy": "PASS",
+    "guard": "PASS",
+    "cli_list": "PASS",
+    "metadata": "PASS"
+  },
+  "checksum_manifest": {
+    "filename": "SHA256SUMS.txt",
+    "sha256": "c2e3ce4d6901dab0bbbe6aa21d5cdbe282680bdcc2471035f7be7f53cbf56711",
+    "github_asset_id": 566197426,
+    "download_matches_build": true
+  }
+}
