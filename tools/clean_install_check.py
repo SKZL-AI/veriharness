@@ -58,6 +58,7 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--source", default=".", help="tree to build from")
     ap.add_argument("--keep", action="store_true", help="keep the scratch directory")
+    ap.add_argument("--dist", help="test existing wheel/sdist without rebuilding them")
     args = ap.parse_args()
 
     quelle = Path(args.source).resolve()
@@ -74,16 +75,18 @@ def main() -> int:
         # behind in the tree under test, which is exactly the sort of residue a
         # "clean checkout" claim must not depend on.
         baum = arbeit / "source"
-        shutil.copytree(
-            quelle, baum,
-            ignore=shutil.ignore_patterns(
-                ".git", ".pytest_cache", ".ruff_cache", "__pycache__",
-                "build", "dist", "*.egg-info", "runs", "demo",
-            ),
-        )
-        schritt("build wheel and sdist", [sys.executable, "-m", "build", str(baum)], cwd=baum)
-
-        dist = baum / "dist"
+        if args.dist:
+            dist = Path(args.dist).resolve()
+        else:
+            shutil.copytree(
+                quelle, baum,
+                ignore=shutil.ignore_patterns(
+                    ".git", ".pytest_cache", ".ruff_cache", "__pycache__",
+                    "build", "dist", "*.egg-info", "runs", "demo",
+                ),
+            )
+            schritt("build wheel and sdist", [sys.executable, "-m", "build", str(baum)], cwd=baum)
+            dist = baum / "dist"
         raeder = sorted(dist.glob("*.whl"))
         quellen = sorted(dist.glob("*.tar.gz"))
         print(f"  {'OK  ' if raeder else 'ROT '} wheel produced: {[w.name for w in raeder] or 'none'}")

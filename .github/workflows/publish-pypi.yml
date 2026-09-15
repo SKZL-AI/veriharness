@@ -1,0 +1,201 @@
+name: Distribute immutable hoh v0.1.0
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_ref:
+        description: Immutable source tag (only audited v0.1.0 is accepted)
+        required: true
+        default: v0.1.0
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hoh-v0.1.0-distribution
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: github.repository == 'SKZL-AI/veriharness' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      test_exists: ${{ steps.test-existing.outputs.exists }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          path: control
+          persist-credentials: false
+      - uses: actions/checkout@v6
+        with:
+          ref: refs/tags/v0.1.0
+          fetch-depth: 0
+          path: source
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Verify immutable source identity and metadata
+        env:
+          RELEASE_REF: ${{ inputs.release_ref }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python control/tools/distribution_release.py identity --release-ref "$RELEASE_REF"
+          gh api repos/SKZL-AI/veriharness/releases/tags/v0.1.0 > release.json
+          python - <<'PY'
+          import json
+          release = json.load(open('release.json'))
+          assert release['tag_name'] == 'v0.1.0'
+          assert not release['draft'] and not release['prerelease']
+          PY
+      - name: Build wheel and sdist once
+        run: |
+          python -m pip install --upgrade pip build twine
+          mkdir -p bundle/dist
+          python -m build --outdir "$GITHUB_WORKSPACE/bundle/dist" source
+          python -m twine check --strict bundle/dist/*
+          python control/tools/distribution_release.py archive
+          python -m pip freeze > bundle/build-tool-versions.txt
+      - name: Official clean install checker, reusing the same distributions
+        run: python control/tools/clean_install_check.py --source source --dist bundle/dist
+      - name: Fresh wheel install and CLI/metadata/policy smoke
+        run: |
+          python -m venv "$RUNNER_TEMP/wheel-venv"
+          "$RUNNER_TEMP/wheel-venv/bin/python" -m pip install --no-cache-dir --index-url https://pypi.org/simple bundle/dist/*.whl
+          cp control/tools/distribution_smoke.py "$RUNNER_TEMP/distribution_smoke.py"
+          export PATH="$RUNNER_TEMP/wheel-venv/bin:$PATH"
+          cd "$RUNNER_TEMP"
+          python -I distribution_smoke.py | tee "$GITHUB_WORKSPACE/bundle/wheel-smoke.txt"
+      - name: Check existing TestPyPI files without skip-existing
+        id: test-existing
+        run: python control/tools/distribution_release.py index --index testpypi --allow-missing
+      - name: Retain verification tools with the canonical artifact bundle
+        run: |
+          cp control/tools/distribution_release.py control/tools/distribution_smoke.py bundle/
+          python control/tools/distribution_release.py hashes
+      - uses: actions/upload-artifact@v5
+        with:
+          name: hoh-v0.1.0-canonical
+          path: bundle/
+          if-no-files-found: error
+          retention-days: 90
+
+  testpypi:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/project/hoh/0.1.0/
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v6
+        with:
+          name: hoh-v0.1.0-canonical
+          path: bundle
+      - name: Verify artifact bytes
+        working-directory: bundle/dist
+        run: sha256sum --check ../SHA256SUMS.txt
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        if: needs.build.outputs.test_exists != 'true'
+        with:
+          packages-dir: bundle/dist/
+          repository-url: https://test.pypi.org/legacy/
+
+  testpypi-smoke:
+    needs: testpypi
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      pypi_exists: ${{ steps.pypi-existing.outputs.exists }}
+    steps:
+      - uses: actions/download-artifact@v6
+        with:
+          name: hoh-v0.1.0-canonical
+          path: bundle
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Verify TestPyPI metadata and downloaded file hashes
+        run: python bundle/distribution_release.py index --index testpypi
+      - name: Fresh TestPyPI install; dependencies only from production PyPI
+        run: |
+          python -m venv "$RUNNER_TEMP/test-venv"
+          "$RUNNER_TEMP/test-venv/bin/python" -m pip install --no-cache-dir --index-url https://pypi.org/simple 'pydantic>=2.0'
+          "$RUNNER_TEMP/test-venv/bin/python" -m pip install --no-cache-dir --no-deps --index-url https://test.pypi.org/simple hoh==0.1.0
+          cp bundle/distribution_smoke.py "$RUNNER_TEMP/distribution_smoke.py"
+          export PATH="$RUNNER_TEMP/test-venv/bin:$PATH"
+          cd "$RUNNER_TEMP"
+          python -I distribution_smoke.py | tee "$GITHUB_WORKSPACE/bundle/testpypi-smoke.txt"
+      - name: Verify any existing production version before approval
+        id: pypi-existing
+        run: python bundle/distribution_release.py index --index pypi --allow-missing
+      - uses: actions/upload-artifact@v5
+        with:
+          name: testpypi-verification
+          path: |
+            bundle/testpypi-verification.json
+            bundle/testpypi-smoke.txt
+          if-no-files-found: error
+
+  pypi:
+    needs: testpypi-smoke
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/hoh/0.1.0/
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v6
+        with:
+          name: hoh-v0.1.0-canonical
+          path: bundle
+      - name: Verify the identical tested artifact bytes
+        working-directory: bundle/dist
+        run: sha256sum --check ../SHA256SUMS.txt
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        if: needs.testpypi-smoke.outputs.pypi_exists != 'true'
+        with:
+          packages-dir: bundle/dist/
+
+  pypi-smoke:
+    needs: pypi
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.11', '3.12', '3.13']
+    steps:
+      - uses: actions/download-artifact@v6
+        with:
+          name: hoh-v0.1.0-canonical
+          path: bundle
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Verify production metadata and downloaded file hashes
+        run: python bundle/distribution_release.py index --index pypi
+      - name: Independent installation exclusively from production PyPI
+        run: |
+          python -m venv "$RUNNER_TEMP/pypi-venv"
+          "$RUNNER_TEMP/pypi-venv/bin/python" -m pip install --no-cache-dir --index-url https://pypi.org/simple hoh==0.1.0
+          cp bundle/distribution_smoke.py "$RUNNER_TEMP/distribution_smoke.py"
+          export PATH="$RUNNER_TEMP/pypi-venv/bin:$PATH"
+          cd "$RUNNER_TEMP"
+          python -I distribution_smoke.py | tee "$GITHUB_WORKSPACE/bundle/pypi-smoke.txt"
+      - uses: actions/upload-artifact@v5
+        with:
+          name: pypi-verification-${{ matrix.python }}
+          path: |
+            bundle/pypi-verification.json
+            bundle/pypi-smoke.txt
+          if-no-files-found: error

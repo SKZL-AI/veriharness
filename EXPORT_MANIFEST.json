@@ -7,6 +7,11 @@
       "rule": "repo-meta"
     },
     {
+      "path": ".github/workflows/publish-pypi.yml",
+      "decision": "INCLUDE",
+      "rule": "repo-meta"
+    },
+    {
       "path": ".gitignore",
       "decision": "INCLUDE",
       "rule": "repo-meta"
@@ -3797,6 +3802,11 @@
       "rule": "tests"
     },
     {
+      "path": "tests/test_distribution_release.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
       "path": "tests/test_evidence.py",
       "decision": "INCLUDE",
       "rule": "tests"
@@ -3973,6 +3983,16 @@
     },
     {
       "path": "tools/confinement_evidence.py",
+      "decision": "INCLUDE",
+      "rule": "tooling"
+    },
+    {
+      "path": "tools/distribution_release.py",
+      "decision": "INCLUDE",
+      "rule": "tooling"
+    },
+    {
+      "path": "tools/distribution_smoke.py",
       "decision": "INCLUDE",
       "rule": "tooling"
     },
