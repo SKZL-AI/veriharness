@@ -40,6 +40,32 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  artifact-transfer:
+    name: release artifact transfer integrity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Prepare a nested bundle and its checksum manifest
+        run: |
+          mkdir -p transfer-source/nested
+          cp .github/releases/v0.1.0.json transfer-source/nested/receipt.json
+          cp README.md transfer-source/README.md
+          cd transfer-source
+          sha256sum README.md nested/receipt.json > SHA256SUMS.txt
+      - uses: actions/upload-artifact@v7.0.1
+        with:
+          name: release-transfer-check
+          path: transfer-source/
+          if-no-files-found: error
+          retention-days: 1
+      - uses: actions/download-artifact@v8.0.1
+        with:
+          name: release-transfer-check
+          path: transfer-downloaded
+      - name: Verify downloaded bytes and directory layout
+        working-directory: transfer-downloaded
+        run: sha256sum --check SHA256SUMS.txt
+
   suite:
     name: tests and linter (Python ${{ matrix.python }})
     runs-on: ubuntu-latest
