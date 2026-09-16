@@ -280,6 +280,16 @@
         "eefb60a6e994b2f9925a0227f41519290ecfe3be"
       ],
       "why_not_the_product": "Independent verification of public registry and release bytes, provenance, installation receipts, and documentation after publication; no agent campaign or product acceptance is claimed."
+    },
+    {
+      "id": "release-supply-chain-hardening",
+      "category": "MAIN_ORCHESTRATOR_DIRECT",
+      "is_development_node": false,
+      "commits": [
+        "96b892086ceed40b90d7c794fadee932019c6318",
+        "ccd47e2bea5c1d3d9b6b73831ce0c8881cdb5372"
+      ],
+      "why_not_the_product": "Owner-authorized release trust-boundary maintenance: immutable release-tag rules, current artifact actions and an independent CI upload/download integrity check. Includes the preceding distribution-documentation merge; no product acceptance or benchmark result is claimed."
     }
   ]
 }
