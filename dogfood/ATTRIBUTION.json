@@ -304,6 +304,16 @@
         "ac99d82af07e8fb62fe790e5fde1f4ffd9be7883"
       ],
       "why_not_the_product": "Integrating work that was done in the public repository, and building the guard that stops the next export from reverting it. Outside any run for three reasons that compound: the integration decides how one ledger absorbs another's record, which is the ledger writing itself; it repairs two gates (attribution, readiness) that would otherwise be asked to certify the run doing the repair; and the guard is the mechanism by which this project's own work reaches the public repository at all. A run cannot be the thing that decides whose version of a file survives."
+    },
+    {
+      "id": "v010-o176-board-regeneration",
+      "category": "MAIN_ORCHESTRATOR_DIRECT",
+      "is_development_node": false,
+      "commits": [
+        "dbb4ca7ba83e8f521e15f0caa2a20bfe219deeb6",
+        "0b5795e9a4939092cb78435f485092e67f48a3e1"
+      ],
+      "why_not_the_product": "The board run that deleted the distribution section, and the repair of both halves of O176. Outside any run by construction: the first commit is the board writing itself, and the second changes how that board decides which ledger entries it owns -- a run cannot be the thing that repairs the accounting which certifies it. The finding was also found by inspection rather than by a gate, and deciding what a claim's text should be is not work a dispatch can be given."
     }
   ]
 }
