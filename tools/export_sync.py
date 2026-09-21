@@ -280,6 +280,11 @@ def export(push: bool) -> int:
         return 1
     print("push it from the staging checkout with an ordinary `git push`; "
           "this tool does not push for you and has no force path")
+    print("then record the new base: `python3 tools/export_sync.py record "
+          "--export-commit origin/main`. Skipping that leaves the base behind "
+          "our own push, and the next run reports our files as changed on both "
+          "sides -- a true statement about the recorded base and a false alarm "
+          "about the work.")
     return 0
 
 

@@ -391,8 +391,25 @@ def test_writing_the_document_re_anchors_its_own_ledger_entries(tmp_path,
         "| `a` | PASS | one | `cmd a` |\n"
         "| `b` | FAIL | two | `cmd b` |\n")
     (tmp_path / "CLAIMS.json").write_text(json.dumps({
-        "claims": [{"id": "C-001", "text": "old", "where": "docs/READINESS.md:7",
-                    "status": "SUPPORTED", "anchor_digest": "stale"}],
+        "claims": [
+            # Board-shaped: a stale version of the row it anchors. Ownership
+            # is decided on the text (O176), so a placeholder here would
+            # exercise the opposite of the real case.
+            {"id": "C-001", "text": "| `a` | FAIL | zero | `cmd a` |",
+             "where": "docs/READINESS.md:7",
+             "status": "SUPPORTED", "anchor_digest": "stale"},
+            # Not board-shaped, anchored in the same document: prose that
+            # somebody else's claim points at. It must come back untouched.
+            # Before O176 every entry in this file was zipped positionally
+            # against the generated rows, so a claim about the published
+            # distribution was rewritten into a `routing` row -- factually
+            # wrong, and green, because the ledger had been made consistent
+            # with itself.
+            {"id": "C-002",
+             "text": "The v0.1.0 distribution was published on 2026-09-15.",
+             "where": "docs/READINESS.md:9",
+             "status": "SUPPORTED", "anchor_digest": "prosa"},
+        ],
         "not_claims": [],
     }))
     monkeypatch.setattr(rd, "HOH", tmp_path)
@@ -403,10 +420,16 @@ def test_writing_the_document_re_anchors_its_own_ledger_entries(tmp_path,
     assert n >= 2
     ids = [e["id"] for e in d["claims"]]
     assert "C-001" in ids, "an existing entry was removed instead of updated"
-    assert len(d["claims"]) == 2, "one row, one claim"
-    assert all(e["anchor_digest"] != "stale" for e in d["claims"])
-    assert {e["text"] for e in d["claims"]} == {
-        "| `a` | PASS | one | `cmd a` |", "| `b` | FAIL | two | `cmd b` |"}
+    assert len(d["claims"]) == 3, "two rows, plus the prose entry left alone"
+    nach = {e["id"]: e for e in d["claims"]}
+    assert nach["C-001"]["anchor_digest"] != "stale"
+    assert nach["C-001"]["text"] == "| `a` | PASS | one | `cmd a` |"
+    # The negative control, and the half that matters: prose this tool does
+    # not write must come back exactly as it went in.
+    assert nach["C-002"]["text"] == (
+        "The v0.1.0 distribution was published on 2026-09-15.")
+    assert nach["C-002"]["anchor_digest"] == "prosa"
+    assert nach["C-002"]["where"] == "docs/READINESS.md:9"
     assert d["not_claims"], "the frame and the provenance line are not_claims"
 
 

@@ -2462,6 +2462,16 @@
       "rule": "internal-working-document"
     },
     {
+      "path": "dogfood/specs/o167-u2b-bare-paths.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/specs/o175-hardcoded-home-paths.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
       "path": "dogfood/specs/r1-export-manifest.md",
       "decision": "EXCLUDE",
       "rule": "internal-working-document"

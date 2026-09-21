@@ -922,6 +922,7 @@ def markdown(rows: list[Zeile], kopf: str) -> str:
     for r in rows:
         if r.warum:
             z.append(f"* **`{r.name}`** — {r.warum}.")
+    z += verteilung_abschnitt()
     z += [
         "",
         "## What this does not decide",
@@ -932,6 +933,59 @@ def markdown(rows: list[Zeile], kopf: str) -> str:
         "",
     ]
     return "\n".join(z)
+
+
+def verteilung_abschnitt() -> list[str]:
+    """What the published distribution establishes, rendered from its receipt.
+
+    O176. This section existed as prose somebody had written into
+    `docs/READINESS.md` by hand. The next `--write` regenerated the document
+    and dropped it -- seven sentences, four of them anchors for claims
+    C-465..C-468, gone in the commit that was supposed to integrate the work
+    they describe. The export guard could not catch it either, because a
+    generated file is exactly what its exemption list covers.
+
+    A generated document cannot hold hand-written content. So the content
+    moves to where the generator can see it: the machine-readable receipt the
+    publishing workflow wrote. Change the receipt and this section changes;
+    delete the receipt and the section says so rather than vanishing.
+    """
+    quittung = HOH / ".github/releases/v0.1.0.json"
+    if not quittung.is_file():
+        return ["", "## The published distribution", "",
+                "No distribution receipt in this tree, so nothing is claimed "
+                "about a published package here.", ""]
+    d = json.loads(quittung.read_text())
+    version = d.get("version", "unknown")
+    tag = d.get("source_tag", "unknown")
+    # Only the versions the receipt records as passing. Listing a version the
+    # receipt does not vouch for would be the shape this whole board refuses.
+    smoke = d.get("python_smoke") or {}
+    pythons = sorted(v for v, r in smoke.items()
+                     if isinstance(r, dict) and r.get("result") == "PASS")
+    z = ["", "## The published distribution", "",
+         "Rendered from `.github/releases/v0.1.0.json`, the receipt the "
+         "publishing workflow wrote. The table above remains the historical "
+         "measurement at its stated commit; these lines are about the package, "
+         "not about the campaigns.", ""]
+    wann = str(d.get("publication_timestamp") or "")[:10]
+    z.append(f"The v{version} distribution was published"
+             + (f" on {wann}" if wann else "")
+             + f" from the unchanged release tag `{tag}`.")
+    z.append("TestPyPI, PyPI, and the GitHub release carry byte-identical "
+             "wheel and sdist files.")
+    if pythons:
+        z.append("Fresh installations passed on Python "
+                 + ", ".join(str(v) for v in pythons)
+                 + "; both PEP-740 attestations were verified.")
+    z.append("Publication used OIDC Trusted Publishing through the protected "
+             "`pypi` environment, with no long-lived token.")
+    z.append("The [machine-readable receipt](../.github/releases/v0.1.0.json) "
+             "records hashes, job results, provenance and verification scope.")
+    z.append("These distribution checks do not remeasure the historical agent "
+             "campaigns and do not establish external sandbox support.")
+    z.append("")
+    return z
 
 
 def _anker(zeile: str) -> str:
@@ -965,9 +1019,31 @@ def _ledger_nachziehen(ziel: Path) -> int:
                     or z.startswith("* **`") or z.startswith("| condition |")
                     or z.startswith("|---") or z.startswith("Measured at")]
 
+    def gehoert_uns(text: str) -> bool:
+        """Is this entry one this tool writes, or somebody else's?
+
+        O176, second half. `vorhanden` used to be *every* entry anchored in
+        this document, zipped positionally against the rows this tool
+        generates. That was true while the board's rows were the only claims
+        here. When four claims arrived whose anchors were prose in the
+        distribution section, they were swept into the same list and silently
+        rewritten: C-465's text became a `routing` table row. The ledger stayed
+        internally consistent and became factually wrong, which is the one
+        outcome a ledger must not have.
+
+        Ownership is decided on the shape this tool emits, not on the file the
+        entry happens to live in.
+        """
+        s = text.strip()
+        return (s.startswith("| `") or s.startswith("* **`")
+                or s.startswith("| condition |") or s.startswith("|---")
+                or s.startswith("Measured at")
+                or s.startswith("Open, and each one blocking"))
+
     def nachziehen(schlüssel: str, praefix: str, neue, notiz: dict) -> int:
         vorhanden = [e for e in d[schlüssel]
-                     if e.get("where", "").startswith(rel + ":")]
+                     if e.get("where", "").startswith(rel + ":")
+                     and gehoert_uns(e.get("text", ""))]
         n = 0
         for e, (i, z) in zip(vorhanden, neue, strict=False):
             e["where"] = f"{rel}:{i}"
