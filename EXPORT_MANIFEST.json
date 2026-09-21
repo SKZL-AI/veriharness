@@ -92,6 +92,11 @@
       "rule": "internal-working-document"
     },
     {
+      "path": "DOGFOOD_SUCCESSION.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
       "path": "EXPORT_MANIFEST.json",
       "decision": "INCLUDE",
       "rule": "governance"
@@ -3032,6 +3037,11 @@
       "rule": "internal-working-document"
     },
     {
+      "path": "dogfood/succession/SUCCESSION.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
       "path": "dogfood/unattended-e2e/fixture-git-log.txt",
       "decision": "EXCLUDE",
       "rule": "internal-working-document"
@@ -3937,6 +3947,11 @@
       "rule": "tests"
     },
     {
+      "path": "tests/test_succession.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
       "path": "tests/test_taxonomy_telemetry.py",
       "decision": "INCLUDE",
       "rule": "tests"
@@ -4058,6 +4073,11 @@
     },
     {
       "path": "tools/repetition_plan.py",
+      "decision": "INCLUDE",
+      "rule": "tooling"
+    },
+    {
+      "path": "tools/succession.py",
       "decision": "INCLUDE",
       "rule": "tooling"
     },

@@ -215,6 +215,23 @@ REPO_META_BASENAMES = frozenset({".gitignore", ".gitattributes", ".dockerignore"
 #: internal-working-document.
 CLAIMS_LEDGER_BASENAMES = frozenset({"CLAIMS.json", "CLAIMS.md"})
 
+#: O181. The four `DOGFOOD_*.md` files that predate this rule are classified
+#: `internal-working-document` by the German-density heuristic -- not because
+#: of what they are, but because of the language they happen to be written
+#: in. A fifth one written in English fell straight through to `public-docs`,
+#: and the leak scan then caught it carrying this machine's home directory.
+#:
+#: The heuristic is not the defect and is not touched: it was calibrated on
+#: this repository's own documents and it is right about all four. What it
+#: cannot do is see that a document is an internal working note when the note
+#: is in English, because language is not the property that decides.
+#:
+#: `DOGFOOD_` is this project's own marker for that property, worn by every
+#: such file it has. Named here so the classification rests on the marker
+#: rather than on a language accident, narrow enough that it claims nothing
+#: about any other file.
+_DOGFOOD_BASENAME_RE = re.compile(r"^DOGFOOD_.+\.md$")
+
 #: A root-level parked predecessor: NAME.v<digits>.<rest>, sibling of NAME.
 _VERSIONED_SIBLING_RE = re.compile(r"^(?P<base>.+)\.v\d+\.(?P<rest>.+)$")
 
@@ -769,6 +786,8 @@ def _classify(rel_path: str, root: Path) -> tuple[str, str]:
                 return "EXCLUDE", "foreign-subject"
             if german_density(text) >= GERMAN_DENSITY_THRESHOLD:
                 return "EXCLUDE", "internal-working-document"
+        if _DOGFOOD_BASENAME_RE.match(rel_path.rsplit("/", 1)[-1]):
+            return "EXCLUDE", "internal-working-document"
         return "INCLUDE", "public-docs"
 
     return "EXCLUDE", "unclassified"

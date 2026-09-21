@@ -146,6 +146,14 @@ _ALLOWED = {
     "Alter Eintrag",
     "Rahmen bestaetigt",
     "Kandidatenbindung verletzt",
+    # O183. Not product output: a sample of the ledger, which is German and
+    # internal, fed to the pattern that reads it. The vacuity this gate exists
+    # to catch is a German *expectation* about an English source; this is a
+    # German *input* with an English expectation about it, and it fails the
+    # moment the pattern gets looser -- which is what it is there for.
+    "Priorität dieser Sache ist offen",
+    "Priorität: mittel",
+    "ein getracktes Todo bleibt offen",
 }
 
 #: Five characters, not seven. `"belegt"` is exactly six and sat in the word

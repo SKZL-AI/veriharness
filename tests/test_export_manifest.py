@@ -1481,3 +1481,51 @@ def test_hardcoded_home_ignores_ellipsis_and_placeholder_root():
                  "https:" + _SL * 2 + "example.com" + _abs("home", "example", "x"),
                  "file:rel" + _abs("home", "example")):
         assert em.find_hardcoded_home_path(text) is None, text
+
+
+def test_an_internal_working_note_is_classified_by_its_marker_not_its_language():
+    """O181: the four DOGFOOD_*.md files that predate this rule are EXCLUDE
+    because of the language they are written in, not because of what they are.
+
+    The German-density heuristic was calibrated on this repository's documents
+    and is right about all four. What it cannot see is that an internal
+    working note written in **English** is still an internal working note --
+    and the fifth one, written in English, fell through to `public-docs`. The
+    leak scan then caught it carrying this machine's home directory, which is
+    the second gate doing the first gate's job.
+
+    Both halves are pinned. The negative control is the one that matters: the
+    rule must claim nothing beyond the marker, or every root-level markdown
+    file quietly becomes internal.
+    """
+    import tools.export_manifest as em  # noqa: PLC0415
+
+    englisch = ("# A note\n\nThis document is written in English and says "
+                "nothing German at all, so the density heuristic will not "
+                "classify it.\n")
+    assert em.german_density(englisch) < em.GERMAN_DENSITY_THRESHOLD
+
+    with tempfile.TemporaryDirectory() as tmp:
+        wurzel = Path(tmp)
+        (wurzel / "docs").mkdir()
+
+        def regel_fuer(pfad: str) -> tuple[str, str]:
+            ziel = wurzel / pfad
+            ziel.parent.mkdir(parents=True, exist_ok=True)
+            ziel.write_text(englisch, encoding="utf-8")
+            return em._classify(pfad, wurzel)
+
+        assert regel_fuer("DOGFOOD_SOMETHING.md") == (
+            "EXCLUDE", "internal-working-document")
+
+        # Negative controls: the marker, and only the marker. An English
+        # document without it stays public, or the rule has quietly made
+        # every root-level note internal.
+        for pfad in ("README.md", "NOTES.md", "docs/GUIDE.md",
+                     "DOGFOODISH.md"):
+            _, regel = regel_fuer(pfad)
+            assert regel != "internal-working-document", (
+                f"{pfad} was swallowed by a rule that should only match the "
+                "marker"
+            )
+

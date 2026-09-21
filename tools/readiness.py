@@ -151,6 +151,38 @@ def zeile_attribution() -> Zeile:
                  "to take the phase's own description of itself on trust")
 
 
+def zeile_succession() -> Zeile:
+    """Does the phase boundary still describe the tree it was written in?
+
+    A long programme outlives the session that starts it, and the handover has
+    been a document nobody could check. This row is the check: green means a
+    successor can pick the capsule up and the ground under it has not moved.
+    """
+    befehl = "python3 tools/succession.py verify"
+    rc, aus = _py("tools/succession.py", "verify")
+    if rc == 2:
+        return Zeile("succession", NOT_RUN,
+                     "no succession capsule in this tree", befehl,
+                     "a phase boundary that was never written is not a "
+                     "verified one; the row says so rather than reporting "
+                     "the absence as safe")
+    if rc == 3:
+        luecken = [z for z in aus.splitlines() if "could not be checked" in z]
+        return Zeile("succession", NOT_RUN,
+                     (luecken[0].strip()[:90] if luecken
+                      else "some fields could not be checked here"), befehl,
+                     "a field that cannot be checked from this machine is an "
+                     "environment gap, which is neither a pass nor drift")
+    gedriftet = [z for z in aus.splitlines() if z.strip().startswith("DRIFTED:")]
+    return Zeile(
+        "succession", PASS if rc == 0 else FAIL,
+        (gedriftet[0].strip()[:90] if gedriftet
+         else "every field re-derives from this tree"),
+        befehl,
+        "the capsule is not wrong about the past when it drifts -- it is "
+        "stale about the present, and a successor reading it would be too")
+
+
 def zeile_export_sync() -> Zeile:
     """Would exporting right now overwrite work that did not come from here?
 
@@ -881,6 +913,7 @@ def zeilen(quick: bool) -> list[Zeile]:
         zeile_benchmark_v3(),
         zeile_export(),
         zeile_export_sync(),
+        zeile_succession(),
         zeile_install(quick),
         zeile_attribution(),
         zeile_evidenzindex(),
