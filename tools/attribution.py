@@ -216,14 +216,30 @@ def _lauf_nachweis(repo: Path, eintrag: dict) -> list[str]:
     return []
 
 
+#: Files whose sole change cannot be development work, because each is
+#: generated from the tree it describes and contains nothing else. O186 added
+#: the second one: the succession capsule is written by a tool, its content is
+#: derived, and it is re-written after every commit -- so without this rule
+#: each capsule commit created the next unattributed commit, forever.
+BOOKKEEPING_PATHS = frozenset({
+    "dogfood/ATTRIBUTION.json",
+    "dogfood/succession/SUCCESSION.json",
+})
+
+
 def _nur_das_ledger(repo: Path, sha: str) -> bool:
-    """Did this commit touch `dogfood/ATTRIBUTION.json` and nothing else?
+    """Did this commit touch exactly one bookkeeping file and nothing else?
 
     A commit that changed only this ledger is the ledger recording earlier
     commits. It cannot itself be unaccounted development work, because it
     changed no code, no document and no evidence -- which is a stronger
     statement than "its message says it is bookkeeping", and is why this asks
-    git rather than reading the message.
+    git rather than reading the message. The same argument, and only that
+    argument, extends the rule to the succession capsule.
+
+    **One** of them, not a subset: a commit carrying both is a commit doing
+    two things at once, and the point of the rule is that the diff leaves no
+    room for a third.
 
     A merge commit is deliberately not special-cased: `git show --name-only`
     on a merge lists nothing, so this returns False and the commit stays a gap
@@ -231,7 +247,7 @@ def _nur_das_ledger(repo: Path, sha: str) -> bool:
     """
     text = _git(repo, "show", "--name-only", "--format=", sha)
     pfade = {z.strip() for z in text.splitlines() if z.strip()}
-    return pfade == {"dogfood/ATTRIBUTION.json"}
+    return len(pfade) == 1 and pfade <= BOOKKEEPING_PATHS
 
 
 def _anker_vorhanden(repo: Path, anker: str) -> bool:

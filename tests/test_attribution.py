@@ -170,12 +170,77 @@ def test_todays_work_is_not_attributed_to_the_product():
                 f"{nach_sha[sha]}, and the session wrote it by hand")
 
 
-def test_two_unattributed_commits_are_still_a_gap():
-    """One is the price of a closed range. Two is the thing being prevented."""
-    if _fremde_historie():
-        pytest.skip("this clone does not contain the history the ledger describes")
-    bericht = at.pruefe(WURZEL, {"anchor": "HEAD~3", "entries": []})
+def _scratch_history(tmp, commits):
+    """A scratch history: [(message, {path: content}), ...] after an anchor."""
+    import subprocess as _sp
+    repo = tmp / "r"
+    repo.mkdir()
+
+    def g(*a):
+        return _sp.run(["git", "-C", str(repo), *a], capture_output=True,
+                       text=True, check=True).stdout.strip()
+
+    g("init", "-q", "-b", "main")
+    g("config", "user.email", "t@example.invalid")
+    g("config", "user.name", "t")
+    (repo / "a.txt").write_text("0\n")
+    g("add", "-A"); g("commit", "-q", "-m", "anchor")
+    shas = {"anchor": g("rev-parse", "HEAD")}
+    for message, dateien in commits:
+        for rel, inhalt in dateien.items():
+            ziel = repo / rel
+            ziel.parent.mkdir(parents=True, exist_ok=True)
+            ziel.write_text(inhalt)
+        g("add", "-A"); g("commit", "-q", "-m", message)
+        shas[message] = g("rev-parse", "HEAD")
+    return repo, shas
+
+
+def test_two_unattributed_commits_are_still_a_gap(tmp_path):
+    """One is the price of a closed range. Two is the thing being prevented.
+
+    O186. This read `HEAD~3` of the live repository, which stopped being two
+    unattributed commits the moment the last three were bookkeeping -- and the
+    test went red for a reason that had nothing to do with its subject. A
+    check about what a history shape means belongs on a history built for it.
+    """
+    repo, shas = _scratch_history(tmp_path, [
+        ("work one", {"a.txt": "1\n"}),
+        ("work two", {"a.txt": "2\n"}),
+        ("tip", {"a.txt": "3\n"}),
+    ])
+    bericht = at.pruefe(repo, {"anchor": shas["anchor"], "entries": []})
     assert any("belong to no entry" in p for p in bericht["problems"])
+    # And named, both of them: a count without the shas is not actionable.
+    assert shas["work one"][:12] in " ".join(bericht["problems"])
+    assert shas["work two"][:12] in " ".join(bericht["problems"])
+
+
+def test_a_capsule_only_commit_is_bookkeeping_and_a_mixed_one_is_not(tmp_path):
+    """O186. The capsule is re-written after every commit, so without this the
+    chain could not be closed: each capsule commit created the next gap, and
+    closing that one needed another capsule commit. The same argument as the
+    ledger, and it stops at exactly the same place -- one bookkeeping file,
+    nothing beside it."""
+    kapsel = "dogfood/succession/SUCCESSION.json"
+    repo, shas = _scratch_history(tmp_path, [
+        ("work", {"a.txt": "1\n"}),
+        ("capsule only", {kapsel: '{"c": 1}\n'}),
+        ("capsule and more", {kapsel: '{"c": 2}\n', "a.txt": "2\n"}),
+        ("both ledgers", {kapsel: '{"c": 3}\n',
+                          "dogfood/ATTRIBUTION.json": '{"x": 1}\n'}),
+        ("tip", {"a.txt": "3\n"}),
+    ])
+    ledger = {"anchor": shas["anchor"], "entries": [
+        {"id": "e", "category": "MAIN_ORCHESTRATOR_DIRECT",
+         "is_development_node": False, "commits": [shas["work"]],
+         "why_not_the_product": "fixture"},
+    ]}
+    offen = " ".join(at.pruefe(repo, ledger)["problems"])
+    assert shas["capsule only"][:12] not in offen, "a capsule-only commit is bookkeeping"
+    assert shas["capsule and more"][:12] in offen, "anything beside it is work"
+    assert shas["both ledgers"][:12] in offen, (
+        "two bookkeeping files in one commit is a commit doing two things")
 
 def test_a_ledger_only_commit_is_tolerated_and_anything_else_is_not():
     """O169: with only the tip tolerated, this check had no reachable green.

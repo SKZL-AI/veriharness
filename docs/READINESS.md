@@ -5,15 +5,15 @@ command that produced it, and the verdict is the conjunction of the
 rows rather than a judgement typed above them. A row this tool cannot
 evaluate is `NOT_RUN`, which is never a pass.
 
-Measured at `baccc91` on 2026-09-21.
+Measured at `e0212e6` on 2026-09-21.
 
     TECHNICALLY_STABLE_READY = no
 
-Open, and each one blocking: export_sync, external_ci.
+Open, and each one blocking: succession, external_ci.
 
 | condition | state | measured | command |
 |---|---|---|---|
-| `tests` | PASS | 1314 passed | `python3 -m pytest -q` |
+| `tests` | PASS | 1319 passed | `python3 -m pytest -q` |
 | `lint` | PASS | clean | `ruff check --select F,E9 src tests tools` |
 | `claims` | PASS | OK: all checks passed | `python3 tools/check_claims.py check all` |
 | `union_invariants` | PASS | U1-U5 pass | `python3 tools/union_gate.py` |
@@ -26,13 +26,13 @@ Open, and each one blocking: export_sync, external_ci.
 | `benchmark_v2_historical` | FAIL (advisory) | HISTORICAL_COMPLETE; matched_budget_valid = NO; budget_rule violated: 2 cell(s) ran past the dispatch budget without being stopped | `python3 tools/repetition_plan.py --campaign v2` |
 | `benchmark_v3` | PASS | 15 of 15 cells; COMPLETE; matched_budget_valid = YES; freeze DRIFTED (post-campaign repair, accounted for) | `python3 tools/prereg.py check --campaign v3 && python3 tools/repetition_plan.py --campaign v3` |
 | `export_manifest` | PASS | no leaks, 0 unacknowledged dangling reference(s), 12 acknowledged, 0 other problem(s) | `python3 tools/export_manifest.py check` |
-| `export_sync` | NOT_RUN | STOP -- no export checkout. Set VERIHARNESS_EXPORT_CHECKOUT to the checkout that carries t | `python3 tools/export_sync.py status` |
-| `succession` | PASS | every field re-derives from this tree | `python3 tools/succession.py verify` |
+| `export_sync` | PASS | clean; 6 ours to write | `python3 tools/export_sync.py status` |
+| `succession` | FAIL | DRIFTED: 1 field(s) no longer describe this tree: internal_commit | `python3 tools/succession.py verify` |
 | `clean_install` | PASS | 0 red step(s) | `python3 tools/clean_install_check.py` |
 | `attribution` | PASS | 1 of 12 nodes through the product | `python3 tools/attribution.py` |
 | `evidence_index` | PASS | EVIDENCE_INDEX.md matches the trees it describes | `python3 tools/evidence_index.py` |
 | `paper_audit` | PASS | 8 of 8 checks | `python3 tools/audit_refs.py <each check>` |
-| `external_ci` | FAIL | the recorded run tested a different export: 7 path(s) differ beyond this gate's own reports (tests/test_succession.py, tools/succession.py, EXPORT_MANIFEST.json). Re-export, re-run CI, record it again. | `python3 tools/exact_head_ci.py --run-id ID --export-commit SHA` |
+| `external_ci` | FAIL | the recorded run tested a different export: 3 path(s) differ beyond this gate's own reports (dogfood/ATTRIBUTION.json, tests/test_attribution.py, tools/attribution.py). Re-export, re-run CI, record it again. | `python3 tools/exact_head_ci.py --run-id ID --export-commit SHA` |
 | `routing` | PASS | DEFERRED_ON_EVIDENCE | `read docs/ROUTING.md` |
 
 ## Why some rows are advisory
@@ -44,7 +44,7 @@ Open, and each one blocking: export_sync, external_ci.
 * **`benchmark_v2_historical`** — historical and advisory: v2 is an immutable dataset, its matched budget was not matched during the runs, and no step available today changes that. A blocking row over it could never be satisfied, and a gate that cannot be satisfied puts pressure on re-interpreting the dataset -- the one thing freezing a protocol forbids. `benchmark_v3` carries the release question.
 * **`benchmark_v3`** — the campaign a release may rest on: pre-registered, run under an enforced budget, complete. A campaign that produced every result file while violating the protocol is FAIL here, because the files are not what is being asked about.
 * **`export_manifest`** — the dangling references are limitation 12e: published documents citing internal ones. Advisory, because none of them is a false claim -- what a reader loses is the ability to follow a citation.
-* **`export_sync`** — a comparison that did not run is not a green one; the row says so rather than reporting the absence as safe.
+* **`export_sync`** — the export is one-directional and the public repository is not read-only: this row is what stops a copy from reverting work done there.
 * **`succession`** — the capsule is not wrong about the past when it drifts -- it is stale about the present, and a successor reading it would be too.
 * **`attribution`** — the ratio is not a gate -- it is reported so that nobody has to take the phase's own description of itself on trust.
 * **`paper_audit`** — `coverage` is red on a maintenance item paper/AUDIT.md itself flags and explains: paper/NUMBERS.md catalogues the 2 of a '2 of 3' ratio and not the 3. It is a documented, deliberately deferred operator item, not an unexamined failure.

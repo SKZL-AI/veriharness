@@ -398,6 +398,36 @@
         "476519012a4f9e16b14e08badc24a93fefa5c69d"
       ],
       "why_not_the_product": "An instruction about the product's language, carried out by the orchestrator, plus the three defects that carrying it out exposed (O182-O184). Outside any run: the language of the published surface is a decision nobody dispatched, and two of the three defects were in the succession tooling itself -- a run cannot be the thing that repairs the instrument its own handover is measured with."
+    },
+    {
+      "id": "v010-phase-close",
+      "category": "MAIN_ORCHESTRATOR_DIRECT",
+      "is_development_node": false,
+      "commits": [
+        "71408e81a26baa9cf89e9bafef6f801196a96085",
+        "b361f505f90db155d48d579edac8a60112ea05d3"
+      ],
+      "why_not_the_product": "O185 and the board that closes the phase. Outside any run: O185 is a defect in the published test suite found by running it in the export rather than here, which is an act of comparing two trees and belongs to whoever holds both. The board is the measurement a run cannot make about itself."
+    },
+    {
+      "id": "v010-handover",
+      "category": "MAIN_ORCHESTRATOR_DIRECT",
+      "is_development_node": false,
+      "commits": [
+        "35ccedb085a8555ee22625b5b71c72f817ff7751",
+        "c67aabb92dd1062c6b9269db59548df9e202e381"
+      ],
+      "why_not_the_product": "The capsule and the handover note beside it. Outside any run by construction: both describe what a successor session inherits, and a run inside this phase cannot describe the boundary of the phase that contains it."
+    },
+    {
+      "id": "v010-bookkeeping-rule",
+      "category": "MAIN_ORCHESTRATOR_DIRECT",
+      "is_development_node": false,
+      "commits": [
+        "e0212e64c5c5eee9b61f7a5c98416b3c7bceaf4c",
+        "46da7dff2052ec72ffe7cc5b5a221bf58e837828"
+      ],
+      "why_not_the_product": "O186, the rule that decides which commits this ledger has to account for, and the board beside it. Outside any run by construction: a run cannot widen the rule that decides whether its own commits need attributing, and the board is the measurement a run cannot make about itself."
     }
   ]
 }
