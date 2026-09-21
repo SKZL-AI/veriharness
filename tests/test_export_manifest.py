@@ -1324,3 +1324,160 @@ def test_the_campaigns_own_declaration_and_evidence_are_published():
             "the superseded registration is not published: it is superseded, "
             "nothing points at it as a path, and the claim it supports is "
             "checkable from git without it")
+
+
+# --------------------------------------------------------------------------
+# O175: a literal absolute path under a concrete home directory, in any
+# INCLUDE file regardless of rule. Every fixture path is assembled at runtime
+# so this file itself stays clean under the check it tests.
+# --------------------------------------------------------------------------
+
+_SL = chr(47)
+
+
+def _abs(*parts: str) -> str:
+    return _SL + _SL.join(parts)
+
+
+_STAGING_LINE = 'STAGING = Path("' + _abs("home", "example", "checkout") + '")\n'
+
+
+def _scan_one(tmp_path, rel: str, text: str, rule: str) -> list[dict]:
+    target = tmp_path / rel
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(text, encoding="utf-8")
+    return em.scan_include_for_leaks(
+        [{"path": rel, "decision": "INCLUDE", "rule": rule}], tmp_path)
+
+
+def test_hardcoded_home_fires_on_code_literal():
+    found = em.find_hardcoded_home_path(_STAGING_LINE)
+    assert found == _abs("home", "example", "checkout")
+
+
+def test_hardcoded_home_fires_inside_a_comment():
+    text = "x = 1  # staging lives at " + _abs("home", "example", "checkout") + "\n"
+    assert em.find_hardcoded_home_path(text) is not None
+
+
+def test_hardcoded_home_fires_inside_a_docstring():
+    text = ('def f():\n    """Copies into '
+            + _abs("home", "example", "checkout") + ' first."""\n')
+    assert em.find_hardcoded_home_path(text) is not None
+
+
+def test_hardcoded_home_fires_on_users_and_root():
+    assert em.find_hardcoded_home_path(
+        'p = "' + _abs("Users", "example", "src") + '"') is not None
+    assert em.find_hardcoded_home_path(
+        'p = "' + _abs("root", ".config", "x") + '"') is not None
+
+
+def test_hardcoded_home_scan_fires_under_a_non_docs_rule(tmp_path):
+    findings = _scan_one(tmp_path, "tools/stage.py", _STAGING_LINE, "tooling")
+    assert findings == [{"type": "hardcoded-home-path", "path": "tools/stage.py"}]
+
+
+def test_hardcoded_home_type_is_distinct_from_home_path(tmp_path):
+    findings = _scan_one(tmp_path, "docs/a.md", _STAGING_LINE, "public-docs")
+    assert sorted(f["type"] for f in findings) == ["hardcoded-home-path", "home-path"]
+
+
+def test_hardcoded_home_ignores_tilde_and_home_variable():
+    for text in ('p = "~' + _SL + 'checkout"',
+                 "cd $HOME" + _SL + "checkout",
+                 "x=${HOME}" + _SL + "checkout",
+                 'os.path.expanduser("~")'):
+        assert em.find_hardcoded_home_path(text) is None, text
+
+
+def test_hardcoded_home_ignores_path_home():
+    assert em.find_hardcoded_home_path('STAGING = Path.home() / "checkout"') is None
+
+
+def test_hardcoded_home_ignores_policy_guard_pattern_file(tmp_path):
+    home = _SL + "home" + _SL
+    guard = ("(^|[;&|])rm[[:space:]]+(" + home + "|" + _SL + "root" + _SL
+             + ")[^[:space:]]*\n"
+             + 're.compile(r"' + home + "[^" + _SL + "]+" + _SL + '")\n'
+             + "never write under " + home + " or " + home + "*" + _SL + "\n")
+    assert em.find_hardcoded_home_path(guard) is None
+    findings = _scan_one(tmp_path, "src/hoh/policy/guard.txt", guard, "package")
+    assert [f for f in findings if f["type"] == "hardcoded-home-path"] == []
+
+
+def test_hardcoded_home_ignores_relative_paths():
+    for text in ("home" + _SL + "example" + _SL + "checkout",
+                 "dogfood" + _SL + "x" + _abs("home", "example", "y"),
+                 "." + _abs("home", "example", "x")):
+        assert em.find_hardcoded_home_path(text) is None, text
+
+
+def test_hardcoded_home_ignores_the_placeholder_name():
+    text = 'cwd = "' + _abs("home", "someone", "hoh") + '"'
+    assert em.find_hardcoded_home_path(text) is None
+
+
+def test_hardcoded_home_ignores_bare_prefixes_in_prose():
+    home = _SL + "home" + _SL
+    for text in ("a path like " + home + "<name>" + _SL + "x",
+                 "No " + home + ", " + _SL + "root" + _SL + ", or ~" + _SL):
+        assert em.find_hardcoded_home_path(text) is None, text
+
+
+def test_no_literal_home_path_in_current_include_set():
+    """Criterion 2 of O175: the tree as it stands carries no such literal.
+
+    If this fails, narrow the pattern; do not exempt the file.
+    """
+    manifest = json.loads((REPO_ROOT / "EXPORT_MANIFEST.json").read_text(encoding="utf-8"))
+    read = 0
+    hits = []
+    for e in manifest["entries"]:
+        if e["decision"] != "INCLUDE" or e["path"].endswith("/"):
+            continue
+        try:
+            text = (REPO_ROOT / e["path"]).read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        read += 1
+        found = em.find_hardcoded_home_path(text)
+        if found is not None:
+            hits.append((e["path"], found))
+    assert read >= 140, read
+    assert hits == []
+
+
+def test_hardcoded_home_fires_on_file_urls():
+    home = _abs("home", "example")
+    users = _abs("Users", "example")
+    assert em.find_hardcoded_home_path(
+        'u = "file:' + _SL * 2 + home + _SL + 'x"') == home + _SL + "x"
+    assert em.find_hardcoded_home_path(
+        "file:" + _SL * 2 + "localhost" + users + _SL + "x") == users + _SL + "x"
+
+
+def test_hardcoded_home_fires_on_a_bare_home_root():
+    home = _abs("home", "example")
+    users = _abs("Users", "example")
+    assert em.find_hardcoded_home_path('STAGING = Path("' + home + '")') == home
+    assert em.find_hardcoded_home_path("cd " + users) == users
+    assert em.find_hardcoded_home_path("(" + home + ")") == home
+
+
+def test_hardcoded_home_ignores_users_shared():
+    for text in (_abs("Users", "Shared", "x"),
+                 "in " + _abs("Users", "Shared") + ".",
+                 'p = "' + _abs("Users", "Shared") + '"'):
+        assert em.find_hardcoded_home_path(text) is None, text
+    # Only under /Users: a Linux user may well be called that.
+    assert em.find_hardcoded_home_path(_abs("home", "Shared", "x")) is not None
+
+
+def test_hardcoded_home_ignores_ellipsis_and_placeholder_root():
+    for text in ("`" + _abs("home", "...") + "`",
+                 "`" + _SL + _abs("home", "...") + "` is the same",
+                 'cwd = "' + _abs("home", "someone") + '"',
+                 "https:" + _SL * 2 + "example.com" + _abs("home", "example", "x"),
+                 "file:rel" + _abs("home", "example")):
+        assert em.find_hardcoded_home_path(text) is None, text

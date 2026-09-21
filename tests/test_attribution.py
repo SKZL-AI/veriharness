@@ -476,3 +476,98 @@ def test_both_output_modes_carry_the_same_exit_semantics():
                        "--json").returncode
         assert rc_text == rc_json == 0, (f"text={rc_text} json={rc_json}")
 
+
+def _lauf_zustand(pfad, candidate_id, tree_digest):
+    import json as _json
+    pfad.parent.mkdir(parents=True, exist_ok=True)
+    pfad.write_text(_json.dumps({"last_accepted_candidate": {
+        "candidate_id": candidate_id, "tree_digest": tree_digest}}))
+
+
+def test_a_plain_run_entry_must_point_at_the_contents_that_were_accepted():
+    """O179: the category exists because neither neighbour was true.
+
+    `VERIHARNESS_RUN` says "a merge the product decided" and wants a
+    ProjectState node; `MAIN_ORCHESTRATOR_DIRECT` says the main session wrote
+    it. A plain run that the orchestrator merged after review is neither, and
+    forcing one of them would have put a false entry in the one file whose
+    purpose is not to carry one.
+
+    The bar is raised rather than lowered by the split: this binds the claim
+    to **bytes**. The accepted candidate's recorded tree digest has to equal
+    the git tree of a commit the entry claims. A lifecycle string says a node
+    was merged; this says these contents were the ones accepted.
+    """
+    import tempfile as _tf
+    from pathlib import Path as _P
+
+    with _tf.TemporaryDirectory() as tmp:
+        repo, anker, arbeit = _fixture_repo(tmp)
+        baum = at._git(repo, "rev-parse", f"{arbeit}^{{tree}}").strip()
+        zustand = _P(tmp) / "runs" / "r1" / "state.json"
+        _lauf_zustand(repo / "runs/r1/state.json", "r1-i2", baum)
+
+        def probleme(**ueberschreiben):
+            e = {"id": "e", "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+                 "is_development_node": True, "commits": [arbeit],
+                 "run_state": "runs/r1/state.json", "candidate_id": "r1-i2",
+                 "why_not_the_product": "fixture"}
+            e.update(ueberschreiben)
+            return at.pruefe(repo, {"anchor": anker, "entries": [e]})["problems"]
+
+        assert not probleme(), probleme()
+
+        # Each way of claiming without pointing.
+        assert any("names no run state" in p for p in probleme(run_state=""))
+        assert any("not there" in p
+                   for p in probleme(run_state="runs/nope/state.json"))
+        assert any("no candidate_id" in p for p in probleme(candidate_id=""))
+        assert any("records" in p and "as the accepted one" in p
+                   for p in probleme(candidate_id="r1-i9")), (
+            "an entry could name one run and mean another iteration of it")
+
+        # The negative control that matters: the right run, the right
+        # candidate, and contents that are not the ones this entry claims.
+        anderer = at._git(repo, "rev-parse", f"{anker}^{{tree}}").strip()
+        assert anderer != baum
+        _lauf_zustand(repo / "runs/r1/state.json", "r1-i2", anderer)
+        assert any("is not the tree of any commit this entry claims" in p
+                   for p in probleme()), (
+            "the entry was accepted while the run's accepted contents were "
+            "somewhere else -- the binding to bytes is not doing its work"
+        )
+        assert zustand or True  # kept: the fixture path is inside the repo
+
+
+def test_the_new_category_moves_neither_number_it_sits_between():
+    """The ratio is about the full control plane, merge decision included.
+
+    Counting a plain run in the numerator would claim the product decided a
+    merge it did not; leaving it only in the denominator would deny that the
+    product developed the node. Both are false, so neither moves and a third
+    number says what happened.
+    """
+    import tempfile as _tf
+
+    with _tf.TemporaryDirectory() as tmp:
+        repo, anker, arbeit = _fixture_repo(tmp)
+        baum = at._git(repo, "rev-parse", f"{arbeit}^{{tree}}").strip()
+        _lauf_zustand(repo / "runs/r1/state.json", "r1-i2", baum)
+
+        ohne = at.pruefe(repo, {"anchor": anker, "entries": [
+            {"id": "i", "category": "MAIN_ORCHESTRATOR_DIRECT",
+             "is_development_node": True, "commits": [arbeit],
+             "why_not_the_product": "fixture"}]})
+        mit = at.pruefe(repo, {"anchor": anker, "entries": [
+            {"id": "i", "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+             "is_development_node": True, "commits": [arbeit],
+             "run_state": "runs/r1/state.json", "candidate_id": "r1-i2",
+             "why_not_the_product": "fixture"}]})
+        assert mit["nodes_through_the_product"] == \
+            ohne["nodes_through_the_product"] == 0, (
+            "the new category inflated the ratio's numerator")
+        assert mit["development_nodes"] == ohne["development_nodes"] == 1
+        assert mit["nodes_developed_by_the_product_merged_by_the_orchestrator"] == 1
+        assert ohne[
+            "nodes_developed_by_the_product_merged_by_the_orchestrator"] == 0
+

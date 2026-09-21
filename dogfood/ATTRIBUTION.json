@@ -344,6 +344,28 @@
         "ded9b97282d89bda69a90d79d9ec32c1e5813042"
       ],
       "why_not_the_product": "The board written while external_ci was correctly red, and the re-anchoring of the two distribution claims that the derivation split apart: binding each assurance to its own receipt field turned one combined sentence into two, so the claims pointing at it moved. Both are ledger and board bookkeeping about a change to a gate, which is the orchestrator's act by construction."
+    },
+    {
+      "id": "o175-hardcoded-home-path-check",
+      "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+      "is_development_node": true,
+      "run_state": "runs/o175w/state.json",
+      "candidate_id": "o175w-i2",
+      "commits": [
+        "e305cc6e34c5a6597044507c23ac6019488c8440",
+        "3b36e1e85e15fe4eb865e196a8455c29c6b6640d",
+        "f87a19d40b066a42869c6f3f6c15c2f41e9c5ecd"
+      ],
+      "why_not_the_product": "The product developed this through a plain `hoh run` -- plan, developer, independent QA, two iterations accepted against receipts -- and the orchestrator decided the merge after reviewing it, which is why this is not VERIHARNESS_RUN. It is not MAIN_ORCHESTRATOR_DIRECT either: the main session did not write it. The claim is bound to bytes rather than to a lifecycle string: runs/o175w/state.json records candidate o175w-i2 with tree digest 5f75a72eda5360c9b33a790ab90fc70879950283, which is the tree of commit 3b36e1e named here. What the review checked, and what it did not, is in the ledger at O179."
+    },
+    {
+      "id": "v010-vocabulary-extension",
+      "category": "MAIN_ORCHESTRATOR_DIRECT",
+      "is_development_node": false,
+      "commits": [
+        "7f2f075d7adc81eb08660a96694ea9b9ee0e5c67"
+      ],
+      "why_not_the_product": "The board written before the attribution vocabulary was extended. Orchestrator work by construction: a run cannot write the board that certifies it, and it cannot be the thing that decides which categories this ledger may use to describe its own provenance."
     }
   ]
 }

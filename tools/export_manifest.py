@@ -590,6 +590,87 @@ def contains_home_path(text: str) -> bool:
 
 
 # --------------------------------------------------------------------------
+# Hardcoded home paths (O175)
+#
+# A different property from `contains_home_path`, and deliberately narrower:
+# not "mentions a home-ish prefix" -- guard pattern files and code that
+# handles `~` or $HOME legitimately do that -- but "carries a literal
+# absolute path under one concrete home directory". A published tool once
+# carried such a literal and no gate saw it, because the home-path scan is
+# (correctly) scoped to reader-facing docs. This check runs over every
+# INCLUDE file regardless of rule and, like `contains_home_path`, over raw
+# text: a literal in a comment or docstring is still published.
+#
+# Only a named home counts: /home/<name> and /Users/<name> with <name> one
+# plain path segment starting with a letter, digit or underscore -- either
+# followed by a further segment or standing alone as the home root itself
+# (Path("/home/<name>") is as much a leak as anything below it) -- and
+# /root/ followed by a segment character. So a bare /home/, an ellipsis
+# /home/..., a pattern like /home/[^/]+/ or /home/*/, a placeholder like
+# /home/<name>/, and "/root/," in prose do not match.
+#
+# The start must not continue a path (a relative x/home/..., a URL path on
+# some host, or the //home/ of a doubled slash), with one exception: a
+# file:// or file://localhost URL is an absolute local path in disguise, so
+# file:///home/<name>/x is caught. The reported literal starts at the path,
+# never at the scheme. Assembled at runtime so this module's own source
+# carries no such literal.
+# --------------------------------------------------------------------------
+
+#: Home-directory names that are documentation placeholders, not somebody's
+#: machine. Measured when this check was introduced: the only named-home
+#: literals in the INCLUDE set use "someone" (a docstring example in
+#: src/hoh/dispatchers.py and fixtures in tests/test_review_findings.py).
+#: Narrowing by name keeps the check rule- and file-independent. Read at
+#: call time, so the set is the single place to change. "example" is *not*
+#: a placeholder here: it is exactly the kind of name a real checkout uses.
+_PLACEHOLDER_HOME_NAMES = frozenset({"someone"})
+
+#: Directories directly under macOS's /Users that are not a user's home.
+#: "Shared" is the system-wide shared folder every Mac has; naming it says
+#: nothing about whose machine this is. Applies to the /Users form only and,
+#: like the placeholder set, is read at call time.
+_NON_USER_DIRS_UNDER_USERS = frozenset({"Shared"})
+
+
+def _hardcoded_home_path_pattern() -> re.Pattern[str]:
+    sl = chr(47)
+    path_char = r"[A-Za-z0-9._~$" + re.escape(sl) + r"-]"
+    file_url = "file:" + sl + sl
+    # Fixed-width lookbehinds only: not after a path character, or right
+    # after a file:// / file://localhost scheme.
+    before = ("(?:(?<!" + path_char + ")|(?<=" + re.escape(file_url) + ")"
+              "|(?<=" + re.escape(file_url + "localhost") + "))")
+    seg = r"[A-Za-z0-9._-]"
+    named = (before + sl + r"(?P<dir>home|Users)" + sl
+             + r"(?P<name>[A-Za-z0-9_]" + seg + r"*)"
+             + "(?:" + sl + "|(?!" + path_char + "))")
+    root = before + sl + "root" + sl + seg
+    return re.compile(named + "|" + root)
+
+
+_HARDCODED_HOME_PATH_RE = _hardcoded_home_path_pattern()
+
+
+def find_hardcoded_home_path(text: str) -> str | None:
+    """The first literal absolute path under a concrete home directory, or None."""
+    for m in _HARDCODED_HOME_PATH_RE.finditer(text):
+        name = m.group("name")
+        if name is not None:
+            # "in /Users/Shared." ends a sentence; the dot is not the name.
+            name = name.rstrip(".")
+            if name in _PLACEHOLDER_HOME_NAMES:
+                continue
+            if m.group("dir") == "Users" and name in _NON_USER_DIRS_UNDER_USERS:
+                continue
+        end = m.end()
+        while end < len(text) and not text[end].isspace() and text[end] not in "\"'`)]>,;":
+            end += 1
+        return text[m.start():end]
+    return None
+
+
+# --------------------------------------------------------------------------
 # Private/internal address and token-shaped-string needles for the
 # INCLUDE-set scan (K7). Neither is a literal identifying string, so neither
 # needs runtime assembly the way a home-directory path does; both are
@@ -1194,6 +1275,9 @@ def scan_include_for_leaks(entries: list[dict], root: Path) -> list[dict]:
             continue
         if e["rule"] in _HOME_PATH_SCAN_RULES and contains_home_path(text):
             findings.append({"type": "home-path", "path": e["path"]})
+        # Every rule: a literal under a concrete home is never legitimate.
+        if find_hardcoded_home_path(text) is not None:
+            findings.append({"type": "hardcoded-home-path", "path": e["path"]})
         ip_match = _PRIVATE_IPV4_RE.search(text)
         if ip_match:
             findings.append({"type": "private-address", "path": e["path"]})

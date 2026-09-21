@@ -62,6 +62,23 @@ KATEGORIEN = (
     "CAPTAIN",
     # Produced or verified by the external CI, not on this machine.
     "EXTERNAL_CI",
+    # O179. The product developed it through a plain `hoh run` -- plan,
+    # developer, independent QA, acceptance against receipts -- and the
+    # **orchestrator** decided the merge after reviewing it. Its own category
+    # because neither of the two it sits between is true: `VERIHARNESS_RUN`
+    # says "a merge the product decided" and requires a ProjectState node
+    # with a MERGED lifecycle, which a plain run does not have and did not
+    # do; `MAIN_ORCHESTRATOR_DIRECT` says the main session wrote it, which is
+    # false where a run did.
+    #
+    # Forcing either would have been a false entry in the one file whose
+    # whole purpose is not to carry one. The evidence bar is not lowered by
+    # the split -- it is raised: an entry here names the run state and the
+    # accepted candidate, and the candidate's recorded tree digest has to
+    # equal the git tree of one of the commits the entry claims. That binds
+    # the claim to bytes, where VERIHARNESS_RUN binds it to a lifecycle
+    # string.
+    "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
 )
 
 
@@ -138,6 +155,67 @@ def _shas(repo: Path, eintrag: dict, probleme: list[str]) -> list[str]:
     return text.splitlines()
 
 
+def _lauf_nachweis(repo: Path, eintrag: dict) -> list[str]:
+    """What an entry claiming a plain run has to point at.
+
+    Claiming it is free; pointing at what it left is not -- the same sentence
+    `VERIHARNESS_RUN` is held to, asked of the artefact a plain run actually
+    produces. Four things, and the last is the one that matters:
+
+    * a run state exists at the named path;
+    * it records an accepted candidate;
+    * that candidate's id is the one the entry names -- so an entry cannot
+      point at a run and mean a different iteration of it;
+    * and the candidate's recorded `tree_digest` equals the git tree of one
+      of the commits this entry claims. That is the binding to bytes. A
+      lifecycle string says a node was merged; this says *these* contents
+      were the ones accepted.
+
+    The digest is compared against every claimed commit rather than the first,
+    because an entry legitimately names the run's own commits and the merge
+    that brought them in, and only one of those carries the accepted tree.
+    """
+    pfad = eintrag.get("run_state", "")
+    if not pfad:
+        return [f"{eintrag['id']}: claims a run produced it and names no run "
+                "state. Pointing at what the run left is the whole difference "
+                "between this and a claim"]
+    voll = repo / pfad
+    if not voll.is_file():
+        return [f"{eintrag['id']}: names a run state that is not there: {pfad}"]
+    try:
+        zustand = json.loads(voll.read_text())
+    except (OSError, ValueError) as exc:
+        return [f"{eintrag['id']}: {pfad} unreadable: {exc}"]
+
+    kandidat = zustand.get("last_accepted_candidate") or {}
+    if not kandidat:
+        return [f"{eintrag['id']}: {pfad} records no accepted candidate, so "
+                "nothing in it was accepted"]
+    verlangt = eintrag.get("candidate_id", "")
+    if not verlangt:
+        return [f"{eintrag['id']}: names a run state and no candidate_id"]
+    if kandidat.get("candidate_id") != verlangt:
+        return [f"{eintrag['id']}: names candidate {verlangt}, but {pfad} "
+                f"records {kandidat.get('candidate_id') or 'none'} as the "
+                "accepted one"]
+
+    digest = kandidat.get("tree_digest")
+    if not digest:
+        return [f"{eintrag['id']}: the accepted candidate in {pfad} carries no "
+                "tree_digest, so the claim cannot be bound to any contents"]
+    baeume = set()
+    for sha in eintrag.get("commits") or []:
+        baum = _git(repo, "rev-parse", f"{sha}^{{tree}}").strip()
+        if baum:
+            baeume.add(baum)
+    if digest not in baeume:
+        return [f"{eintrag['id']}: the accepted candidate's tree {digest[:12]} "
+                "is not the tree of any commit this entry claims. The entry "
+                "points at a run whose accepted contents are somewhere else"]
+    return []
+
+
 def _nur_das_ledger(repo: Path, sha: str) -> bool:
     """Did this commit touch `dogfood/ATTRIBUTION.json` and nothing else?
 
@@ -204,6 +282,7 @@ def pruefe(repo: Path, ledger: dict) -> dict:
             "categories": {},
             "development_nodes": 0,
             "nodes_through_the_product": 0,
+            "nodes_developed_by_the_product_merged_by_the_orchestrator": 0,
             "through_the_product": 0,
             "other_histories": {},
             "sentence": "nothing was verified here",
@@ -308,6 +387,8 @@ def pruefe(repo: Path, ledger: dict) -> dict:
                         )
                 except (OSError, ValueError) as exc:
                     probleme.append(f"{eintrag['id']}: {zustand} unreadable: {exc}")
+        if eintrag["category"] == "VERIHARNESS_RUN_ORCHESTRATOR_MERGED":
+            probleme.extend(_lauf_nachweis(repo, eintrag))
 
     nicht_zugeordnet = [c for c in alle if c not in gesehen]
     # `HEAD` itself may be unattributed, and exactly it: a commit cannot name
@@ -344,6 +425,7 @@ def pruefe(repo: Path, ledger: dict) -> dict:
     nach_kategorie: dict[str, int] = {k: 0 for k in KATEGORIEN}
     knoten_gesamt = 0
     knoten_produkt = 0
+    knoten_entwickelt = 0
     fremd_nach_kategorie: dict[str, dict[str, int]] = {}
     for eintrag in ledger["entries"]:
         herkunft = eintrag.get("history")
@@ -364,6 +446,13 @@ def pruefe(repo: Path, ledger: dict) -> dict:
             knoten_gesamt += 1
             if eintrag["category"] == "VERIHARNESS_RUN":
                 knoten_produkt += 1
+            elif eintrag["category"] == "VERIHARNESS_RUN_ORCHESTRATOR_MERGED":
+                # Its own count, reported on its own line. Folding it into the
+                # numerator would claim the product decided a merge it did not
+                # decide; leaving it only in the denominator would deny that
+                # the product developed the node at all. Both are false, so
+                # neither number moves and a third one says what happened.
+                knoten_entwickelt += 1
 
     return {
         "anchor": anker,
@@ -371,6 +460,8 @@ def pruefe(repo: Path, ledger: dict) -> dict:
         "commits_by_category": {k: v for k, v in nach_kategorie.items() if v},
         "development_nodes": knoten_gesamt,
         "nodes_through_the_product": knoten_produkt,
+        "nodes_developed_by_the_product_merged_by_the_orchestrator":
+            knoten_entwickelt,
         "sentence": (
             f"{knoten_produkt} of {knoten_gesamt} post-anchor development nodes "
             "were executed through the shipped control plane"
@@ -422,6 +513,12 @@ def main(argv=None) -> int:
             print(f"  {k:<26s} {v:>3d} commit(s)")
         print()
         print("  " + bericht["sentence"])
+        n = bericht.get(
+            "nodes_developed_by_the_product_merged_by_the_orchestrator", 0)
+        if n:
+            print(f"  {n} further node(s) the product developed and the "
+                  "orchestrator merged after review, counted in neither "
+                  "number above")
         for h, d in (bericht.get("other_histories") or {}).items():
             summe = sum(d["commits_by_category"].values())
             print(f"  recorded from {h}: {summe} commit(s), "
