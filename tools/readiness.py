@@ -132,6 +132,16 @@ def zeile_meta() -> Zeile:
 def zeile_attribution() -> Zeile:
     befehl = "python3 tools/attribution.py"
     rc, aus = _py("tools/attribution.py")
+    if rc == 3 or "ENVIRONMENT_GAP" in aus:
+        # O171: the tool has a third state -- it ran somewhere that does not
+        # carry the history the ledger describes, so it checked nothing. That
+        # is not a failure of the ledger and must not be reported as one, and
+        # it is not a pass either.
+        return Zeile("attribution", NOT_RUN,
+                     "this checkout does not carry the history the ledger "
+                     "describes, so nothing was verified", befehl,
+                     "an environment gap is its own state; reporting it as "
+                     "FAIL would blame the ledger for the checkout")
     m = re.search(r"(\d+) of (\d+) post-anchor development nodes", aus)
     return Zeile("attribution", PASS if rc == 0 else FAIL,
                  (f"{m.group(1)} of {m.group(2)} nodes through the product"
@@ -139,6 +149,38 @@ def zeile_attribution() -> Zeile:
                  befehl,
                  "the ratio is not a gate -- it is reported so that nobody has "
                  "to take the phase's own description of itself on trust")
+
+
+def zeile_export_sync() -> Zeile:
+    """Would exporting right now overwrite work that did not come from here?
+
+    Separate from `export_manifest`, which asks whether the *set* of exported
+    paths is right. This asks whether their *content* can be written without
+    discarding somebody else's change -- the question nobody was asking when
+    three merged pull requests landed in the public repository and the copier
+    compared nothing.
+    """
+    befehl = "python3 tools/export_sync.py status"
+    rc, aus = _py("tools/export_sync.py", "status")
+    if rc == 2:
+        # No checkout configured, or no recorded base. Nothing was compared,
+        # which is neither safe nor a failure of the export.
+        return Zeile("export_sync", NOT_RUN,
+                     (aus.strip().splitlines() or ["no comparison was made"])[0][:90],
+                     befehl,
+                     "a comparison that did not run is not a green one; the "
+                     "row says so rather than reporting the absence as safe")
+    zahlen = dict(re.findall(r"^(\w[\w ()]*?):\s+(\d+)$", aus, re.M))
+    konflikte = len([z for z in aus.splitlines()
+                     if z.strip().startswith(("conflict:", "only in the public"))])
+    return Zeile(
+        "export_sync", PASS if rc == 0 else FAIL,
+        (f"{konflikte} unintegrated public change(s)" if konflikte
+         else f"clean; {zahlen.get('to write (ours)', '?')} ours to write"),
+        befehl,
+        "the export is one-directional and the public repository is not "
+        "read-only: this row is what stops a copy from reverting work done "
+        "there")
 
 
 def zeile_export() -> Zeile:
@@ -838,6 +880,7 @@ def zeilen(quick: bool) -> list[Zeile]:
         zeile_benchmark_v2(),
         zeile_benchmark_v3(),
         zeile_export(),
+        zeile_export_sync(),
         zeile_install(quick),
         zeile_attribution(),
         zeile_evidenzindex(),

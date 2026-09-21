@@ -72,6 +72,31 @@ def _git(repo: Path, *args: str) -> str:
     return p.stdout.strip() if p.returncode == 0 else ""
 
 
+#: Histories other than the one this ledger's anchor names. An entry may
+#: describe work that happened in a **different repository** -- the public
+#: export is the case that exists: its commits are real, reviewed and merged,
+#: and none of their shas is in the development history this ledger tiles.
+#:
+#: Such an entry is recorded, never resolved. Resolving it here would report
+#: "names a commit that is not after the anchor", which is true and useless:
+#: the sha was never supposed to be in this history. Counting it in
+#: `commits_by_category` would be worse -- it would add commits to a
+#: denominator this ledger does not cover, which is the quiet number
+#: corruption O140 is about. So these entries are counted separately, under
+#: the history they belong to.
+#:
+#: Data rather than a branch, for the same reason the export manifest keeps
+#: its acknowledged references as data: a decision that can be read and
+#: counted is a different thing from a special case inside a function.
+FREMDE_HISTORIEN: dict[str, str] = {
+    "public-export": (
+        "the published export repository SKZL-AI/veriharness. Its history is "
+        "an export of this one and its commits are its own; docs/READINESS.md "
+        "and dogfood/external-ci/ carry what was measured there"
+    ),
+}
+
+
 def commits_since(repo: Path, anker: str) -> list[str]:
     """Every commit after the anchor, oldest first, merges included.
 
@@ -165,13 +190,25 @@ def _anker_vorhanden(repo: Path, anker: str) -> bool:
 def pruefe(repo: Path, ledger: dict) -> dict:
     anker = ledger["anchor"]
     if not _anker_vorhanden(repo, anker):
+        # O171: this used to return half a report -- no `commits_by_category`,
+        # no `sentence`, no `ok` -- and the CLI read those keys unconditionally,
+        # so running this in an export clone ended in `KeyError:
+        # commits_by_category` instead of the environment gap the branch was
+        # written to state. A gate that crashes where it means to say "I
+        # cannot check this here" reports nothing at all, which is the one
+        # outcome this project treats as worse than a red result.
         return {
             "anchor": anker,
             "commits_after_anchor": 0,
+            "commits_by_category": {},
             "categories": {},
             "development_nodes": 0,
+            "nodes_through_the_product": 0,
             "through_the_product": 0,
+            "other_histories": {},
+            "sentence": "nothing was verified here",
             "problems": [],
+            "ok": False,
             "environment_gap": (
                 f"this repository does not contain the anchor commit "
                 f"{anker[:12]}, so it is not the history this ledger "
@@ -184,7 +221,42 @@ def pruefe(repo: Path, ledger: dict) -> dict:
     gesehen: dict[str, str] = {}
     probleme: list[str] = []
 
+    fremd: dict[str, list[str]] = {}
     for eintrag in ledger["entries"]:
+        herkunft = eintrag.get("history")
+        if herkunft is not None:
+            # Recorded, not resolved. Validated on what can be checked here:
+            # a known history, a known category, an explicit commit list (a
+            # range cannot be resolved in a history this repository does not
+            # have), and a reason.
+            if herkunft not in FREMDE_HISTORIEN:
+                probleme.append(
+                    f"{eintrag['id']}: unknown history {herkunft!r}; known are "
+                    + ", ".join(sorted(FREMDE_HISTORIEN))
+                )
+            if eintrag["category"] not in KATEGORIEN:
+                probleme.append(
+                    f"{eintrag['id']}: unknown category {eintrag['category']!r}"
+                )
+            if eintrag.get("range"):
+                probleme.append(
+                    f"{eintrag['id']}: describes {herkunft} and names a range. "
+                    "A range is resolved with git rev-list, which cannot run "
+                    "against a history this repository does not have; name the "
+                    "commits explicitly"
+                )
+            if not eintrag.get("commits"):
+                probleme.append(
+                    f"{eintrag['id']}: describes {herkunft} and names no commits"
+                )
+            if eintrag["category"] == "VERIHARNESS_RUN":
+                probleme.append(
+                    f"{eintrag['id']}: claims the product executed it in "
+                    f"{herkunft}, whose run state this repository does not "
+                    "carry, so the claim cannot be checked where it is made"
+                )
+            fremd.setdefault(herkunft, []).extend(eintrag.get("commits") or [])
+            continue
         bereich = eintrag.get("range") or {}
         if str(bereich.get("to", "")).upper() in ("HEAD", "@"):
             probleme.append(
@@ -272,7 +344,18 @@ def pruefe(repo: Path, ledger: dict) -> dict:
     nach_kategorie: dict[str, int] = {k: 0 for k in KATEGORIEN}
     knoten_gesamt = 0
     knoten_produkt = 0
+    fremd_nach_kategorie: dict[str, dict[str, int]] = {}
     for eintrag in ledger["entries"]:
+        herkunft = eintrag.get("history")
+        if herkunft is not None:
+            # Never in the internal denominator. The ratio this tool reports is
+            # about the history the anchor names; adding commits from another
+            # repository to it would change a number without changing anything
+            # it measures.
+            k = fremd_nach_kategorie.setdefault(herkunft, {})
+            k[eintrag["category"]] = k.get(eintrag["category"], 0) + len(
+                eintrag.get("commits") or [])
+            continue
         n = len(_shas(repo, eintrag, []))
         nach_kategorie[eintrag["category"]] = nach_kategorie.get(
             eintrag["category"], 0
@@ -292,6 +375,11 @@ def pruefe(repo: Path, ledger: dict) -> dict:
             f"{knoten_produkt} of {knoten_gesamt} post-anchor development nodes "
             "were executed through the shipped control plane"
         ),
+        "other_histories": {
+            h: {"commits_by_category": k,
+                "what": FREMDE_HISTORIEN.get(h, "unknown history")}
+            for h, k in sorted(fremd_nach_kategorie.items())
+        },
         "problems": probleme,
         "ok": not probleme,
     }
@@ -312,6 +400,14 @@ def main(argv=None) -> int:
     bericht = pruefe(args.repo.resolve(), ledger)
     if args.json:
         print(json.dumps(bericht, indent=2))
+        return 0 if bericht.get("environment_gap") else (0 if bericht["ok"] else 1)
+    if bericht.get("environment_gap"):
+        # Not a pass and not a violation: a third state, printed as itself and
+        # given its own exit code so that `attribution.py && echo ok` cannot
+        # print ok for a run that verified nothing (O171).
+        print("ENVIRONMENT_GAP: nothing was verified here")
+        print(f"  {bericht['environment_gap']}")
+        return 3
     else:
         print(f"anchor {bericht['anchor'][:12]}, "
               f"{bericht['commits_after_anchor']} commit(s) after it")
@@ -319,6 +415,10 @@ def main(argv=None) -> int:
             print(f"  {k:<26s} {v:>3d} commit(s)")
         print()
         print("  " + bericht["sentence"])
+        for h, d in (bericht.get("other_histories") or {}).items():
+            summe = sum(d["commits_by_category"].values())
+            print(f"  recorded from {h}: {summe} commit(s), "
+                  "not counted in the ratio above")
         for p in bericht["problems"]:
             print(f"  PROBLEM: {p}")
     return 0 if bericht["ok"] else 1

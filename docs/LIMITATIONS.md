@@ -1320,3 +1320,49 @@ trees, so an acknowledgement for those two can only point a reader at the
 published result document, not at a description of the withheld tree.
 Priority: medium.
 
+## 20. The export is guarded now, and the guard is narrower than it sounds
+
+For most of this project's life the export was a copy: every `INCLUDE` path
+from the internal tree into the public checkout. That held while the internal
+tree was the only place anything was written. It stopped holding when the
+distribution work was done **in the public repository** -- three merged pull
+requests touching fourteen files, nine of which the internal tree also
+carries. A copy would have written the older internal version over six of them
+and reported success, because it compared nothing.
+
+`tools/export_sync.py` compares three states per path before it writes
+anything: the digest recorded the last time the two sides were deliberately
+synchronised, the internal file now, and the public file at the current head.
+Only "ours moved, theirs did not" is written. "Theirs moved, ours did not" and
+"both moved and disagree" stop the run **before the first write**, name the
+paths, and say that integrating them and recording a new base is the only way
+forward. The public head is read again immediately before a push, because a
+head that moved in between makes the comparison a statement about a tree
+nobody is pushing to.
+
+**What it does not do, and none of these is an oversight.**
+
+It does not merge. It stops and reports; a human or a later session decides
+whose version survives. A tool that picked a winner would be the thing this
+entry is about, with an extra step.
+
+It does not delete. A path the base knows and the internal tree no longer
+carries is reported and left in place. That is the house rule, and it also
+means a genuine removal has to be done deliberately somewhere else.
+
+It does not use timestamps. An mtime survives a copy, a checkout and a
+restore, and the question here is provenance, not age.
+
+It exempts exactly two paths, and the exemption is the part most likely to
+rot: `CLAIMS.md` and `docs/READINESS.md`, both written wholesale by tools in
+this repository from other inputs. The first draft of that set also carried
+`CLAIMS.json`, copied out of a different gate's tolerance list without being
+re-derived for this question -- and since the ledger is written rather than
+generated, that exemption would have silently reverted six claims the
+distribution work added in the public repository. Exactly the defect the file
+exists to prevent, reintroduced by its own exemption list, and found by
+attacking the guard rather than confirming it (O174).
+
+It cannot tell a deliberate divergence from an accidental one. "Recording a
+new base" is a human act, and the tool believes it.
+

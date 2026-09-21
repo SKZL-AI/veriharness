@@ -270,7 +270,8 @@
         "e1300f959d40539887678c38a7f9093a48a9cd91",
         "f144d4236baa43c7ede6e5677888788ca4a76d49"
       ],
-      "why_not_the_product": "Owner-authorized registry publication and independent supply-chain verification. This changes the release trust boundary and records external publishing evidence, so it is orchestrator work rather than a product-accepted development node."
+      "why_not_the_product": "Owner-authorized registry publication and independent supply-chain verification. This changes the release trust boundary and records external publishing evidence, so it is orchestrator work rather than a product-accepted development node. Recorded here from the export repository rather than re-derived: these commits were made in SKZL-AI/veriharness and none of their shas is in this development history, so the entry is marked as describing that history and is counted separately from the ratio this ledger reports.",
+      "history": "public-export"
     },
     {
       "id": "v010-distribution-receipt",
@@ -279,7 +280,8 @@
       "commits": [
         "eefb60a6e994b2f9925a0227f41519290ecfe3be"
       ],
-      "why_not_the_product": "Independent verification of public registry and release bytes, provenance, installation receipts, and documentation after publication; no agent campaign or product acceptance is claimed."
+      "why_not_the_product": "Independent verification of public registry and release bytes, provenance, installation receipts, and documentation after publication; no agent campaign or product acceptance is claimed. Recorded here from the export repository rather than re-derived: these commits were made in SKZL-AI/veriharness and none of their shas is in this development history, so the entry is marked as describing that history and is counted separately from the ratio this ledger reports.",
+      "history": "public-export"
     },
     {
       "id": "release-supply-chain-hardening",
@@ -289,7 +291,19 @@
         "96b892086ceed40b90d7c794fadee932019c6318",
         "ccd47e2bea5c1d3d9b6b73831ce0c8881cdb5372"
       ],
-      "why_not_the_product": "Owner-authorized release trust-boundary maintenance: immutable release-tag rules, current artifact actions and an independent CI upload/download integrity check. Includes the preceding distribution-documentation merge; no product acceptance or benchmark result is claimed."
+      "why_not_the_product": "Owner-authorized release trust-boundary maintenance: immutable release-tag rules, current artifact actions and an independent CI upload/download integrity check. Includes the preceding distribution-documentation merge; no product acceptance or benchmark result is claimed. Recorded here from the export repository rather than re-derived: these commits were made in SKZL-AI/veriharness and none of their shas is in this development history, so the entry is marked as describing that history and is counted separately from the ratio this ledger reports.",
+      "history": "public-export"
+    },
+    {
+      "id": "v010-distribution-integration-and-export-guard",
+      "category": "MAIN_ORCHESTRATOR_DIRECT",
+      "is_development_node": false,
+      "commits": [
+        "c501e5a3b0f1e998d0789eda287e0e42e5e6ebc4",
+        "67e04f31fe566d3c7cd6309e6fe177e8fb6f1e48",
+        "ac99d82af07e8fb62fe790e5fde1f4ffd9be7883"
+      ],
+      "why_not_the_product": "Integrating work that was done in the public repository, and building the guard that stops the next export from reverting it. Outside any run for three reasons that compound: the integration decides how one ledger absorbs another's record, which is the ledger writing itself; it repairs two gates (attribution, readiness) that would otherwise be asked to certify the run doing the repair; and the guard is the mechanism by which this project's own work reaches the public repository at all. A run cannot be the thing that decides whose version of a file survives."
     }
   ]
 }

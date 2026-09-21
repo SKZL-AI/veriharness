@@ -21,6 +21,7 @@ from __future__ import annotations
 import glob
 import hashlib
 import json
+import os
 import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
@@ -123,6 +124,44 @@ def test_no_provider_dispatch_in_a_v3_run_tree_predates_the_binding_commit(
                     gesehen.append(s)
     if not gesehen:
         braucht_evidenz(RUN_EVIDENCE_V3)
+        # O173. The recorded cells are here -- that is what `braucht_evidenz`
+        # asks about, and why it does not skip -- but the run trees they name
+        # are scratch directories under /tmp that the campaign wrote and the
+        # machine later reclaimed. Three states, not two, and only the middle
+        # one was modelled: the cells can be present while the trees they point
+        # into are gone. `min([])` then raised ValueError, so the check ended in
+        # a crash rather than in either of the answers it exists to give.
+        #
+        # The distinction that decides it is whether a single named tree still
+        # stands. None standing is an environment gap: there is nothing left to
+        # read, and saying so is the honest answer. One standing and carrying no
+        # telemetry is a finding, and still fails below -- which is the negative
+        # control this branch would otherwise destroy.
+        # Decided on the run roots alone. A candidate worktree never carries
+        # telemetry -- the controller writes it into the run root -- so
+        # counting surviving worktrees here would report trees that could not
+        # answer the question even when they were new.
+        roots = set()
+        for f in sorted((HOH / "dogfood/benchmark/results-v3").glob("*.json")):
+            d = json.loads(f.read_text()).get("arm_detail") or {}
+            if d.get("root"):
+                roots.add(str(d["root"]))
+        vorhanden = sorted(w for w in roots if os.path.isdir(w))
+        if not vorhanden:
+            pytest.skip(
+                f"none of the {len(roots)} run root(s) campaign v3 recorded "
+                "still exists -- they are scratch directories the machine "
+                "reclaimed, and the telemetry lived inside them. The recorded "
+                "cells and their bound digests are unaffected and are checked "
+                "by the tests around this one; this particular question cannot "
+                "be asked again without re-running the campaign, which would "
+                "make it a different campaign"
+            )
+        pytest.fail(
+            f"{len(vorhanden)} of {len(roots)} recorded run root(s) still "
+            "exist and not one carries a telemetry record: "
+            + ", ".join(vorhanden[:3])
+        )
     frueheste = datetime.fromisoformat(min(gesehen).replace("Z", "+00:00"))
     assert wann < frueheste, (
         f"a provider was dispatched at {min(gesehen)}, before the registration "

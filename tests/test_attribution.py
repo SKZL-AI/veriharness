@@ -260,3 +260,164 @@ def test_a_ledger_only_commit_is_tolerated_and_anything_else_is_not():
             "a trailing commit that touched more than the ledger was excused, "
             "so the widening swallowed the check it was supposed to narrow"
         )
+
+
+def _fixture_repo(tmp):
+    """A throwaway repository with an anchor and two commits after it."""
+    import subprocess as _sp
+    from pathlib import Path as _P
+    repo = _P(tmp) / "r"
+    repo.mkdir()
+
+    def g(*a):
+        return _sp.run(["git", "-C", str(repo), *a], capture_output=True,
+                       text=True, check=True).stdout.strip()
+
+    g("init", "-q", "-b", "main")
+    g("config", "user.email", "t@example.invalid")
+    g("config", "user.name", "t")
+    (repo / "a.txt").write_text("1\n")
+    g("add", "-A"); g("commit", "-q", "-m", "anchor")
+    anker = g("rev-parse", "HEAD")
+    (repo / "a.txt").write_text("2\n")
+    g("add", "-A"); g("commit", "-q", "-m", "work")
+    arbeit = g("rev-parse", "HEAD")
+    (repo / "a.txt").write_text("3\n")
+    g("add", "-A"); g("commit", "-q", "-m", "tip")
+    return repo, anker, arbeit
+
+
+FREMD_SHA = "8edb1a2a1af6fe07f2db5bdaedfa6d2e041c289d"
+
+
+def test_an_entry_for_another_history_is_recorded_and_not_resolved():
+    """O172: the distribution work happened in the export repository.
+
+    Its commits are real, reviewed and merged, and not one of their shas is in
+    the development history this ledger tiles. Resolving them here would
+    report "names a commit that is not after the anchor" -- true, and useless,
+    because the sha was never supposed to be in this history. So an entry may
+    declare the history it describes, and is then recorded rather than
+    resolved.
+
+    The negative control is the half that matters: the same entry *without*
+    the marker must still be reported, or the marker is not a declaration but
+    a way to smuggle any sha past the check.
+    """
+    import tempfile as _tf
+
+    with _tf.TemporaryDirectory() as tmp:
+        repo, anker, arbeit = _fixture_repo(tmp)
+        basis = {"id": "e", "category": "MAIN_ORCHESTRATOR_DIRECT",
+                 "is_development_node": False, "commits": [FREMD_SHA],
+                 "why_not_the_product": "fixture"}
+
+        mit = at.pruefe(repo, {"anchor": anker, "entries": [
+            {**basis, "history": "public-export"},
+            {"id": "i", "category": "MAIN_ORCHESTRATOR_DIRECT",
+             "is_development_node": False, "commits": [arbeit],
+             "why_not_the_product": "fixture"}]})
+        assert not mit["problems"], mit["problems"]
+        assert mit["other_histories"]["public-export"][
+            "commits_by_category"]["MAIN_ORCHESTRATOR_DIRECT"] == 1
+
+        ohne = at.pruefe(repo, {"anchor": anker, "entries": [basis]})
+        assert any("not a commit after" in p for p in ohne["problems"]), (
+            "an unmarked foreign sha was accepted, so the marker is not doing "
+            "the work -- the check would pass for any sha at all"
+        )
+
+
+def test_another_history_never_enters_the_internal_denominator():
+    """The ratio is about the history the anchor names.
+
+    Adding commits from another repository to `commits_by_category` would move
+    a number without moving anything it measures -- the O140 shape. This pins
+    that the internal count is identical with and without the foreign entry,
+    and that the foreign commits are reported under their own history instead.
+    """
+    import tempfile as _tf
+
+    with _tf.TemporaryDirectory() as tmp:
+        repo, anker, arbeit = _fixture_repo(tmp)
+        intern_nur = {"id": "i", "category": "MAIN_ORCHESTRATOR_DIRECT",
+                      "is_development_node": True, "commits": [arbeit],
+                      "why_not_the_product": "fixture"}
+        fremd = {"id": "e", "category": "MAIN_ORCHESTRATOR_DIRECT",
+                 "history": "public-export", "is_development_node": True,
+                 "commits": [FREMD_SHA, FREMD_SHA[:-1] + "0"],
+                 "why_not_the_product": "fixture"}
+
+        a = at.pruefe(repo, {"anchor": anker, "entries": [intern_nur]})
+        b = at.pruefe(repo, {"anchor": anker, "entries": [intern_nur, fremd]})
+        assert a["commits_by_category"] == b["commits_by_category"]
+        assert a["development_nodes"] == b["development_nodes"], (
+            "a foreign-history entry moved the node denominator"
+        )
+        assert b["other_histories"]["public-export"][
+            "commits_by_category"]["MAIN_ORCHESTRATOR_DIRECT"] == 2
+
+
+def test_a_foreign_history_entry_is_still_checked_on_what_is_checkable():
+    """Recorded is not unexamined. Four things are still refused."""
+    import tempfile as _tf
+
+    with _tf.TemporaryDirectory() as tmp:
+        repo, anker, arbeit = _fixture_repo(tmp)
+        # The internal commit needs its own entry, or every case below also
+        # reports the gap it leaves -- which would hide what is being tested.
+        intern = {"id": "i", "category": "MAIN_ORCHESTRATOR_DIRECT",
+                  "is_development_node": False, "commits": [arbeit],
+                  "why_not_the_product": "fixture"}
+
+        def probleme(**ueberschreiben):
+            e = {"id": "e", "category": "MAIN_ORCHESTRATOR_DIRECT",
+                 "history": "public-export", "is_development_node": False,
+                 "commits": [FREMD_SHA], "why_not_the_product": "fixture"}
+            e.update(ueberschreiben)
+            return at.pruefe(
+                repo, {"anchor": anker, "entries": [intern, e]})["problems"]
+
+        assert any("unknown history" in p for p in probleme(history="erfunden"))
+        assert any("unknown category" in p for p in probleme(category="ERFUNDEN"))
+        assert any("names a range" in p
+                   for p in probleme(range={"from": "a", "to": "b"}))
+        assert any("names no commits" in p for p in probleme(commits=[]))
+        assert any("cannot be checked where it is made" in p
+                   for p in probleme(category="VERIHARNESS_RUN")), (
+            "a foreign-history entry was allowed to claim the product executed "
+            "it, in a repository that does not carry the run state to check"
+        )
+        assert not probleme()
+
+
+def test_a_missing_anchor_reports_an_environment_gap_instead_of_crashing():
+    """O171: the missing-anchor branch returned half a report.
+
+    It carried no `commits_by_category`, no `sentence` and no `ok`, and the CLI
+    read all three unconditionally -- so running this in an export clone ended
+    in `KeyError: commits_by_category` rather than the environment gap the
+    branch exists to state. A gate that crashes where it means to say "I
+    cannot check this here" has reported nothing at all.
+
+    The negative control is the key set: if a future edit drops one of them
+    again, this fails before the CLI does.
+    """
+    import tempfile as _tf
+
+    with _tf.TemporaryDirectory() as tmp:
+        repo, _, _ = _fixture_repo(tmp)
+        bericht = at.pruefe(repo, {"anchor": "0" * 40, "entries": []})
+        assert bericht.get("environment_gap")
+        for schluessel in ("commits_by_category", "sentence", "ok",
+                           "commits_after_anchor", "problems",
+                           "other_histories"):
+            assert schluessel in bericht, (
+                f"{schluessel} missing from the environment-gap report; the "
+                "CLI reads it unconditionally and would crash again"
+            )
+        assert bericht["ok"] is False, (
+            "an environment gap reported ok=True would be a pass for a run "
+            "that verified nothing"
+        )
+
