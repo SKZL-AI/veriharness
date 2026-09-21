@@ -314,6 +314,26 @@
         "0b5795e9a4939092cb78435f485092e67f48a3e1"
       ],
       "why_not_the_product": "The board run that deleted the distribution section, and the repair of both halves of O176. Outside any run by construction: the first commit is the board writing itself, and the second changes how that board decides which ledger entries it owns -- a run cannot be the thing that repairs the accounting which certifies it. The finding was also found by inspection rather than by a gate, and deciding what a claim's text should be is not work a dispatch can be given."
+    },
+    {
+      "id": "v010-board-before-review-repairs",
+      "category": "MAIN_ORCHESTRATOR_DIRECT",
+      "is_development_node": false,
+      "commits": [
+        "1bd8c84d960aa5b2ddaff79b4a6347a8618a3df9"
+      ],
+      "why_not_the_product": "The readiness board written immediately before an independent review's findings were addressed. Orchestrator work by construction: running the gates and recording what they returned is the act a run would have to be certified by, not one it can perform."
+    },
+    {
+      "id": "v010-review-repairs",
+      "category": "MAIN_ORCHESTRATOR_DIRECT",
+      "is_development_node": false,
+      "commits": [
+        "4a9bd4bc8b61a135a36644620889f8c3fb03df75",
+        "cc4890a37159bcdf1a65e1eac5c2ea1aa7f9ae2d",
+        "22d9901d19a56825fafdd6cca87778f1155278be"
+      ],
+      "why_not_the_product": "Closing five findings from an independent review, and the reviewed-but-held decision on the o175 candidate. Outside any run: four of the five defects were in gates -- the export guard, the readiness board's distribution section, the attribution CLI -- and a run cannot repair the checks that certify it. The fifth is a decision about what this ledger may claim, which is the ledger writing itself."
     }
   ]
 }

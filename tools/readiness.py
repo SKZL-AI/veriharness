@@ -936,54 +936,122 @@ def markdown(rows: list[Zeile], kopf: str) -> str:
 
 
 def verteilung_abschnitt() -> list[str]:
-    """What the published distribution establishes, rendered from its receipt.
+    """What the published distribution establishes -- derived, not asserted.
 
-    O176. This section existed as prose somebody had written into
-    `docs/READINESS.md` by hand. The next `--write` regenerated the document
-    and dropped it -- seven sentences, four of them anchors for claims
-    C-465..C-468, gone in the commit that was supposed to integrate the work
-    they describe. The export guard could not catch it either, because a
-    generated file is exactly what its exemption list covers.
+    O176 moved this section out of hand-written prose and into a generator,
+    so that regenerating the board could not delete it. The first generator
+    then read three fields -- version, date, the passing Python versions --
+    and stated everything else as a constant. An independent review fed it a
+    receipt saying `production_pypi_result: FAIL`, `attestations: NOT_VERIFIED`,
+    `trusted_publishing: false`, `long_lived_pypi_token_used: true`, and the
+    section still claimed byte-identical files, verified attestations and
+    protected token-free publishing.
 
-    A generated document cannot hold hand-written content. So the content
-    moves to where the generator can see it: the machine-readable receipt the
-    publishing workflow wrote. Change the receipt and this section changes;
-    delete the receipt and the section says so rather than vanishing.
+    That is O140's shape in the repair for O176: a sentence that reads like a
+    measurement and is a constant written beside one. So every line below
+    names the field it rests on, and a field that is missing, negative or
+    contradictory produces a sentence saying **that**, not silence and not
+    the positive claim. `_zusicherung` is the whole rule: it never emits the
+    affirmative text unless the evidence it was handed says so.
     """
     quittung = HOH / ".github/releases/v0.1.0.json"
     if not quittung.is_file():
         return ["", "## The published distribution", "",
                 "No distribution receipt in this tree, so nothing is claimed "
                 "about a published package here.", ""]
-    d = json.loads(quittung.read_text())
-    version = d.get("version", "unknown")
-    tag = d.get("source_tag", "unknown")
-    # Only the versions the receipt records as passing. Listing a version the
-    # receipt does not vouch for would be the shape this whole board refuses.
-    smoke = d.get("python_smoke") or {}
-    pythons = sorted(v for v, r in smoke.items()
-                     if isinstance(r, dict) and r.get("result") == "PASS")
+    try:
+        d = json.loads(quittung.read_text())
+    except ValueError as exc:
+        return ["", "## The published distribution", "",
+                f"The distribution receipt is unreadable ({exc}), so nothing "
+                "is claimed about a published package here.", ""]
+
     z = ["", "## The published distribution", "",
-         "Rendered from `.github/releases/v0.1.0.json`, the receipt the "
-         "publishing workflow wrote. The table above remains the historical "
-         "measurement at its stated commit; these lines are about the package, "
-         "not about the campaigns.", ""]
+         "Derived from `.github/releases/v0.1.0.json`, the receipt the "
+         "publishing workflow wrote -- every line below names the field it "
+         "rests on, and a field that is missing or negative produces a line "
+         "saying so rather than the positive claim. The table above remains "
+         "the historical measurement at its stated commit; these lines are "
+         "about the package, not about the campaigns.", ""]
+
+    def zusicherung(gilt: bool | None, ja: str, nein: str, feld: str) -> str:
+        """The affirmative sentence only when the evidence says so."""
+        if gilt is None:
+            return f"Not confirmed -- the receipt carries no `{feld}`: {nein}"
+        if not gilt:
+            return f"**Not confirmed** -- `{feld}` in the receipt says otherwise: {nein}"
+        return ja
+
+    version = d.get("version")
+    tag = d.get("source_tag")
     wann = str(d.get("publication_timestamp") or "")[:10]
-    z.append(f"The v{version} distribution was published"
-             + (f" on {wann}" if wann else "")
-             + f" from the unchanged release tag `{tag}`.")
-    z.append("TestPyPI, PyPI, and the GitHub release carry byte-identical "
-             "wheel and sdist files.")
-    if pythons:
+    prod = d.get("production_pypi_result")
+    test = d.get("testpypi_result")
+    assets = d.get("github_assets_match")
+    att = (d.get("attestations") or {}).get("status")
+    tp = d.get("trusted_publishing")
+    token = d.get("long_lived_pypi_token_used")
+    umgebung = d.get("production_environment") or {}
+    pruefer = umgebung.get("required_reviewer")
+    smoke = d.get("python_smoke") or {}
+    bestanden = sorted(v for v, r in smoke.items()
+                       if isinstance(r, dict) and r.get("result") == "PASS")
+    durchgefallen = sorted(v for v, r in smoke.items()
+                           if isinstance(r, dict) and r.get("result") != "PASS")
+
+    z.append(zusicherung(
+        prod == "PASS" and version is not None and tag is not None,
+        f"The v{version} distribution was published"
+        + (f" on {wann}" if wann else "")
+        + f" from the unchanged release tag `{tag}`.",
+        "no successful publication to the production index is recorded.",
+        "production_pypi_result"))
+
+    z.append(zusicherung(
+        None if assets is None else (bool(assets) and test == "PASS"),
+        "TestPyPI, PyPI, and the GitHub release carry byte-identical wheel "
+        "and sdist files.",
+        "the three copies are not recorded as byte-identical.",
+        "github_assets_match / testpypi_result"))
+
+    if not smoke:
+        z.append("Not confirmed -- the receipt carries no `python_smoke`: no "
+                 "fresh installation is recorded.")
+    elif durchgefallen:
+        z.append("**Not confirmed** -- fresh installations are recorded as "
+                 "passing on Python " + (", ".join(bestanden) or "none")
+                 + " and as not passing on " + ", ".join(durchgefallen) + ".")
+    else:
         z.append("Fresh installations passed on Python "
-                 + ", ".join(str(v) for v in pythons)
-                 + "; both PEP-740 attestations were verified.")
-    z.append("Publication used OIDC Trusted Publishing through the protected "
-             "`pypi` environment, with no long-lived token.")
+                 + ", ".join(bestanden) + ".")
+
+    z.append(zusicherung(
+        None if att is None else att == "VERIFIED",
+        "Both PEP-740 attestations were verified.",
+        "the attestations are not recorded as verified.",
+        "attestations.status"))
+
+    z.append(zusicherung(
+        None if (tp is None and token is None) else (bool(tp) and not token),
+        "Publication used OIDC Trusted Publishing"
+        + (f" through the protected `{umgebung.get('name', 'pypi')}` "
+           f"environment, reviewer {pruefer}," if pruefer else ",")
+        + " with no long-lived token.",
+        "trusted publishing without a long-lived token is not recorded.",
+        "trusted_publishing / long_lived_pypi_token_used"))
+
     z.append("The [machine-readable receipt](../.github/releases/v0.1.0.json) "
              "records hashes, job results, provenance and verification scope.")
-    z.append("These distribution checks do not remeasure the historical agent "
-             "campaigns and do not establish external sandbox support.")
+
+    umfang = d.get("verification_scope") or {}
+    if umfang.get("historical_campaigns_rerun") or \
+            umfang.get("external_sandbox_reverified"):
+        z.append("The receipt's `verification_scope` claims more than "
+                 "distribution; this board does not carry that claim.")
+    else:
+        z.append("These distribution checks do not remeasure the historical "
+                 "agent campaigns and do not establish external sandbox "
+                 "support.")
     z.append("")
     return z
 

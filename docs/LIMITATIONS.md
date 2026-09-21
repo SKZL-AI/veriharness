@@ -1353,15 +1353,29 @@ means a genuine removal has to be done deliberately somewhere else.
 It does not use timestamps. An mtime survives a copy, a checkout and a
 restore, and the question here is provenance, not age.
 
-It exempts exactly two paths, and the exemption is the part most likely to
-rot: `CLAIMS.md` and `docs/READINESS.md`, both written wholesale by tools in
-this repository from other inputs. The first draft of that set also carried
-`CLAIMS.json`, copied out of a different gate's tolerance list without being
-re-derived for this question -- and since the ledger is written rather than
-generated, that exemption would have silently reverted six claims the
-distribution work added in the public repository. Exactly the defect the file
-exists to prevent, reintroduced by its own exemption list, and found by
-attacking the guard rather than confirming it (O174).
+It exempts nothing, and that took two corrections to arrive at. The first
+draft carried three paths copied out of a different gate's tolerance list:
+`CLAIMS.md`, `docs/READINESS.md` and `CLAIMS.json`. The ledger came out after
+an attack on the guard showed that exempting it would have silently reverted
+six claims the distribution work added in the public repository -- the defect
+the file exists to prevent, reintroduced by its own exemption list (O174). An
+independent review then asked why the other two were exempt at all, and the
+answer did not survive the question: "generated" describes the content, not
+the decision, and a file being regenerable says nothing about whether someone
+added something to it that our regeneration will drop -- which is precisely
+what happened (O176). The exemption was also unnecessary. The case it was
+written for, this project rewriting those files on every gate run, already
+reads as "ours moved, theirs did not" and is already written.
+
+It checks the tree it writes into, which the first version did not. The
+comparison is about the public head; the files land in a working checkout,
+and those are not the same thing. Uncommitted work there -- staged, unstaged
+or untracked -- was replaced by our version and the run reported success,
+until a review reproduced it. The checkout must now be at the head the
+comparison was made against, and nothing we would write may collide with work
+that is present and uncommitted. Neither is resolved automatically: no reset,
+no stash, no removal, and a test asserts that none of those appears in the
+file at all.
 
 It cannot tell a deliberate divergence from an accidental one. "Recording a
 new base" is a human act, and the tool believes it.

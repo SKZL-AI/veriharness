@@ -45,6 +45,7 @@ import os
 import shutil
 import subprocess
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 
 HOH = Path(__file__).resolve().parent.parent
@@ -72,26 +73,35 @@ def staging() -> Path:
         raise Abbruch(f"{STAGING} is not a git checkout")
     return STAGING
 
-#: Files this project *generates* from the tree on every gate run. They are
-#: expected to differ between syncs for a reason that is not anyone's work, so
-#: comparing them would stop every export; and a hand edit to a generated file
-#: does not survive its next regeneration anyway, whoever made it.
+#: No path is exempt from the comparison. The set is kept, empty, because
+#: its history is the argument for why it is empty.
 #:
-#: O174. The first draft of this set was copied from the `external_ci` row's
-#: tolerance in `tools/readiness.py`, which answers a different question, and
-#: it carried `CLAIMS.json`. That file is the ledger -- written, not generated
-#: -- and exempting it meant a change made to it in the public repository
-#: would be silently overwritten by ours. Not hypothetically: the distribution
-#: work added six claims to it there, and an export under the first draft
-#: would have reverted them without a word, which is the defect this whole
-#: file exists to prevent, reintroduced by its own exemption list.
+#: It began as `{docs/READINESS.md, CLAIMS.md, CLAIMS.json}`, copied out of
+#: the `external_ci` row's tolerance in `tools/readiness.py` -- a different
+#: question -- and O174 removed the ledger from it after an attack showed six
+#: public claims would have been reverted in silence. An independent review
+#: then asked the obvious next question: why are the other two exempt at all?
 #:
-#: The rule this set now follows: a path belongs here only if a tool in this
-#: repository writes it wholesale from other inputs. `CLAIMS.md` is rendered
-#: from `CLAIMS.json`; `docs/READINESS.md` is written by the board. The ledger
-#: itself is neither, and is compared like everything else -- our re-anchoring
-#: of it reads as ours, and a change of theirs stops the run.
-BERICHTE = {"docs/READINESS.md", "CLAIMS.md"}
+#: The answer was "they are generated, so a public edit to them does not
+#: survive regeneration anyway". That is true of the *content* and irrelevant
+#: to the *decision*: "generated" does not prove a public change is
+#: dispensable, and a file being regenerable says nothing about whether
+#: somebody added something to it that our regeneration will drop -- which is
+#: precisely what O176 was.
+#:
+#: The exemption also turned out to be unnecessary. The case it was written
+#: for -- this project rewrites these files on every gate run -- reads as
+#: `mine != base, theirs == base`, which is already "ours" and already
+#: written. The case it was silently covering was `theirs != base`, which is
+#: somebody else's change and must stop. A stale base makes both sides look
+#: moved; the answer to that is to record the base after a push, which the
+#: tool now says in as many words, and the failure direction is a stop rather
+#: than an overwrite.
+#:
+#: So a generated file that legitimately replaces public content does it the
+#: same way every other file does: integrate, then record the new base. That
+#: record is the explicit, checkable regeneration evidence.
+BERICHTE: frozenset[str] = frozenset()
 
 
 class Abbruch(RuntimeError):
@@ -135,6 +145,76 @@ def blob_digests(repo: Path, commit: str) -> dict[str, str]:
                                 capture_output=True).stdout
         ergebnis[pfad] = digest(inhalt)
     return ergebnis
+
+
+def staging_schmutz(repo: Path) -> dict[str, str]:
+    """Every path the staging checkout has touched and not committed.
+
+    Staged, unstaged and untracked alike, because all three are somebody's
+    work and this tool writes over the working tree. `--porcelain=v1 -z` so
+    that a filename with a space, a quote or a newline in it is parsed and
+    not guessed at; `--untracked-files=all` so that a new file inside an
+    untracked directory is seen individually rather than as its parent.
+    """
+    aus = _git(repo, "status", "--porcelain=v1", "-z", "--untracked-files=all")
+    felder = aus.split("\0")
+    schmutz: dict[str, str] = {}
+    i = 0
+    while i < len(felder):
+        eintrag = felder[i]
+        i += 1
+        if len(eintrag) < 4:
+            continue
+        xy, pfad = eintrag[:2], eintrag[3:]
+        if xy[0] == "R":
+            # A rename carries its source in the next field.
+            if i < len(felder):
+                schmutz[felder[i]] = xy
+                i += 1
+        schmutz[pfad] = xy
+    return schmutz
+
+
+def staging_pruefen(repo: Path, kopf: str, schreiben: list[str]) -> list[str]:
+    """Reasons the staging checkout is not safe to write into right now.
+
+    The comparison above is about `origin/main`. This is about the tree the
+    files actually land in, and the two are not the same thing -- which is
+    how the first version of this tool came to replace uncommitted work in
+    the staging checkout with our version and report success. Two questions,
+    both answered before the first write:
+
+    * is the checkout at the commit the comparison was made against? If not,
+      the result of writing into it is a mixture of two states that nobody
+      reviewed;
+    * does anything we would write collide with work that is here and not
+      committed? Staged, unstaged and untracked all count.
+
+    Never resolved automatically. No reset, no stash, no removal: the whole
+    point is that this tool does not decide whose work survives.
+    """
+    gruende = []
+    kopf_hier = _git(repo, "rev-parse", "HEAD").strip()
+    if kopf_hier != kopf:
+        gruende.append(
+            f"the staging checkout is at {kopf_hier[:12]}, not at the head "
+            f"this comparison was made against ({kopf[:12]}). Writing here "
+            "would mix two states; check it out first")
+    schmutz = staging_schmutz(repo)
+    kollision = sorted(set(schmutz) & set(schreiben))
+    if kollision:
+        gruende.append(
+            f"{len(kollision)} path(s) we would write are modified and not "
+            "committed in the staging checkout: "
+            + ", ".join(f"{p} [{schmutz[p].strip() or '??'}]"
+                        for p in kollision[:10]))
+    sonst = sorted(set(schmutz) - set(schreiben))
+    if sonst:
+        gruende.append(
+            f"(not a collision, reported so it is not lost from view: "
+            f"{len(sonst)} other uncommitted path(s) here, e.g. "
+            + ", ".join(sonst[:5]) + ")")
+    return gruende
 
 
 def lade_zustand() -> dict:
@@ -254,8 +334,22 @@ def export(push: bool) -> int:
     if nenne_hindernisse(plan, geschrieben_haette=True):
         return 1
 
+    zu_schreiben = plan["schreiben"] + plan["neu"] + plan["berichte"]
+    hindernisse = staging_pruefen(staging(), kopf_vorher, zu_schreiben)
+    ernst = [g for g in hindernisse if not g.startswith("(")]
+    for g in hindernisse:
+        print(f"  staging: {g}")
+    if ernst:
+        print()
+        print("STOP -- nothing was written. The comparison was about the "
+              "public head; this is about the tree the files land in, and it "
+              "is not in a state this tool may write into. Resolve it there "
+              "-- commit, move aside, or check out the right head. Nothing "
+              "will be reset, stashed or removed from here.")
+        return 1
+
     geschrieben = 0
-    for pfad in plan["schreiben"] + plan["neu"] + plan["berichte"]:
+    for pfad in zu_schreiben:
         ziel = staging() / pfad
         ziel.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(HOH / pfad, ziel)
@@ -335,9 +429,10 @@ def record(export_commit: str) -> int:
                 "commit, so anything differing here afterwards is ours.",
         "public_repo": "SKZL-AI/veriharness",
         "synced_export_commit": voll,
-        "recorded_at_utc": subprocess.run(
-            ["date", "-u", "+%Y-%m-%dT%H:%M:%SZ"],
-            capture_output=True, text=True).stdout.strip(),
+        # Not `subprocess.run(["date", ...])`: there is no `date -u` on
+        # Windows, and shelling out for a timestamp the standard library
+        # produces is a portability cost with nothing bought for it.
+        "recorded_at_utc": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "ours_at_record_time": unsere,
         "path_digests": dict(sorted(ihre.items())),
     }, indent=2) + "\n")

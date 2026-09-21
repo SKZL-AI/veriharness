@@ -748,3 +748,116 @@ def test_no_audit_at_all_is_not_run_rather_than_passed(tmp_path, monkeypatch):
     monkeypatch.setattr(rd, "HOH", tmp_path)
     (tmp_path / "dogfood").mkdir()
     assert rd.zeile_telemetrie().zustand == rd.NOT_RUN
+
+
+def _abschnitt_mit(receipt_aenderungen, tmp_path):
+    """Render the distribution section from a doctored copy of the receipt.
+
+    The real receipt is never touched: it is the record of what was actually
+    published, and editing it to make a test pass would be the one move this
+    whole section is about.
+    """
+    import json
+
+    echt = json.loads(
+        (WURZEL / ".github/releases/v0.1.0.json").read_text())
+    d = json.loads(json.dumps(echt))
+    d.update(receipt_aenderungen)
+    ziel = tmp_path / ".github" / "releases"
+    ziel.mkdir(parents=True, exist_ok=True)
+    (ziel / "v0.1.0.json").write_text(json.dumps(d))
+    alt = rd.HOH
+    try:
+        rd.HOH = tmp_path
+        return [z for z in rd.verteilung_abschnitt() if z.strip()]
+    finally:
+        rd.HOH = alt
+
+
+def test_the_distribution_section_is_derived_and_not_asserted(tmp_path):
+    """The counter-proof an independent review ran, kept as a test.
+
+    O176 moved this section into a generator so a board run could not delete
+    it. The first generator read three fields and stated the rest as
+    constants -- so a receipt recording FAIL, NOT_VERIFIED and
+    `long_lived_pypi_token_used: true` still produced text claiming
+    byte-identical files, verified attestations and protected token-free
+    publishing. O140's shape, inside the repair for O176.
+
+    Each assurance is checked against its own field, and the positive case is
+    asserted too: a guard that only ever says "not confirmed" would pass this
+    while making the section useless.
+    """
+    echt = _abschnitt_mit({}, tmp_path / "echt")
+    verbunden = " ".join(echt)
+    assert "Not confirmed" not in verbunden, (
+        "the real receipt records a successful publication and the section "
+        "must say so; a generator that never affirms anything is not a "
+        "derivation either"
+    )
+    for muss in ("byte-identical", "PEP-740", "Trusted Publishing"):
+        assert muss in verbunden
+
+    negativ = _abschnitt_mit({
+        "production_pypi_result": "FAIL",
+        "testpypi_result": "FAIL",
+        "github_assets_match": False,
+        "attestations": {"status": "NOT_VERIFIED"},
+        "trusted_publishing": False,
+        "long_lived_pypi_token_used": True,
+        "production_environment": {"required_reviewer": None},
+    }, tmp_path / "negativ")
+    text = " ".join(negativ)
+    for feld in ("production_pypi_result", "github_assets_match",
+                 "attestations.status", "trusted_publishing"):
+        assert f"`{feld}" in text or feld in text, (
+            f"{feld} is not named in the section that rests on it")
+    assert text.count("Not confirmed") >= 4, (
+        "a receipt recording failure on every axis still produced affirmative "
+        "text: " + text[:400]
+    )
+    assert "were verified." not in text
+    assert "carry byte-identical wheel and sdist files." not in text
+
+
+def test_a_missing_field_is_not_confirmed_rather_than_assumed(tmp_path):
+    """Absent evidence and negative evidence are different, and neither is a
+    pass. The wording distinguishes them; both refuse the claim."""
+    fehlend = _abschnitt_mit({
+        "attestations": None, "trusted_publishing": None,
+        "long_lived_pypi_token_used": None, "github_assets_match": None,
+    }, tmp_path / "fehlend")
+    text = " ".join(fehlend)
+    assert "the receipt carries no" in text
+    assert "were verified." not in text
+
+
+def test_one_failing_python_version_is_named_not_averaged(tmp_path):
+    """The versions come from python_smoke, and a version recorded as failing
+    must appear as failing rather than be dropped from the list -- a list of
+    only the passing ones reads as though the others were never tried."""
+    import json
+
+    echt = json.loads((WURZEL / ".github/releases/v0.1.0.json").read_text())
+    smoke = json.loads(json.dumps(echt["python_smoke"]))
+    schlecht = sorted(smoke)[-1]
+    smoke[schlecht]["result"] = "FAIL"
+    text = " ".join(_abschnitt_mit({"python_smoke": smoke}, tmp_path / "py"))
+    assert "Not confirmed" in text and schlecht in text
+    assert "as not passing on " + schlecht in text
+
+
+def test_no_receipt_says_so_instead_of_vanishing(tmp_path):
+    """The section that replaced hand-written prose must not disappear when
+    its input does -- that was the failure mode it was built to end."""
+    leer = tmp_path / "leer"
+    leer.mkdir()
+    alt = rd.HOH
+    try:
+        rd.HOH = leer
+        zeilen = [z for z in rd.verteilung_abschnitt() if z.strip()]
+    finally:
+        rd.HOH = alt
+    assert any("## The published distribution" in z for z in zeilen)
+    assert any("No distribution receipt" in z for z in zeilen)
+

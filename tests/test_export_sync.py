@@ -86,25 +86,35 @@ def test_our_work_after_integrating_is_ours_not_a_conflict():
     assert not plan["konflikt"]
 
 
-def test_the_report_files_are_exempt_and_the_exemption_is_bounded():
-    """The gate rewrites three files on every run, so they differ between syncs
-    for a reason that is not anyone's work. The exemption must not be wider."""
-    assert es.BERICHTE == {"docs/READINESS.md", "CLAIMS.md"}
-    assert "CLAIMS.json" not in es.BERICHTE, (
-        "O174: the ledger is written, not generated. Exempting it means a "
-        "change made to it in the public repository is overwritten in silence "
-        "-- which is what happened to six claims there, and what the next "
-        "assertion pins"
+def test_no_path_is_exempt_from_the_comparison():
+    """O174, then an independent review: the exemption list is empty now.
+
+    It began as three paths copied from a different gate's tolerance. O174
+    removed the ledger after an attack showed six public claims would have
+    been reverted in silence. The review then asked why the other two were
+    exempt at all, and the honest answer was that "generated" describes the
+    content and not the decision -- a file being regenerable says nothing
+    about whether somebody added something our regeneration will drop, which
+    is exactly what O176 was.
+
+    Both halves are pinned. Their change to a generated file must stop, and
+    our own regeneration of it must still be written -- otherwise removing
+    the exemption would have deadlocked every export instead of guarding it.
+    """
+    assert es.BERICHTE == frozenset(), (
+        "a path was exempted again; the kept-empty set is the record of why "
+        "that is the wrong shape"
     )
-    ihre_claims = es.plane({"CLAIMS.json": A}, {"CLAIMS.json": A},
-                           {"CLAIMS.json": B})
-    assert [p for p, _ in ihre_claims["konflikt"]] == ["CLAIMS.json"]
-    plan = es.plane({"CLAIMS.md": A}, {"CLAIMS.md": B}, {"CLAIMS.md": C})
-    assert plan["berichte"] == ["CLAIMS.md"] and not plan["konflikt"]
-    # Negative control: any other path with the same shape is a conflict.
-    anders = es.plane({"docs/OTHER.md": A}, {"docs/OTHER.md": B},
-                      {"docs/OTHER.md": C})
-    assert [p for p, _ in anders["konflikt"]] == ["docs/OTHER.md"]
+    for pfad in ("docs/READINESS.md", "CLAIMS.md", "CLAIMS.json"):
+        ihre = es.plane({pfad: A}, {pfad: A}, {pfad: B})
+        assert [p for p, _ in ihre["konflikt"]] == [pfad], (
+            f"a public change to {pfad} was not reported"
+        )
+        unsere = es.plane({pfad: A}, {pfad: B}, {pfad: A})
+        assert unsere["schreiben"] == [pfad], (
+            f"our own regeneration of {pfad} was blocked, which would "
+            "deadlock every export after a gate run"
+        )
 
 
 def test_no_force_push_anywhere_in_the_tool():
@@ -285,4 +295,168 @@ def test_without_a_checkout_it_refuses_instead_of_guessing_one():
         assert "no export checkout" in str(exc.value)
     finally:
         es.STAGING = echt
+
+
+def _staging_fixture(w):
+    """A bare remote, a staging clone at its head, and an internal tree that
+    differs from it by one file."""
+    import json as _json
+
+    fern, st, intern = w / "f.git", w / "s", w / "i"
+
+    def g(repo, *a):
+        return subprocess.run(["git", "-C", str(repo), *a], capture_output=True,
+                              text=True, check=True).stdout.strip()
+
+    subprocess.run(["git", "init", "-q", "--bare", "-b", "main", str(fern)],
+                   check=True)
+    subprocess.run(["git", "init", "-q", "-b", "main", str(st)], check=True)
+    g(st, "config", "user.email", "t@example.invalid")
+    g(st, "config", "user.name", "t")
+    g(st, "remote", "add", "origin", str(fern))
+    (st / "f.txt").write_text("base\n")
+    (st / "EXPORT_MANIFEST.json").write_text(_json.dumps({"entries": [
+        {"path": "f.txt", "decision": "INCLUDE"},
+        {"path": "EXPORT_MANIFEST.json", "decision": "INCLUDE"}]}))
+    g(st, "add", "-A")
+    g(st, "commit", "-q", "-m", "base")
+    g(st, "push", "-q", "origin", "main")
+    g(st, "fetch", "-q", "origin")
+    intern.mkdir()
+    (intern / "f.txt").write_text("internal change\n")
+    (intern / "EXPORT_MANIFEST.json").write_text(
+        (st / "EXPORT_MANIFEST.json").read_text())
+    return st, intern, g, g(st, "rev-parse", "origin/main")
+
+
+def _export_im_fixture(w, vorbereiten):
+    """Record a base, let `vorbereiten` dirty the staging tree, then export."""
+    import io
+    from contextlib import redirect_stdout
+
+    st, intern, g, kopf = _staging_fixture(w)
+    echt = es.HOH, es.STAGING, es.STATE
+    try:
+        es.HOH, es.STAGING, es.STATE = intern, st, w / "state.json"
+        with redirect_stdout(io.StringIO()):
+            assert es.record(kopf) == 0
+        vorbereiten(st, intern, g)
+        puffer = io.StringIO()
+        with redirect_stdout(puffer):
+            rc = es.export(push=False)
+        return rc, puffer.getvalue(), st
+    finally:
+        es.HOH, es.STAGING, es.STATE = echt
+
+
+def test_uncommitted_work_in_the_staging_checkout_is_not_written_over():
+    """The comparison is about the public head. The files land in a working
+    tree, and those are not the same thing.
+
+    The first version of this tool compared against `origin/main` and then
+    wrote into the staging checkout without ever asking what state it was in
+    -- so uncommitted work there was replaced by our version and the run
+    reported success. Found by an independent review, not by this suite.
+
+    All three kinds of dirt count, and each is asserted separately: unstaged,
+    staged, and untracked. The assertion that matters in every case is not
+    the exit code but the file: it must come back byte-for-byte.
+    """
+    faelle = {
+        "unstaged": lambda st, intern, g: (st / "f.txt").write_text("THEIRS\n"),
+        "staged": lambda st, intern, g: ((st / "f.txt").write_text("THEIRS\n"),
+                                         g(st, "add", "f.txt")),
+    }
+    for name, vorbereiten in faelle.items():
+        with tempfile.TemporaryDirectory() as tmp:
+            rc, aus, st = _export_im_fixture(Path(tmp), vorbereiten)
+            assert rc == 1, f"{name}: the export reported success"
+            assert (st / "f.txt").read_text() == "THEIRS\n", (
+                f"{name}: uncommitted work in the staging checkout was "
+                "overwritten -- the defect this test exists for"
+            )
+            assert "not committed in the staging checkout" in aus
+
+    # Untracked, and a path we would newly create rather than replace.
+    def untracked(st, intern, g):
+        import json as _json
+        (intern / "neu.md").write_text("ours\n")
+        (intern / "EXPORT_MANIFEST.json").write_text(_json.dumps({"entries": [
+            {"path": "f.txt", "decision": "INCLUDE"},
+            {"path": "neu.md", "decision": "INCLUDE"},
+            {"path": "EXPORT_MANIFEST.json", "decision": "INCLUDE"}]}))
+        (st / "neu.md").write_text("THEIRS UNTRACKED\n")
+
+    with tempfile.TemporaryDirectory() as tmp:
+        rc, aus, st = _export_im_fixture(Path(tmp), untracked)
+        assert rc == 1
+        assert (st / "neu.md").read_text() == "THEIRS UNTRACKED\n", (
+            "an untracked file in the staging checkout was overwritten"
+        )
+
+
+def test_a_staging_checkout_at_another_head_is_refused():
+    """Writing into a tree that is not at the commit the comparison was made
+    against produces a mixture of two states that nobody reviewed."""
+    def zurueck(st, intern, g):
+        (st / "andere.txt").write_text("x\n")
+        g(st, "add", "-A")
+        g(st, "commit", "-q", "-m", "staging moved on its own")
+
+    with tempfile.TemporaryDirectory() as tmp:
+        rc, aus, st = _export_im_fixture(Path(tmp), zurueck)
+        assert rc == 1
+        assert "not at the head this comparison was made against" in aus
+        assert (st / "f.txt").read_text() == "base\n", (
+            "the export wrote into a checkout at a different head"
+        )
+
+
+def test_a_clean_staging_checkout_is_still_written_to():
+    """The negative control for the two refusals above. A guard that refuses
+    everything is not a guard, and this is the case the tool exists to do."""
+    with tempfile.TemporaryDirectory() as tmp:
+        rc, aus, st = _export_im_fixture(Path(tmp), lambda st, i, g: None)
+        assert rc == 0, aus
+        assert (st / "f.txt").read_text() == "internal change\n"
+
+
+def test_nothing_here_resets_stashes_or_removes_foreign_work():
+    """The refusal is the whole mechanism. A tool that tidied the staging
+    checkout to get past its own guard would be the defect with a extra step."""
+    quelle = (WURZEL / "tools" / "export_sync.py").read_text()
+    for verboten in ("reset --hard", "git stash", "clean -", "checkout --",
+                     "shutil.rmtree", "os.remove", "unlink("):
+        assert verboten not in quelle, (
+            f"{verboten!r} appears in a tool whose contract is that it never "
+            "decides whose work survives"
+        )
+
+
+def test_the_timestamp_comes_from_the_standard_library():
+    """`date -u` is not a command on Windows, and shelling out for something
+    the standard library produces buys nothing. Found by a review running
+    this on another platform.
+
+    Asked of the syntax tree, not of the text. The first version of this test
+    searched for the string `"date"` and failed on the comment explaining why
+    the call was removed -- a check that fires on prose about the thing it
+    forbids is the shape this project keeps finding in its own gates.
+    """
+    import ast
+
+    quelle = (WURZEL / "tools" / "export_sync.py").read_text()
+    baum = ast.parse(quelle)
+    for knoten in ast.walk(baum):
+        if not isinstance(knoten, ast.Call) or not knoten.args:
+            continue
+        erstes = knoten.args[0]
+        if not isinstance(erstes, ast.List) or not erstes.elts:
+            continue
+        kopf = erstes.elts[0]
+        if isinstance(kopf, ast.Constant) and kopf.value == "date":
+            raise AssertionError(
+                f"a subprocess call to `date` survives at line {knoten.lineno}"
+            )
+    assert "datetime.now(UTC)" in quelle
 

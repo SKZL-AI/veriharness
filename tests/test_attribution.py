@@ -421,3 +421,58 @@ def test_a_missing_anchor_reports_an_environment_gap_instead_of_crashing():
             "that verified nothing"
         )
 
+
+def test_both_output_modes_carry_the_same_exit_semantics():
+    """O171, finished. The repair gave the text mode a third exit code for an
+    environment gap and left `--json` returning 0 for the same state -- so the
+    machine-readable mode reported as success exactly what the human-readable
+    one had been changed to refuse. Found by an independent review.
+
+    Run as real CLI invocations, because the defect was in `main`'s return
+    path and a test that called `pruefe` directly would have missed it
+    entirely. Three states, both modes, and the environment-gap case uses a
+    repository that genuinely lacks the anchor rather than a mocked one.
+    """
+    import json as _json
+    import subprocess as _sp
+    import sys as _sys
+    import tempfile as _tf
+    from pathlib import Path as _P
+
+    werkzeug = str(WURZEL / "tools" / "attribution.py")
+
+    def lauf(*extra):
+        return _sp.run([_sys.executable, werkzeug, *extra],
+                       capture_output=True, text=True)
+
+    with _tf.TemporaryDirectory() as tmp:
+        repo, anker, arbeit = _fixture_repo(tmp)
+        ledger = _P(tmp) / "ledger.json"
+
+        # 1. An environment gap: this repository does not carry the anchor.
+        ledger.write_text(_json.dumps({"anchor": "0" * 40, "entries": []}))
+        for modus in ([], ["--json"]):
+            r = lauf("--repo", str(repo), "--ledger", str(ledger), *modus)
+            assert r.returncode == 3, (
+                f"{modus or ['text']}: an environment gap exited "
+                f"{r.returncode}, not 3 -- 0 would report a run that verified "
+                "nothing as a pass"
+            )
+
+        # 2. A finding: a commit no entry claims.
+        ledger.write_text(_json.dumps({"anchor": anker, "entries": []}))
+        rc_text = lauf("--repo", str(repo), "--ledger", str(ledger)).returncode
+        rc_json = lauf("--repo", str(repo), "--ledger", str(ledger),
+                       "--json").returncode
+        assert rc_text == rc_json == 1, (f"text={rc_text} json={rc_json}")
+
+        # 3. A verified pass.
+        ledger.write_text(_json.dumps({"anchor": anker, "entries": [
+            {"id": "i", "category": "MAIN_ORCHESTRATOR_DIRECT",
+             "is_development_node": False, "commits": [arbeit],
+             "why_not_the_product": "fixture"}]}))
+        rc_text = lauf("--repo", str(repo), "--ledger", str(ledger)).returncode
+        rc_json = lauf("--repo", str(repo), "--ledger", str(ledger),
+                       "--json").returncode
+        assert rc_text == rc_json == 0, (f"text={rc_text} json={rc_json}")
+

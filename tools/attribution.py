@@ -400,7 +400,14 @@ def main(argv=None) -> int:
     bericht = pruefe(args.repo.resolve(), ledger)
     if args.json:
         print(json.dumps(bericht, indent=2))
-        return 0 if bericht.get("environment_gap") else (0 if bericht["ok"] else 1)
+        # One exit semantics for both output formats: 3 an environment gap,
+        # 1 a finding, 0 a verified pass. The first version of this line
+        # returned 0 for the gap, so `--json` reported as success exactly the
+        # state the text mode had been given its own code to avoid -- the
+        # repair of O171 in one format and not the other.
+        if bericht.get("environment_gap"):
+            return 3
+        return 0 if bericht["ok"] else 1
     if bericht.get("environment_gap"):
         # Not a pass and not a violation: a third state, printed as itself and
         # given its own exit code so that `attribution.py && echo ok` cannot
