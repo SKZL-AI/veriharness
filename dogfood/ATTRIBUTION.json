@@ -334,6 +334,16 @@
         "22d9901d19a56825fafdd6cca87778f1155278be"
       ],
       "why_not_the_product": "Closing five findings from an independent review, and the reviewed-but-held decision on the o175 candidate. Outside any run: four of the five defects were in gates -- the export guard, the readiness board's distribution section, the attribution CLI -- and a run cannot repair the checks that certify it. The fifth is a decision about what this ledger may claim, which is the ledger writing itself."
+    },
+    {
+      "id": "v010-review-reanchor",
+      "category": "MAIN_ORCHESTRATOR_DIRECT",
+      "is_development_node": false,
+      "commits": [
+        "14c0777e48e5dddfea73767d1644af875632686c",
+        "ded9b97282d89bda69a90d79d9ec32c1e5813042"
+      ],
+      "why_not_the_product": "The board written while external_ci was correctly red, and the re-anchoring of the two distribution claims that the derivation split apart: binding each assurance to its own receipt field turned one combined sentence into two, so the claims pointing at it moved. Both are ledger and board bookkeeping about a change to a gate, which is the orchestrator's act by construction."
     }
   ]
 }
