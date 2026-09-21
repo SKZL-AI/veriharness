@@ -5,7 +5,7 @@ command that produced it, and the verdict is the conjunction of the
 rows rather than a judgement typed above them. A row this tool cannot
 evaluate is `NOT_RUN`, which is never a pass.
 
-Measured at `88b0349` on 2026-09-21.
+Measured at `6b5e663` on 2026-09-21.
 
     TECHNICALLY_STABLE_READY = no
 
@@ -13,7 +13,7 @@ Open, and each one blocking: external_ci.
 
 | condition | state | measured | command |
 |---|---|---|---|
-| `tests` | PASS | 1303 passed | `python3 -m pytest -q` |
+| `tests` | PASS | 1304 passed | `python3 -m pytest -q` |
 | `lint` | PASS | clean | `ruff check --select F,E9 src tests tools` |
 | `claims` | PASS | OK: all checks passed | `python3 tools/check_claims.py check all` |
 | `union_invariants` | PASS | U1-U5 pass | `python3 tools/union_gate.py` |
@@ -26,12 +26,12 @@ Open, and each one blocking: external_ci.
 | `benchmark_v2_historical` | FAIL (advisory) | HISTORICAL_COMPLETE; matched_budget_valid = NO; budget_rule violated: 2 cell(s) ran past the dispatch budget without being stopped | `python3 tools/repetition_plan.py --campaign v2` |
 | `benchmark_v3` | PASS | 15 of 15 cells; COMPLETE; matched_budget_valid = YES; freeze DRIFTED (post-campaign repair, accounted for) | `python3 tools/prereg.py check --campaign v3 && python3 tools/repetition_plan.py --campaign v3` |
 | `export_manifest` | PASS | no leaks, 0 unacknowledged dangling reference(s), 12 acknowledged, 0 other problem(s) | `python3 tools/export_manifest.py check` |
-| `export_sync` | PASS | clean; 5 ours to write | `python3 tools/export_sync.py status` |
+| `export_sync` | PASS | clean; 6 ours to write | `python3 tools/export_sync.py status` |
 | `clean_install` | PASS | 0 red step(s) | `python3 tools/clean_install_check.py` |
 | `attribution` | PASS | 1 of 12 nodes through the product | `python3 tools/attribution.py` |
 | `evidence_index` | PASS | EVIDENCE_INDEX.md matches the trees it describes | `python3 tools/evidence_index.py` |
 | `paper_audit` | PASS | 8 of 8 checks | `python3 tools/audit_refs.py <each check>` |
-| `external_ci` | FAIL | the recorded run tested a different export: 5 path(s) differ beyond this gate's own reports (dogfood/ATTRIBUTION.json, tests/test_attribution.py, tests/test_export_manifest.py). Re-export, re-run CI, record it again. | `python3 tools/exact_head_ci.py --run-id ID --export-commit SHA` |
+| `external_ci` | FAIL | the recorded run tested a different export: 3 path(s) differ beyond this gate's own reports (dogfood/ATTRIBUTION.json, tests/test_readiness.py, tools/readiness.py). Re-export, re-run CI, record it again. | `python3 tools/exact_head_ci.py --run-id ID --export-commit SHA` |
 | `routing` | PASS | DEFERRED_ON_EVIDENCE | `read docs/ROUTING.md` |
 
 ## Why some rows are advisory

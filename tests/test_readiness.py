@@ -762,7 +762,11 @@ def _abschnitt_mit(receipt_aenderungen, tmp_path):
     echt = json.loads(
         (WURZEL / ".github/releases/v0.1.0.json").read_text())
     d = json.loads(json.dumps(echt))
-    d.update(receipt_aenderungen)
+    for schluessel, wert in receipt_aenderungen.items():
+        if wert is None:
+            d.pop(schluessel, None)   # absent, not present-and-null
+        else:
+            d[schluessel] = wert
     ziel = tmp_path / ".github" / "releases"
     ziel.mkdir(parents=True, exist_ok=True)
     (ziel / "v0.1.0.json").write_text(json.dumps(d))
@@ -860,4 +864,45 @@ def test_no_receipt_says_so_instead_of_vanishing(tmp_path):
         rd.HOH = alt
     assert any("## The published distribution" in z for z in zeilen)
     assert any("No distribution receipt" in z for z in zeilen)
+
+
+def test_a_truthy_string_is_not_a_yes_and_a_missing_field_is_not_a_no(tmp_path):
+    """An independent review's second pass, and both halves are the same slip.
+
+    `bool(wert)` accepted the string "false" as true, so a receipt recording
+    `trusted_publishing: "false"` still produced the success sentence. And a
+    missing `long_lived_pypi_token_used` was read as "no token was used" --
+    an absent record treated as a record of absence, which is the shape this
+    project refuses everywhere else.
+
+    Fields are compared by type and value now. Four answers, not two: says
+    yes, says no, says nothing, says something of the wrong type -- and only
+    the first produces the claim.
+    """
+    faelle = [
+        ("tp true, token field absent",
+         {"long_lived_pypi_token_used": None}, "trusted_publishing"),
+        ("tp as the string 'false'",
+         {"trusted_publishing": "false"}, "trusted_publishing"),
+        ("token as the int 1",
+         {"long_lived_pypi_token_used": 1}, "trusted_publishing"),
+        ("assets as the string 'false'",
+         {"github_assets_match": "false"}, "github_assets_match"),
+        ("assets field absent",
+         {"github_assets_match": None}, "github_assets_match"),
+    ]
+    for name, aenderung, feld in faelle:
+        zeilen = _abschnitt_mit(aenderung, tmp_path / name.replace(" ", "_"))
+        treffer = [z for z in zeilen if feld in z]
+        assert treffer, f"{name}: no line rests on {feld}"
+        assert "Not confirmed" in treffer[0], (
+            f"{name}: produced an affirmative claim -- {treffer[0][:120]}"
+        )
+
+    # The negative control: the real receipt must still affirm, or a check
+    # that refuses everything would pass this test while saying nothing.
+    echt = " ".join(_abschnitt_mit({}, tmp_path / "echt"))
+    assert "Not confirmed" not in echt
+    assert "with no long-lived token." in echt
+    assert "carry byte-identical wheel and sdist files." in echt
 

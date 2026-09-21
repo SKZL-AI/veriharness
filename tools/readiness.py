@@ -974,11 +974,40 @@ def verteilung_abschnitt() -> list[str]:
          "the historical measurement at its stated commit; these lines are "
          "about the package, not about the campaigns.", ""]
 
-    def zusicherung(gilt: bool | None, ja: str, nein: str, feld: str) -> str:
+    FEHLT, TYP, NEIN, JA = "fehlt", "typ", "nein", "ja"
+
+    def ist(wert, erwartet, typ) -> str:
+        """Does this field say what the affirmative sentence would need?
+
+        Four answers, not two. An independent review found the third and
+        fourth: `bool(wert)` accepted the string `"false"` as true, and a
+        missing field was read as permission rather than as absence. So a
+        value is compared by identity or equality against what is expected,
+        and a value of the wrong type is its own answer -- never a pass, and
+        never reported as though the receipt had said no.
+        """
+        if wert is None:
+            return FEHLT
+        if not isinstance(wert, typ):
+            return TYP
+        return JA if wert == erwartet else NEIN
+
+    def alle(*zustaende) -> str:
+        """The weakest answer among several fields wins, worst first: a claim
+        resting on two fields is only as good as the one that does not hold."""
+        for schlecht in (TYP, FEHLT, NEIN):
+            if schlecht in zustaende:
+                return schlecht
+        return JA
+
+    def zusicherung(zustand: str, ja: str, nein: str, feld: str) -> str:
         """The affirmative sentence only when the evidence says so."""
-        if gilt is None:
+        if zustand == FEHLT:
             return f"Not confirmed -- the receipt carries no `{feld}`: {nein}"
-        if not gilt:
+        if zustand == TYP:
+            return (f"**Not confirmed** -- `{feld}` in the receipt is not of "
+                    f"the type this reads: {nein}")
+        if zustand == NEIN:
             return f"**Not confirmed** -- `{feld}` in the receipt says otherwise: {nein}"
         return ja
 
@@ -1000,7 +1029,8 @@ def verteilung_abschnitt() -> list[str]:
                            if isinstance(r, dict) and r.get("result") != "PASS")
 
     z.append(zusicherung(
-        prod == "PASS" and version is not None and tag is not None,
+        alle(ist(prod, "PASS", str), ist(version, version, str),
+             ist(tag, tag, str)),
         f"The v{version} distribution was published"
         + (f" on {wann}" if wann else "")
         + f" from the unchanged release tag `{tag}`.",
@@ -1008,7 +1038,7 @@ def verteilung_abschnitt() -> list[str]:
         "production_pypi_result"))
 
     z.append(zusicherung(
-        None if assets is None else (bool(assets) and test == "PASS"),
+        alle(ist(assets, True, bool), ist(test, "PASS", str)),
         "TestPyPI, PyPI, and the GitHub release carry byte-identical wheel "
         "and sdist files.",
         "the three copies are not recorded as byte-identical.",
@@ -1026,13 +1056,16 @@ def verteilung_abschnitt() -> list[str]:
                  + ", ".join(bestanden) + ".")
 
     z.append(zusicherung(
-        None if att is None else att == "VERIFIED",
+        ist(att, "VERIFIED", str),
         "Both PEP-740 attestations were verified.",
         "the attestations are not recorded as verified.",
         "attestations.status"))
 
     z.append(zusicherung(
-        None if (tp is None and token is None) else (bool(tp) and not token),
+        # Both fields, by identity. `bool(tp)` accepted the string "false",
+        # and a missing token field was read as "no token was used" -- an
+        # absent record is not a record of absence.
+        alle(ist(tp, True, bool), ist(token, False, bool)),
         "Publication used OIDC Trusted Publishing"
         + (f" through the protected `{umgebung.get('name', 'pypi')}` "
            f"environment, reviewer {pruefer}," if pruefer else ",")

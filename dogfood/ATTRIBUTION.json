@@ -366,6 +366,17 @@
         "7f2f075d7adc81eb08660a96694ea9b9ee0e5c67"
       ],
       "why_not_the_product": "The board written before the attribution vocabulary was extended. Orchestrator work by construction: a run cannot write the board that certifies it, and it cannot be the thing that decides which categories this ledger may use to describe its own provenance."
+    },
+    {
+      "id": "v010-receipt-strictness",
+      "category": "MAIN_ORCHESTRATOR_DIRECT",
+      "is_development_node": false,
+      "commits": [
+        "31afa6addc5cc758268687847612c8cbf19e266c",
+        "88b0349ae47accc7173dc852de4470c6829ffc18",
+        "ca10f3fb6ef764a0e457bf1dc196991bd6da156b"
+      ],
+      "why_not_the_product": "The two boards around the second review pass, and O180 -- making every receipt assurance compare by type and value instead of truthiness. Outside any run: running the gates and recording what they returned is the act a run would have to be certified by, and O180 changes how strictly that gate reads its own evidence."
     }
   ]
 }
