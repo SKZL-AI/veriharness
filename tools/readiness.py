@@ -279,6 +279,58 @@ def row_parallelism() -> Row:
                "is checked rather than remembered")
 
 
+def row_capability_matrix() -> Row:
+    """Does the capability matrix still describe this repository?
+
+    V3.3 P0. Same shape as the parallelism row and for the same reason: the
+    matrix is generated, so the only way it can be wrong is by being old. The
+    row re-derives it and compares the statuses, which makes a stale matrix a
+    red row rather than a table somebody trusts.
+
+    It deliberately does not block on the *content* -- 29 MISSING capabilities
+    are the plan's premise, not a regression. What it blocks on is the
+    document disagreeing with the probes.
+    """
+    command = ("python3 tools/capability_matrix.py "
+               "--out program/v3_3/VERIHARNESS_CAPABILITY_MATRIX.json")
+    document = HOH / "program/v3_3/VERIHARNESS_CAPABILITY_MATRIX.json"
+    if not document.is_file():
+        return Row("capability_matrix", NOT_RUN,
+                   "no capability matrix in this tree", command,
+                   "a matrix nobody derived is not a matrix that holds")
+    import importlib.util as _il
+    spec = _il.spec_from_file_location("capability_matrix",
+                                       HERE / "capability_matrix.py")
+    cm = _il.module_from_spec(spec)
+    sys.modules["capability_matrix"] = cm
+    spec.loader.exec_module(cm)
+    try:
+        fresh = cm.measure()
+    except cm.RegisterMissing as exc:
+        return Row("capability_matrix", NOT_RUN, str(exc)[:100], command,
+                   "the register is internal and this tool is published: a "
+                   "clone can hold the instrument without holding anything "
+                   "for it to measure")
+    on_disk = json.loads(document.read_text(encoding="utf-8"))
+    now = {r["id"]: r["status"] for r in fresh["capabilities"]}
+    then = {r["id"]: r["status"] for r in on_disk.get("capabilities") or []}
+    moved = sorted(k for k in set(now) | set(then) if now.get(k) != then.get(k))
+    counts = fresh["counts"]
+    if moved:
+        return Row("capability_matrix", FAIL,
+                   f"{len(moved)} capability status(es) moved since the "
+                   f"document was written: " + ", ".join(moved[:4]), command,
+                   "a generated document that was not regenerated describes a "
+                   "tree that no longer exists")
+    return Row(
+        "capability_matrix", PASS,
+        f"{counts.get('PROVEN', 0)} proven, {counts.get('MISSING', 0)} missing, "
+        f"{counts.get('PARTIAL', 0)} partial -- re-derives identically",
+        command,
+        "the matrix is what the next phase is planned from, so it is checked "
+        "rather than remembered")
+
+
 def row_export_sync() -> Row:
     """Would exporting right now overwrite work that did not come from here?
 
@@ -1013,6 +1065,7 @@ def row_list(quick: bool) -> list[Row]:
         row_identifiers(),
         row_preflight(),
         row_parallelism(),
+        row_capability_matrix(),
         row_install(quick),
         row_attribution(),
         row_evidence_index(),

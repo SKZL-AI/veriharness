@@ -83,6 +83,17 @@ RUN_EVIDENCE_V3 = Withheld(
     "digests that redaction would break; docs/BENCHMARK_RESULTS_v3.md carries "
     "what they measured")
 
+#: V3.3 P0. The requirement register is a reading of the operator's planning
+#: package, which is not published: the plan is the customer's, the tree is
+#: the product's. A published clone therefore cannot derive the capability
+#: matrix, and must say so rather than pretend the matrix is empty.
+PROGRAM_REGISTER = Withheld(
+    "program/v3_3/REQUIREMENTS.json", "unclassified",
+    "the V3.3 requirement register is derived from an internal planning "
+    "package and stays in the internal tree; without it a capability matrix "
+    "cannot be derived here, and an empty matrix would read as a repository "
+    "with no requirements")
+
 
 def _manifest() -> dict[str, tuple[str, str]]:
     """path -> (decision, rule). Raises if the manifest cannot authorise anything."""

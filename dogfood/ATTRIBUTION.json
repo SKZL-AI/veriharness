@@ -472,6 +472,16 @@
         "fd1dbc23ab09b4ce06ce3b6d7d30cbeaa629455c"
       ],
       "why_not_the_product": "The V3.3 P0 baselines: the parallelism measurement and the campaign-drift accounting the rename made necessary. Outside any run by construction -- a baseline is the description of what the product currently is, and the product cannot be the author of its own description without the ratio this ledger reports becoming circular. One of these commits carries the ledger together with the board and the evidence records, which is why it needed an entry at all: a commit that changes anything besides one bookkeeping file is work, whatever its message says (O186)."
+    },
+    {
+      "id": "v3-3-p0-capability-matrix",
+      "category": "MAIN_ORCHESTRATOR_DIRECT",
+      "is_development_node": false,
+      "commits": [
+        "38cba3207047b1af69842d4735778a191675b536",
+        "65072c71c17dfcf29b81417d087f7036194bc1e4"
+      ],
+      "why_not_the_product": "The V3.3 requirement register and the matrix derived from it. Outside any run by construction: the register is a reading of the plan, and the matrix is this repository's description of itself -- a run inside it cannot be the author of the list its own work will be measured against. Corrected on the day it was written: the first version of this entry claimed 44 commits because the script that built it decided 'already attributed' by scanning literal shas, while the checker resolves ranges as well. The checker caught it as a double claim; the entry now contains exactly the commits the checker says belong to no other entry (O192)."
     }
   ]
 }

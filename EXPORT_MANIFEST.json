@@ -3612,7 +3612,22 @@
       "rule": "operational-integration"
     },
     {
+      "path": "program/v3_3/REQUIREMENTS.json",
+      "decision": "EXCLUDE",
+      "rule": "unclassified"
+    },
+    {
+      "path": "program/v3_3/VERIHARNESS_CAPABILITY_MATRIX.json",
+      "decision": "EXCLUDE",
+      "rule": "unclassified"
+    },
+    {
       "path": "program/v3_3/VERIHARNESS_ENVIRONMENT_CAPABILITIES.json",
+      "decision": "EXCLUDE",
+      "rule": "unclassified"
+    },
+    {
+      "path": "program/v3_3/VERIHARNESS_GAP_REGISTER.md",
       "decision": "EXCLUDE",
       "rule": "unclassified"
     },
@@ -3827,6 +3842,11 @@
       "rule": "tests"
     },
     {
+      "path": "tests/test_capability_matrix.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
       "path": "tests/test_claims_anchors.py",
       "decision": "INCLUDE",
       "rule": "tests"
@@ -4028,6 +4048,11 @@
     },
     {
       "path": "tools/budget_evidence.py",
+      "decision": "INCLUDE",
+      "rule": "tooling"
+    },
+    {
+      "path": "tools/capability_matrix.py",
       "decision": "INCLUDE",
       "rule": "tooling"
     },
