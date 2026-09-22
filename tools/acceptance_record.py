@@ -105,6 +105,7 @@ HOH = Path(__file__).resolve().parent.parent
 PUBLISHED = "https://github.com/SKZL-AI/veriharness.git"
 STRICT_MODES = ("auto", "dontAsk", "bypassPermissions")
 DOCUMENTED_RUN_ID = "minimal-demo"
+STDERR_MARKER = "\n--- stderr ---\n"
 #: The operator variables a step may inherit (plus HERDR_*, which hoh reads to
 #: find its own pane). PATH, VIRTUAL_ENV and HOH_RUNS are set per step.
 ENV_BASE_KEYS = {"HOME", "USER", "LOGNAME", "LANG", "LC_ALL", "TERM", "SHELL", "PATH",
@@ -319,8 +320,10 @@ def _recheck(step: dict | None, out: str | None) -> dict:
     """One re-executed spec criterion: the step as recorded and the receipt
     the fresh install's strict runner printed."""
     step = step or {}
+    # Only stdout: a warning on stderr (appended after the marker the drive
+    # writes) must not turn a passing recheck into a missing receipt.
     try:
-        data = json.loads(out or "")
+        data = json.loads((out or "").split(STDERR_MARKER, 1)[0])
     except ValueError:
         data = {}
     data = data if isinstance(data, dict) else {}
@@ -355,8 +358,12 @@ def derive(evidence: Path) -> dict:
         if name in steps:
             duplicates.append(name)
         out_rel = s.get("output")
-        s["text"] = (_read(root, ev / out_rel)
-                     if isinstance(out_rel, str) and not os.path.isabs(out_rel) else None)
+        raw = (_read(root, ev / out_rel)
+               if isinstance(out_rel, str) and not os.path.isabs(out_rel) else None)
+        # The drive appends stderr after a marker. Every value is read from
+        # stdout alone: a warning on stderr must not break a parse (both
+        # reviewers, round 6); stderr stays in the evidence, beside it.
+        s["text"] = raw.split(STDERR_MARKER, 1)[0] if raw is not None else None
         steps[name] = s
 
     def text(name):

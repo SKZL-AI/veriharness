@@ -30,7 +30,7 @@ export HOH_RUNS=<a-directory-for-your-runs>
 python3 tools/preflight.py --profile demo
 hoh worktree --repo <your-project-checkout> --branch hoh-minimal-example
 hoh start --repo <worktree-path> --spec examples/minimal/spec.md --run-id minimal-demo
-hoh run minimal-demo --iterations 2 --planner claude --developer claude --qa claude \
+hoh run minimal-demo --iterations 2 --until-accepted --planner claude --developer claude --qa claude \
     --isolation strict --approval-policy policy/role_approval.default.json --trust-worktree
 hoh report minimal-demo
 ```

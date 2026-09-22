@@ -66,7 +66,7 @@ export HOH_RUNS=<a-directory-for-your-runs>
 python3 tools/preflight.py --profile demo
 hoh worktree --repo <your-project-checkout> --branch hoh-minimal-example
 hoh start --repo <worktree-path> --spec examples/minimal/spec.md --run-id minimal-demo
-hoh run minimal-demo --iterations 2 --planner claude --developer claude --qa claude \\
+hoh run minimal-demo --iterations 2 --until-accepted --planner claude --developer claude --qa claude \\
     --isolation strict --approval-policy policy/role_approval.default.json --trust-worktree
 hoh report minimal-demo
 ```
@@ -79,7 +79,7 @@ SPEC = """# Spec
 3. **K3 -- a test file exists and passes.**
    Command: `python3 -m pytest -q test_greet.py`
 """
-RUN_ARGV = ["hoh", "run", RUN, "--iterations", "2", "--planner", "claude", "--developer",
+RUN_ARGV = ["hoh", "run", RUN, "--iterations", "2", "--until-accepted", "--planner", "claude", "--developer",
             "claude", "--qa", "claude", "--isolation", "strict", "--approval-policy",
             "policy/role_approval.default.json", "--trust-worktree"]
 
@@ -422,7 +422,7 @@ def test_n1_a_step_recorded_twice_is_refused(ev):
 
 
 @pytest.mark.parametrize("step,argv", [
-    ("run", ["hoh", "run", RUN, "--iterations", "2", "--planner", "claude", "--developer",
+    ("run", ["hoh", "run", RUN, "--iterations", "2", "--until-accepted", "--planner", "claude", "--developer",
              "claude", "--qa", "claude", "--isolation", "none", "--approval-policy",
              "policy/role_approval.default.json", "--trust-worktree"]),
     ("run", RUN_ARGV[:-1]),
@@ -805,3 +805,19 @@ def test_r4_a_driver_or_tool_that_is_not_the_committed_one_is_refused(ev, which)
 def test_r4_an_uncommitted_driver_is_refused(ev):
     _step_output(ev, "driver_status").write_text(" M tools/acceptance_record.py\n")
     assert any("uncommitted changes" in p for p in _problems(ev))
+
+
+# --- round 6 (both reviewers): stdout only; stop after the first acceptance ------
+
+@pytest.mark.parametrize("name", ["recheck_K3", "worktree", "interpreter", "doctor"])
+def test_a_warning_on_stderr_does_not_fail_an_honest_run(ev, name):
+    f = _step_output(ev, name)
+    f.write_text(f.read_text() + "\n--- stderr ---\n/x/site.py:1: DeprecationWarning: {x}\n")
+    assert _problems(ev) == []
+
+
+def test_the_run_must_stop_at_the_first_acceptance_as_documented(ev):
+    """Reviewer A, round 6: without --until-accepted a second iteration re-runs
+    a satisfied spec and can leave the run in PLANNING."""
+    _step_edit(ev, "run", lambda r: r["argv"].remove("--until-accepted"))
+    assert any("step run is not the command the README" in p for p in _problems(ev))

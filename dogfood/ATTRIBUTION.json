@@ -555,6 +555,26 @@
         "6ff91551563401438635c19b41bd0d8b4695038b"
       ],
       "why_not_the_product": "The P1-16 acceptance record, its driver, O203 and the O205 drift accounting were built by the orchestrator under five adversarial review rounds: they are the instrument that judges whether a product run happened as documented, and a run cannot author the instrument that judges it. Counted as a development node outside the product."
+    },
+    {
+      "id": "p1-16-regeneration",
+      "category": "MAIN_ORCHESTRATOR_DIRECT",
+      "is_development_node": true,
+      "commits": [
+        "3e33bca68ae06e89046f3f6dc0a4976d813d6bdf"
+      ],
+      "why_not_the_product": "The fixpoint regeneration after the P1-16 fix set: generated documents re-derived from the tree by tools/regenerate.py. Mechanical, and outside the product for the same reason the instrument is -- a run does not regenerate the board that judges it."
+    },
+    {
+      "id": "p1-16-export-and-preflight",
+      "category": "MAIN_ORCHESTRATOR_DIRECT",
+      "is_development_node": true,
+      "commits": [
+        "0608989673bc68e1c043d6591da92667fcbb135b",
+        "98e3b1efe58dfc9c8d7436c1b3bf5630be77de21",
+        "a6d00630f6db2d028bb04786eeec969d65047a9b"
+      ],
+      "why_not_the_product": "Recording the export's CI evidence and the sync base, and the pre-flight corrections both reviewers required before the fourth drive (--until-accepted in the documented command, stdout-only parsing). Orchestrator work on the instrument and its evidence, outside the product."
     }
   ]
 }
