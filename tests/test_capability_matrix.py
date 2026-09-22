@@ -119,7 +119,7 @@ def test_a_probe_that_could_not_run_is_not_a_finding_about_the_software():
 def test_every_requirement_in_the_register_has_a_probe_the_tool_understands():
     """A register entry the classifier cannot read would come out
     NOT_DETERMINABLE forever and nobody would notice it was a typo."""
-    known = {"none", "symbol", "method", "test", "row"}
+    known = {"none", "symbol", "method", "test", "row", "evidence"}
     for req in _register()["requirements"]:
         kind = (req.get("probe") or {}).get("kind")
         assert kind in known, (req["id"], kind)

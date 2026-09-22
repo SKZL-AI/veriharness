@@ -1220,6 +1220,7 @@ def run_check(
                 k: v for k, v in proof_.items() if k.endswith("_ns")
             },
             runner_namespaces=own_ns,
+            observed_python3=proof_.get("python3", ""),
             network_policy=network_,
             candidate_mount_mode=mount,
             resource_limit_policy=limits_,

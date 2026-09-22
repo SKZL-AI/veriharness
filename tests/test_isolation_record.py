@@ -1078,10 +1078,27 @@ def test_a_short_proof_does_not_default_the_missing_line(tmp_path):
         "mnt_ns": "mnt:[1]", "net_ns": "net:[2]"
     }
     assert "candidate_writable" not in marker_reading("mnt:[1]\n")
-    # And only the first three lines are ever read.
-    many = "\n".join(f"line{i}" for i in range(50))
-    assert set(marker_reading(many)) == {"mnt_ns", "net_ns", "candidate_writable"}
-    assert marker_reading(many)["mnt_ns"] == "line0"
+    # And only the first lines the prologue writes are ever read: three until
+    # 2026-09-22, four since O203 added the interpreter line. (Until the same
+    # day this used fifty `line<i>` strings; since lines are validated by
+    # shape, junk is refused outright, so the bound is shown with well-formed
+    # lines followed by more of them.)
+    many = "mnt:[1]\nnet:[2]\nro\n/v/bin/python3\n" + "\n".join(
+        f"/forged{i}/bin/python3" for i in range(50))
+    assert set(marker_reading(many)) == {"mnt_ns", "net_ns", "candidate_writable", "python3"}
+    assert marker_reading(many)["python3"] == "/v/bin/python3"
+    assert marker_reading(many)["mnt_ns"] == "mnt:[1]"
+
+
+def test_a_missing_proof_line_does_not_shift_the_others_up():
+    """Reviewer B: with one `readlink` silent, pairing by position read the
+    net id as the mount id, the mode as the net id, and the check's own
+    appended line as the interpreter. Shapes stop the reading instead."""
+    from hoh.sandbox import marker_reading
+
+    shifted = "net:[2]\nro\n/v/bin/python3\n/forged/bin/python3\n"
+    assert marker_reading(shifted) == {}
+    assert marker_reading("mnt:[1]\nro\n/v/bin/python3\n") == {"mnt_ns": "mnt:[1]"}
 
 
 def test_a_two_line_proof_is_not_honoured(tmp_path):

@@ -309,6 +309,14 @@ class IsolationRecord(Strict):
     #: removes the class, rather than adding a fourth condition to the three
     #: that were already not enough.
     complaint: str = ""
+    #: What PATH resolved `python3` to when the check's shell started,
+    #: reported from inside the sandbox before the check ran (O203). It is the
+    #: interpreter a *bare* `python3` in the command runs -- not a record of
+    #: every interpreter a command might name by path or after changing PATH,
+    #: which a reviewer demonstrated it does not see. "none" when there was
+    #: none; empty on the unsandboxed path and on receipts written before the
+    #: field existed.
+    observed_python3: str = ""
 
     def honoured(self) -> bool:
         """Did the run get the isolation it asked for?

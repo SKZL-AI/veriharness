@@ -46,6 +46,7 @@ assumption that it is there.
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 from dataclasses import dataclass, field
@@ -189,26 +190,48 @@ class SandboxBackend(Protocol):
 #: still leaves the proof. Nothing on the pipe means the command never
 #: started, which is how a sandbox that fails during setup is told apart from
 #: a check that ran and exited non-zero -- bubblewrap 0.9 exits 1 for both.
+#:
+#: A fourth line (O203) names the `python3` the check's own shell resolves,
+#: read from the same PATH the check gets -- what a *bare* `python3` in the
+#: command runs, not whatever a command names by path or after changing PATH. Without it the interpreter a strict
+#: check ran under was only ever inferred -- from a doctor probe taken before
+#: the run, or from the runner's own prefix -- and a reviewer pointed out that
+#: the host interpreter had the same version and also had pytest, so nothing
+#: in a receipt told the two apart. `none` when there is no python3 at all,
+#: so the line is never missing and never shifts.
 MARKER_PROLOGUE = (
     "{ readlink /proc/self/ns/mnt; readlink /proc/self/ns/net; "
     'if [ ! -e "$HOH_CANDIDATE" ]; then echo absent; '
     'elif [ -w "$HOH_CANDIDATE" ]; then echo rw; '
-    "else echo ro; fi; } >&$HOH_PROOF_FD 2>/dev/null || true\n"
+    "else echo ro; fi; command -v python3 || echo none; "
+    "} >&$HOH_PROOF_FD 2>/dev/null || true\n"
 )
 
 
 def marker_reading(text: str) -> dict[str, str]:
     """Parses what came back from the sandbox. Missing lines stay missing.
 
-    Only the **first three** lines are read. The pipe is shared with the check
+    Only the **first four** lines are read (three until O203 added the
+    interpreter line). The pipe is shared with the check
     command's own file descriptors, so a later writer can append; it cannot
     alter what the prologue already wrote. Defaulting a missing key was a
     surviving mutation in review: a short marker that silently became "ro" is
     the same weaker-source-as-proof class this whole area is about.
     """
-    lines = [z.strip() for z in text.splitlines() if z.strip()][:3]
-    key = ("mnt_ns", "net_ns", "candidate_writable")
-    return dict(zip(key, lines))
+    lines = [z.strip() for z in text.splitlines() if z.strip()][:4]
+    # Each line must have its own shape, in order; reading stops at the first
+    # that does not. Pairing by position alone meant one silently failed
+    # `readlink` shifted every later value up a key -- the candidate's mode
+    # read as a namespace id, and the check's own appended line read as the
+    # interpreter (reviewer B, 2026-09-22).
+    shapes = (("mnt_ns", r"mnt:\[\d+\]"), ("net_ns", r"net:\[\d+\]"),
+              ("candidate_writable", r"absent|ro|rw"), ("python3", r"none|/\S*"))
+    out: dict[str, str] = {}
+    for (key, shape), line in zip(shapes, lines):
+        if not re.fullmatch(shape, line):
+            break
+        out[key] = line
+    return out
 
 
 def own_namespaces() -> dict[str, str]:

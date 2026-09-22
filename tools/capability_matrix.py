@@ -81,6 +81,52 @@ def _board() -> dict[str, tuple[str, str]]:
     return rows
 
 
+def _inside(rel: str) -> Path | None:
+    """`rel` resolved under the tree, or None when it is empty, absolute or
+    escapes it. Reviewer B: evidence from outside the tree could make a
+    requirement PROVEN through a register edit."""
+    if not rel or Path(rel).is_absolute():
+        return None
+    path = (HOH / rel).resolve()
+    return path if path.is_relative_to(HOH.resolve()) else None
+
+
+def evidence_status(probe: dict) -> tuple[str, str]:
+    """The status of an `evidence` probe, and one line saying why.
+
+    Fails per requirement, never for the whole matrix: a malformed record used
+    to raise out of `measure()` and take all 184 rows down with it.
+    """
+    record, evid = _inside(probe.get("path", "")), _inside(probe.get("evidence_dir", ""))
+    if record is None or evid is None:
+        return NOT_DETERMINABLE, (f"evidence probe paths must lie inside the tree: "
+                                  f"{probe.get('path')!r}, {probe.get('evidence_dir')!r}")
+    if not record.is_file():
+        return MISSING, f"no acceptance record at {probe.get('path')}"
+    try:
+        data = json.loads(record.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        return NOT_DETERMINABLE, f"record {probe.get('path')} unreadable: {exc}"
+    if not isinstance(data, dict):
+        return NOT_DETERMINABLE, f"record {probe.get('path')} is not an object"
+    try:
+        again = subprocess.run(
+            # The derivation tool sits beside this one, wherever the tree
+            # under test is. Resolving it through HOH made a missing tool
+            # indistinguishable from a forged record.
+            [sys.executable, str(Path(__file__).resolve().parent / "acceptance_record.py"),
+             "--evidence", str(evid), "--out", str(record), "--check"],
+            capture_output=True, text=True, cwd=str(HOH), timeout=300)
+        rederived = again.returncode == 0
+    except subprocess.TimeoutExpired:
+        rederived = False
+    note = (f"record {probe.get('path')}: satisfied={data.get('requirement_satisfied')}, "
+            f"re-derivation {'ok' if rederived else 'FAILED'}")
+    if data.get("requirement_satisfied") is True and rederived:
+        return PROVEN, note
+    return IMPLEMENTED_NOT_PROVEN, note
+
+
 def classify(req: dict, symbols, collection, board) -> dict:
     """One requirement's status, and the evidence that produced it."""
     probe = req.get("probe") or {}
@@ -132,6 +178,15 @@ def classify(req: dict, symbols, collection, board) -> dict:
             status = NOT_DETERMINABLE
         else:
             status = PROVEN if test_seen else MISSING
+    elif kind == "evidence":
+        # A durable acceptance record derived from a preserved run (P1-16):
+        # PROVEN only when it exists, says the requirement is satisfied, and
+        # re-derives from its evidence -- a hand-edited record fails the last
+        # condition. Durable evidence, not operational state (O197).
+        status, note = evidence_status(probe)
+        evidence.append(note)
+        if status == MISSING and equivalent:
+            status = PARTIAL
     elif kind == "row":
         # O197. A board row answers "is this green right now", which is
         # operational state; this matrix answers "does the capability exist

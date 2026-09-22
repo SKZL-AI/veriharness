@@ -431,6 +431,79 @@ def row_program_scope() -> Row:
                "quarter of the programme; only the plan can say it is not")
 
 
+def row_acceptance() -> Row:
+    """Do the end-to-end acceptances in the register still hold?
+
+    Every requirement whose probe is `evidence` (P1-16 today) is judged exactly
+    as the capability matrix judges it: the record must exist, re-derive from
+    its preserved run, *and* say the requirement is satisfied. Reviewer B: the
+    first version passed on re-derivation alone, so a record that honestly
+    said "not satisfied" made this row green while the matrix said
+    IMPLEMENTED_NOT_PROVEN -- and it hard-coded the paths the register holds.
+    """
+    command = ("python3 tools/acceptance_record.py --evidence <dir> --out <record> --check, "
+               "for each evidence probe in the register, via tools/capability_matrix.py")
+    import importlib.util as _il
+    spec = _il.spec_from_file_location("capability_matrix", HERE / "capability_matrix.py")
+    cm = _il.module_from_spec(spec)
+    sys.modules["capability_matrix"] = cm
+    spec.loader.exec_module(cm)
+    cm.HOH = HOH          # judge the same tree this board describes
+    try:
+        register = json.loads((HOH / "program/v3_3/REQUIREMENTS.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        return Row("acceptance", NOT_RUN, f"no readable register: {exc}", command,
+                   "an acceptance is judged against the register")
+    probes = [(r["id"], r["probe"]) for r in register.get("requirements") or []
+              if (r.get("probe") or {}).get("kind") == "evidence"]
+    if not probes:
+        return Row("acceptance", NOT_RUN, "no evidence-probed requirement in the register",
+                   command, "nothing to judge")
+    results = {rid: cm.evidence_status(probe) for rid, probe in probes}
+    # Blocking only for evidence that is broken: a record that no longer
+    # re-derives from its run, or one that cannot be read. A requirement that
+    # is honestly not proven yet -- no record, or a record that re-derives and
+    # says it falls short -- is capability status, not a regression of this
+    # tree, the same line the capability matrix row draws (reviewer B round 2:
+    # otherwise the board flips to not-ready on a fact that has not changed).
+    broken = {rid: note for rid, (st, note) in results.items()
+              if st == cm.NOT_DETERMINABLE or "re-derivation FAILED" in note}
+    unproven = {rid: st for rid, (st, _) in results.items() if st != cm.PROVEN}
+    why = ("an end-to-end acceptance is evidence about one real run; a record that "
+           "no longer matches that run is not evidence, and a requirement not yet "
+           "proven is shown, not hidden")
+    # A requirement the register records as proven (`proven_on`) that is no
+    # longer PROVEN has regressed -- a stricter derivation or a lost record --
+    # and that blocks: otherwise the drop would read as "not yet proven" and
+    # show only as advisory (reviewer B, round 3).
+    regressed = [rid for rid, probe in probes
+                 if probe.get("proven_on") and results[rid][0] != cm.PROVEN]
+    if regressed:
+        return Row("acceptance", FAIL, "no longer proven: " + ", ".join(regressed),
+                   command, why)
+    if broken:
+        return Row("acceptance", FAIL, "; ".join(f"{rid}: {n[:70]}" for rid, n in broken.items()),
+                   command, why)
+    if not unproven:
+        return Row("acceptance", PASS, "all proven: " + ", ".join(results), command, why)
+    # A missing record is only "not here" when its run is not here either --
+    # the public export. Evidence present with its record gone is a broken
+    # state, and blocks (reviewer B, round 3).
+    orphaned = [rid for rid, probe in probes
+                if results[rid][0] == cm.MISSING and probe.get("evidence_dir")
+                and (HOH / probe["evidence_dir"]).is_dir()]
+    if orphaned:
+        return Row("acceptance", FAIL,
+                   "evidence present but no record: " + ", ".join(orphaned), command, why)
+    if all(st == cm.MISSING for st in unproven.values()):
+        return Row("acceptance", NOT_RUN,
+                   "no acceptance record in this tree for " + ", ".join(unproven), command,
+                   why, advisory=True)
+    return Row("acceptance", FAIL,
+               "not yet proven: " + ", ".join(f"{rid} {st}" for rid, st in unproven.items()),
+               command, why, advisory=True)
+
+
 def row_export_sync() -> Row:
     """Would exporting right now overwrite work that did not come from here?
 
@@ -1168,6 +1241,7 @@ def row_list(quick: bool) -> list[Row]:
         row_program_scope(),
         row_capability_matrix(),
         row_build_plan(),
+        row_acceptance(),
         row_baseline_docs(),
         row_install(quick),
         row_attribution(),

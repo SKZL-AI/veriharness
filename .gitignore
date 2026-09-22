@@ -1,4 +1,7 @@
 __pycache__/
+# A virtual environment made inside a clone, as examples/minimal/README.md
+# suggests. Python 3.13's venv ignores itself; older ones do not.
+.venv/
 *.pyc
 .pytest_cache/
 *.egg-info/

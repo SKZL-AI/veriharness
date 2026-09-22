@@ -15,13 +15,19 @@ rejection shows.
 
 ## Running the live example yourself
 
-You need Herdr running (`HERDR_ENV=1`) and `hoh` installed with its test
-extra (`pip install -e ".[test]"` from the repository root): this spec's K3
-runs `python3 -m pytest`, and a strict check runs under the interpreter HoH
-is installed into, so that interpreter needs pytest. Then, from a git worktree containing this
-directory's `spec.md`:
+You need Herdr running (`HERDR_ENV=1`). Everything else is below, in order,
+run from the root of your clone of this repository -- the spec path is
+relative to it. `hoh` is installed with its test extra: this spec's K3 runs
+`python3 -m pytest`, and a strict check runs under the interpreter HoH is
+installed into, so that interpreter needs pytest. `HOH_RUNS` says where run
+directories go; without it they go to `~/hoh/runs`. The doctor
+(`tools/preflight.py`) ends with `profile demo: READY`, or names what is
+missing before any quota is spent.
 
 ```sh
+pip install -e ".[test]"        # into a fresh virtual environment
+export HOH_RUNS=<a-directory-for-your-runs>
+python3 tools/preflight.py --profile demo
 hoh worktree --repo <your-project-checkout> --branch hoh-minimal-example
 hoh start --repo <worktree-path> --spec examples/minimal/spec.md --run-id minimal-demo
 hoh run minimal-demo --iterations 2 --planner claude --developer claude --qa claude \

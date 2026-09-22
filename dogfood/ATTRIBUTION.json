@@ -545,6 +545,16 @@
         "c9bec51f178c4a3729fb61f1b86e3229860e4820"
       ],
       "why_not_the_product": "The integrity guard (O201) and the sandbox toolchain bind (O200) were built by the orchestrator: both are preconditions for a product run to be admissible at all, and a run cannot author the inventory that judges its own conduct. Counted as a development node outside the product."
+    },
+    {
+      "id": "p1-16-acceptance-record-and-o205",
+      "category": "MAIN_ORCHESTRATOR_DIRECT",
+      "is_development_node": true,
+      "commits": [
+        "25a5d835f0e127b03ac48f8e766f3241b0006209",
+        "6ff91551563401438635c19b41bd0d8b4695038b"
+      ],
+      "why_not_the_product": "The P1-16 acceptance record, its driver, O203 and the O205 drift accounting were built by the orchestrator under five adversarial review rounds: they are the instrument that judges whether a product run happened as documented, and a run cannot author the instrument that judges it. Counted as a development node outside the product."
     }
   ]
 }
