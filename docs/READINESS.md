@@ -5,15 +5,15 @@ command that produced it, and the verdict is the conjunction of the
 rows rather than a judgement typed above them. A row this tool cannot
 evaluate is `NOT_RUN`, which is never a pass.
 
-Measured at `a5ed02b` on 2026-09-22.
+Measured at `e22e945` on 2026-09-22.
 
     TECHNICALLY_STABLE_READY = no
 
-Open, and each one blocking: succession, external_ci.
+Open, and each one blocking: export_manifest, succession, external_ci.
 
 | condition | state | measured | command |
 |---|---|---|---|
-| `tests` | PASS | 1374 passed | `python3 -m pytest -q` |
+| `tests` | PASS | 1386 passed | `python3 -m pytest -q` |
 | `lint` | PASS | clean | `ruff check --select F,E9 src tests tools` |
 | `claims` | PASS | OK: all checks passed | `python3 tools/check_claims.py check all` |
 | `union_invariants` | PASS | U1-U5 pass | `python3 tools/union_gate.py` |
@@ -25,20 +25,20 @@ Open, and each one blocking: succession, external_ci.
 | `benchmark_v3_preregistration` | PASS | DRIFTED, 51 file(s) frozen at d22fc1536f43 -- moved after the campaign, accounted for: src/hoh/amendment.py, src/hoh/approval.py, src/hoh/assurance.py, src/hoh/capability.py | `python3 tools/prereg.py check --campaign v3` |
 | `benchmark_v2_historical` | FAIL (advisory) | HISTORICAL_COMPLETE; matched_budget_valid = NO; budget_rule violated: 2 cell(s) ran past the dispatch budget without being stopped | `python3 tools/repetition_plan.py --campaign v2` |
 | `benchmark_v3` | PASS | 15 of 15 cells; COMPLETE; matched_budget_valid = YES; freeze DRIFTED (post-campaign repair, accounted for) | `python3 tools/prereg.py check --campaign v3 && python3 tools/repetition_plan.py --campaign v3` |
-| `export_manifest` | PASS | no leaks, 0 unacknowledged dangling reference(s), 12 acknowledged, 0 other problem(s) | `python3 tools/export_manifest.py check` |
-| `export_sync` | PASS | clean; 6 ours to write | `python3 tools/export_sync.py status` |
-| `succession` | FAIL | DRIFTED: 4 field(s) no longer describe this tree: internal_commit, board, sync, open_findi | `python3 tools/succession.py verify` |
+| `export_manifest` | FAIL | the manifest is out of date, so the reference checks did not run | `python3 tools/export_manifest.py check` |
+| `export_sync` | PASS | clean; 5 ours to write | `python3 tools/export_sync.py status` |
+| `succession` | FAIL | DRIFTED: 2 field(s) no longer describe this tree: board, open_findings | `python3 tools/succession.py verify` |
 | `identifiers` | PASS | 0 file(s) still carry German identifiers | `python3 tools/identifiers.py check src tools tests` |
 | `preflight` | PASS | profile demo: READY | `python3 tools/preflight.py --profile demo` |
 | `parallelism_baseline` | PASS | re-derives identically; project_native_parallelism = MISSING | `python3 tools/parallelism_baseline.py --out program/v3_3/VERIHARNESS_PARALLELISM_BASELINE.md` |
-| `capability_matrix` | PASS | 29 proven, 29 missing, 3 partial -- re-derives identically | `python3 tools/capability_matrix.py --out program/v3_3/VERIHARNESS_CAPABILITY_MATRIX.json` |
-| `build_plan` | PASS | 34 open requirement(s) in 3 wave(s) | `python3 tools/build_plan.py` |
+| `capability_matrix` | PASS | 28 proven, 29 missing, 3 partial -- re-derives identically | `python3 tools/capability_matrix.py --out program/v3_3/VERIHARNESS_CAPABILITY_MATRIX.json` |
+| `build_plan` | PASS | 35 open requirement(s) in 3 wave(s) | `python3 tools/build_plan.py` |
 | `baseline_docs` | PASS | 3 document(s) re-render identically | `python3 tools/baseline_docs.py --out-dir program/v3_3` |
 | `clean_install` | PASS | 0 red step(s) | `python3 tools/clean_install_check.py` |
 | `attribution` | PASS | 1 of 12 nodes through the product | `python3 tools/attribution.py` |
 | `evidence_index` | PASS | EVIDENCE_INDEX.md matches the trees it describes | `python3 tools/evidence_index.py` |
 | `paper_audit` | PASS | 8 of 8 checks | `python3 tools/audit_refs.py <each check>` |
-| `external_ci` | FAIL | the recorded run tested a different export: 5 path(s) differ beyond this gate's own reports (tests/test_baseline_docs.py, tools/baseline_docs.py, EXPORT_MANIFEST.json). Re-export, re-run CI, record it again. | `python3 tools/exact_head_ci.py --run-id ID --export-commit SHA` |
+| `external_ci` | FAIL | the recorded run tested a different export: 4 path(s) differ beyond this gate's own reports (tests/test_regenerate.py, tools/regenerate.py, EXPORT_MANIFEST.json). Re-export, re-run CI, record it again. | `python3 tools/exact_head_ci.py --run-id ID --export-commit SHA` |
 | `routing` | PASS | DEFERRED_ON_EVIDENCE | `read docs/ROUTING.md` |
 
 ## Why some rows are advisory
@@ -49,7 +49,7 @@ Open, and each one blocking: succession, external_ci.
 * **`benchmark_v3_preregistration`** — drift before the campaign starts is a re-freeze; drift during it invalidates the campaign; drift after it is a repair, and it counts only while every moved file is named with a reason, changed after the last cell, and the raw results still hash to what they did.
 * **`benchmark_v2_historical`** — historical and advisory: v2 is an immutable dataset, its matched budget was not matched during the runs, and no step available today changes that. A blocking row over it could never be satisfied, and a gate that cannot be satisfied puts pressure on re-interpreting the dataset -- the one thing freezing a protocol forbids. `benchmark_v3` carries the release question.
 * **`benchmark_v3`** — the campaign a release may rest on: pre-registered, run under an enforced budget, complete. A campaign that produced every result file while violating the protocol is FAIL here, because the files are not what is being asked about.
-* **`export_manifest`** — the dangling references are limitation 12e: published documents citing internal ones. Advisory, because none of them is a false claim -- what a reader loses is the ability to follow a citation.
+* **`export_manifest`** — re-derive it with `python3 tools/export_manifest.py derive`; a count taken against a stale manifest would be a zero that means 'not measured'.
 * **`export_sync`** — the export is one-directional and the public repository is not read-only: this row is what stops a copy from reverting work done there.
 * **`succession`** — the capsule is not wrong about the past when it drifts -- it is stale about the present, and a successor reading it would be too.
 * **`identifiers`** — a published tool whose names are in another language is readable only to the people who wrote it.

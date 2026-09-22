@@ -3837,6 +3837,11 @@
       "rule": "tests"
     },
     {
+      "path": "tests/test_agent_names.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
       "path": "tests/test_amendment.py",
       "decision": "INCLUDE",
       "rule": "tests"
@@ -4003,6 +4008,11 @@
     },
     {
       "path": "tests/test_refusal_evidence.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_regenerate.py",
       "decision": "INCLUDE",
       "rule": "tests"
     },
@@ -4193,6 +4203,11 @@
     },
     {
       "path": "tools/readiness.py",
+      "decision": "INCLUDE",
+      "rule": "tooling"
+    },
+    {
+      "path": "tools/regenerate.py",
       "decision": "INCLUDE",
       "rule": "tooling"
     },

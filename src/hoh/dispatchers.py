@@ -27,6 +27,7 @@ checkable, and the path shows up as evidence in the receipt directory.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import subprocess
@@ -303,7 +304,24 @@ class HerdrDispatcher(_Base):
     # -- Pane and agent management ------------------------------------------- #
 
     def _agent_name(self, role: Role, state: RunState) -> str:
-        return f"hoh-{state.run_id[:12]}-{role.value}".lower().replace("_", "-")[:32]
+        """The Herdr agent name for one role of one run.
+
+        The unique part comes first. The earlier form was
+        `hoh-{run_id[:12]}-{role}`, so any two runs whose ids shared twelve
+        characters shared an agent name (O195): `repair-3-feature-a` and
+        `repair-3-feature-b` both became `hoh-repair-3-fea-developer`. The
+        ownership check below refuses a name taken elsewhere, so nothing was
+        ever adopted -- the second run simply could not start. Harmless one run
+        at a time; a hard stop for independent nodes running together.
+
+        A digest of the *whole* run id leads, because Herdr truncates agent
+        names at about 24 characters and uniqueness after that point is
+        uniqueness it throws away. The readable id follows for the operator.
+        """
+        digest = hashlib.sha256(state.run_id.encode("utf-8")).hexdigest()[:7]
+        readable = state.run_id.lower().replace("_", "-")
+        name = f"h{digest}-{role.value}-{readable}"
+        return "".join(c if (c.isalnum() or c == "-") else "-" for c in name)[:32]
 
     def _ensure_agent(self, role: Role, state: RunState) -> str:
         if role in self.agents:

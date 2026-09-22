@@ -504,6 +504,16 @@
         "577b3d2196b2a067b66dc5ab840f83f53a27ca80"
       ],
       "why_not_the_product": "The last three P0 baselines and the state-ownership ADR. Outside any run by construction: a baseline is this repository's description of itself, and an ADR is a decision about who owns what -- neither is a thing a run inside the repository can author about the repository. HEAD is included explicitly because the positionless rule tolerates the tip only until the next commit displaces it."
+    },
+    {
+      "id": "v3-3-agent-names-and-regeneration",
+      "category": "MAIN_ORCHESTRATOR_DIRECT",
+      "is_development_node": false,
+      "commits": [
+        "d4401f7400eb6a34230001d5f0ca0f2ce5093677",
+        "e22e9458db865cd361ae3607cba88fc545d64dea"
+      ],
+      "why_not_the_product": "The agent-name collision fix (O195) and the regeneration loop (O194). Outside any run: O195 changes how a run's own agents are named, which no run can change about itself without its restart reuse breaking mid-flight; O194 orders the instruments that measure the repository, which is the measurement a run is inside of."
     }
   ]
 }
