@@ -482,6 +482,18 @@
         "65072c71c17dfcf29b81417d087f7036194bc1e4"
       ],
       "why_not_the_product": "The V3.3 requirement register and the matrix derived from it. Outside any run by construction: the register is a reading of the plan, and the matrix is this repository's description of itself -- a run inside it cannot be the author of the list its own work will be measured against. Corrected on the day it was written: the first version of this entry claimed 44 commits because the script that built it decided 'already attributed' by scanning literal shas, while the checker resolves ranges as well. The checker caught it as a double claim; the entry now contains exactly the commits the checker says belong to no other entry (O192)."
+    },
+    {
+      "id": "v3-3-p0-build-order",
+      "category": "MAIN_ORCHESTRATOR_DIRECT",
+      "is_development_node": false,
+      "commits": [
+        "271f56cc685738fe070172a98ecfa4efbbbedc16",
+        "3346ed5bd049e247457f6f3de8bf2151b0085fbf",
+        "41d9731d4539c3aeee55ff90719d496b413e3b14",
+        "53533e23584f2631e8e461011648d9f44c698eeb"
+      ],
+      "why_not_the_product": "The implementation DAG and the build checklist. Outside any run by construction: a run executes one node of this order, and the order of the work is the question the run is an answer inside of. The tip was tolerated when the gaps were computed and stopped being the tip when this entry was committed, which is the positionless rule doing exactly what O169 built it for -- and why an entry is written twice before it closes."
     }
   ]
 }

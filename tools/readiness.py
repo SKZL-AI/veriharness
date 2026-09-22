@@ -331,6 +331,33 @@ def row_capability_matrix() -> Row:
         "rather than remembered")
 
 
+def row_build_plan() -> Row:
+    """Is the remaining work in an order somebody could actually execute?
+
+    V3.3 P0. Not a measurement of the product: a measurement of the plan. It
+    goes red on a dependency cycle or a dependency that is not a requirement,
+    which are the two ways a build order can contain a step nobody can take.
+    """
+    command = "python3 tools/build_plan.py"
+    rc, out = _py("tools/build_plan.py")
+    if rc == 3:
+        return Row("build_plan", NOT_RUN,
+                   "no requirement register in this tree", command,
+                   "the register is internal and this tool is published")
+    if rc != 0:
+        bad = [z for z in out.splitlines()
+               if z.startswith(("UNPLACEABLE", "DANGLING"))]
+        return Row("build_plan", FAIL,
+                   (bad[0][:100] if bad else f"exit {rc}"), command,
+                   "an order that drops an edge to stay acyclic is an order "
+                   "with an impossible step in it")
+    summary = [z for z in out.splitlines() if "open requirement" in z]
+    return Row("build_plan", PASS,
+               (summary[-1].strip()[:90] if summary else "derived"), command,
+               "the build order is derived from the register, so it cannot "
+               "drift from the statuses it is planned against")
+
+
 def row_export_sync() -> Row:
     """Would exporting right now overwrite work that did not come from here?
 
@@ -1066,6 +1093,7 @@ def row_list(quick: bool) -> list[Row]:
         row_preflight(),
         row_parallelism(),
         row_capability_matrix(),
+        row_build_plan(),
         row_install(quick),
         row_attribution(),
         row_evidence_index(),

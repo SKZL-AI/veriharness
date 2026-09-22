@@ -3617,6 +3617,16 @@
       "rule": "unclassified"
     },
     {
+      "path": "program/v3_3/VERIHARNESS_BUILD_CHECKLIST.json",
+      "decision": "EXCLUDE",
+      "rule": "unclassified"
+    },
+    {
+      "path": "program/v3_3/VERIHARNESS_BUILD_CHECKLIST.md",
+      "decision": "EXCLUDE",
+      "rule": "unclassified"
+    },
+    {
       "path": "program/v3_3/VERIHARNESS_CAPABILITY_MATRIX.json",
       "decision": "EXCLUDE",
       "rule": "unclassified"
@@ -3628,6 +3638,11 @@
     },
     {
       "path": "program/v3_3/VERIHARNESS_GAP_REGISTER.md",
+      "decision": "EXCLUDE",
+      "rule": "unclassified"
+    },
+    {
+      "path": "program/v3_3/VERIHARNESS_IMPLEMENTATION_DAG.json",
       "decision": "EXCLUDE",
       "rule": "unclassified"
     },
@@ -3833,6 +3848,11 @@
     },
     {
       "path": "tests/test_budget_evidence.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_build_plan.py",
       "decision": "INCLUDE",
       "rule": "tests"
     },
@@ -4048,6 +4068,11 @@
     },
     {
       "path": "tools/budget_evidence.py",
+      "decision": "INCLUDE",
+      "rule": "tooling"
+    },
+    {
+      "path": "tools/build_plan.py",
       "decision": "INCLUDE",
       "rule": "tooling"
     },
