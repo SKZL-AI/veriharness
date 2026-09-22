@@ -15,14 +15,17 @@ rejection shows.
 
 ## Running the live example yourself
 
-You need Herdr running (`HERDR_ENV=1`) and `hoh` installed (`pip install -e .`
-from the repository root). Then, from a git worktree containing this
+You need Herdr running (`HERDR_ENV=1`) and `hoh` installed with its test
+extra (`pip install -e ".[test]"` from the repository root): this spec's K3
+runs `python3 -m pytest`, and a strict check runs under the interpreter HoH
+is installed into, so that interpreter needs pytest. Then, from a git worktree containing this
 directory's `spec.md`:
 
 ```sh
 hoh worktree --repo <your-project-checkout> --branch hoh-minimal-example
 hoh start --repo <worktree-path> --spec examples/minimal/spec.md --run-id minimal-demo
-hoh run minimal-demo --iterations 2 --planner claude --developer claude --qa claude
+hoh run minimal-demo --iterations 2 --planner claude --developer claude --qa claude \
+    --isolation strict --approval-policy policy/role_approval.default.json --trust-worktree
 hoh report minimal-demo
 ```
 

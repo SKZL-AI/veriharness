@@ -1,6 +1,6 @@
 {
   "schema": "hoh-role-approval/1",
-  "what": "The default role approval policy for VeriHarness runs (P1-09). Roles run in the harness's `auto` mode: routine actions are approved by the harness, risky ones are stopped, and nothing waits for a human. The deny-list below applies in every mode and cannot be shortened: a policy missing any mandatory entry is refused on load.",
+  "what": "The default role approval policy for VeriHarness runs (P1-09). Roles run in the harness's `auto` mode: routine actions are approved by the harness, risky ones are stopped, and nothing waits for a human. The deny-list is a set of *permission rules*: it makes the ordinary tool paths for deletion, history rewriting, privilege, network and publishing fail closed in every mode, and it cannot be shortened -- a policy missing any mandatory entry is refused on load. It is a behavioural control and defence in depth, not a security boundary: an equivalent invocation through an absolute path, a wrapper or an interpreter does not match a textual rule. What proves the house rule is the integrity guard `hoh run` applies around every run (src/hoh/integrity.py).",
   "mode": "auto",
   "deny": [
     "Bash(rm:*)",

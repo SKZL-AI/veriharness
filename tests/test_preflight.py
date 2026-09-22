@@ -198,3 +198,31 @@ def test_the_cli_exit_code_carries_the_verdict(tmp_path):
     assert body["verdict"] in ("NOT_READY", "INCONCLUSIVE")
     assert body["profile"] == "unattended"
     assert body["digest"]
+
+
+def test_the_sandbox_interpreter_is_read_back_from_a_real_strict_check():
+    """O200: the doctor said READY while a strict check ran under the system
+    interpreter. The answer now comes from inside the sandbox."""
+    c = pf.check_sandbox_interpreter()
+    if c.state == pf.INCONCLUSIVE:
+        import pytest
+        pytest.skip(c.detail)
+    assert c.state == pf.PASS, c.detail
+    assert c.evidence["seen_prefix"] == c.evidence["hoh_prefix"]
+
+
+def test_the_sandbox_interpreter_check_fails_when_the_bind_is_missing(monkeypatch):
+    """The negative control: without the toolchain bind the system interpreter
+    answers, and the check must say so rather than pass."""
+    import sys
+    from pathlib import Path
+    from hoh import runner
+    if Path(sys.prefix).resolve().is_relative_to(Path("/usr")):
+        import pytest
+        pytest.skip("this interpreter is the system one")
+    monkeypatch.setattr(runner, "interpreter_toolchain", lambda: ((), ""))
+    c = pf.check_sandbox_interpreter()
+    if c.state == pf.INCONCLUSIVE:
+        import pytest
+        pytest.skip(c.detail)
+    assert c.state == pf.FAIL and "not under" in c.detail

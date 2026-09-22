@@ -348,6 +348,54 @@ def check_resource_controls() -> Check:
         {"controls": declared})
 
 
+def check_sandbox_interpreter() -> Check:
+    """Which interpreter answers a strict check, and can it run the tests?
+
+    O200, read back from the built object: one real check through the real
+    runner under strict isolation, asked which interpreter it is. The first
+    autonomous P1-16 run was rejected twice because the answer was
+    `/usr/bin/python3` and it had no pytest, while this doctor said READY.
+    Whether pytest is importable there is reported beside it, because the
+    shipped example needs it and a fresh install without `.[test]` has none.
+    """
+    sys.path.insert(0, str(HOH / "src"))
+    try:
+        from hoh.contracts import AcceptanceCheck, Candidate
+        from hoh.runner import run_check
+        from hoh.sandbox import BubblewrapSandbox, Isolation
+    except Exception as exc:                      # pragma: no cover
+        return Check("sandbox_interpreter", "which interpreter runs a strict check?",
+                     INCONCLUSIVE, f"not importable: {exc}", {})
+    if BubblewrapSandbox().unavailable() is not None:
+        return Check("sandbox_interpreter", "which interpreter runs a strict check?",
+                     INCONCLUSIVE, "no strict sandbox on this machine to ask", {})
+    cand = Candidate(candidate_id="preflight", repo_path=str(HOH), commit="0" * 40,
+                     tree_clean=True, tree_digest="preflight")
+    answers = {}
+    with tempfile.TemporaryDirectory() as tmp:
+        for key, cmd in (("prefix", "python3 -c 'import sys; print(sys.prefix)'"),
+                         ("pytest", "python3 -c 'import pytest'")):
+            check = AcceptanceCheck(check_id=f"PI-{key}", description="preflight",
+                                    command=cmd, expect_exit=0)
+            receipt, log = run_check(check, cand, run_id="preflight", iteration=1,
+                                     attempt=1, cwd=Path(tmp),
+                                     isolation=Isolation.STRICT)
+            answers[key] = (receipt.exit_code, log.strip().splitlines()[-1:] or [""])
+    seen = answers["prefix"][1][0]
+    ours = str(Path(sys.prefix).resolve())
+    same = answers["prefix"][0] == 0 and seen == ours
+    has_pytest = answers["pytest"][0] == 0
+    return Check(
+        "sandbox_interpreter", "which interpreter runs a strict check?",
+        PASS if same else FAIL,
+        (f"a strict check runs under {seen}"
+         + ("" if same else f", not under {ours} which HoH runs under")
+         + ("; pytest available" if has_pytest else
+            "; pytest NOT available there -- install with `pip install -e \".[test]\"` "
+            "for specs that run it")),
+        {"seen_prefix": seen, "hoh_prefix": ours, "pytest_available": has_pytest})
+
+
 def check_trust_readiness() -> Check:
     """Can a run's developer worktree be trusted with nobody present?
 
@@ -511,6 +559,7 @@ def measure(deep: bool = False) -> list[Check]:
         check_git_repo(),
         check_infrastructure_exits(),
         check_isolation(),
+        check_sandbox_interpreter(),
         check_resource_controls(),
         check_trust_readiness(),
         check_role_permissions(),

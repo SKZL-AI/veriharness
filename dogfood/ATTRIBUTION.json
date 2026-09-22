@@ -536,6 +536,15 @@
         "af0dc0e60b5c340977621fe375b28c64a704c83a"
       ],
       "why_not_the_product": "P1-09 was built by the orchestrator because it is the capability a product run needs in order to run at all: without it the first dispatch of any run stops for a human (O198), and a run cannot build the policy that decides whether it may start. Counted as a development node, and not through the product, which is what it was."
+    },
+    {
+      "id": "p1-integrity-and-sandbox-toolchain",
+      "category": "MAIN_ORCHESTRATOR_DIRECT",
+      "is_development_node": true,
+      "commits": [
+        "c9bec51f178c4a3729fb61f1b86e3229860e4820"
+      ],
+      "why_not_the_product": "The integrity guard (O201) and the sandbox toolchain bind (O200) were built by the orchestrator: both are preconditions for a product run to be admissible at all, and a run cannot author the inventory that judges its own conduct. Counted as a development node outside the product."
     }
   ]
 }

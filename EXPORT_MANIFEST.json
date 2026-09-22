@@ -1107,6 +1107,36 @@
       "rule": "internal-working-document"
     },
     {
+      "path": "dogfood/p1-16/20260922T1434Z/clone.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1434Z/doctor-demo.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1434Z/install.log",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1434Z/run.log",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1434Z/start.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1434Z/worktree.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
       "path": "dogfood/planner-confinement.v20260913T135001Z/SUMMARY.json",
       "decision": "EXCLUDE",
       "rule": "internal-working-document"
@@ -3817,6 +3847,11 @@
       "rule": "package"
     },
     {
+      "path": "src/hoh/integrity.py",
+      "decision": "INCLUDE",
+      "rule": "package"
+    },
+    {
       "path": "src/hoh/launcher.py",
       "decision": "INCLUDE",
       "rule": "package"
@@ -4022,6 +4057,11 @@
       "rule": "tests"
     },
     {
+      "path": "tests/test_integrity.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
       "path": "tests/test_isolation_record.py",
       "decision": "INCLUDE",
       "rule": "tests"
@@ -4118,6 +4158,11 @@
     },
     {
       "path": "tests/test_sandbox.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_sandbox_toolchain.py",
       "decision": "INCLUDE",
       "rule": "tests"
     },

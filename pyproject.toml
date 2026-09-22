@@ -33,6 +33,14 @@ classifiers = [
 # holds; the file extension now sets it instead.
 readme = "README.md"
 
+# O200. The shipped minimal example's acceptance criterion runs
+# `python3 -m pytest`, and a strict check runs under the interpreter HoH was
+# installed into. A fresh `pip install -e .` gave that interpreter no pytest,
+# so the example could never be accepted from a fresh clone. Opt-in, because
+# the product itself does not need it: `pip install -e ".[test]"`.
+[project.optional-dependencies]
+test = ["pytest>=7"]
+
 [project.urls]
 # PLACEHOLDER -- VeriHarness is the decided project name, but no host or
 # account has been chosen for it yet, so no hosting location can be stated

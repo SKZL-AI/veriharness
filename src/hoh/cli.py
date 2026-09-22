@@ -736,6 +736,42 @@ def _waiting_for_approval(exc: BaseException) -> bool:
     return isinstance(exc, WaitingForApproval) or "blocked" in str(exc)
 
 
+def _integrity_close(store, before) -> bool:
+    """Verify the inventory after the roles ran. False when the rule broke.
+
+    A violation fails the run with the exact paths and is never repaired
+    first: the run that deleted something stays the run on record as having
+    done it.
+    """
+    if before is None:
+        return True
+    from . import integrity
+    problems = integrity.verify(before)
+    record = {"held": not problems, "violations": problems,
+              "checked": ["pre-existing tracked files", "refs", "own branch history",
+                          "other worktrees"]}
+    (store.dir / "approval" / "integrity.json").write_text(
+        json.dumps(record, indent=2) + "\n", encoding="utf-8")
+    if not problems:
+        return True
+    print("INTEGRITY VIOLATION -- the house rule was broken by this run:",
+          file=sys.stderr)
+    for line in problems:
+        print(f"  {line}", file=sys.stderr)
+    try:
+        with store.lock():
+            fresh = store.read_state()
+            fresh.note("INTEGRITY VIOLATION: " + "; ".join(problems)[:900])
+            try:
+                stages.fail(fresh, "integrity violation: " + problems[0][:200])
+            except stages.TransitionError:
+                pass    # the note above is on the record either way
+            store.write_state(fresh)
+    except Exception as exc:
+        print(f"could not record the violation in the run state: {exc}", file=sys.stderr)
+    return False
+
+
 def cmd_run(args) -> int:
     """Runs iterations. The operator path that was missing until now.
 
@@ -866,6 +902,19 @@ def cmd_run(args) -> int:
         with store.lock():
             store.write_state(state)
 
+    # The captain's standing rule, measured rather than trusted: an inventory
+    # of what the roles must leave alone, taken before the first role starts.
+    from . import integrity
+    try:
+        integrity_before = integrity.snapshot(state.repo_path)
+    except RuntimeError as exc:
+        integrity_before = None
+        print(f"integrity inventory not measurable here: {exc}", file=sys.stderr)
+    if integrity_before is not None:
+        (store.dir / "approval").mkdir(parents=True, exist_ok=True)
+        (store.dir / "approval" / "integrity-before.json").write_text(
+            json.dumps(integrity_before, indent=2) + "\n", encoding="utf-8")
+
     controller = Controller(
         store, dispatcher, spec_path=state.spec_path, isolation=isolation
     )
@@ -902,6 +951,7 @@ def cmd_run(args) -> int:
                     dispatcher.close_own()
                 except Exception:
                     pass
+            _integrity_close(store, integrity_before)
             return 1
 
         ran += 1
@@ -931,6 +981,9 @@ def cmd_run(args) -> int:
             break
         if out.accepted and args.until_accepted:
             break
+
+    if not _integrity_close(store, integrity_before):
+        return 3
 
     # Apply the retention limit (§7): parked intermediate states and old
     # arenas move to attic/, receipts and evidence never do.

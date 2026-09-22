@@ -6011,10 +6011,17 @@
     },
     {
       "id": "N-066",
-      "text": "You need Herdr running (`HERDR_ENV=1`) and `hoh` installed (`pip install -e .`",
+      "text": "You need Herdr running (`HERDR_ENV=1`) and `hoh` installed with its test",
       "where": "examples/minimal/README.md:18",
       "reason": "command/instruction snippet naming an environment-variable value (`HERDR_ENV=1`) as setup instructions, not a measurement",
-      "anchor_digest": "4ae610062266bc5b8e1a40a4c9ae737ffc6165f5cb9c25e3b3de275dfbaa7bac"
+      "anchor_digest": "6e2f85056ff7f8fd042080265e6e6a401a059ada005ac8c9190f6ab5e629697b",
+      "superseded": {
+        "on": "2026-09-22",
+        "previous_text": "You need Herdr running (`HERDR_ENV=1`) and `hoh` installed (`pip install -e .`",
+        "previous_where": "examples/minimal/README.md:18",
+        "previous_anchor_digest": "4ae610062266bc5b8e1a40a4c9ae737ffc6165f5cb9c25e3b3de275dfbaa7bac",
+        "why": "superseded 2026-09-22 (O200): the install line now names the `test` extra, because the example's K3 runs pytest under the interpreter HoH is installed into. Still a setup instruction naming an environment-variable value, not a measurement."
+      }
     },
     {
       "id": "N-067",
@@ -12855,6 +12862,20 @@
       "where": "docs/READINESS.md:66",
       "anchor_digest": "fed9d7c7e603951324db6f5cc639ec43f821a90cf4b24451694f57652873e1ab",
       "reason": "a table frame, a provenance line, or the reason a row is advisory; the measurement is in the row itself"
+    },
+    {
+      "id": "N-997",
+      "text": "extra (`pip install -e \".[test]\"` from the repository root): this spec's K3",
+      "where": "examples/minimal/README.md:19",
+      "reason": "install instruction naming the package extra to install; a command, not a measurement",
+      "anchor_digest": "d6dd02e68ed6707ab0b033628276c5f03da41cb45060ccbf63039f8b3b4d36ef"
+    },
+    {
+      "id": "N-998",
+      "text": "runs `python3 -m pytest`, and a strict check runs under the interpreter HoH",
+      "where": "examples/minimal/README.md:20",
+      "reason": "names the interpreter command a criterion runs (`python3`); an instruction, not a measurement",
+      "anchor_digest": "a26fadc6d89d0db5a1af008695ef449ac3680e81b469ab1938b6d098f1366d91"
     }
   ],
   "claim_surfaces": [
@@ -13310,6 +13331,11 @@
       "why": "source or test code under src/hoh/, tests/, or tools/; claims about its behaviour live in docs/** and are covered there, not by re-declaring the source itself as a claim surface"
     },
     {
+      "path": "src/hoh/integrity.py",
+      "reason": "source-code",
+      "why": "the role-integrity guard; its checks are the rule it enforces, not a claim"
+    },
+    {
       "path": "src/hoh/launcher.py",
       "reason": "source-code",
       "why": "the binding to real Herdr/HoH dispatch: what it asserts -- that a run ending on the same candidate it started with is not an acceptance, that a provider outage is not a rejection -- is exercised in tests/test_launcher_verdicts.py against constructed run states"
@@ -13515,6 +13541,11 @@
       "why": "a test module. Its numbers are the values it asserts, which are the measurement rather than a claim about it"
     },
     {
+      "path": "tests/test_integrity.py",
+      "reason": "source-code",
+      "why": "a test module. Its numbers are the values it asserts, which are the measurement rather than a claim about it"
+    },
+    {
       "path": "tests/test_isolation_record.py",
       "reason": "source-code",
       "why": "a test module. Its numbers are the values it asserts, which are the measurement rather than a claim about it"
@@ -13613,6 +13644,11 @@
       "path": "tests/test_sandbox.py",
       "reason": "source-code",
       "why": "a test module: it measures the same command inside and outside a sandbox and demands they differ"
+    },
+    {
+      "path": "tests/test_sandbox_toolchain.py",
+      "reason": "source-code",
+      "why": "a test module. Its numbers are the values it asserts, which are the measurement rather than a claim about it"
     },
     {
       "path": "tests/test_source_hygiene.py",

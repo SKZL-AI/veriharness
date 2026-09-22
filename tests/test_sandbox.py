@@ -457,6 +457,25 @@ def test_negative_controls_on_the_runner_path(arena, command, cid):
         _check(command, cid=cid), _candidate(arena), run_id="r", iteration=1,
         attempt=1, cwd=arena, isolation=Isolation.STRICT,
     )
+    if command == "ls /home" and receipt.exit_code == 0:
+        # Changed 2026-09-22 (O200), by addition. Since the strict sandbox
+        # binds the interpreter HoH runs under, an interpreter living below
+        # /home makes bubblewrap create its path components, so `ls /home`
+        # succeeds. What this control is *for* -- other users' home
+        # directories and the rest of this one stay unreadable -- is asserted
+        # exactly: /home may list only the interpreter's first component and
+        # nothing else. Where no interpreter lives under /home the literal
+        # assertion below still applies unchanged.
+        from hoh.runner import interpreter_toolchain
+        under_home = [b for b in interpreter_toolchain()[0]
+                      if b.is_relative_to(Path("/home"))]
+        assert under_home, f"{command!r} succeeded with nothing bound under /home"
+        allowed = {b.relative_to("/home").parts[0] for b in under_home}
+        output = transcript.split("--- output ---", 1)[-1]
+        listed = set(output.split())
+        assert listed and listed <= allowed, (
+            f"/home lists more than the bound interpreter: {sorted(listed - allowed)}")
+        return
     assert receipt.exit_code != 0, f"{command!r} succeeded inside the sandbox: {transcript[-300:]}"
 
 

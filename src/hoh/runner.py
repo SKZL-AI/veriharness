@@ -649,6 +649,43 @@ def _limit_policy() -> str:
     return ",".join(f"{names_[res]}={value_}" for res, value_ in _unsandboxed_limits())
 
 
+def interpreter_toolchain() -> tuple[tuple[Path, ...], str]:
+    """The interpreter HoH runs under, as read-only binds and a PATH prefix.
+
+    O200. The strict backend exposes `/usr`, `/bin`, `/lib*` and `/etc/ssl`
+    and nothing else, so a check's `python3` resolved to the system
+    interpreter -- whatever the operator installed. The shipped minimal
+    example asks for `python3 -m pytest`; on a machine whose system Python has
+    no pytest every strict run of it was INCONCLUSIVE on the candidate *and*
+    the baseline, and could never be accepted.
+
+    The interpreter a check should see is the one the operator installed HoH
+    into: `sys.prefix`, and `sys.base_prefix` behind it when that is a venv.
+    Both are bound read-only and put first on PATH. Nothing else of the home
+    directory becomes visible -- bwrap binds exactly these paths -- and an
+    interpreter already under `/usr` needs no bind at all.
+    """
+    import sys as _sys
+    seen: list[Path] = []
+    for raw in (_sys.prefix, _sys.base_prefix):
+        path = Path(raw).resolve()
+        if path in seen or path == Path("/usr") or Path("/usr") in path.parents:
+            continue
+        seen.append(path)
+    bins = [str(p / "bin") for p in seen]
+    return tuple(seen), ":".join(bins)
+
+
+def _with_toolchain_path(env: dict, prefix: str) -> dict:
+    """Put the interpreter's `bin` first on PATH, after the caller's own PATH
+    if it set one and before the system directories otherwise."""
+    if not prefix:
+        return env
+    base = env.get("PATH") or os.environ.get("PATH") or "/usr/local/bin:/usr/bin:/bin"
+    env["PATH"] = f"{prefix}:{base}"
+    return env
+
+
 def _scratch_dir(workdir: Path) -> Path:
     """Where a check command's `HOME` and `TMPDIR` point: **beside** the arena.
 
@@ -998,6 +1035,7 @@ def run_check(
                 # report honoured isolation.
                 read_end, write_end = os.pipe()
                 os.set_inheritable(write_end, True)
+                toolchain_binds, toolchain_path = interpreter_toolchain()
                 spec = SandboxSpec(
                     candidate=workdir, scratch=scratch, isolation=isolation,
                     timeout=timeout,
@@ -1013,7 +1051,8 @@ def run_check(
                     # same call produced different environments depending on
                     # isolation. No in-tree caller passed it, which is how it
                     # stayed unnoticed.
-                    extra_env=dict(env or {}),
+                    extra_env=_with_toolchain_path(dict(env or {}), toolchain_path),
+                    ro_binds=toolchain_binds,
                     proof_fd=write_end,
                 )
                 plan = sandbox.plan(["/bin/bash", "-c", resolved_command], spec)
