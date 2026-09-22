@@ -3632,6 +3632,16 @@
       "rule": "unclassified"
     },
     {
+      "path": "program/v3_3/VERIHARNESS_CONTRACT_TRACE_BASELINE.md",
+      "decision": "EXCLUDE",
+      "rule": "unclassified"
+    },
+    {
+      "path": "program/v3_3/VERIHARNESS_CURRENT_BASELINE.md",
+      "decision": "EXCLUDE",
+      "rule": "unclassified"
+    },
+    {
       "path": "program/v3_3/VERIHARNESS_ENVIRONMENT_CAPABILITIES.json",
       "decision": "EXCLUDE",
       "rule": "unclassified"
@@ -3653,6 +3663,16 @@
     },
     {
       "path": "program/v3_3/VERIHARNESS_PARALLELISM_BASELINE.md",
+      "decision": "EXCLUDE",
+      "rule": "unclassified"
+    },
+    {
+      "path": "program/v3_3/VERIHARNESS_PRODUCT_BASELINE.md",
+      "decision": "EXCLUDE",
+      "rule": "unclassified"
+    },
+    {
+      "path": "program/v3_3/VERIHARNESS_STATE_OWNERSHIP_ADR.md",
       "decision": "EXCLUDE",
       "rule": "unclassified"
     },
@@ -3838,6 +3858,11 @@
     },
     {
       "path": "tests/test_attribution.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_baseline_docs.py",
       "decision": "INCLUDE",
       "rule": "tests"
     },
@@ -4058,6 +4083,11 @@
     },
     {
       "path": "tools/audit_refs.py",
+      "decision": "INCLUDE",
+      "rule": "tooling"
+    },
+    {
+      "path": "tools/baseline_docs.py",
       "decision": "INCLUDE",
       "rule": "tooling"
     },

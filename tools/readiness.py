@@ -358,6 +358,55 @@ def row_build_plan() -> Row:
                "drift from the statuses it is planned against")
 
 
+def row_baseline_docs() -> Row:
+    """Do the three rendered baselines still match what they render?
+
+    V3.3 P0. Same rule as the other two generated documents: a rendering that
+    was not re-rendered describes a tree that no longer exists. It compares
+    the documents on disk with a fresh rendering, ignoring only the line that
+    says when they were written.
+    """
+    command = "python3 tools/baseline_docs.py --out-dir program/v3_3"
+    folder = HOH / "program/v3_3"
+    import importlib.util as _il
+    spec = _il.spec_from_file_location("baseline_docs", HERE / "baseline_docs.py")
+    bd = _il.module_from_spec(spec)
+    sys.modules["baseline_docs"] = bd
+    spec.loader.exec_module(bd)
+    try:
+        body = bd.measure()
+    except Exception as exc:                       # RegisterMissing and friends
+        return Row("baseline_docs", NOT_RUN, str(exc)[:100], command,
+                   "the register is internal and this tool is published")
+    fresh = {
+        "VERIHARNESS_CURRENT_BASELINE.md": bd.current_baseline(body),
+        "VERIHARNESS_PRODUCT_BASELINE.md": bd.product_baseline(body),
+        "VERIHARNESS_CONTRACT_TRACE_BASELINE.md": bd.contract_trace(body),
+    }
+    stale = []
+    for name, text in fresh.items():
+        target = folder / name
+        if not target.is_file():
+            stale.append(f"{name} is missing")
+            continue
+        a = [line for line in text.strip().splitlines()
+             if not line.startswith("Measured at ")]
+        b = [line for line in target.read_text(encoding="utf-8").strip().splitlines()
+             if not line.startswith("Measured at ")]
+        if a != b:
+            stale.append(name)
+    if stale:
+        return Row("baseline_docs", FAIL,
+                   f"{len(stale)} document(s) no longer match: "
+                   + ", ".join(stale[:2]), command,
+                   "a rendering that was not re-rendered describes a tree "
+                   "that no longer exists")
+    return Row("baseline_docs", PASS,
+               f"{len(fresh)} document(s) re-render identically", command,
+               "the baselines are summaries of measurements taken elsewhere, "
+               "so the only thing that can go wrong is being old")
+
+
 def row_export_sync() -> Row:
     """Would exporting right now overwrite work that did not come from here?
 
@@ -1094,6 +1143,7 @@ def row_list(quick: bool) -> list[Row]:
         row_parallelism(),
         row_capability_matrix(),
         row_build_plan(),
+        row_baseline_docs(),
         row_install(quick),
         row_attribution(),
         row_evidence_index(),

@@ -494,6 +494,16 @@
         "53533e23584f2631e8e461011648d9f44c698eeb"
       ],
       "why_not_the_product": "The implementation DAG and the build checklist. Outside any run by construction: a run executes one node of this order, and the order of the work is the question the run is an answer inside of. The tip was tolerated when the gaps were computed and stopped being the tip when this entry was committed, which is the positionless rule doing exactly what O169 built it for -- and why an entry is written twice before it closes."
+    },
+    {
+      "id": "v3-3-p0-complete",
+      "category": "MAIN_ORCHESTRATOR_DIRECT",
+      "is_development_node": false,
+      "commits": [
+        "1f8205173089cbfecad28f35399bd0e3a52e2619",
+        "577b3d2196b2a067b66dc5ab840f83f53a27ca80"
+      ],
+      "why_not_the_product": "The last three P0 baselines and the state-ownership ADR. Outside any run by construction: a baseline is this repository's description of itself, and an ADR is a decision about who owns what -- neither is a thing a run inside the repository can author about the repository. HEAD is included explicitly because the positionless rule tolerates the tip only until the next commit displaces it."
     }
   ]
 }
