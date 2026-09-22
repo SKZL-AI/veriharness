@@ -152,9 +152,9 @@ def test_the_planner_protects_the_run_directory_and_the_repository(
         tmp_path, repo, spec):
     ctrl, state, store = build(tmp_path, repo, spec, Dispatcher(repo=repo))
     p = _policy(ctrl, Role.PLANNER, state)
-    geschuetzt = {str(x) for x in p.protected}
-    assert str(store.dir / "state.json") in geschuetzt
-    assert str(repo) in geschuetzt
+    is_protected = {str(x) for x in p.protected}
+    assert str(store.dir / "state.json") in is_protected
+    assert str(repo) in is_protected
 
 
 def test_the_preservation_suite_is_protected_once_it_exists(tmp_path, repo, spec):
@@ -168,18 +168,18 @@ def test_the_preservation_suite_is_protected_once_it_exists(tmp_path, repo, spec
 def test_no_role_protects_the_directory_it_answers_through(tmp_path, repo, spec):
     """Protecting `answers/` would make every role's own answer a violation."""
     ctrl, state, store = build(tmp_path, repo, spec, Dispatcher(repo=repo))
-    for rolle in (Role.PLANNER, Role.DEVELOPER, Role.QA):
-        p = _policy(ctrl, rolle, state)
+    for role_ in (Role.PLANNER, Role.DEVELOPER, Role.QA):
+        p = _policy(ctrl, role_, state)
         assert str(store.dir / "answers") not in {str(x) for x in p.protected}
 
 
 def test_the_developer_is_the_one_role_whose_workspace_is_not_protected(
         tmp_path, repo, spec):
     ctrl, state, _ = build(tmp_path, repo, spec, Dispatcher(repo=repo))
-    entwickler = {str(x) for x in _policy(ctrl, Role.DEVELOPER, state).protected}
-    assert str(repo) not in entwickler
-    for rolle in (Role.PLANNER, Role.QA):
-        assert str(repo) in {str(x) for x in _policy(ctrl, rolle, state).protected}
+    developer_ = {str(x) for x in _policy(ctrl, Role.DEVELOPER, state).protected}
+    assert str(repo) not in developer_
+    for role_ in (Role.PLANNER, Role.QA):
+        assert str(repo) in {str(x) for x in _policy(ctrl, role_, state).protected}
 
 
 def test_the_planner_and_developer_watch_the_arena_root_for_a_new_child(
@@ -187,8 +187,8 @@ def test_the_planner_and_developer_watch_the_arena_root_for_a_new_child(
     """A staging directory created during a dispatch and moved in afterwards."""
     ctrl, state, store = build(tmp_path, repo, spec, Dispatcher(repo=repo))
     store.arenas_dir.mkdir(parents=True, exist_ok=True)
-    for rolle in (Role.PLANNER, Role.DEVELOPER):
-        p = _policy(ctrl, rolle, state)
+    for role_ in (Role.PLANNER, Role.DEVELOPER):
+        p = _policy(ctrl, role_, state)
         assert str(store.arenas_dir) in {str(x) for x in p.protected_shallow}
 
 
@@ -243,29 +243,29 @@ def test_a_planner_that_empties_the_preservation_suite_is_caught(
     removes the marker `K1` looks for, and the regression used to be accepted
     as a checkpoint with nothing noted anywhere.
     """
-    zustand = {"n": 0}
+    policy_state = {"n": 0}
 
     def sabotage(state: RunState) -> None:
-        zustand["n"] += 1
-        if zustand["n"] >= 2:
+        policy_state["n"] += 1
+        if policy_state["n"] >= 2:
             (store.dir / "checks.json").write_text('{"checks": []}')
 
-    def entwickeln(r: Path) -> None:
-        if zustand["n"] >= 2:
+    def do_development(r: Path) -> None:
+        if policy_state["n"] >= 2:
             (r / MARKER).unlink(missing_ok=True)
         else:
             (r / MARKER).write_text("ok\n", encoding="utf-8")
 
-    d = Dispatcher(repo=repo, planner_effect=sabotage, develop=entwickeln)
+    d = Dispatcher(repo=repo, planner_effect=sabotage, develop=do_development)
     ctrl, state, store = build(tmp_path, repo, spec, d)
 
-    erste = ctrl.run_iteration(state)
-    assert erste.accepted, erste.reason
+    first = ctrl.run_iteration(state)
+    assert first.accepted, first.reason
 
-    zweite = ctrl.run_iteration(state)
-    assert not zweite.accepted
-    assert "capability violation" in zweite.reason
-    assert "checks.json" in zweite.reason
+    second = ctrl.run_iteration(state)
+    assert not second.accepted
+    assert "capability violation" in second.reason
+    assert "checks.json" in second.reason
     assert state.condition.value == "BLOCKED"
 
 
@@ -276,10 +276,10 @@ def test_a_planner_that_writes_into_the_live_worktree_is_caught(
     A file the planner dropped into the repository during its own dispatch was
     therefore inside the candidate the run then accepted.
     """
-    def hintertuer(state: RunState) -> None:
+    def back_door(state: RunState) -> None:
         (repo / "backdoor.py").write_text("# planted by the planner\n")
 
-    d = Dispatcher(repo=repo, planner_effect=hintertuer)
+    d = Dispatcher(repo=repo, planner_effect=back_door)
     ctrl, state, _ = build(tmp_path, repo, spec, d)
 
     out = ctrl.run_iteration(state)
@@ -292,11 +292,11 @@ def test_a_planner_that_writes_into_the_live_worktree_is_caught(
 def test_a_planner_that_writes_into_a_candidate_arena_is_caught(
         tmp_path, repo, spec):
     """O125 in its original words, against the installed policy."""
-    zustand = {"n": 0}
+    policy_state = {"n": 0}
 
     def sabotage(state: RunState) -> None:
-        zustand["n"] += 1
-        if zustand["n"] < 2:
+        policy_state["n"] += 1
+        if policy_state["n"] < 2:
             return
         for d in sorted(store.arenas_dir.glob("*")):
             if d.is_dir() and d.name != "planner" and any(d.iterdir()):
@@ -307,25 +307,25 @@ def test_a_planner_that_writes_into_a_candidate_arena_is_caught(
     ctrl, state, store = build(tmp_path, repo, spec, d)
 
     assert ctrl.run_iteration(state).accepted
-    zweite = ctrl.run_iteration(state)
+    second = ctrl.run_iteration(state)
 
-    assert not zweite.accepted
-    assert "capability violation" in zweite.reason
+    assert not second.accepted
+    assert "capability violation" in second.reason
 
 
 def test_qa_may_not_reach_the_arena_of_another_iteration(tmp_path, repo, spec):
     """QA's working directory is still the arena root, so its siblings are
     one name away. They are protected rather than merely out of reach."""
-    zustand = {"n": 0}
+    policy_state = {"n": 0}
 
     def sabotage(state: RunState) -> None:
-        zustand["n"] += 1
-        if zustand["n"] < 2:
+        policy_state["n"] += 1
+        if policy_state["n"] < 2:
             return
-        eigene = getattr(ctrl, "_qa_arena", None)
+        own_ = getattr(ctrl, "_qa_arena", None)
         for d in sorted(store.arenas_dir.glob("*")):
             if (d.is_dir() and d.name != "planner" and any(d.iterdir())
-                    and (eigene is None or d.resolve() != eigene.resolve())):
+                    and (own_ is None or d.resolve() != own_.resolve())):
                 (d / "qa-notes.md").write_text("# planted\n")
                 return
 
@@ -333,9 +333,9 @@ def test_qa_may_not_reach_the_arena_of_another_iteration(tmp_path, repo, spec):
     ctrl, state, store = build(tmp_path, repo, spec, d)
 
     assert ctrl.run_iteration(state).accepted
-    zweite = ctrl.run_iteration(state)
-    assert not zweite.accepted
-    assert "capability violation" in zweite.reason
+    second = ctrl.run_iteration(state)
+    assert not second.accepted
+    assert "capability violation" in second.reason
 
 
 # --------------------------------------------------------------------------- #
@@ -366,41 +366,41 @@ def test_two_ordinary_iterations_in_a_row_are_still_accepted(tmp_path, repo, spe
         return plan_for(state, command=f"test -f step{state.iteration}.txt",
                         check_id=f"K{state.iteration}")
 
-    def entwickeln(r: Path) -> None:
+    def do_development(r: Path) -> None:
         n = 1 + len(list(r.glob("step*.txt")))
         (r / f"step{n}.txt").write_text("ok\n", encoding="utf-8")
 
     def qa(state: RunState) -> dict:
         # Preservation requirements accumulate, and QA has to answer all of
         # them -- an unanswered criterion is a missing verdict, not a pass.
-        alle = [f"K{i}" for i in range(1, state.iteration + 1)]
+        all_ = [f"K{i}" for i in range(1, state.iteration + 1)]
         return {
             "verdicts": [{
                 "check_id": k, "outcome": "PASS",
                 "receipt_id": f"{state.run_id}-i{state.iteration}-a{state.attempt}-{k}",
                 "reproduction": "pytest", "note": "green",
-            } for k in alle],
+            } for k in all_],
             "open_gaps": [], "summary": "all good",
         }
 
-    d = Dispatcher(repo=repo, plan_json=plan, develop=entwickeln, qa_json=qa)
+    d = Dispatcher(repo=repo, plan_json=plan, develop=do_development, qa_json=qa)
     ctrl, state, _ = build(tmp_path, repo, spec, d)
     assert ctrl.run_iteration(state).accepted
-    zweite = ctrl.run_iteration(state)
-    assert zweite.accepted, zweite.reason
+    second = ctrl.run_iteration(state)
+    assert second.accepted, second.reason
 
 
 def test_qa_writing_in_the_arena_it_reviews_is_not_a_violation(tmp_path, repo, spec):
     """Bytecode from running the thing is the ordinary case, not an attack."""
-    def arbeiten(state: RunState) -> None:
-        eigene = getattr(ctrl, "_qa_arena", None)
-        if eigene is not None:
-            (eigene / "__pycache__").mkdir(exist_ok=True)
-            (eigene / "__pycache__" / "app.cpython-313.pyc").write_bytes(b"\x00")
+    def work_items(state: RunState) -> None:
+        own_ = getattr(ctrl, "_qa_arena", None)
+        if own_ is not None:
+            (own_ / "__pycache__").mkdir(exist_ok=True)
+            (own_ / "__pycache__" / "app.cpython-313.pyc").write_bytes(b"\x00")
         # ... and the cache a test runner leaves in the directory QA works from
         (ctrl.store.arenas_dir / ".pytest_cache").mkdir(exist_ok=True)
 
-    d = Dispatcher(repo=repo, qa_effect=arbeiten)
+    d = Dispatcher(repo=repo, qa_effect=work_items)
     ctrl, state, _ = build(tmp_path, repo, spec, d)
     out = ctrl.run_iteration(state)
     assert out.accepted, out.reason
@@ -444,11 +444,11 @@ def test_every_capability_a_role_is_granted_but_not_held_to_is_declared(
     saying so would make the policy read as enforcement it is not.
     """
     ctrl, state, _ = build(tmp_path, repo, spec, Dispatcher(repo=repo))
-    for rolle in (Role.PLANNER, Role.DEVELOPER, Role.QA):
-        p = _policy(ctrl, rolle, state)
-        assert p.declared_but_unenforced, f"{rolle.value} declares nothing"
+    for role_ in (Role.PLANNER, Role.DEVELOPER, Role.QA):
+        p = _policy(ctrl, role_, state)
+        assert p.declared_but_unenforced, f"{role_.value} declares nothing"
         for name in p.declared_but_unenforced:
-            assert hasattr(p, name), f"{rolle.value} names an unknown capability"
+            assert hasattr(p, name), f"{role_.value} names an unknown capability"
 
 
 # --------------------------------------------------------------------------- #
@@ -456,11 +456,11 @@ def test_every_capability_a_role_is_granted_but_not_held_to_is_declared(
 # --------------------------------------------------------------------------- #
 
 
-def _telemetrie(store):
+def _telemetry(store):
     import json as _json
 
-    pfad = store.dir / "telemetry.jsonl"
-    return [_json.loads(z) for z in pfad.read_text().splitlines() if z.strip()]
+    path = store.dir / "telemetry.jsonl"
+    return [_json.loads(z) for z in path.read_text().splitlines() if z.strip()]
 
 
 def test_an_iteration_records_one_dispatch_per_role_with_its_identity(
@@ -482,13 +482,13 @@ def test_an_iteration_records_one_dispatch_per_role_with_its_identity(
     ctrl, state, store = build(tmp_path, repo, spec, d)
 
     assert ctrl.run_iteration(state).accepted
-    saetze = _telemetrie(store)
+    sentences = _telemetry(store)
 
-    assert [s["role"] for s in saetze] == ["planner", "developer", "qa"]
-    assert {s["provider"] for s in saetze} == {"claude"}
-    assert saetze[0]["model"] == "claude-opus-5"
-    assert saetze[2]["model"] == "claude-sonnet-5"
-    assert {s["effort"] for s in saetze} == {"high"}
+    assert [s["role"] for s in sentences] == ["planner", "developer", "qa"]
+    assert {s["provider"] for s in sentences} == {"claude"}
+    assert sentences[0]["model"] == "claude-opus-5"
+    assert sentences[2]["model"] == "claude-sonnet-5"
+    assert {s["effort"] for s in sentences} == {"high"}
 
 
 def test_a_dispatcher_that_names_no_model_says_not_available(tmp_path, repo, spec):
@@ -498,7 +498,7 @@ def test_a_dispatcher_that_names_no_model_says_not_available(tmp_path, repo, spe
     d = Dispatcher(repo=repo)
     ctrl, state, store = build(tmp_path, repo, spec, d)
     assert ctrl.run_iteration(state).accepted
-    assert {s["model"] for s in _telemetrie(store)} == {NOT_AVAILABLE}
+    assert {s["model"] for s in _telemetry(store)} == {NOT_AVAILABLE}
 
 
 def test_the_verification_record_counts_every_receipt_the_run_wrote(
@@ -513,10 +513,10 @@ def test_the_verification_record_counts_every_receipt_the_run_wrote(
     ctrl, state, store = build(tmp_path, repo, spec, d)
     assert ctrl.run_iteration(state).accepted
 
-    auf_platte = len(list((store.dir / "receipts").glob("*.json")))
-    qa = next(s for s in _telemetrie(store) if s["role"] == "qa")
-    assert auf_platte >= 2, "the fixture should produce a baseline receipt too"
-    assert qa["receipts"] == auf_platte
+    on_disk = len(list((store.dir / "receipts").glob("*.json")))
+    qa = next(s for s in _telemetry(store) if s["role"] == "qa")
+    assert on_disk >= 2, "the fixture should produce a baseline receipt too"
+    assert qa["receipts"] == on_disk
 
 
 def test_every_record_says_what_the_witness_covered(tmp_path, repo, spec):
@@ -524,7 +524,7 @@ def test_every_record_says_what_the_witness_covered(tmp_path, repo, spec):
     d = Dispatcher(repo=repo)
     ctrl, state, store = build(tmp_path, repo, spec, d)
     assert ctrl.run_iteration(state).accepted
-    for s in _telemetrie(store):
+    for s in _telemetry(store):
         assert s["witnessed_trees"] is not None
         assert s["witnessed_trees"] > 0, f"{s['role']} ran unwitnessed"
 
@@ -538,22 +538,22 @@ def test_a_transient_retry_reaches_the_record(tmp_path, repo, spec):
     from hoh.contracts import Role as R
     from hoh.controller import DispatchError
 
-    class Wackelig(Dispatcher):
+    class Shaky(Dispatcher):
         def __init__(self, **kw):
             super().__init__(**kw)
-            self.uebrig = 2
+            self.remaining_ = 2
 
         def dispatch(self, role, prompt, *, state):
-            if role is R.PLANNER and self.uebrig:
-                self.uebrig -= 1
+            if role is R.PLANNER and self.remaining_:
+                self.remaining_ -= 1
                 raise DispatchError("provider timeout", transient=True)
             return super().dispatch(role, prompt, state=state)
 
-    d = Wackelig(repo=repo)
+    d = Shaky(repo=repo)
     ctrl, state, store = build(tmp_path, repo, spec, d)
     assert ctrl.run_iteration(state).accepted
-    planer = next(s for s in _telemetrie(store) if s["role"] == "planner")
-    assert planer["retries"] == 2
+    planner_ = next(s for s in _telemetry(store) if s["role"] == "planner")
+    assert planner_["retries"] == 2
     assert state.usage.transient_retries == 2
 
 
@@ -562,22 +562,22 @@ def test_a_retry_on_one_role_is_not_charged_to_the_next(tmp_path, repo, spec):
     from hoh.contracts import Role as R
     from hoh.controller import DispatchError
 
-    class Wackelig(Dispatcher):
+    class Shaky(Dispatcher):
         def __init__(self, **kw):
             super().__init__(**kw)
-            self.uebrig = 1
+            self.remaining_ = 1
 
         def dispatch(self, role, prompt, *, state):
-            if role is R.PLANNER and self.uebrig:
-                self.uebrig -= 1
+            if role is R.PLANNER and self.remaining_:
+                self.remaining_ -= 1
                 raise DispatchError("provider timeout", transient=True)
             return super().dispatch(role, prompt, state=state)
 
-    d = Wackelig(repo=repo)
+    d = Shaky(repo=repo)
     ctrl, state, store = build(tmp_path, repo, spec, d)
     assert ctrl.run_iteration(state).accepted
-    nach_rolle = {s["role"]: s["retries"] for s in _telemetrie(store)}
-    assert nach_rolle == {"planner": 1, "developer": 0, "qa": 0}
+    by_role = {s["role"]: s["retries"] for s in _telemetry(store)}
+    assert by_role == {"planner": 1, "developer": 0, "qa": 0}
 
 
 def test_a_failed_dispatch_is_classified_from_its_exception(tmp_path, repo, spec):
@@ -592,7 +592,7 @@ def test_a_failed_dispatch_is_classified_from_its_exception(tmp_path, repo, spec
     from hoh.controller import DispatchError
     from hoh.taxonomy import FailureClass
 
-    class Kaputt(Dispatcher):
+    class Broken(Dispatcher):
         def dispatch(self, role, prompt, *, state):
             if role is R.PLANNER:
                 raise DispatchError(
@@ -602,15 +602,15 @@ def test_a_failed_dispatch_is_classified_from_its_exception(tmp_path, repo, spec
                     transient=False)
             return super().dispatch(role, prompt, state=state)
 
-    d = Kaputt(repo=repo)
+    d = Broken(repo=repo)
     ctrl, state, store = build(tmp_path, repo, spec, d)
     try:
         ctrl.run_iteration(state)
     except DispatchError:
         pass
-    planer = next(s for s in _telemetrie(store) if s["role"] == "planner")
-    assert planer["outcome"] == "failed"
-    assert planer["failure_class"] == FailureClass.PROVIDER_TRANSIENT.value
+    planner_ = next(s for s in _telemetry(store) if s["role"] == "planner")
+    assert planner_["outcome"] == "failed"
+    assert planner_["failure_class"] == FailureClass.PROVIDER_TRANSIENT.value
 
 
 def test_the_amendment_chain_is_protected(tmp_path, repo, spec):
@@ -625,10 +625,10 @@ def test_the_amendment_chain_is_protected(tmp_path, repo, spec):
     (store.dir / "amendments.json").write_text('{"run_id": "r1", '
                                                '"origin_digest": "x", '
                                                '"amendments": []}')
-    for rolle in (Role.PLANNER, Role.DEVELOPER, Role.QA):
-        p = _policy(ctrl, rolle, state)
+    for role_ in (Role.PLANNER, Role.DEVELOPER, Role.QA):
+        p = _policy(ctrl, role_, state)
         assert str(store.dir / "amendments.json") in {str(x) for x in p.protected}, (
-            f"{rolle.value} could rewrite the chain that gates acceptance")
+            f"{role_.value} could rewrite the chain that gates acceptance")
 
 
 def test_a_role_cannot_create_the_amendment_chain_that_gates_acceptance(
@@ -641,13 +641,13 @@ def test_a_role_cannot_create_the_amendment_chain_that_gates_acceptance(
     dispatch: zero violations, and from the next iteration the controller
     believed a specification a role had written for itself.
     """
-    def faelschen(state: RunState) -> None:
+    def forge_(state: RunState) -> None:
         (store.dir / "amendments.json").write_text(json.dumps({
             "run_id": "r1", "origin_digest": state.spec_digest,
             "amendments": [],
         }))
 
-    d = Dispatcher(repo=repo, planner_effect=faelschen)
+    d = Dispatcher(repo=repo, planner_effect=forge_)
     ctrl, state, store = build(tmp_path, repo, spec, d)
 
     out = ctrl.run_iteration(state)
@@ -677,14 +677,14 @@ def test_a_dispatch_that_took_no_witness_reports_none(tmp_path, repo, spec):
     with pytest.raises(DispatchError):
         ctrl.run_iteration(state)
 
-    saetze = _telemetrie(store)
-    gescheitert = [s for s in saetze if s["outcome"] != "ok"]
-    assert gescheitert, [s["outcome"] for s in saetze]
-    letzte = gescheitert[-1]
-    assert "dispatch refused" in letzte["detail"]
-    assert letzte["witnessed_trees"] is None, (
+    sentences = _telemetry(store)
+    failed_ = [s for s in sentences if s["outcome"] != "ok"]
+    assert failed_, [s["outcome"] for s in sentences]
+    last_ = failed_[-1]
+    assert "dispatch refused" in last_["detail"]
+    assert last_["witnessed_trees"] is None, (
         "it reported a coverage it never measured")
-    assert letzte["witnessed_listings"] is None
+    assert last_["witnessed_listings"] is None
 
 
 def test_a_field_name_that_does_not_exist_does_not_discard_the_record(
@@ -703,18 +703,18 @@ def test_a_field_name_that_does_not_exist_does_not_discard_the_record(
     c = Controller.__new__(Controller)
     c.store = store
     c.dispatcher = object()
-    zustand = Controller.new_state(
+    policy_state = Controller.new_state(
         run_id="r", repo_path=repo, project_name="p", spec_path=spec,
         budgets=Budgets(max_iterations=1))
 
     c.note_dispatch(role="planner", run_id="r", iteration=1, attempt=0,
                     started_at="2026-09-11T10:00:00Z",
                     ended_at="2026-09-11T10:00:04Z", usage={},
-                    state=zustand, tokens=123)
+                    state=policy_state, tokens=123)
 
-    (satz,) = c.telemetry().read()
-    assert satz.role == "planner"
-    assert any("no such field" in h for h in zustand.history)
+    (sentence,) = c.telemetry().read()
+    assert sentence.role == "planner"
+    assert any("no such field" in h for h in policy_state.history)
 
 
 def test_a_role_outside_the_enum_keeps_its_configured_identity(tmp_path, repo, spec):
@@ -722,7 +722,7 @@ def test_a_role_outside_the_enum_keeps_its_configured_identity(tmp_path, repo, s
     from hoh.controller import Controller
     from hoh.store import RunStore
 
-    class Versender:
+    class Sender:
         profiles = {"gate": "claude"}
         models = {"gate": "claude-opus-5"}
         efforts = {"gate": "high"}
@@ -731,16 +731,16 @@ def test_a_role_outside_the_enum_keeps_its_configured_identity(tmp_path, repo, s
     store.dir.mkdir(parents=True, exist_ok=True)
     c = Controller.__new__(Controller)
     c.store = store
-    c.dispatcher = Versender()
+    c.dispatcher = Sender()
 
     c.note_dispatch(role="gate", run_id="r", iteration=1, attempt=0,
                     started_at="2026-09-11T10:00:00Z",
                     ended_at="2026-09-11T10:00:04Z", usage={})
 
-    (satz,) = c.telemetry().read()
-    assert satz.provider == "claude"
-    assert satz.model == "claude-opus-5"
-    assert satz.effort == "high"
+    (sentence,) = c.telemetry().read()
+    assert sentence.provider == "claude"
+    assert sentence.model == "claude-opus-5"
+    assert sentence.effort == "high"
 
 
 def test_the_check_commands_home_is_not_a_protected_tree(tmp_path, repo, spec):
@@ -750,16 +750,16 @@ def test_the_check_commands_home_is_not_a_protected_tree(tmp_path, repo, spec):
     are not evidence about anything.
     """
     ctrl, state, store = build(tmp_path, repo, spec, Dispatcher(repo=repo))
-    arenen = store.arenas_dir
-    arenen.mkdir(parents=True, exist_ok=True)
-    (arenen / "aaaa1111").mkdir()
-    (arenen / "aaaa1111.scratch").mkdir()
-    (arenen / "aaaa1111.scratch.v20260913T000000Z").mkdir()
-    (arenen / ".hoh-scratch-r1-i1-a1-K1").mkdir()
+    arenas = store.arenas_dir
+    arenas.mkdir(parents=True, exist_ok=True)
+    (arenas / "aaaa1111").mkdir()
+    (arenas / "aaaa1111.scratch").mkdir()
+    (arenas / "aaaa1111.scratch.v20260913T000000Z").mkdir()
+    (arenas / ".hoh-scratch-r1-i1-a1-K1").mkdir()
 
-    namen = {Path(x).name for x in _policy(ctrl, Role.PLANNER, state).protected}
-    assert "aaaa1111" in namen
-    assert not any(".scratch" in n for n in namen), sorted(namen)
+    names_ = {Path(x).name for x in _policy(ctrl, Role.PLANNER, state).protected}
+    assert "aaaa1111" in names_
+    assert not any(".scratch" in n for n in names_), sorted(names_)
 
 
 def test_a_gitignored_file_in_the_repository_is_not_a_violation(
@@ -776,11 +776,11 @@ def test_a_gitignored_file_in_the_repository_is_not_a_violation(
     git(repo, "add", "-A")
     git(repo, "commit", "-qm", "ignore bytecode")
 
-    def hintergrund(state: RunState) -> None:
+    def background(state: RunState) -> None:
         (repo / "__pycache__").mkdir(exist_ok=True)
         (repo / "__pycache__" / "app.cpython-313.pyc").write_bytes(b"\x00\x01")
 
-    d = Dispatcher(repo=repo, qa_effect=hintergrund)
+    d = Dispatcher(repo=repo, qa_effect=background)
     ctrl, state, _ = build(tmp_path, repo, spec, d)
     out = ctrl.run_iteration(state)
     assert out.accepted, out.reason
@@ -796,18 +796,18 @@ def test_a_retry_spends_a_dispatch_and_the_budget_sees_it(tmp_path, repo, spec):
     from hoh.contracts import Role as R
     from hoh.controller import DispatchError
 
-    class Wackelig(Dispatcher):
+    class Shaky(Dispatcher):
         def __init__(self, **kw):
             super().__init__(**kw)
-            self.aufrufe = 0
+            self.calls_ = 0
 
         def dispatch(self, role, prompt, *, state):
-            self.aufrufe += 1
-            if role is R.PLANNER and self.aufrufe <= 3:
+            self.calls_ += 1
+            if role is R.PLANNER and self.calls_ <= 3:
                 raise DispatchError("provider timeout", transient=True)
             return super().dispatch(role, prompt, state=state)
 
-    d = Wackelig(repo=repo)
+    d = Shaky(repo=repo)
     ctrl, state, _ = build(tmp_path, repo, spec, d)
     state.budgets.max_dispatches = 2
     state.budgets.max_transient_retries = 5
@@ -818,7 +818,7 @@ def test_a_retry_spends_a_dispatch_and_the_budget_sees_it(tmp_path, repo, spec):
     assert "budget" in str(exc.value).lower()
     assert state.usage.dispatches == 2, (
         f"the retries did not spend budget: {state.usage.dispatches}")
-    assert d.aufrufe <= 2, "the provider was called past a spent budget"
+    assert d.calls_ <= 2, "the provider was called past a spent budget"
 
 
 def test_a_non_dispatch_record_contributes_no_provider_calls(tmp_path, repo, spec):
@@ -834,13 +834,13 @@ def test_a_non_dispatch_record_contributes_no_provider_calls(tmp_path, repo, spe
 
     d = Dispatcher(repo=repo)
     ctrl, state, store = build(tmp_path, repo, spec, d)
-    ctrl._letzte_aufrufe = 3
+    ctrl._last_calls = 3
     ctrl.note_dispatch(role="gate", run_id=state.run_id, iteration=1,
                        attempt=1, started_at="t0", ended_at="t1", state=state)
-    zeile = json.loads(
+    line = json.loads(
         (store.dir / "telemetry.jsonl").read_text().splitlines()[-1])
-    assert zeile["role"] == "gate"
-    assert zeile["provider_calls"] == 0
+    assert line["role"] == "gate"
+    assert line["provider_calls"] == 0
 
 
 def test_a_retry_does_not_rebaseline_anything_but_the_state_file(
@@ -858,7 +858,7 @@ def test_a_retry_does_not_rebaseline_anything_but_the_state_file(
     ctrl, state, store = build(tmp_path, repo, spec, Dispatcher(repo=repo))
     (store.dir / "checks.json").write_text('{"checks": []}', encoding="utf-8")
     p = ctrl._policy_for(Role.PLANNER, state)
-    zeuge = CapabilityWitness.take(p)
+    witness_ = CapabilityWitness.take(p)
 
     # What the controller does between attempts, and what a role must not get
     # away with in the same window.
@@ -866,12 +866,12 @@ def test_a_retry_does_not_rebaseline_anything_but_the_state_file(
     (store.dir / "checks.json").write_text('{"checks": ["hijacked"]}',
                                            encoding="utf-8")
 
-    erneuert = zeuge.neu_bezeugen([store.state_path])
-    assert erneuert == [str(store.state_path)]
+    renewed = witness_.witness_again([store.state_path])
+    assert renewed == [str(store.state_path)]
 
-    verletzt = zeuge.violations()
-    assert any("checks.json" in v for v in verletzt), (
+    violated = witness_.violations()
+    assert any("checks.json" in v for v in violated), (
         "the write into the acceptance suite was absorbed by the re-witness")
     assert not any(v.endswith("state.json") or "state.json (" in v
-                   for v in verletzt), (
+                   for v in violated), (
         "the controller's own charge must not read as a violation")

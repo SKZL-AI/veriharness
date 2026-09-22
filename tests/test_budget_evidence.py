@@ -23,7 +23,7 @@ import pytest
 HOH = Path(__file__).resolve().parent.parent
 
 
-def _laden():
+def _load():
     spec = importlib.util.spec_from_file_location(
         "budget_evidence", HOH / "tools" / "budget_evidence.py")
     mod = importlib.util.module_from_spec(spec)
@@ -32,10 +32,10 @@ def _laden():
     return mod
 
 
-be = _laden()
+be = _load()
 
 
-def _gruen() -> dict:
+def _green() -> dict:
     """A measurement in which every control holds."""
     return {
         "ceilings": [9, 8, 4],
@@ -59,12 +59,12 @@ def _gruen() -> dict:
 
 
 def test_the_green_measurement_is_the_only_one_that_passes():
-    ok, offen = be.verdikt(_gruen())
-    assert ok and not offen
+    ok, open_ = be.verdict(_green())
+    assert ok and not open_
 
 
-@pytest.mark.parametrize("schluessel", sorted(be.KONTROLLEN.values()))
-def test_every_control_can_fail_the_verdict_on_its_own(schluessel):
+@pytest.mark.parametrize("key", sorted(be.CONTROLS.values()))
+def test_every_control_can_fail_the_verdict_on_its_own(key):
     """No control is decorative.
 
     A suite where one red control is outvoted by the others is a suite that
@@ -72,28 +72,28 @@ def test_every_control_can_fail_the_verdict_on_its_own(schluessel):
     that cannot be reached and a budget that cannot be exceeded are different
     broken instruments, and either one invalidates the campaign.
     """
-    m = _gruen()
-    m[schluessel] = False
-    ok, offen = be.verdikt(m)
+    m = _green()
+    m[key] = False
+    ok, open_ = be.verdict(m)
     assert not ok
-    assert any(schluessel in o for o in offen)
+    assert any(key in o for o in open_)
 
 
 def test_a_missing_key_is_not_read_as_false_or_as_true():
-    m = _gruen()
+    m = _green()
     del m["counter_persisted_before_each_call"]
-    ok, offen = be.verdikt(m)
+    ok, open_ = be.verdict(m)
     assert not ok
-    assert "counter_persisted_before_each_call was not measured" in offen
+    assert "counter_persisted_before_each_call was not measured" in open_
 
 
 def test_a_key_of_the_wrong_type_is_refused():
     """`"yes"` is truthy, and that is exactly how an asserted figure passes."""
-    m = _gruen()
+    m = _green()
     m["a_restart_does_not_refund"] = "yes"
-    ok, offen = be.verdikt(m)
+    ok, open_ = be.verdict(m)
     assert not ok
-    assert any("not a bool" in o for o in offen)
+    assert any("not a bool" in o for o in open_)
 
 
 def test_an_overrun_in_any_run_fails_even_with_every_flag_green():
@@ -104,11 +104,11 @@ def test_an_overrun_in_any_run_fails_even_with_every_flag_green():
     mutant whose second run made six calls under a ceiling of four had
     nothing comparing them.
     """
-    m = _gruen()
+    m = _green()
     m["runs"][1]["provider_calls"] = 18
-    ok, offen = be.verdikt(m)
+    ok, open_ = be.verdict(m)
     assert not ok
-    assert any("reached the provider under a ceiling of 8" in o for o in offen)
+    assert any("reached the provider under a ceiling of 8" in o for o in open_)
 
 
 def test_a_ceiling_set_that_cannot_force_the_refusal_is_refused():
@@ -119,9 +119,9 @@ def test_a_ceiling_set_that_cannot_force_the_refusal_is_refused():
     with that refusal deleted passed seven of eight controls.
     """
     with pytest.raises(SystemExit, match="multiple of"):
-        be.messen(ceilings=(9, 6))
+        be.measure_(ceilings=(9, 6))
     with pytest.raises(SystemExit, match="different"):
-        be.messen(ceilings=(8, 8))
+        be.measure_(ceilings=(8, 8))
 
 
 def test_without_the_falsifier_the_verdict_cannot_be_verified(tmp_path,
@@ -129,13 +129,13 @@ def test_without_the_falsifier_the_verdict_cannot_be_verified(tmp_path,
     """The point of the switch, and the same rule `confinement_evidence.py`
     holds itself to: a control suite that was not falsified reports what it
     was built to report."""
-    monkeypatch.setattr(be, "messen", lambda **kw: _gruen())
-    ziel = tmp_path / "b.json"
-    rc = be.main(["--no-falsifier", "--out", str(ziel)])
+    monkeypatch.setattr(be, "measure_", lambda **kw: _green())
+    target = tmp_path / "b.json"
+    rc = be.main(["--no-falsifier", "--out", str(target)])
     assert rc == 1
     import json
 
-    d = json.loads(ziel.read_text())
+    d = json.loads(target.read_text())
     assert d["budget_enforcement"] == "NOT_VERIFIED"
     assert "the falsifiers were not run" in d["open"]
 
@@ -147,9 +147,9 @@ def test_the_controls_pass_on_this_build():
     -- and at least one must not be a multiple of three, or the per-dispatch
     refusal is never reached.
     """
-    m = be.messen(ceilings=(4, 2))
-    ok, offen = be.verdikt(m)
-    assert ok, offen
+    m = be.measure_(ceilings=(4, 2))
+    ok, open_ = be.verdict(m)
+    assert ok, open_
     assert m["the_product_refused_a_dispatch"]
     # The reading that motivated `provider_calls`: a telemetry line is not a
     # provider call. The refused dispatch writes a line and costs nothing.
@@ -157,7 +157,7 @@ def test_the_controls_pass_on_this_build():
     assert m["refusal_classes"] == ["BUDGET_EXHAUSTED"]
 
 
-@pytest.mark.parametrize("art", be.FALSIFIKATOREN)
+@pytest.mark.parametrize("art", be.FALSIFIERS)
 def test_each_falsifier_is_detected(art):
     """Both shapes of a lost enforcement, run for real.
 
@@ -167,7 +167,7 @@ def test_each_falsifier_is_detected(art):
     the tool still called the falsifier detected, because it asked whether the
     fixture overran rather than whether the controls went red.
     """
-    f = be.falsifikator(art, (4, 2))
+    f = be.falsifier(art, (4, 2))
     assert f["ran"]
     assert f["detected"], f
     assert f["verdict_on_the_mutated_build"] == "NOT_VERIFIED"

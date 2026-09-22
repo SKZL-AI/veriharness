@@ -32,37 +32,37 @@ import json
 import sys
 from pathlib import Path
 
-HIER = Path(__file__).resolve().parent
-HOH = HIER.parent
-ZIEL = HOH / "docs/EVIDENCE_INDEX.md"
+HERE = Path(__file__).resolve().parent
+HOH = HERE.parent
+TARGET = HOH / "docs/EVIDENCE_INDEX.md"
 
 
-def tree_digest(wurzel: Path) -> tuple[str, int, int]:
+def tree_digest(root: Path) -> tuple[str, int, int]:
     """(digest, files, bytes) over a directory, content and relative names."""
     h = hashlib.sha256()
-    dateien = sorted(
-        p for p in wurzel.rglob("*")
+    files = sorted(
+        p for p in root.rglob("*")
         if p.is_file() and "__pycache__" not in p.parts
     )
-    groesse = 0
-    for p in dateien:
-        h.update(str(p.relative_to(wurzel)).encode())
+    size_ = 0
+    for p in files:
+        h.update(str(p.relative_to(root)).encode())
         h.update(b"\x00")
-        roh = p.read_bytes()
-        h.update(hashlib.sha256(roh).digest())
-        groesse += len(roh)
-    return h.hexdigest()[:16], len(dateien), groesse
+        raw_ = p.read_bytes()
+        h.update(hashlib.sha256(raw_).digest())
+        size_ += len(raw_)
+    return h.hexdigest()[:16], len(files), size_
 
 
-def strict_zusammenfassung(wurzel: Path) -> dict:
-    quittungen = sorted((wurzel / "receipts").glob("*.json"))
-    zeilen = []
-    for f in quittungen:
+def strict_summary(root: Path) -> dict:
+    receipts_ = sorted((root / "receipts").glob("*.json"))
+    lines = []
+    for f in receipts_:
         d = json.loads(f.read_text())
         iso = d.get("isolation") or {}
-        beob = iso.get("observed_namespaces") or {}
-        lauf = iso.get("runner_namespaces") or {}
-        zeilen.append({
+        observed_calls = iso.get("observed_namespaces") or {}
+        run = iso.get("runner_namespaces") or {}
+        lines.append({
             "receipt_id": d.get("receipt_id"),
             "exit_code": d.get("exit_code"),
             "runner_ok": d.get("runner_ok"),
@@ -70,18 +70,18 @@ def strict_zusammenfassung(wurzel: Path) -> dict:
             "verified_from_inside": iso.get("verified_from_inside"),
             "mount": iso.get("candidate_mount_mode"),
             "network": iso.get("network_policy"),
-            "namespaces_differ": bool(beob) and bool(lauf) and all(
-                beob.get(k) and beob.get(k) != v for k, v in lauf.items()
+            "namespaces_differ": bool(observed_calls) and bool(run) and all(
+                observed_calls.get(k) and observed_calls.get(k) != v for k, v in run.items()
             ),
         })
-    return {"receipts": zeilen}
+    return {"receipts": lines}
 
 
-def unattended_zusammenfassung(wurzel: Path) -> dict:
+def unattended_summary(root: Path) -> dict:
     st = json.loads(
-        (wurzel / "root/projects/unattended/project.json").read_text()
+        (root / "root/projects/unattended/project.json").read_text()
     )
-    menschlich = [
+    human_ = [
         d for d in st.get("decisions", [])
         if d.get("actor") not in ("orchestrator", None)
     ]
@@ -94,21 +94,21 @@ def unattended_zusammenfassung(wurzel: Path) -> dict:
         ],
         "closure_generation": st.get("closure_generation"),
         "decisions_total": len(st.get("decisions", [])),
-        "decisions_by_a_person": len(menschlich),
+        "decisions_by_a_person": len(human_),
         "external_actions": len(st.get("external_actions", [])),
     }
 
 
-def confinement_zusammenfassung(wurzel: Path) -> dict:
+def confinement_summary(root: Path) -> dict:
     """The path-free half of a confinement measurement.
 
     The counters are the claim; the paths they were read from are the part
     that cannot be published, and they are also the part a reader does not
     need in order to see what is being asserted.
     """
-    s = json.loads((wurzel / "SUMMARY.json").read_text())
-    kontrolle = s.get("instrument_control") or {}
-    kopien = [
+    s = json.loads((root / "SUMMARY.json").read_text())
+    control = s.get("instrument_control") or {}
+    copies_ = [
         {"matches_tree": k.get("matches_tree"),
          "differences": len(k.get("differences") or [])}
         for k in s.get("planner_copies", [])
@@ -125,14 +125,14 @@ def confinement_zusammenfassung(wurzel: Path) -> dict:
                 "qa_answered", "acceptance_functions",
             )
         },
-        "planner_copies": kopien,
+        "planner_copies": copies_,
         "copy_separate_from_candidate_arenas":
             s.get("planner_copy_separate_from_candidate_arenas"),
         "developer_touched": s.get("developer_touched"),
         "receipts": s.get("receipts"),
-        "control_planted": kontrolle.get("planted"),
-        "control_detected": kontrolle.get("detected"),
-        "control_missed": kontrolle.get("missed") or [],
+        "control_planted": control.get("planted"),
+        "control_detected": control.get("detected"),
+        "control_missed": control.get("missed") or [],
         "open": s.get("open") or [],
     }
 
@@ -143,7 +143,7 @@ def confinement_zusammenfassung(wurzel: Path) -> dict:
 #: refuses the receipt trees above. Naming them here is the third option the
 #: advisory left open -- visibly marked as unpublished provenance, with no
 #: path for a reader to try to follow.
-INTERNE_DOKUMENTE = (
+INTERNAL_DOCUMENTS = (
     ("*Abschlussbericht*",
      "the closing report of this project's own dogfood phase: what was "
      "built, what was measured, what was left open",
@@ -175,24 +175,24 @@ INTERNE_DOKUMENTE = (
 )
 
 
-def rendern() -> str:
+def render_() -> str:
     streng = HOH / "dogfood/strict-e2e"
     unbe = HOH / "dogfood/unattended-e2e"
-    eing = HOH / "dogfood/planner-confinement"
+    confined = HOH / "dogfood/planner-confinement"
     s_dig, s_n, s_b = tree_digest(streng)
     u_dig, u_n, u_b = tree_digest(unbe)
-    c_dig, c_n, c_b = tree_digest(eing)
-    s = strict_zusammenfassung(streng)
-    u = unattended_zusammenfassung(unbe)
-    c = confinement_zusammenfassung(eing)
+    c_dig, c_n, c_b = tree_digest(confined)
+    s = strict_summary(streng)
+    u = unattended_summary(unbe)
+    c = confinement_summary(confined)
 
-    geehrt = sum(
+    honoured = sum(
         1 for r in s["receipts"]
         if r["verified_from_inside"] and r["namespaces_differ"]
         and r["mount"] == "read-only" and r["network"] == "denied"
     )
 
-    zeilen = [
+    lines = [
         "# Evidence index: what the claims rest on, and what is not published here",
         "",
         "Three claims in this repository rest on evidence trees that are **not**",
@@ -226,18 +226,18 @@ def rendern() -> str:
         f"* receipts carrying an isolation record: {len(s['receipts'])}",
         "* receipts where isolation was **shown** from inside -- namespaces",
         "  differing from the runner's, candidate read-only, network denied:",
-        f"  **{geehrt} of {len(s['receipts'])}**",
+        f"  **{honoured} of {len(s['receipts'])}**",
         "",
         "| receipt | exit | runner_ok | effective | verified inside | namespaces differ | mount | network |",
         "|---|---|---|---|---|---|---|---|",
     ]
     for r in s["receipts"]:
-        zeilen.append(
+        lines.append(
             f"| `{r['receipt_id']}` | {r['exit_code']} | {r['runner_ok']} | "
             f"{r['effective']} | {r['verified_from_inside']} | "
             f"{r['namespaces_differ']} | {r['mount']} | {r['network']} |"
         )
-    zeilen += [
+    lines += [
         "",
         "The namespace ids themselves are in the tree and are not reproduced",
         "here: they are kernel inode numbers for this machine's namespaces, and",
@@ -261,8 +261,8 @@ def rendern() -> str:
         "|---|---|",
     ]
     for g in u["gates"]:
-        zeilen.append(f"| `{g['name']}` | {g['outcome']} |")
-    zeilen += [
+        lines.append(f"| `{g['name']}` | {g['outcome']} |")
+    lines += [
         "",
         "Two gate results for the same gate name at different generations is the",
         "point, not a duplicate: the first closure found a red gate, a repair",
@@ -277,8 +277,8 @@ def rendern() -> str:
         "|---|---|",
     ]
     for k, v in c["metrics"].items():
-        zeilen.append(f"| `{k}` | {v} |")
-    zeilen += [
+        lines.append(f"| `{k}` | {v} |")
+    lines += [
         "",
         "The last four are positive controls. Without them a boundary that",
         "forbade everything would score perfectly on the first four, which is",
@@ -328,7 +328,7 @@ def rendern() -> str:
         "",
         "| internal document | what it is | where its substance is published |",
         "|---|---|---|",
-        *(f"| {name} | {was} | {wo} |" for name, was, wo in INTERNE_DOKUMENTE),
+        *(f"| {name} | {was} | {where} |" for name, was, where in INTERNAL_DOCUMENTS),
         "",
         "None of them is a source for a number. Every number a published",
         "document states is carried by `CLAIMS.json`, which names the file and",
@@ -342,20 +342,20 @@ def rendern() -> str:
         "it. Those are different things and the difference is the point.",
         "",
     ]
-    return "\n".join(zeilen)
+    return "\n".join(lines)
 
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--write", action="store_true")
     args = ap.parse_args(argv)
-    text = rendern()
+    text = render_()
     if args.write:
-        ZIEL.write_text(text, encoding="utf-8")
-        print(f"wrote {ZIEL}")
+        TARGET.write_text(text, encoding="utf-8")
+        print(f"wrote {TARGET}")
     else:
-        alt = ZIEL.read_text(encoding="utf-8") if ZIEL.exists() else ""
-        if alt != text:
+        old = TARGET.read_text(encoding="utf-8") if TARGET.exists() else ""
+        if old != text:
             print("EVIDENCE_INDEX.md is out of date; run with --write",
                   file=sys.stderr)
             return 1

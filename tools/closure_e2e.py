@@ -53,18 +53,18 @@ import time
 from datetime import UTC, datetime
 from pathlib import Path
 
-HIER = Path(__file__).resolve().parent
-HOH = HIER.parent
+HERE = Path(__file__).resolve().parent
+HOH = HERE.parent
 sys.path.insert(0, str(HOH / "src"))
 
-AUFGABEN = HOH / "dogfood/benchmark/tasks"
+TASKS = HOH / "dogfood/benchmark/tasks"
 
 #: Measured, not chosen. See the module docstring: campaign v2's arm C reached
 #: CLOSED at eighteen dispatches on this fixture, with one repair node, before
 #: a shared ceiling existed. Changing this number is a source change with
 #: provenance, which is the point.
-ERKLAERTES_BUDGET = 18
-BUDGET_HERKUNFT = (
+DECLARED_BUDGET = 18
+BUDGET_ORIGIN = (
     "campaign v2, arm C: four of five tasks reached CLOSED at a measured 18 "
     "dispatches with one repair node each (to_roman among them), before a "
     "shared ceiling existed. Read from "
@@ -75,14 +75,14 @@ TRUST_HELPER_ENV = "HOH_TRUST_HELPER"
 WORKTREE_ROOT_ENV = "HOH_WORKTREE_ROOT"
 
 
-def _konfiguriert(name: str) -> Path:
-    wert = os.environ.get(name, "").strip()
-    if not wert:
+def _configured(name: str) -> Path:
+    value_ = os.environ.get(name, "").strip()
+    if not value_:
         raise SystemExit(
             f"{name} is not set. This dispatches real agents into worktrees, "
             "which needs this deployment's trust helper and the directory its "
             "harness puts worktrees in.")
-    return Path(wert).expanduser()
+    return Path(value_).expanduser()
 
 
 def _git(repo: Path, *args: str) -> subprocess.CompletedProcess:
@@ -92,10 +92,10 @@ def _git(repo: Path, *args: str) -> subprocess.CompletedProcess:
 
 def _fixture(task: str) -> Path:
     """The task's base state in a fresh repository with its own nonce."""
-    basis = Path(tempfile.mkdtemp(prefix=f"closure-{task}-"))
-    repo = basis / f"ce-{task}-{basis.name.rsplit('-', 1)[-1]}"
+    baseline = Path(tempfile.mkdtemp(prefix=f"closure-{task}-"))
+    repo = baseline / f"ce-{task}-{baseline.name.rsplit('-', 1)[-1]}"
     repo.mkdir(parents=True)
-    for f in sorted((AUFGABEN / task / "base").iterdir()):
+    for f in sorted((TASKS / task / "base").iterdir()):
         shutil.copy2(f, repo / f.name)
     (repo / ".gitignore").write_text("__pycache__/\n.pytest_cache/\n*.pyc\n")
     _git(repo, "init", "-q", "-b", "main")
@@ -106,32 +106,32 @@ def _fixture(task: str) -> Path:
     return repo
 
 
-def _je_lauf(root: Path) -> dict:
+def _per_run(root: Path) -> dict:
     """Provider calls per run under this root, from the runs' own records."""
-    raus = {}
-    for zustand in sorted(root.glob("*/state.json")):
+    out_list = {}
+    for state in sorted(root.glob("*/state.json")):
         try:
-            d = json.loads(zustand.read_text(encoding="utf-8"))
+            d = json.loads(state.read_text(encoding="utf-8"))
         except (OSError, ValueError):               # pragma: no cover - exotic
             continue
-        telemetrie = zustand.parent / "telemetry.jsonl"
-        aufrufe = 0
-        if telemetrie.exists():
-            for z in telemetrie.read_text().splitlines():
+        telemetry_ = state.parent / "telemetry.jsonl"
+        calls_ = 0
+        if telemetry_.exists():
+            for z in telemetry_.read_text().splitlines():
                 if z.strip():
                     try:
-                        aufrufe += int(json.loads(z).get("provider_calls") or 0)
+                        calls_ += int(json.loads(z).get("provider_calls") or 0)
                     except ValueError:              # pragma: no cover - partial
                         pass
-        raus[zustand.parent.name] = {
+        out_list[state.parent.name] = {
             "state_usage_dispatches": int(
                 (d.get("usage") or {}).get("dispatches", 0) or 0),
-            "telemetry_provider_calls": aufrufe,
+            "telemetry_provider_calls": calls_,
         }
-    return raus
+    return out_list
 
 
-def _fremder_prozess(root: Path, repo: Path, budget: int) -> dict:
+def _foreign_process(root: Path, repo: Path, budget: int) -> dict:
     """What a **separate interpreter** says is left of the shared budget.
 
     The no-reset property is not readable from inside the process that spent
@@ -142,8 +142,8 @@ def _fremder_prozess(root: Path, repo: Path, budget: int) -> dict:
         "import json,sys;sys.path.insert(0,%r);"
         "from hoh.launcher import HohRunLauncher;"
         "l=HohRunLauncher(%r,%r,dispatch_budget=%d);"
-        "print(json.dumps({'spent':l.verbrauchtes_budget(),"
-        "'left':l.verbleibendes_budget()}))"
+        "print(json.dumps({'spent':l.spent_budget(),"
+        "'left':l.remaining_budget()}))"
         % (str(HOH / "src"), str(root), str(repo), budget))
     p = subprocess.run([sys.executable, "-c", code], capture_output=True,
                        text=True, timeout=120,
@@ -153,7 +153,7 @@ def _fremder_prozess(root: Path, repo: Path, budget: int) -> dict:
     return json.loads(p.stdout)
 
 
-def lauf(task: str, budget: int) -> dict:
+def one_run(task: str, budget: int) -> dict:
     from hoh.launcher import HohRunLauncher
     from hoh.orchestrator import GateOutcome, GateResult, GateRunner, HaltClass, ProjectController
     from hoh.project import ActionClass, Lifecycle, ProjectState, TaskNode
@@ -162,7 +162,7 @@ def lauf(task: str, budget: int) -> dict:
     os.environ["PYTHONPATH"] = str(HOH / "src")
     repo = _fixture(task)
     root = repo.parent / "root"
-    spec = AUFGABEN / task / "SPEC.md"
+    spec = TASKS / task / "SPEC.md"
     nonce = repo.name.rsplit("-", 1)[-1][:8].replace("_", "")
 
     class Gates(GateRunner):
@@ -206,20 +206,20 @@ def lauf(task: str, budget: int) -> dict:
         planner="claude", developer="claude", qa="claude",
         dispatch_budget=budget,
         approvals=PrefixScopedProvider(
-            script=_konfiguriert(TRUST_HELPER_ENV),
-            prefix=_konfiguriert(WORKTREE_ROOT_ENV) / repo.name))
+            script=_configured(TRUST_HELPER_ENV),
+            prefix=_configured(WORKTREE_ROOT_ENV) / repo.name))
     t0 = time.monotonic()
-    ergebnis = ProjectController(store, starter, Gates()).run()
-    dauer = time.monotonic() - t0
-    nach = store.read_state()
+    result = ProjectController(store, starter, Gates()).run()
+    duration_ = time.monotonic() - t0
+    after = store.read_state()
 
-    laeufe = _je_lauf(root)
-    knoten = [n.id for n in nach.nodes if not n.repair_of]
-    reparaturen = [n.id for n in nach.nodes if n.repair_of]
-    def summe(namen):
-        return sum(v["telemetry_provider_calls"] for k, v in laeufe.items()
-                   if any(k.startswith(n) or n in k for n in namen))
-    gesamt = sum(v["telemetry_provider_calls"] for v in laeufe.values())
+    runs = _per_run(root)
+    node_list = [n.id for n in after.nodes if not n.repair_of]
+    reparaturen = [n.id for n in after.nodes if n.repair_of]
+    def total_(names_):
+        return sum(v["telemetry_provider_calls"] for k, v in runs.items()
+                   if any(k.startswith(n) or n in k for n in names_))
+    total = sum(v["telemetry_provider_calls"] for v in runs.values())
 
     return {
         "purpose": "post-O143 operational closure sanity",
@@ -227,70 +227,70 @@ def lauf(task: str, budget: int) -> dict:
         "is_a_benchmark": False,
         "task": task,
         "declared_shared_budget": budget,
-        "budget_provenance": BUDGET_HERKUNFT,
-        "runs": laeufe,
-        "primary_nodes": knoten,
+        "budget_provenance": BUDGET_ORIGIN,
+        "runs": runs,
+        "primary_nodes": node_list,
         "repair_nodes": reparaturen,
-        "provider_calls_total": gesamt,
-        "primary_spend": summe(knoten),
-        "repair_spend": summe(reparaturen),
-        "remaining_budget": max(budget - gesamt, 0),
-        "halt": str(ergebnis.halt).replace("HaltClass.", ""),
-        "closed": ergebnis.halt is HaltClass.CLOSED,
-        "rc_closed": nach.rc_closed(),
-        "closure_generation": nach.closure_generation,
-        "human_decisions": len([d for d in nach.decisions
+        "provider_calls_total": total,
+        "primary_spend": total_(node_list),
+        "repair_spend": total_(reparaturen),
+        "remaining_budget": max(budget - total, 0),
+        "halt": str(result.halt).replace("HaltClass.", ""),
+        "closed": result.halt is HaltClass.CLOSED,
+        "rc_closed": after.rc_closed(),
+        "closure_generation": after.closure_generation,
+        "human_decisions": len([d for d in after.decisions
                                 if d.actor not in ("orchestrator", None)]),
         "approvals": [{"granted": a.granted} for a in starter.approvals_given],
-        "wallclock_seconds": round(dauer, 1),
-        "steps": [f"{s.kind}:{s.node or ''}" for s in ergebnis.steps],
-        "reason": ergebnis.reason[:300],
+        "wallclock_seconds": round(duration_, 1),
+        "steps": [f"{s.kind}:{s.node or ''}" for s in result.steps],
+        "reason": result.reason[:300],
         "root": str(root),
         "repo": str(repo),
-        "budget_seen_by_a_separate_process": _fremder_prozess(root, repo, budget),
+        "budget_seen_by_a_separate_process": _foreign_process(root, repo, budget),
     }
 
 
-ERWARTET = {
+EXPECTED = {
     "closed": bool,
     "provider_calls_total": int,
     "human_decisions": int,
 }
 
 
-def verdikt(m: dict) -> tuple[bool, list[str]]:
-    offen = []
-    for name, art in ERWARTET.items():
+def verdict(m: dict) -> tuple[bool, list[str]]:
+    open_ = []
+    for name, art in EXPECTED.items():
         if name not in m:
-            offen.append(f"{name} was not measured")
+            open_.append(f"{name} was not measured")
         elif not isinstance(m[name], art):
-            offen.append(f"{name} is {m[name]!r}, not a {art.__name__}")
-    if offen:
-        return False, offen
+            open_.append(f"{name} is {m[name]!r}, not a {art.__name__}")
+    if open_:
+        return False, open_
 
     if not m["closed"]:
-        offen.append(f"the run halted {m['halt']}, not CLOSED")
+        open_.append(f"the run halted {m['halt']}, not CLOSED")
     if not m["rc_closed"]:
-        offen.append("the project state does not report closure")
+        open_.append("the project state does not report closure")
     if not m["repair_nodes"]:
-        offen.append("no repair node ran, so the repair path was not exercised")
+        open_.append("no repair node ran, so the repair path was not exercised")
     if m["human_decisions"]:
-        offen.append(f"{m['human_decisions']} human decision(s): this has to "
+        open_.append(f"{m['human_decisions']} human decision(s): this has to "
                      f"close without intervention or it says nothing about "
                      f"the unattended path")
     if m["provider_calls_total"] > m["declared_shared_budget"]:
-        offen.append(f"{m['provider_calls_total']} provider calls against a "
+        open_.append(f"{m['provider_calls_total']} provider calls against a "
                      f"declared ceiling of {m['declared_shared_budget']}")
     if not m["repair_spend"]:
-        offen.append("the repair node spent nothing, so it did not draw on "
+        open_.append("the repair node spent nothing, so it did not draw on "
                      "the shared budget")
-    fremd = m.get("budget_seen_by_a_separate_process") or {}
-    if fremd.get("spent") != m["provider_calls_total"]:
-        offen.append(
-            f"a separate process reads {fremd.get('spent')} spent where the "
+    foreign = m.get("budget_seen_by_a_separate_process") or {}
+    if foreign.get("spent") != m["provider_calls_total"]:
+        open_.append(
+            f"a separate process reads {foreign.get('spent')} spent where the "
             f"run's own records say {m['provider_calls_total']}: the budget "
             f"does not survive the process that spent it")
-    return not offen, offen
+    return not open_, open_
 
 
 def main(argv=None) -> int:
@@ -301,13 +301,13 @@ def main(argv=None) -> int:
     ap.add_argument("--json", action="store_true")
     args = ap.parse_args(argv)
 
-    _konfiguriert(TRUST_HELPER_ENV)
-    _konfiguriert(WORKTREE_ROOT_ENV)
+    _configured(TRUST_HELPER_ENV)
+    _configured(WORKTREE_ROOT_ENV)
 
-    m = lauf(args.task, ERKLAERTES_BUDGET)
-    ok, offen = verdikt(m)
+    m = one_run(args.task, DECLARED_BUDGET)
+    ok, open_ = verdict(m)
     m["POST_O143_FULL_CONTROL_CLOSURE"] = "VERIFIED" if ok else "NOT_VERIFIED"
-    m["open"] = offen
+    m["open"] = open_
     m["measured_at"] = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     if args.out:
@@ -316,8 +316,8 @@ def main(argv=None) -> int:
             # Never overwritten: a sequence of attempts at this is exactly
             # what a reader needs to see, and a file that only ever holds the
             # last one hides a budget that was raised until something closed.
-            stempel = datetime.now(UTC).strftime("%Y-%m-%dT%H-%M-%SZ")
-            args.out.rename(args.out.with_name(f"{args.out.name}.v{stempel}"))
+            stamp = datetime.now(UTC).strftime("%Y-%m-%dT%H-%M-%SZ")
+            args.out.rename(args.out.with_name(f"{args.out.name}.v{stamp}"))
         args.out.write_text(json.dumps(m, indent=2) + "\n", encoding="utf-8")
         print(f"wrote {args.out}")
     if args.json:
@@ -331,7 +331,7 @@ def main(argv=None) -> int:
               f"{m.get('budget_seen_by_a_separate_process')}")
         print(f"  {'POST_O143_FULL_CONTROL_CLOSURE':<34s} "
               f"{m['POST_O143_FULL_CONTROL_CLOSURE']}")
-        for o in offen:
+        for o in open_:
             print(f"  open: {o}")
     return 0 if ok else 1
 

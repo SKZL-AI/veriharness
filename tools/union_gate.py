@@ -702,21 +702,21 @@ def build_arg_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _parse_required(roh: str) -> frozenset[int]:
-    if not roh.strip():
+def _parse_required(raw_: str) -> frozenset[int]:
+    if not raw_.strip():
         return frozenset()
-    zahlen = set()
-    for teil in roh.replace("U", "").replace("u", "").split(","):
-        teil = teil.strip()
-        if not teil:
+    numbers = set()
+    for part_ in raw_.replace("U", "").replace("u", "").split(","):
+        part_ = part_.strip()
+        if not part_:
             continue
-        if not teil.isdigit():
-            raise SystemExit(f"--require: {teil!r} is not an invariant number")
-        n = int(teil)
+        if not part_.isdigit():
+            raise SystemExit(f"--require: {part_!r} is not an invariant number")
+        n = int(part_)
         if not 1 <= n <= 5:
             raise SystemExit(f"--require: U{n} does not exist; U1..U5 are defined")
-        zahlen.add(n)
-    return frozenset(zahlen)
+        numbers.add(n)
+    return frozenset(numbers)
 
 
 def main(argv: list[str] | None = None) -> int:

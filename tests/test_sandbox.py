@@ -36,7 +36,7 @@ from hoh.sandbox import (
 )
 
 bwrap = BubblewrapSandbox()
-braucht_bwrap = pytest.mark.skipif(
+needs_bwrap = pytest.mark.skipif(
     bwrap.unavailable() is not None,
     reason=f"no usable sandbox: {bwrap.unavailable()}",
 )
@@ -49,15 +49,15 @@ def arena(tmp_path):
     The nesting is the point: `runs/<id>/arena` sits inside the project's own
     checkout, and the arena itself has no `.git`.
     """
-    aussen = tmp_path / "projekt"
-    aussen.mkdir()
-    subprocess.run(["git", "init", "-q", "-b", "master"], cwd=aussen, check=True)
-    subprocess.run(["git", "config", "user.email", "a@example.invalid"], cwd=aussen, check=True)
-    subprocess.run(["git", "config", "user.name", "A"], cwd=aussen, check=True)
-    (aussen / "f.txt").write_text("ancestor\n")
-    subprocess.run(["git", "add", "-A"], cwd=aussen, check=True)
-    subprocess.run(["git", "commit", "-q", "-m", "ancestor"], cwd=aussen, check=True)
-    a = aussen / "runs" / "r1" / "arena"
+    outside_ = tmp_path / "projekt"
+    outside_.mkdir()
+    subprocess.run(["git", "init", "-q", "-b", "master"], cwd=outside_, check=True)
+    subprocess.run(["git", "config", "user.email", "a@example.invalid"], cwd=outside_, check=True)
+    subprocess.run(["git", "config", "user.name", "A"], cwd=outside_, check=True)
+    (outside_ / "f.txt").write_text("ancestor\n")
+    subprocess.run(["git", "add", "-A"], cwd=outside_, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "ancestor"], cwd=outside_, check=True)
+    a = outside_ / "runs" / "r1" / "arena"
     a.mkdir(parents=True)
     (a / "slug.py").write_text("candidate\n")
     assert not (a / ".git").exists(), "an arena has no .git of its own"
@@ -75,8 +75,8 @@ def spec(arena, tmp_path):
 # Limit 6: closed, and measured both ways
 # --------------------------------------------------------------------------- #
 
-@braucht_bwrap
-def test_limit_6_git_klettert_draussen_raus_und_drinnen_nicht(arena, spec):
+@needs_bwrap
+def test_limit_6_git_climbs_out_outside_and_not_inside(arena, spec):
     """`git rev-parse --show-toplevel` inside an arena does not fail outside a
     sandbox -- it silently answers with the *ancestor* repository, so `git
     status` and `git log` report on the live working tree rather than the
@@ -96,18 +96,18 @@ def test_limit_6_git_klettert_draussen_raus_und_drinnen_nicht(arena, spec):
     assert m["isolation"] == "strict"
 
 
-@braucht_bwrap
-def test_der_elternbaum_ist_drinnen_nicht_sichtbar(arena, spec):
+@needs_bwrap
+def test_the_parent_tree_is_not_visible_inside(arena, spec):
     """The mechanism behind limit 6's closure, asserted directly rather than
     inferred from git's behaviour."""
-    eltern_git = arena.parents[2] / ".git"
-    assert eltern_git.is_dir(), "the ancestor .git exists outside"
-    r = bwrap.run(["test", "-e", str(eltern_git)], spec)
+    parent_git = arena.parents[2] / ".git"
+    assert parent_git.is_dir(), "the ancestor .git exists outside"
+    r = bwrap.run(["test", "-e", str(parent_git)], spec)
     assert r.exit_code != 0, "the parent .git must not be reachable from inside"
 
 
-@braucht_bwrap
-def test_der_kandidat_ist_drinnen_nur_lesbar(spec):
+@needs_bwrap
+def test_the_candidate_is_read_only_inside(spec):
     """A check that rewrites the thing it checks has invalidated its own
     result before it finished."""
     r = bwrap.run(["sh", "-c", "echo tampered >> slug.py"], spec)
@@ -115,16 +115,16 @@ def test_der_kandidat_ist_drinnen_nur_lesbar(spec):
     assert (spec.candidate / "slug.py").read_text() == "candidate\n"
 
 
-@braucht_bwrap
-def test_scratch_ist_schreibbar_und_liegt_nicht_im_kandidaten(spec):
+@needs_bwrap
+def test_scratch_is_writable_and_lies_outside_the_candidate(spec):
     r = bwrap.run(["sh", "-c", f"echo ok > {spec.scratch}/note"], spec)
     assert r.exit_code == 0, r.stderr
     assert (spec.scratch / "note").read_text().strip() == "ok"
     assert spec.scratch not in spec.candidate.parents
 
 
-@braucht_bwrap
-def test_netzwerk_ist_standardmaessig_aus(spec):
+@needs_bwrap
+def test_the_network_is_off_by_default(spec):
     """Off by default, not off by configuration: a check that needs the network
     has to say so, and saying so is visible in the spec."""
     assert spec.network is False
@@ -133,8 +133,8 @@ def test_netzwerk_ist_standardmaessig_aus(spec):
     assert r.stdout.strip() == "0", f"routes visible inside the sandbox: {r.stdout!r}"
 
 
-@braucht_bwrap
-def test_die_umgebung_wird_nicht_geerbt(spec):
+@needs_bwrap
+def test_the_environment_is_not_inherited(spec):
     """An inherited environment is an inherited capability."""
     import os
 
@@ -153,19 +153,19 @@ def test_die_umgebung_wird_nicht_geerbt(spec):
 # Limit 4: narrowed, not closed -- and the difference stated
 # --------------------------------------------------------------------------- #
 
-@braucht_bwrap
-def test_limit_4_der_radius_schrumpft_aber_der_guard_bleibt_eine_denylist(spec, tmp_path):
+@needs_bwrap
+def test_limit_4_the_radius_shrinks_but_the_guard_stays_a_denylist(spec, tmp_path):
     """The sandbox stops a command from reaching the wider machine. It does not
     make the guard sound, and this test asserts both halves so neither claim
     can be quoted without the other.
     """
-    geheim = tmp_path / "geheim.txt"
-    geheim.write_text("not for the check\n")
+    secret_ = tmp_path / "geheim.txt"
+    secret_.write_text("not for the check\n")
 
     # Narrowed: the file exists and is readable to this process, and is not
     # reachable from inside.
-    assert geheim.read_text().startswith("not for")
-    r = bwrap.run(["cat", str(geheim)], spec)
+    assert secret_.read_text().startswith("not for")
+    r = bwrap.run(["cat", str(secret_)], spec)
     assert r.exit_code != 0, "the sandbox must not reach outside the declared binds"
 
     # Not closed: the guard is still a pattern denylist over a string a shell
@@ -184,7 +184,7 @@ def test_limit_4_der_radius_schrumpft_aber_der_guard_bleibt_eine_denylist(spec, 
 # Limit 5: untouched
 # --------------------------------------------------------------------------- #
 
-def test_limit_5_bleibt_offen_weil_es_kein_isolationsproblem_ist():
+def test_limit_5_stays_open_because_it_is_not_an_isolation_problem():
     """The guard reasons about the command with `{ARENA}` replaced by the
     literal string "ARENA"; the runner substitutes the real absolute path. Two
     different strings, and no amount of isolation makes them equal. Asserted
@@ -192,22 +192,22 @@ def test_limit_5_bleibt_offen_weil_es_kein_isolationsproblem_ist():
     """
     from hoh import runner
 
-    quelle = Path(runner.__file__).read_text()
-    assert "{ARENA}" in quelle, "the placeholder is still how a check names the arena"
+    source = Path(runner.__file__).read_text()
+    assert "{ARENA}" in source, "the placeholder is still how a check names the arena"
     # The two substitution sites still exist and are still different: the guard
     # substitutes a stand-in, the runner a real path.
-    assert "ARENA" in quelle
+    assert "ARENA" in source
 
 
 # --------------------------------------------------------------------------- #
 # Fail-closed
 # --------------------------------------------------------------------------- #
 
-def test_ohne_backend_faellt_strict_geschlossen_aus():
+def test_without_a_backend_strict_fails_closed():
     """A sandbox that silently degrades is worse than none, because the reason
     to ask for one is the assumption that it is there."""
 
-    class Keiner:
+    class NoneOfThem:
         name = "keiner"
 
         def unavailable(self):
@@ -217,12 +217,12 @@ def test_ohne_backend_faellt_strict_geschlossen_aus():
             raise AssertionError("must never be reached")
 
     with pytest.raises(SandboxUnavailable) as exc:
-        select(Isolation.STRICT, [Keiner()])
+        select(Isolation.STRICT, [NoneOfThem()])
     assert "deliberately unavailable" in str(exc.value)
     assert "strict" in str(exc.value)
 
 
-def test_nosandbox_verweigert_strict(spec):
+def test_nosandbox_refuses_strict(spec):
     """Returning a STRICT-labelled result it did not provide is the precise
     failure this module exists to prevent."""
     n = NoSandbox()
@@ -231,30 +231,30 @@ def test_nosandbox_verweigert_strict(spec):
     assert "cannot provide strict" in str(exc.value)
 
 
-def test_nosandbox_laeuft_nur_wenn_ausdruecklich_verlangt(spec):
-    offen = SandboxSpec(candidate=spec.candidate, scratch=spec.scratch,
+def test_nosandbox_runs_only_when_explicitly_asked_for(spec):
+    open_ = SandboxSpec(candidate=spec.candidate, scratch=spec.scratch,
                         isolation=Isolation.NONE)
-    r = NoSandbox().run(["sh", "-c", "echo hi"], offen)
+    r = NoSandbox().run(["sh", "-c", "echo hi"], open_)
     assert r.exit_code == 0
     assert r.stdout.strip() == "hi"
     assert r.isolation is Isolation.NONE
     assert "no isolation" in r.detail
 
 
-def test_das_ergebnis_sagt_wie_es_lief(spec):
+def test_the_result_says_how_it_ran(spec):
     """A result that does not say how it ran is a result you cannot reason
     about."""
-    offen = SandboxSpec(candidate=spec.candidate, scratch=spec.scratch,
+    open_ = SandboxSpec(candidate=spec.candidate, scratch=spec.scratch,
                         isolation=Isolation.NONE)
-    assert NoSandbox().run(["true"], offen).isolation is Isolation.NONE
+    assert NoSandbox().run(["true"], open_).isolation is Isolation.NONE
 
 
 # --------------------------------------------------------------------------- #
 # A declared limit that is not enforced is a limit that exists in a docstring
 # --------------------------------------------------------------------------- #
 
-@braucht_bwrap
-def test_speichergrenze_wird_wirklich_erzwungen(spec):
+@needs_bwrap
+def test_the_memory_ceiling_is_actually_enforced(spec):
     """`memory_bytes` was declared before it was enforced.
 
     A field that names a protection and does nothing is worse than no field:
@@ -270,15 +270,15 @@ def test_speichergrenze_wird_wirklich_erzwungen(spec):
 
     # And without the limit, the same allocation succeeds -- otherwise the test
     # above would pass on a machine that simply has no memory.
-    weit = SandboxSpec(candidate=spec.candidate, scratch=spec.scratch)
+    wide = SandboxSpec(candidate=spec.candidate, scratch=spec.scratch)
     r2 = bwrap.run(
-        ["python3", "-c", "b = bytearray(512 * 1024 * 1024); print(len(b))"], weit
+        ["python3", "-c", "b = bytearray(512 * 1024 * 1024); print(len(b))"], wide
     )
     assert r2.exit_code == 0, r2.stderr[-200:]
 
 
-@braucht_bwrap
-def test_die_grenze_gilt_auch_fuer_kindprozesse(spec):
+@needs_bwrap
+def test_the_ceiling_applies_to_child_processes_too(spec):
     """Set between fork and exec, so everything the check starts inherits it.
 
     A limit on the parent only is a limit the command escapes by starting a
@@ -292,7 +292,7 @@ def test_die_grenze_gilt_auch_fuer_kindprozesse(spec):
     assert r.exit_code != 0, "a child process escaped the memory ceiling"
 
 
-def test_ohne_grenzen_wird_kein_hook_installiert(spec):
+def test_without_ceilings_no_hook_is_installed(spec):
     """No limits means no preexec hook at all, rather than one that does
     nothing -- a hook that runs and applies nothing is a place for a future
     change to go unnoticed."""
@@ -315,14 +315,14 @@ def _check(command: str, cid: str = "K1"):
                            expect_exit=0)
 
 
-def _candidate(pfad):
+def _candidate(path):
     from hoh.contracts import Candidate
 
-    return Candidate(candidate_id="c1", repo_path=str(pfad), commit="a" * 40,
+    return Candidate(candidate_id="c1", repo_path=str(path), commit="a" * 40,
                      tree_clean=True, tree_digest="d" * 16)
 
 
-def test_strict_ohne_backend_faellt_geschlossen_aus_statt_ungesandboxt_zu_laufen(arena):
+def test_strict_without_a_backend_fails_closed_instead_of_running_unsandboxed(arena):
     """The whole reason to ask for isolation is the assumption it is there.
 
     A run that quietly proceeds without it has measured something other than
@@ -330,7 +330,7 @@ def test_strict_ohne_backend_faellt_geschlossen_aus_statt_ungesandboxt_zu_laufen
     """
     from hoh.runner import run_check
 
-    class Keiner:
+    class NoneOfThem:
         name = "keiner"
 
         def unavailable(self):
@@ -341,7 +341,7 @@ def test_strict_ohne_backend_faellt_geschlossen_aus_statt_ungesandboxt_zu_laufen
 
     import hoh.sandbox as sb
 
-    echt = sb.select
+    real = sb.select
     sb.select = lambda iso, backends=None: (_ for _ in ()).throw(
         sb.SandboxUnavailable("no backend can provide strict isolation. keiner: deliberately unavailable")
     )
@@ -351,7 +351,7 @@ def test_strict_ohne_backend_faellt_geschlossen_aus_statt_ungesandboxt_zu_laufen
             attempt=1, cwd=arena, isolation=sb.Isolation.STRICT,
         )
     finally:
-        sb.select = echt
+        sb.select = real
 
     assert receipt.runner_ok is False, "a refused sandbox is not a verdict"
     assert receipt.exit_code == 126
@@ -360,8 +360,8 @@ def test_strict_ohne_backend_faellt_geschlossen_aus_statt_ungesandboxt_zu_laufen
     assert receipt.outcome(expect_exit=0).name == "INCONCLUSIVE"
 
 
-@braucht_bwrap
-def test_ein_echter_acceptance_check_laeuft_im_sandkasten(arena):
+@needs_bwrap
+def test_a_real_acceptance_check_runs_in_the_sandbox(arena):
     """Not a demo path: `run_check`, the function every acceptance check goes
     through."""
     from hoh.runner import run_check
@@ -378,8 +378,8 @@ def test_ein_echter_acceptance_check_laeuft_im_sandkasten(arena):
     assert "strict isolation" in transcript
 
 
-@braucht_bwrap
-def test_limit_6_im_echten_runner_pfad(arena):
+@needs_bwrap
+def test_limit_6_on_the_real_runner_path(arena):
     """What the sandbox actually adds for limit 6 -- which is not what it looks
     like at first.
 
@@ -402,50 +402,50 @@ def test_limit_6_im_echten_runner_pfad(arena):
     from hoh.sandbox import Isolation
 
     def toplevel(transcript: str) -> str:
-        for zeile in transcript.splitlines():
-            if zeile.startswith("/"):
-                return zeile
+        for line in transcript.splitlines():
+            if line.startswith("/"):
+                return line
         return ""
 
     # 1. The runner's own mitigation holds.
-    mit, t_mit = run_check(
+    with_, t_with = run_check(
         _check("git rev-parse --show-toplevel"), _candidate(arena),
         run_id="r", iteration=1, attempt=1, cwd=arena,
     )
-    assert mit.exit_code != 0, t_mit[-300:]
+    assert with_.exit_code != 0, t_with[-300:]
 
     # 2. And the check can take it away.
-    ohne, t_ohne = run_check(
+    without, t_without = run_check(
         _check("env -u GIT_CEILING_DIRECTORIES git rev-parse --show-toplevel", cid="K2"),
         _candidate(arena), run_id="r", iteration=1, attempt=1, cwd=arena,
     )
-    assert ohne.exit_code == 0, t_ohne[-300:]
-    assert toplevel(t_ohne) == str(arena.parents[2]), (
+    assert without.exit_code == 0, t_without[-300:]
+    assert toplevel(t_without) == str(arena.parents[2]), (
         "the ancestor repository must still be reachable this way -- if it is "
         "not, the gap this test is about has moved and the test should be re-read"
     )
 
     # 3. Inside the sandbox the same command finds nothing, because there is
     #    nothing to find rather than because a variable said not to look.
-    drin, t_drin = run_check(
+    inside_it, t_inside = run_check(
         _check("env -u GIT_CEILING_DIRECTORIES git rev-parse --show-toplevel", cid="K3"),
         _candidate(arena), run_id="r", iteration=1, attempt=1, cwd=arena,
         isolation=Isolation.STRICT,
     )
-    assert drin.exit_code != 0, t_drin[-300:]
+    assert inside_it.exit_code != 0, t_inside[-300:]
     # Asserted on git's own output, not on the whole transcript: the header
     # carries `# cwd=<arena>`, which contains the ancestor path as a prefix,
     # and matching against that would pass or fail for the wrong reason.
-    assert toplevel(t_drin) == "", t_drin[-300:]
+    assert toplevel(t_inside) == "", t_inside[-300:]
 
 
-@braucht_bwrap
+@needs_bwrap
 @pytest.mark.parametrize("command,cid", [
     ("ls /home", "N2"),
     ("python3 -c \"import urllib.request; urllib.request.urlopen('http://example.invalid', timeout=3)\"", "N4"),
     ("echo tampered >> slug.py", "N5"),
 ])
-def test_negative_kontrollen_im_runner_pfad(arena, command, cid):
+def test_negative_controls_on_the_runner_path(arena, command, cid):
     """Things that work outside and must not inside: reading other users' home
     directories, reaching the network, and writing to a candidate promised
     read-only.
@@ -464,7 +464,7 @@ def test_negative_kontrollen_im_runner_pfad(arena, command, cid):
     "cat /etc/shadow",
     "cat ../../../f.txt",
 ])
-def test_der_guard_faengt_diese_schon_vor_dem_sandkasten(arena, command):
+def test_the_guard_catches_these_before_the_sandbox(arena, command):
     """Two of the obvious escapes never reach the sandbox at all.
 
     An absolute path out and a relative climb are refused by
@@ -480,8 +480,8 @@ def test_der_guard_faengt_diese_schon_vor_dem_sandkasten(arena, command):
                   iteration=1, attempt=1, cwd=arena)
 
 
-@braucht_bwrap
-def test_home_und_tmpdir_zeigen_in_den_scratch(arena):
+@needs_bwrap
+def test_home_and_tmpdir_point_into_the_scratch(arena):
     """Controlled, not inherited -- and not inside the candidate, so a check
     cannot leave something an enumerating criterion would then find."""
     from hoh.runner import run_check
@@ -496,7 +496,7 @@ def test_home_und_tmpdir_zeigen_in_den_scratch(arena):
     assert str(arena) not in transcript.split("H=")[1].split()[0]
 
 
-def test_ohne_isolation_bleibt_alles_wie_bisher(arena):
+def test_without_isolation_everything_stays_as_before(arena):
     """Adding a sandbox must not change what an existing run does.
 
     NONE is the default, and the historical path is what it takes.
@@ -535,21 +535,21 @@ def test_a_sandboxed_check_does_not_read_a_user_site_directory(tmp_path):
 
 def test_a_sandbox_scratch_directory_found_in_place_is_parked(tmp_path):
     """Both regimes create their scratch through the same helper now."""
-    from hoh.runner import _EIGENE_SCRATCHES, _frisches_scratch
+    from hoh.runner import _OWN_SCRATCHES, _fresh_scratch
 
-    ziel = tmp_path / ".hoh-scratch-r-i1-a1-K1"
-    (ziel / "lib").mkdir(parents=True)
-    (ziel / "lib" / "usercustomize.py").write_text("raise SystemExit('planted')\n")
-    _EIGENE_SCRATCHES.pop(str(ziel), None)
+    target = tmp_path / ".hoh-scratch-r-i1-a1-K1"
+    (target / "lib").mkdir(parents=True)
+    (target / "lib" / "usercustomize.py").write_text("raise SystemExit('planted')\n")
+    _OWN_SCRATCHES.pop(str(target), None)
 
-    frisch = _frisches_scratch(ziel)
+    fresh_ = _fresh_scratch(target)
 
-    assert frisch == ziel
-    assert not (frisch / "lib").exists()
-    geparkt = [p for p in tmp_path.iterdir()
+    assert fresh_ == target
+    assert not (fresh_ / "lib").exists()
+    parked = [p for p in tmp_path.iterdir()
                if p.name.startswith(".hoh-scratch-r-i1-a1-K1.v")]
-    assert geparkt, "the planted directory was removed rather than parked"
-    assert (geparkt[0] / "lib" / "usercustomize.py").is_file()
+    assert parked, "the planted directory was removed rather than parked"
+    assert (parked[0] / "lib" / "usercustomize.py").is_file()
 
 
 def test_a_scratch_directory_this_process_made_is_reused(tmp_path):
@@ -560,16 +560,16 @@ def test_a_scratch_directory_this_process_made_is_reused(tmp_path):
     would throw away the pip and pytest caches between two checks of the same
     candidate.
     """
-    from hoh.runner import _EIGENE_SCRATCHES, _frisches_scratch
+    from hoh.runner import _OWN_SCRATCHES, _fresh_scratch
 
-    ziel = tmp_path / ".hoh-scratch-r-i1-a1-K2"
-    _EIGENE_SCRATCHES.pop(str(ziel), None)
+    target = tmp_path / ".hoh-scratch-r-i1-a1-K2"
+    _OWN_SCRATCHES.pop(str(target), None)
 
-    _frisches_scratch(ziel)
-    (ziel / "cache").mkdir()
-    _frisches_scratch(ziel)
+    _fresh_scratch(target)
+    (target / "cache").mkdir()
+    _fresh_scratch(target)
 
-    assert (ziel / "cache").is_dir(), "the second check lost the first's cache"
+    assert (target / "cache").is_dir(), "the second check lost the first's cache"
     assert not [p for p in tmp_path.iterdir() if ".v" in p.name]
 
 
@@ -582,17 +582,17 @@ def test_a_scratch_directory_replaced_behind_our_back_is_parked_again(tmp_path):
     """
     import shutil
 
-    from hoh.runner import _EIGENE_SCRATCHES, _frisches_scratch
+    from hoh.runner import _OWN_SCRATCHES, _fresh_scratch
 
-    ziel = tmp_path / ".hoh-scratch-r-i1-a1-K3"
-    _EIGENE_SCRATCHES.pop(str(ziel), None)
-    _frisches_scratch(ziel)
+    target = tmp_path / ".hoh-scratch-r-i1-a1-K3"
+    _OWN_SCRATCHES.pop(str(target), None)
+    _fresh_scratch(target)
 
     # something else replaces the directory at the same path
-    shutil.move(str(ziel), str(tmp_path / "weggeraeumt"))
-    (ziel / "lib").mkdir(parents=True)
-    (ziel / "lib" / "usercustomize.py").write_text("raise SystemExit('planted')\n")
+    shutil.move(str(target), str(tmp_path / "weggeraeumt"))
+    (target / "lib").mkdir(parents=True)
+    (target / "lib" / "usercustomize.py").write_text("raise SystemExit('planted')\n")
 
-    _frisches_scratch(ziel)
+    _fresh_scratch(target)
 
-    assert not (ziel / "lib").exists(), "the replacement was adopted as ours"
+    assert not (target / "lib").exists(), "the replacement was adopted as ours"

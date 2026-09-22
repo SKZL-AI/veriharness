@@ -22,7 +22,7 @@ from hoh.runner import run_check
 from hoh.sandbox import Isolation, SandboxUnavailable
 
 
-def bwrap_nutzbar() -> bool:
+def bwrap_usable() -> bool:
     if not shutil.which("bwrap"):
         return False
     p = subprocess.run(
@@ -32,26 +32,26 @@ def bwrap_nutzbar() -> bool:
     return p.returncode == 0
 
 
-braucht_bwrap = pytest.mark.skipif(
-    not bwrap_nutzbar(), reason="this machine cannot create the namespace"
+needs_bwrap = pytest.mark.skipif(
+    not bwrap_usable(), reason="this machine cannot create the namespace"
 )
 
 
-def arena_mit_datei(tmp_path: pathlib.Path) -> pathlib.Path:
+def arena_with_file(tmp_path: pathlib.Path) -> pathlib.Path:
     arena = tmp_path / "arena"
     arena.mkdir()
     (arena / "hello.txt").write_text("hi\n")
     return arena
 
 
-def kandidat(arena: pathlib.Path) -> Candidate:
+def candidate_tree(arena: pathlib.Path) -> Candidate:
     return Candidate(
         candidate_id="c1", repo_path=str(arena), commit="a" * 40,
         tree_clean=True, tree_digest="d" * 16,
     )
 
 
-def pruefung(command="cat hello.txt", expect=0) -> AcceptanceCheck:
+def check(command="cat hello.txt", expect=0) -> AcceptanceCheck:
     return AcceptanceCheck(
         check_id="k1", command=command, expect_exit=expect, description="d",
         expect_reason=(
@@ -60,7 +60,7 @@ def pruefung(command="cat hello.txt", expect=0) -> AcceptanceCheck:
     )
 
 
-class Unbrauchbar:
+class Unusable:
     """A backend that reports itself unusable and must never be run."""
 
     name = "broken"
@@ -72,7 +72,7 @@ class Unbrauchbar:
         raise AssertionError("an unavailable backend must not be executed")
 
 
-class LuegtUeberIsolation:
+class LiesAboutIsolation:
     """A backend that runs the command unisolated while claiming a sandbox.
 
     The upward lie, which is the one that matters. A backend claiming *less*
@@ -109,9 +109,9 @@ class LuegtUeberIsolation:
 
 
 def test_the_default_path_records_no_isolation(tmp_path):
-    arena = arena_mit_datei(tmp_path)
+    arena = arena_with_file(tmp_path)
     r, _ = run_check(
-        pruefung(), kandidat(arena), run_id="r", iteration=1, attempt=1, cwd=arena
+        check(), candidate_tree(arena), run_id="r", iteration=1, attempt=1, cwd=arena
     )
     assert r.isolation is not None
     assert r.isolation.requested == "none"
@@ -129,11 +129,11 @@ def test_the_default_path_records_no_isolation(tmp_path):
 # --------------------------------------------------------------------------- #
 
 
-@braucht_bwrap
+@needs_bwrap
 def test_strict_records_the_backend_and_the_regime(tmp_path):
-    arena = arena_mit_datei(tmp_path)
+    arena = arena_with_file(tmp_path)
     r, _ = run_check(
-        pruefung(), kandidat(arena), run_id="r", iteration=1, attempt=1,
+        check(), candidate_tree(arena), run_id="r", iteration=1, attempt=1,
         cwd=arena, isolation=Isolation.STRICT, timeout=60,
     )
     assert r.exit_code == 0 and r.runner_ok
@@ -162,10 +162,10 @@ def test_an_unavailable_injected_backend_fails_closed(tmp_path):
     inside its own `run`. That made a contract property an implementation
     detail of one class.
     """
-    arena = arena_mit_datei(tmp_path)
+    arena = arena_with_file(tmp_path)
     r, _ = run_check(
-        pruefung(), kandidat(arena), run_id="r", iteration=1, attempt=1,
-        cwd=arena, isolation=Isolation.STRICT, sandbox=Unbrauchbar(), timeout=60,
+        check(), candidate_tree(arena), run_id="r", iteration=1, attempt=1,
+        cwd=arena, isolation=Isolation.STRICT, sandbox=Unusable(), timeout=60,
     )
     assert r.runner_ok is False
     assert r.exit_code == 126
@@ -182,13 +182,13 @@ def test_an_unavailable_injected_backend_fails_closed(tmp_path):
 
 
 def test_a_refused_run_does_not_describe_a_regime_it_never_applied(tmp_path):
-    arena = arena_mit_datei(tmp_path)
+    arena = arena_with_file(tmp_path)
     r, _ = run_check(
-        pruefung(), kandidat(arena), run_id="r", iteration=1, attempt=1,
-        cwd=arena, isolation=Isolation.STRICT, sandbox=Unbrauchbar(), timeout=60,
+        check(), candidate_tree(arena), run_id="r", iteration=1, attempt=1,
+        cwd=arena, isolation=Isolation.STRICT, sandbox=Unusable(), timeout=60,
     )
-    for feld in ("network_policy", "candidate_mount_mode", "resource_limit_policy"):
-        assert getattr(r.isolation, feld) == "not applied: isolation refused"
+    for field_ in ("network_policy", "candidate_mount_mode", "resource_limit_policy"):
+        assert getattr(r.isolation, field_) == "not applied: isolation refused"
 
 
 def test_a_backend_that_claims_isolation_it_did_not_apply_is_caught(tmp_path):
@@ -206,10 +206,10 @@ def test_a_backend_that_claims_isolation_it_did_not_apply_is_caught(tmp_path):
     measured nothing about the product, the receipt is INCONCLUSIVE rather
     than a verdict.
     """
-    arena = arena_mit_datei(tmp_path)
+    arena = arena_with_file(tmp_path)
     r, log = run_check(
-        pruefung(), kandidat(arena), run_id="r", iteration=1, attempt=1,
-        cwd=arena, isolation=Isolation.STRICT, sandbox=LuegtUeberIsolation(),
+        check(), candidate_tree(arena), run_id="r", iteration=1, attempt=1,
+        cwd=arena, isolation=Isolation.STRICT, sandbox=LiesAboutIsolation(),
         timeout=60,
     )
     assert r.isolation.requested == "strict"
@@ -222,7 +222,7 @@ def test_a_backend_that_claims_isolation_it_did_not_apply_is_caught(tmp_path):
     assert "left no proof" in log
 
 
-class LuegtMitBeweis:
+class LiesWithProof:
     """The sophisticated liar: runs unisolated *and* writes a real marker.
 
     The marker is honest -- it records the namespaces the command actually ran
@@ -254,10 +254,10 @@ class LuegtMitBeweis:
 
 
 def test_a_marker_showing_the_runners_own_namespaces_refutes_the_claim(tmp_path):
-    arena = arena_mit_datei(tmp_path)
+    arena = arena_with_file(tmp_path)
     r, log = run_check(
-        pruefung(), kandidat(arena), run_id="r", iteration=1, attempt=1,
-        cwd=arena, isolation=Isolation.STRICT, sandbox=LuegtMitBeweis(),
+        check(), candidate_tree(arena), run_id="r", iteration=1, attempt=1,
+        cwd=arena, isolation=Isolation.STRICT, sandbox=LiesWithProof(),
         timeout=60,
     )
     assert r.isolation.effective == "none"
@@ -323,7 +323,7 @@ def test_an_old_receipt_without_the_record_means_unknown(tmp_path):
 # --------------------------------------------------------------------------- #
 
 
-@braucht_bwrap
+@needs_bwrap
 def test_the_candidate_is_read_only_inside_strict(tmp_path):
     """With a positive control, because `exit_code != 0` on its own is what a
     sandbox that never started also produces.
@@ -334,10 +334,10 @@ def test_the_candidate_is_read_only_inside_strict(tmp_path):
     command reported, from inside, that it was in different namespaces and
     that the candidate was read-only there.
     """
-    arena = arena_mit_datei(tmp_path)
+    arena = arena_with_file(tmp_path)
     r, log = run_check(
-        pruefung(command="echo x > hello.txt", expect=0),
-        kandidat(arena), run_id="r", iteration=1, attempt=1,
+        check(command="echo x > hello.txt", expect=0),
+        candidate_tree(arena), run_id="r", iteration=1, attempt=1,
         cwd=arena, isolation=Isolation.STRICT, timeout=60,
     )
     assert r.isolation.honoured(), "the sandbox never started; nothing was measured"
@@ -347,15 +347,15 @@ def test_the_candidate_is_read_only_inside_strict(tmp_path):
 
     # ... and the same write succeeds without isolation, so the failure above
     # is the sandbox and not the command.
-    ohne, _ = run_check(
-        pruefung(command="echo x > hello.txt", expect=0),
-        kandidat(arena), run_id="r", iteration=2, attempt=1, cwd=arena,
+    without, _ = run_check(
+        check(command="echo x > hello.txt", expect=0),
+        candidate_tree(arena), run_id="r", iteration=2, attempt=1, cwd=arena,
     )
-    assert ohne.exit_code == 0
+    assert without.exit_code == 0
     assert (arena / "hello.txt").read_text() == "x\n"
 
 
-@braucht_bwrap
+@needs_bwrap
 def test_a_check_cannot_reach_the_ancestor_repository_under_strict(tmp_path):
     """Limit 6, in the runner rather than in the sandbox unit test.
 
@@ -370,36 +370,36 @@ def test_a_check_cannot_reach_the_ancestor_repository_under_strict(tmp_path):
     arena.mkdir()
     (arena / "hello.txt").write_text("hi\n")
 
-    befehl = "env -u GIT_CEILING_DIRECTORIES git rev-parse --show-toplevel"
+    cmdline = "env -u GIT_CEILING_DIRECTORIES git rev-parse --show-toplevel"
 
     # The positive control first. Without it, "git found nothing" could just as
     # well mean git was missing, the command was misspelled, or the arena was
     # never inside a repository -- and the test would pass for a reason that
     # has nothing to do with isolation.
-    ohne, ohne_log = run_check(
-        pruefung(command=befehl), kandidat(arena),
+    without, without_log = run_check(
+        check(command=cmdline), candidate_tree(arena),
         run_id="r", iteration=1, attempt=1, cwd=arena, timeout=60,
     )
-    assert ohne.exit_code == 0, "the unsandboxed control did not reach the ancestor"
-    assert str(repo) in ohne_log.split("--- output ---", 1)[1], (
+    assert without.exit_code == 0, "the unsandboxed control did not reach the ancestor"
+    assert str(repo) in without_log.split("--- output ---", 1)[1], (
         "unsandboxed, git is expected to climb out of the arena and name the "
         "ancestor repository -- that is limit 6"
     )
 
     r, log = run_check(
-        pruefung(command=befehl), kandidat(arena),
+        check(command=cmdline), candidate_tree(arena),
         run_id="r", iteration=2, attempt=1,
         cwd=arena, isolation=Isolation.STRICT, timeout=60,
     )
-    ausgabe = log.split("--- output ---", 1)[1]
+    output_ = log.split("--- output ---", 1)[1]
     assert r.exit_code != 0, "git found a repository inside the sandbox"
-    assert "not a git repository" in ausgabe
+    assert "not a git repository" in output_
     # git names the boundary it stopped at in its error text, so the ancestor's
     # path appears -- what must not appear is a *toplevel* answer.
-    assert f"{repo}\n" not in ausgabe
+    assert f"{repo}\n" not in output_
 
 
-@braucht_bwrap
+@needs_bwrap
 def test_the_network_is_unavailable_under_strict(tmp_path):
     """Against a socket this test opens itself, so both directions are real.
 
@@ -416,23 +416,23 @@ def test_the_network_is_unavailable_under_strict(tmp_path):
     server.listen(8)
     port = server.getsockname()[1]
     try:
-        arena = arena_mit_datei(tmp_path)
-        befehl = (
+        arena = arena_with_file(tmp_path)
+        cmdline = (
             "python3 -c \"import socket;"
             f"socket.create_connection(('127.0.0.1',{port}),timeout=3)\""
         )
 
-        ohne, _ = run_check(
-            pruefung(command=befehl), kandidat(arena),
+        without, _ = run_check(
+            check(command=cmdline), candidate_tree(arena),
             run_id="r", iteration=1, attempt=1, cwd=arena, timeout=30,
         )
-        assert ohne.exit_code == 0, (
+        assert without.exit_code == 0, (
             "the unsandboxed control could not reach a listener on loopback, so "
             "the sandboxed failure below cannot be attributed to the namespace"
         )
 
         r, _log = run_check(
-            pruefung(command=befehl), kandidat(arena),
+            check(command=cmdline), candidate_tree(arena),
             run_id="r", iteration=2, attempt=1, cwd=arena,
             isolation=Isolation.STRICT, timeout=30,
         )
@@ -443,7 +443,7 @@ def test_the_network_is_unavailable_under_strict(tmp_path):
         server.close()
 
 
-@braucht_bwrap
+@needs_bwrap
 def test_home_and_tmpdir_point_into_the_scratch_area(tmp_path):
     """HOME/TMPDIR must be redirected to a scratch directory beside the
     arena -- never the arena itself, and never the real host home.
@@ -455,23 +455,23 @@ def test_home_and_tmpdir_point_into_the_scratch_area(tmp_path):
     against what the runner actually put in `$HOME`, not against where this
     particular machine happens to keep its home directory.
     """
-    arena = arena_mit_datei(tmp_path)
+    arena = arena_with_file(tmp_path)
     r, log = run_check(
-        pruefung(command='echo "HOME=$HOME TMPDIR=$TMPDIR"'),
-        kandidat(arena), run_id="r", iteration=1, attempt=1,
+        check(command='echo "HOME=$HOME TMPDIR=$TMPDIR"'),
+        candidate_tree(arena), run_id="r", iteration=1, attempt=1,
         cwd=arena, isolation=Isolation.STRICT, timeout=60,
     )
     assert r.exit_code == 0
     assert ".hoh-scratch-" in log
 
     output = log.split("--- output ---")[1]
-    zeile = next(z for z in output.splitlines() if z.startswith("HOME="))
-    home_teil, tmp_teil = zeile.split(" ", 1)
-    home_wert = home_teil.split("=", 1)[1]
-    tmp_wert = tmp_teil.split("=", 1)[1]
+    line = next(z for z in output.splitlines() if z.startswith("HOME="))
+    home_part, tmp_part = line.split(" ", 1)
+    home_value = home_part.split("=", 1)[1]
+    tmp_value = tmp_part.split("=", 1)[1]
 
-    assert home_wert == tmp_wert
-    scratch = pathlib.Path(home_wert)
+    assert home_value == tmp_value
+    scratch = pathlib.Path(home_value)
     assert scratch.parent == arena.parent, "scratch must sit BESIDE the arena"
     assert scratch.name.startswith(".hoh-scratch-")
     assert scratch != arena, "HOME/TMPDIR must not point at the arena itself"
@@ -480,12 +480,12 @@ def test_home_and_tmpdir_point_into_the_scratch_area(tmp_path):
     )
 
 
-@braucht_bwrap
+@needs_bwrap
 def test_select_refuses_strict_when_no_backend_can_provide_it():
     from hoh.sandbox import select
 
     with pytest.raises(SandboxUnavailable, match="no backend can provide"):
-        select(Isolation.STRICT, backends=[Unbrauchbar()])
+        select(Isolation.STRICT, backends=[Unusable()])
 
 
 # --------------------------------------------------------------------------- #
@@ -493,7 +493,7 @@ def test_select_refuses_strict_when_no_backend_can_provide_it():
 # --------------------------------------------------------------------------- #
 
 
-@braucht_bwrap
+@needs_bwrap
 def test_the_ceilings_are_read_back_from_inside_the_check(tmp_path):
     """O107: requesting STRICT used to *remove* ceilings the weaker path applied.
 
@@ -514,10 +514,10 @@ def test_the_ceilings_are_read_back_from_inside_the_check(tmp_path):
         RLIMIT_OPEN_FILES,
     )
 
-    arena = arena_mit_datei(tmp_path)
+    arena = arena_with_file(tmp_path)
     r, log = run_check(
-        pruefung(command="ulimit -v; ulimit -t; ulimit -f; ulimit -n"),
-        kandidat(arena), run_id="r", iteration=1, attempt=1,
+        check(command="ulimit -v; ulimit -t; ulimit -f; ulimit -n"),
+        candidate_tree(arena), run_id="r", iteration=1, attempt=1,
         cwd=arena, isolation=Isolation.STRICT, timeout=60,
     )
     assert r.exit_code == 0
@@ -530,23 +530,23 @@ def test_the_ceilings_are_read_back_from_inside_the_check(tmp_path):
     assert f"as={RLIMIT_ADDRESS_SPACE}" in r.isolation.resource_limit_policy
 
 
-@braucht_bwrap
+@needs_bwrap
 def test_the_unsandboxed_path_applies_the_same_three_ceilings(tmp_path):
     """The control for the one above: STRICT has to be a superset, so the
     comparison is only meaningful if the weaker path really does apply them."""
     from hoh.runner import RLIMIT_ADDRESS_SPACE, RLIMIT_CPU_SECONDS
 
-    arena = arena_mit_datei(tmp_path)
+    arena = arena_with_file(tmp_path)
     r, log = run_check(
-        pruefung(command="ulimit -v; ulimit -t"),
-        kandidat(arena), run_id="r", iteration=1, attempt=1, cwd=arena,
+        check(command="ulimit -v; ulimit -t"),
+        candidate_tree(arena), run_id="r", iteration=1, attempt=1, cwd=arena,
     )
     v, t_ = log.split("--- output ---", 1)[1].split()[:2]
     assert int(v) * 1024 == RLIMIT_ADDRESS_SPACE
     assert int(t_) == RLIMIT_CPU_SECONDS
 
 
-@braucht_bwrap
+@needs_bwrap
 def test_the_file_descriptor_ceiling_actually_stops_a_check(tmp_path):
     """Measured against the ceiling that is *in force*, not against the constant.
 
@@ -555,18 +555,18 @@ def test_the_file_descriptor_ceiling_actually_stops_a_check(tmp_path):
     entirely left the test passing -- it hit the inherited limit instead and
     could not tell the difference. So the target is read out of the receipt.
     """
-    arena = arena_mit_datei(tmp_path)
+    arena = arena_with_file(tmp_path)
     r0, log0 = run_check(
-        pruefung(command="ulimit -n"), kandidat(arena),
+        check(command="ulimit -n"), candidate_tree(arena),
         run_id="r", iteration=2, attempt=1, cwd=arena,
         isolation=Isolation.STRICT, timeout=60,
     )
-    grenze = int(log0.split("--- output ---", 1)[1].split()[0])
-    assert f"nofile={grenze}" in r0.isolation.resource_limit_policy, (
+    limit_ = int(log0.split("--- output ---", 1)[1].split()[0])
+    assert f"nofile={limit_}" in r0.isolation.resource_limit_policy, (
         "the receipt reports a ceiling other than the one in force"
     )
 
-    skript = (
+    script_ = (
         "python3 -c \""
         "import sys;"
         "offen=[];"
@@ -575,21 +575,21 @@ def test_the_file_descriptor_ceiling_actually_stops_a_check(tmp_path):
         "        offen.append(open('/dev/null'))\n"
         "    except OSError:\n"
         "        sys.exit(7)\n"
-        "sys.exit(0)\"" % (grenze + 500)
+        "sys.exit(0)\"" % (limit_ + 500)
     )
     r, _ = run_check(
-        pruefung(command=skript, expect=7), kandidat(arena),
+        check(command=script_, expect=7), candidate_tree(arena),
         run_id="r", iteration=3, attempt=1, cwd=arena,
         isolation=Isolation.STRICT, timeout=120,
     )
     assert r.exit_code == 7, "the descriptor ceiling did not stop the check"
 
 
-@braucht_bwrap
+@needs_bwrap
 def test_a_check_that_overruns_its_deadline_is_inconclusive_not_failed(tmp_path):
-    arena = arena_mit_datei(tmp_path)
+    arena = arena_with_file(tmp_path)
     r, _ = run_check(
-        pruefung(command="sleep 30"), kandidat(arena),
+        check(command="sleep 30"), candidate_tree(arena),
         run_id="r", iteration=1, attempt=1, cwd=arena,
         isolation=Isolation.STRICT, timeout=2,
     )
@@ -614,22 +614,22 @@ def test_the_controller_passes_its_isolation_to_the_candidate_check(monkeypatch)
     """
     from hoh import controller as ctrl
 
-    gesehen = {}
+    seen_ = {}
 
-    def falsch(*a, **kw):
-        gesehen["isolation"] = kw.get("isolation")
+    def wrong(*a, **kw):
+        seen_["isolation"] = kw.get("isolation")
         raise RuntimeError("stop here: only the argument is under test")
 
-    class Zustand:
+    class State:
         run_id, iteration, attempt = "r", 1, 1
 
-    monkeypatch.setattr(ctrl, "run_check", falsch)
+    monkeypatch.setattr(ctrl, "run_check", wrong)
     c = ctrl.Controller.__new__(ctrl.Controller)
     c.store = None
     c.isolation = Isolation.STRICT
     with pytest.raises(RuntimeError):
-        c._execute(Zustand(), pruefung(), kandidat(pathlib.Path("/tmp")))
-    assert gesehen["isolation"] is Isolation.STRICT
+        c._execute(State(), check(), candidate_tree(pathlib.Path("/tmp")))
+    assert seen_["isolation"] is Isolation.STRICT
 
 
 def test_the_controller_defaults_to_the_historical_path(tmp_path):
@@ -656,7 +656,7 @@ def test_the_cli_refuses_an_isolation_it_does_not_know():
 # --------------------------------------------------------------------------- #
 
 
-@braucht_bwrap
+@needs_bwrap
 def test_the_output_ceiling_holds_under_strict_too(tmp_path):
     """The sandboxed branch used to buffer output in memory instead of
     streaming it under a ceiling.
@@ -668,36 +668,36 @@ def test_the_output_ceiling_holds_under_strict_too(tmp_path):
     to be about isolation -- and a reinstatement of the memory regression the
     module docstring says was removed.
     """
-    arena = arena_mit_datei(tmp_path)
-    befehl = "python3 -c \"print('x'*200000)\" ; " * 8
+    arena = arena_with_file(tmp_path)
+    cmdline = "python3 -c \"print('x'*200000)\" ; " * 8
     ceiling = 50_000
 
-    ergebnisse = {}
+    results = {}
     for i, iso in enumerate((None, Isolation.STRICT)):
         r, _ = run_check(
-            pruefung(command=befehl), kandidat(arena),
+            check(command=cmdline), candidate_tree(arena),
             run_id="r", iteration=i + 1, attempt=1, cwd=arena,
             isolation=iso, timeout=120, max_output_bytes=ceiling,
         )
-        ergebnisse[iso] = r
+        results[iso] = r
 
-    for iso, r in ergebnisse.items():
+    for iso, r in results.items():
         assert r.truncated is True, f"{iso}: the ceiling was not applied"
         assert r.runner_ok is False, f"{iso}: overrunning output gave a verdict"
         assert r.exit_code == 126
         assert r.outcome(0).value == "INCONCLUSIVE"
 
 
-@braucht_bwrap
+@needs_bwrap
 def test_a_timeout_under_strict_kills_only_the_sandbox(tmp_path):
     """`_supervise` ends an overrunning check with `killpg`. Without its own
     session the sandboxed process shares the runner's process group, so the
     first timeout on this path signalled the runner, its parent and everything
     else in that group -- the test suite terminated itself the first time the
     supervisor was wired in. This test is that accident, pinned."""
-    arena = arena_mit_datei(tmp_path)
+    arena = arena_with_file(tmp_path)
     r, _ = run_check(
-        pruefung(command="sleep 30"), kandidat(arena),
+        check(command="sleep 30"), candidate_tree(arena),
         run_id="r", iteration=1, attempt=1, cwd=arena,
         isolation=Isolation.STRICT, timeout=2,
     )
@@ -706,7 +706,7 @@ def test_a_timeout_under_strict_kills_only_the_sandbox(tmp_path):
     # in the group the supervisor signalled.
 
 
-@braucht_bwrap
+@needs_bwrap
 def test_the_ceilings_are_reported_as_applied_not_as_requested(tmp_path):
     """A receipt promising 600 CPU-seconds to a check killed at 60 is worse
     than no receipt. The clamp is against the runner's own current soft limit
@@ -722,9 +722,9 @@ def test_the_ceilings_are_reported_as_applied_not_as_requested(tmp_path):
     import resource
 
     for name, res in (("nofile", resource.RLIMIT_NOFILE), ("cpu", resource.RLIMIT_CPU)):
-        weich, _hart = resource.getrlimit(res)
-        if weich != resource.RLIM_INFINITY:
-            assert f"{name}={weich}" in text, (
+        soft, _hard = resource.getrlimit(res)
+        if soft != resource.RLIM_INFINITY:
+            assert f"{name}={soft}" in text, (
                 f"{name} was reported above the limit the runner itself has"
             )
 
@@ -733,18 +733,18 @@ def test_an_unknown_isolation_string_is_refused_before_anything_runs(tmp_path):
     """A plain string slipped past every `is` comparison: the NONE path was
     never taken, the command ran sandboxed, and the record assembly then
     raised AttributeError -- an execution that left no receipt."""
-    arena = arena_mit_datei(tmp_path)
+    arena = arena_with_file(tmp_path)
     with pytest.raises(ValueError, match="unknown isolation"):
         run_check(
-            pruefung(), kandidat(arena), run_id="r", iteration=1, attempt=1,
+            check(), candidate_tree(arena), run_id="r", iteration=1, attempt=1,
             cwd=arena, isolation="medium",
         )
 
 
 def test_a_stringly_typed_isolation_is_coerced_rather_than_misrouted(tmp_path):
-    arena = arena_mit_datei(tmp_path)
+    arena = arena_with_file(tmp_path)
     r, _ = run_check(
-        pruefung(), kandidat(arena), run_id="r", iteration=1, attempt=1,
+        check(), candidate_tree(arena), run_id="r", iteration=1, attempt=1,
         cwd=arena, isolation="none",
     )
     assert r.isolation.requested == "none"
@@ -814,34 +814,34 @@ def test_the_state_carries_the_field_so_it_survives_a_restart(tmp_path):
 # --------------------------------------------------------------------------- #
 
 
-@braucht_bwrap
+@needs_bwrap
 def test_the_receipt_carries_both_sides_of_the_namespace_comparison(tmp_path):
     """`verified_from_inside` is this runner's verdict on two numbers. A reader
     who does not want to take the verdict on trust needs the numbers -- and the
     code that produces the verdict has already been wrong about exactly this
     once."""
-    arena = arena_mit_datei(tmp_path)
+    arena = arena_with_file(tmp_path)
     r, _ = run_check(
-        pruefung(), kandidat(arena), run_id="r", iteration=1, attempt=1,
+        check(), candidate_tree(arena), run_id="r", iteration=1, attempt=1,
         cwd=arena, isolation=Isolation.STRICT, timeout=60,
     )
     iso = r.isolation
     assert set(iso.observed_namespaces) == {"mnt_ns", "net_ns"}
     assert set(iso.runner_namespaces) == {"mnt_ns", "net_ns"}
     # Redo the comparison by hand: that is the point of publishing both sides.
-    for schluessel in ("mnt_ns", "net_ns"):
-        assert iso.observed_namespaces[schluessel] != iso.runner_namespaces[schluessel]
-        assert iso.observed_namespaces[schluessel].startswith(
-            schluessel.split("_")[0]
+    for key in ("mnt_ns", "net_ns"):
+        assert iso.observed_namespaces[key] != iso.runner_namespaces[key]
+        assert iso.observed_namespaces[key].startswith(
+            key.split("_")[0]
         )
 
 
 def test_the_unsandboxed_path_publishes_no_comparison(tmp_path):
     """There is no claim there, so there is nothing to check -- and an empty
     dict says that more honestly than a pair of equal numbers would."""
-    arena = arena_mit_datei(tmp_path)
+    arena = arena_with_file(tmp_path)
     r, _ = run_check(
-        pruefung(), kandidat(arena), run_id="r", iteration=1, attempt=1, cwd=arena
+        check(), candidate_tree(arena), run_id="r", iteration=1, attempt=1, cwd=arena
     )
     assert r.isolation.observed_namespaces == {}
     assert r.isolation.runner_namespaces == {}
@@ -895,13 +895,13 @@ def test_a_check_cannot_forge_the_proof_by_writing_the_scratch_file(tmp_path):
     in. There is no such file any more: the proof went out over a pipe before
     the check started, and the pipe is append-only.
     """
-    arena = arena_mit_datei(tmp_path)
-    faelschung = (
+    arena = arena_with_file(tmp_path)
+    forgery = (
         'printf "mnt:[4026999999]\\nnet:[4026999998]\\nro\\n" '
         '> "$HOME/.hoh-sandbox-proof"; echo done'
     )
     r, log = run_check(
-        pruefung(command=faelschung), kandidat(arena),
+        check(command=forgery), candidate_tree(arena),
         run_id="r", iteration=1, attempt=1, cwd=arena,
         isolation=Isolation.STRICT, sandbox=OhneNamespace(), timeout=60,
     )
@@ -919,14 +919,14 @@ def test_a_check_appending_to_the_proof_pipe_cannot_change_it(tmp_path):
     """The pipe is shared with the check's descriptors, so it can append. It
     cannot alter the bytes the prologue already sent, and only the first three
     lines are parsed."""
-    arena = arena_mit_datei(tmp_path)
-    anhaengen = (
+    arena = arena_with_file(tmp_path)
+    append_ = (
         'echo "mnt:[4026999999]" >&$HOH_PROOF_FD; '
         'echo "net:[4026999998]" >&$HOH_PROOF_FD; '
         'echo ro >&$HOH_PROOF_FD; echo done'
     )
     r, _ = run_check(
-        pruefung(command=anhaengen), kandidat(arena),
+        check(command=append_), candidate_tree(arena),
         run_id="r", iteration=1, attempt=1, cwd=arena,
         isolation=Isolation.STRICT, sandbox=OhneNamespace(), timeout=60,
     )
@@ -934,21 +934,21 @@ def test_a_check_appending_to_the_proof_pipe_cannot_change_it(tmp_path):
     assert not r.isolation.honoured()
 
 
-@braucht_bwrap
+@needs_bwrap
 def test_a_check_that_tidies_its_own_tmpdir_is_not_punished(tmp_path):
     """An ordinary passing check that cleans up after itself used to destroy
     the proof and be scored as an infrastructure refusal."""
-    arena = arena_mit_datei(tmp_path)
+    arena = arena_with_file(tmp_path)
     r, _ = run_check(
-        pruefung(command='echo "tests: 12 passed"; rm -f "$TMPDIR"/.hoh-* ; exit 0'),
-        kandidat(arena), run_id="r", iteration=1, attempt=1, cwd=arena,
+        check(command='echo "tests: 12 passed"; rm -f "$TMPDIR"/.hoh-* ; exit 0'),
+        candidate_tree(arena), run_id="r", iteration=1, attempt=1, cwd=arena,
         isolation=Isolation.STRICT, timeout=60,
     )
     assert r.exit_code == 0 and r.runner_ok is True
     assert r.isolation.honoured()
 
 
-@braucht_bwrap
+@needs_bwrap
 def test_a_candidate_that_was_never_mounted_is_not_read_only(tmp_path):
     """`[ -w path ]` is false for a path that is not there.
 
@@ -963,27 +963,27 @@ def test_a_candidate_that_was_never_mounted_is_not_read_only(tmp_path):
 
         def plan(self, argv, spec):
             # The real bwrap argv with the candidate's bind removed.
-            voll = self._argv([argv[0], "-c", MARKER_PROLOGUE + argv[2]], spec)
-            gekuerzt, i = [], 0
-            while i < len(voll):
-                if (voll[i] == "--ro-bind" and i + 1 < len(voll)
-                        and voll[i + 1] == str(spec.candidate)):
+            full_ = self._argv([argv[0], "-c", MARKER_PROLOGUE + argv[2]], spec)
+            was_truncated, i = [], 0
+            while i < len(full_):
+                if (full_[i] == "--ro-bind" and i + 1 < len(full_)
+                        and full_[i + 1] == str(spec.candidate)):
                     i += 3            # drop the candidate's bind entirely
                     continue
-                if voll[i] == "--chdir":
+                if full_[i] == "--chdir":
                     # ... and start somewhere that exists, so the command runs
                     # and can report. Otherwise bwrap dies at chdir and the
                     # case under test never happens.
-                    gekuerzt += ["--chdir", "/tmp"]
+                    was_truncated += ["--chdir", "/tmp"]
                     i += 2
                     continue
-                gekuerzt.append(voll[i])
+                was_truncated.append(full_[i])
                 i += 1
-            return LaunchPlan(argv=gekuerzt, env={}, cwd=None, proves_isolation=True)
+            return LaunchPlan(argv=was_truncated, env={}, cwd=None, proves_isolation=True)
 
-    arena = arena_mit_datei(tmp_path)
+    arena = arena_with_file(tmp_path)
     r, log = run_check(
-        pruefung(command="true"), kandidat(arena),
+        check(command="true"), candidate_tree(arena),
         run_id="r", iteration=1, attempt=1, cwd=arena,
         isolation=Isolation.STRICT, sandbox=OhneKandidatenBind(), timeout=60,
     )
@@ -993,27 +993,27 @@ def test_a_candidate_that_was_never_mounted_is_not_read_only(tmp_path):
     assert "not present inside the sandbox" in log
 
 
-@braucht_bwrap
+@needs_bwrap
 def test_the_network_policy_is_derived_from_the_namespace_not_the_request(tmp_path):
     """It was `"denied" if not spec.network` -- the request echoed back, in the
     field a reader would most want measured."""
     from hoh.sandbox import MARKER_PROLOGUE, BubblewrapSandbox, LaunchPlan
 
-    class MitNetz(BubblewrapSandbox):
+    class WithNetwork(BubblewrapSandbox):
         name: str = "shares-the-network"
 
         def plan(self, argv, spec):
-            voll = self._argv([argv[0], "-c", MARKER_PROLOGUE + argv[2]], spec)
+            full_ = self._argv([argv[0], "-c", MARKER_PROLOGUE + argv[2]], spec)
             return LaunchPlan(
-                argv=[a for a in voll if a != "--unshare-net"],
+                argv=[a for a in full_ if a != "--unshare-net"],
                 env={}, cwd=None, proves_isolation=True,
             )
 
-    arena = arena_mit_datei(tmp_path)
+    arena = arena_with_file(tmp_path)
     r, _ = run_check(
-        pruefung(command="true"), kandidat(arena),
+        check(command="true"), candidate_tree(arena),
         run_id="r", iteration=1, attempt=1, cwd=arena,
-        isolation=Isolation.STRICT, sandbox=MitNetz(), timeout=60,
+        isolation=Isolation.STRICT, sandbox=WithNetwork(), timeout=60,
     )
     assert r.isolation.network_policy == "allowed"
     assert not r.isolation.honoured()
@@ -1024,9 +1024,9 @@ def test_a_binary_proof_does_not_escape_without_a_receipt(tmp_path):
     """A `UnicodeDecodeError` is a `ValueError`, not an `OSError`, so it used
     to escape `run_check` entirely -- a run that ended with no receipt at all,
     which is the one outcome this module exists to prevent."""
-    arena = arena_mit_datei(tmp_path)
+    arena = arena_with_file(tmp_path)
 
-    class BinaererBeweis(OhneNamespace):
+    class BinaryProof(OhneNamespace):
         name = "binary-proof"
 
         def plan(self, argv, spec):
@@ -1038,8 +1038,8 @@ def test_a_binary_proof_does_not_escape_without_a_receipt(tmp_path):
             )
 
     r, _ = run_check(
-        pruefung(), kandidat(arena), run_id="r", iteration=1, attempt=1,
-        cwd=arena, isolation=Isolation.STRICT, sandbox=BinaererBeweis(), timeout=60,
+        check(), candidate_tree(arena), run_id="r", iteration=1, attempt=1,
+        cwd=arena, isolation=Isolation.STRICT, sandbox=BinaryProof(), timeout=60,
     )
     assert r.receipt_id, "run_check must always return a receipt"
     assert not r.isolation.honoured()
@@ -1058,10 +1058,10 @@ def test_the_runner_sets_verified_from_inside_to_false_when_nothing_proved(tmp_p
     mentioned it either asserted it was True or built the record by hand. A
     field nothing can be seen to falsify is not a measurement.
     """
-    arena = arena_mit_datei(tmp_path)
+    arena = arena_with_file(tmp_path)
     r, _ = run_check(
-        pruefung(), kandidat(arena), run_id="r", iteration=1, attempt=1,
-        cwd=arena, isolation=Isolation.STRICT, sandbox=LuegtUeberIsolation(),
+        check(), candidate_tree(arena), run_id="r", iteration=1, attempt=1,
+        cwd=arena, isolation=Isolation.STRICT, sandbox=LiesAboutIsolation(),
         timeout=60,
     )
     assert r.isolation.verified_from_inside is False
@@ -1079,15 +1079,15 @@ def test_a_short_proof_does_not_default_the_missing_line(tmp_path):
     }
     assert "candidate_writable" not in marker_reading("mnt:[1]\n")
     # And only the first three lines are ever read.
-    viele = "\n".join(f"line{i}" for i in range(50))
-    assert set(marker_reading(viele)) == {"mnt_ns", "net_ns", "candidate_writable"}
-    assert marker_reading(viele)["mnt_ns"] == "line0"
+    many = "\n".join(f"line{i}" for i in range(50))
+    assert set(marker_reading(many)) == {"mnt_ns", "net_ns", "candidate_writable"}
+    assert marker_reading(many)["mnt_ns"] == "line0"
 
 
 def test_a_two_line_proof_is_not_honoured(tmp_path):
-    arena = arena_mit_datei(tmp_path)
+    arena = arena_with_file(tmp_path)
 
-    class Kurz(OhneNamespace):
+    class Short(OhneNamespace):
         name = "short-proof"
 
         def plan(self, argv, spec):
@@ -1100,8 +1100,8 @@ def test_a_two_line_proof_is_not_honoured(tmp_path):
             )
 
     r, _ = run_check(
-        pruefung(), kandidat(arena), run_id="r", iteration=1, attempt=1,
-        cwd=arena, isolation=Isolation.STRICT, sandbox=Kurz(), timeout=60,
+        check(), candidate_tree(arena), run_id="r", iteration=1, attempt=1,
+        cwd=arena, isolation=Isolation.STRICT, sandbox=Short(), timeout=60,
     )
     # This backend also runs in the runner's own namespaces, and that is the
     # stronger complaint, so it is the one reported. Either way the run is
@@ -1116,16 +1116,16 @@ def test_the_soft_limit_clamp_is_measured_not_assumed():
     never ran under lowered soft limits, so removing the clamp survived."""
     import resource
 
-    from hoh.sandbox import SandboxSpec, _rlimit_paare
+    from hoh.sandbox import SandboxSpec, _rlimit_pairs
 
-    weich, hart = resource.getrlimit(resource.RLIMIT_NOFILE)
+    soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
     spec = SandboxSpec(
         candidate=pathlib.Path("/tmp"), scratch=pathlib.Path("/tmp"),
-        max_open_files=(weich + 1000) if weich != resource.RLIM_INFINITY else 1 << 30,
+        max_open_files=(soft + 1000) if soft != resource.RLIM_INFINITY else 1 << 30,
     )
-    paare = dict(_rlimit_paare(spec))
-    if weich != resource.RLIM_INFINITY:
-        assert paare[resource.RLIMIT_NOFILE] == weich, (
+    pairs = dict(_rlimit_pairs(spec))
+    if soft != resource.RLIM_INFINITY:
+        assert pairs[resource.RLIMIT_NOFILE] == soft, (
             "a ceiling that raises the runner's own soft limit is not a ceiling"
         )
 
@@ -1136,12 +1136,12 @@ def test_the_unsandboxed_path_clamps_the_same_way():
 
     from hoh.runner import _unsandboxed_limits
 
-    angewandt = dict(_unsandboxed_limits())
+    applied_ = dict(_unsandboxed_limits())
     for res in (resource.RLIMIT_CPU, resource.RLIMIT_AS, resource.RLIMIT_FSIZE):
-        weich, hart = resource.getrlimit(res)
-        for grenze in (weich, hart):
-            if grenze != resource.RLIM_INFINITY:
-                assert angewandt[res] <= grenze, (
+        soft, hard = resource.getrlimit(res)
+        for limit_ in (soft, hard):
+            if limit_ != resource.RLIM_INFINITY:
+                assert applied_[res] <= limit_, (
                     f"{res}: the unsandboxed path reported a ceiling above the "
                     "one the runner itself has"
                 )
@@ -1150,42 +1150,42 @@ def test_the_unsandboxed_path_clamps_the_same_way():
 def test_the_receipt_reports_the_unsandboxed_ceilings_as_applied(tmp_path):
     from hoh.runner import _unsandboxed_limits
 
-    arena = arena_mit_datei(tmp_path)
+    arena = arena_with_file(tmp_path)
     r, _ = run_check(
-        pruefung(), kandidat(arena), run_id="r", iteration=1, attempt=1, cwd=arena
+        check(), candidate_tree(arena), run_id="r", iteration=1, attempt=1, cwd=arena
     )
-    for _res, wert in _unsandboxed_limits():
-        assert f"={wert}" in r.isolation.resource_limit_policy
+    for _res, value_ in _unsandboxed_limits():
+        assert f"={value_}" in r.isolation.resource_limit_policy
 
 
-@braucht_bwrap
+@needs_bwrap
 def test_the_pid_namespace_is_unshared(tmp_path):
     """Deleting `--unshare-pid/ipc/uts` passed every test."""
-    arena = arena_mit_datei(tmp_path)
+    arena = arena_with_file(tmp_path)
     r, log = run_check(
-        pruefung(command="echo $$; ls /proc | grep -c '^[0-9]*$'"),
-        kandidat(arena), run_id="r", iteration=1, attempt=1,
+        check(command="echo $$; ls /proc | grep -c '^[0-9]*$'"),
+        candidate_tree(arena), run_id="r", iteration=1, attempt=1,
         cwd=arena, isolation=Isolation.STRICT, timeout=60,
     )
     assert r.exit_code == 0
-    zeilen = log.split("--- output ---", 1)[1].split()
+    lines = log.split("--- output ---", 1)[1].split()
     # In its own pid namespace the shell is pid 1 or 2, and /proc lists a
     # handful of processes rather than the machine's.
-    assert int(zeilen[0]) < 10, "the sandbox shares the runner's pid namespace"
-    assert int(zeilen[1]) < 20
+    assert int(lines[0]) < 10, "the sandbox shares the runner's pid namespace"
+    assert int(lines[1]) < 20
 
 
-@braucht_bwrap
+@needs_bwrap
 def test_the_uts_and_ipc_namespaces_are_unshared(tmp_path):
     """Compared by namespace id, not by hostname: `--unshare-uts` gives the
     sandbox its own UTS namespace without renaming the host, so `hostname`
     reports the same string on both sides and proves nothing."""
     import os as os_mod
 
-    arena = arena_mit_datei(tmp_path)
+    arena = arena_with_file(tmp_path)
     r, log = run_check(
-        pruefung(command="readlink /proc/self/ns/uts; readlink /proc/self/ns/ipc"),
-        kandidat(arena), run_id="r", iteration=1, attempt=1, cwd=arena,
+        check(command="readlink /proc/self/ns/uts; readlink /proc/self/ns/ipc"),
+        candidate_tree(arena), run_id="r", iteration=1, attempt=1, cwd=arena,
         isolation=Isolation.STRICT, timeout=60,
     )
     assert r.exit_code == 0
@@ -1212,7 +1212,7 @@ def test_nosandbox_refuses_strict_through_the_plan_as_well(tmp_path):
 
 
 def test_every_test_that_really_needs_a_sandbox_says_so():
-    """A test that asks the *real* backend for STRICT needs `@braucht_bwrap`.
+    """A test that asks the *real* backend for STRICT needs `@needs_bwrap`.
 
     Found by CI, not here: on a runner that cannot create the namespace, the
     runner refuses -- correctly -- and the check comes back 126. On this
@@ -1224,24 +1224,24 @@ def test_every_test_that_really_needs_a_sandbox_says_so():
     """
     import ast
 
-    quelle = pathlib.Path(__file__).read_text()
-    zeilen = quelle.splitlines()
-    fehlend = []
-    for knoten in ast.parse(quelle).body:
-        if not isinstance(knoten, ast.FunctionDef):
+    source = pathlib.Path(__file__).read_text()
+    lines = source.splitlines()
+    missing_ = []
+    for nodes in ast.parse(source).body:
+        if not isinstance(nodes, ast.FunctionDef):
             continue
-        if not knoten.name.startswith("test_"):
+        if not nodes.name.startswith("test_"):
             continue
-        text = "\n".join(zeilen[knoten.lineno - 1: knoten.end_lineno])
+        text = "\n".join(lines[nodes.lineno - 1: nodes.end_lineno])
         if "run_check(" not in text or "Isolation.STRICT" not in text:
             continue
         if "sandbox=" in text:
             continue
-        namen = {getattr(d, "id", getattr(d, "attr", ""))
-                 for d in knoten.decorator_list}
-        if "braucht_bwrap" not in namen:
-            fehlend.append(knoten.name)
-    assert not fehlend, (
+        names_ = {getattr(d, "id", getattr(d, "attr", ""))
+                 for d in nodes.decorator_list}
+        if "needs_bwrap" not in names_:
+            missing_.append(nodes.name)
+    assert not missing_, (
         "these ask the real backend for STRICT and will fail on a machine "
-        f"without namespaces: {fehlend}"
+        f"without namespaces: {missing_}"
     )

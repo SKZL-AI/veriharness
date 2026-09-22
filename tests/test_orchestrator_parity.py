@@ -42,12 +42,12 @@ from hoh.project import (
 )
 from hoh.projectstore import ProjectStore
 
-PROTOTYP = Path(os.path.expanduser("~/hoh-operator-tools/autopilot.py"))
+PROTOTYPE = Path(os.path.expanduser("~/hoh-operator-tools/autopilot.py"))
 
 #: The prototype's vocabulary, in the product's terms. Written out rather than
 #: inferred: an implicit mapping is where a parity claim quietly stops meaning
 #: anything.
-ENTSPRECHUNG = {
+EQUIVALENT = {
     "FIXPUNKT": HaltClass.CLOSED,
     "HALT_EXTERN": HaltClass.BLOCKED_EXTERNAL,
     "HALT_BUDGET": HaltClass.BLOCKED_PROVIDER,
@@ -57,13 +57,13 @@ ENTSPRECHUNG = {
 }
 
 
-def prototyp():
-    if not PROTOTYP.exists():
-        pytest.skip(f"prototype oracle not present at {PROTOTYP} (export regime)")
-    spec = importlib.util.spec_from_file_location("autopilot_oracle", PROTOTYP)
-    modul = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(modul)
-    return modul
+def prototype_():
+    if not PROTOTYPE.exists():
+        pytest.skip(f"prototype oracle not present at {PROTOTYPE} (export regime)")
+    spec = importlib.util.spec_from_file_location("autopilot_oracle", PROTOTYPE)
+    module_ = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module_)
+    return module_
 
 
 # --------------------------------------------------------------------------- #
@@ -118,8 +118,8 @@ class Start(RunLauncher):
 
 
 class Gates(GateRunner):
-    def __init__(self, folge=None, subject="abc1234"):
-        self.folge = list(folge or [GateOutcome.GREEN])
+    def __init__(self, sequence_=None, subject="abc1234"):
+        self.sequence_ = list(sequence_ or [GateOutcome.GREEN])
         self._subject = subject
         self.calls = 0
 
@@ -127,12 +127,12 @@ class Gates(GateRunner):
         return self._subject
 
     def run(self, subject: str) -> list[GateResult]:
-        i = min(self.calls, len(self.folge) - 1)
+        i = min(self.calls, len(self.sequence_) - 1)
         self.calls += 1
-        ausgang = self.folge[i]
-        return [GateResult(name="union", outcome=ausgang, subject=subject,
-                           exit_code=0 if ausgang is GateOutcome.GREEN else 1,
-                           detail="" if ausgang is GateOutcome.GREEN else "composition defect")]
+        outcome_ = self.sequence_[i]
+        return [GateResult(name="union", outcome=outcome_, subject=subject,
+                           exit_code=0 if outcome_ is GateOutcome.GREEN else 1,
+                           detail="" if outcome_ is GateOutcome.GREEN else "composition defect")]
 
 
 def projekt(tmp_path, nodes, pid="p") -> ProjectStore:
@@ -156,42 +156,42 @@ def fahre(tmp_path, nodes, *, verdicts=None, classes=None, gates=None,
 # Parity: the eight scenarios the prototype is exercised on
 # --------------------------------------------------------------------------- #
 
-def _prototyp_faehrt(modul, knoten, *, verdikte=None, gate_folge=None, klassen=None,
+def _prototype_runs(module_, node_list, *, verdict_list=None, gate_sequence=None, classes_=None,
                      max_runden=40):
-    class Sim(modul.Ausfuehrer):
+    class Sim(module_.Ausfuehrer):
         def __init__(self):
-            self.verdikte = dict(verdikte or {})
-            self.gate_folge = list(gate_folge or [0])
-            self.klassen = dict(klassen or {})
-            self.gestartet = []
-            self.gate_aufrufe = 0
+            self.verdict_list = dict(verdict_list or {})
+            self.gate_sequence = list(gate_sequence or [0])
+            self.classes_ = dict(classes_ or {})
+            self.started_ = []
+            self.gate_calls = 0
 
         def klassifiziere(self, k):
-            return self.klassen.get(k["id"], "INTERN")
+            return self.classes_.get(k["id"], "INTERN")
 
         def semantische_abhaengigkeit(self, a, b):
             return False
 
         def starte_lauf(self, k):
-            self.gestartet.append(k["id"])
-            v = self.verdikte.get(k["id"], "ACCEPTED")
+            self.started_.append(k["id"])
+            v = self.verdict_list.get(k["id"], "ACCEPTED")
             if isinstance(v, list):
                 v = v.pop(0) if v else "ACCEPTED"
             return {"verdikt": v}
 
         def globale_gates(self):
-            i = min(self.gate_aufrufe, len(self.gate_folge) - 1)
-            self.gate_aufrufe += 1
-            return self.gate_folge[i], "simuliert"
+            i = min(self.gate_calls, len(self.gate_sequence) - 1)
+            self.gate_calls += 1
+            return self.gate_sequence[i], "simuliert"
 
     sim = Sim()
-    pilot = modul.Autopilot({"nodes": [dict(k) for k in knoten]}, sim,
-                            modul.Protokoll(None), max_runden=max_runden)
+    pilot = module_.Autopilot({"nodes": [dict(k) for k in node_list]}, sim,
+                            module_.Protokoll(None), max_runden=max_runden)
     return pilot.fahre(), sim
 
 
 @pytest.mark.parametrize(
-    "name,knoten,verdikte,gates_proto,gates_prod,klassen,erwartet",
+    "name,node_list,verdict_list,gates_proto,gates_prod,classes_,expected",
     [
         ("S1 durchlauf",
          [{"id": "a", "status": "READY", "dependencies": []},
@@ -211,80 +211,80 @@ def _prototyp_faehrt(modul, knoten, *, verdikte=None, gate_folge=None, klassen=N
          {"a": "BUDGET"}, [0], [GateOutcome.GREEN], None, "HALT_BUDGET"),
     ],
 )
-def test_paritaet_mit_dem_prototyp(tmp_path, name, knoten, verdikte, gates_proto,
-                                   gates_prod, klassen, erwartet):
+def test_parity_with_the_prototype(tmp_path, name, node_list, verdict_list, gates_proto,
+                                   gates_prod, classes_, expected):
     """Both loops reach the same halt class on the same scenario."""
-    modul = prototyp()
-    proto_ende, proto_sim = _prototyp_faehrt(
-        modul, knoten, verdikte=verdikte, gate_folge=gates_proto, klassen=klassen
+    module_ = prototype_()
+    proto_end, proto_sim = _prototype_runs(
+        module_, node_list, verdict_list=verdict_list, gate_sequence=gates_proto, classes_=classes_
     )
-    assert proto_ende == erwartet, f"oracle itself changed: {name} -> {proto_ende}"
+    assert proto_end == expected, f"oracle itself changed: {name} -> {proto_end}"
 
-    produkt_verdikte = None
-    if verdikte:
-        produkt_verdikte = {
+    product_verdicts = None
+    if verdict_list:
+        product_verdicts = {
             k: (RunVerdict.PROVIDER_UNAVAILABLE if v == "BUDGET" else RunVerdict.ACCEPTED)
-            for k, v in verdikte.items()
+            for k, v in verdict_list.items()
         }
-    produkt_klassen = None
-    if klassen:
-        produkt_klassen = {
+    product_classes = None
+    if classes_:
+        product_classes = {
             k: (ActionClass.EXTERNAL if v == "EXTERN" else ActionClass.INTERNAL)
-            for k, v in klassen.items()
+            for k, v in classes_.items()
         }
-    ergebnis, start, _ = fahre(
+    result, start, _ = fahre(
         tmp_path,
-        [TaskNode(id=k["id"], dependencies=k["dependencies"]) for k in knoten],
-        verdicts=produkt_verdikte, classes=produkt_klassen, gates=gates_prod,
+        [TaskNode(id=k["id"], dependencies=k["dependencies"]) for k in node_list],
+        verdicts=product_verdicts, classes=product_classes, gates=gates_prod,
     )
-    assert ergebnis.halt == ENTSPRECHUNG[proto_ende], (
-        f"{name}: oracle says {proto_ende} -> {ENTSPRECHUNG[proto_ende]}, "
-        f"product says {ergebnis.halt} ({ergebnis.reason})"
+    assert result.halt == EQUIVALENT[proto_end], (
+        f"{name}: oracle says {proto_end} -> {EQUIVALENT[proto_end]}, "
+        f"product says {result.halt} ({result.reason})"
     )
 
 
-def test_paritaet_ablehnung_ist_keine_sackgasse(tmp_path):
+def test_parity_a_rejection_is_not_a_dead_end(tmp_path):
     """S4: two rejections then acceptance, both loops close.
 
     Split out because the scripted verdict list is consumed by the run, so the
     two sides need their own copies.
     """
-    modul = prototyp()
-    proto_ende, proto_sim = _prototyp_faehrt(
-        modul, [{"id": "a", "status": "READY", "dependencies": []}],
-        verdikte={"a": ["REJECTED", "REJECTED", "ACCEPTED"]}, gate_folge=[0],
+    module_ = prototype_()
+    proto_end, proto_sim = _prototype_runs(
+        module_, [{"id": "a", "status": "READY", "dependencies": []}],
+        verdict_list={"a": ["REJECTED", "REJECTED", "ACCEPTED"]}, gate_sequence=[0],
     )
-    assert proto_ende == "FIXPUNKT"
-    assert proto_sim.gestartet == ["a", "a", "a"]
+    assert proto_end == "FIXPUNKT"
+    assert proto_sim.started_ == ["a", "a", "a"]
 
-    ergebnis, start, _ = fahre(
+    result, start, _ = fahre(
         tmp_path, [TaskNode(id="a")],
         verdicts={"a": [RunVerdict.REJECTED, RunVerdict.REJECTED, RunVerdict.ACCEPTED]},
         gates=[GateOutcome.GREEN],
     )
-    assert ergebnis.halt is HaltClass.CLOSED, ergebnis.reason
+    assert result.halt is HaltClass.CLOSED, result.reason
     assert start.launched == ["a", "a", "a"], "a rejection is input to the next iteration"
 
 
-def test_paritaet_externe_aktion_startet_nachweislich_nichts(tmp_path):
+def test_parity_an_external_action_demonstrably_starts_nothing(tmp_path):
     """S3, the half that matters: neither loop dispatches before the gate."""
-    modul = prototyp()
-    proto_ende, proto_sim = _prototyp_faehrt(
-        modul, [{"id": "push", "status": "READY", "dependencies": []}],
-        klassen={"push": "EXTERN"}, gate_folge=[0],
+    module_ = prototype_()
+    proto_end, proto_sim = _prototype_runs(
+        module_, [{"id": "push", "status": "READY", "dependencies": []}],
+        classes_={"push": "EXTERN"}, gate_sequence=[0],
     )
-    assert proto_ende == "HALT_EXTERN"
-    assert proto_sim.gestartet == []
+    assert proto_end == "HALT_EXTERN"
+    assert proto_sim.started_ == []
 
-    ergebnis, start, _ = fahre(
+    result, start, _ = fahre(
         tmp_path, [TaskNode(id="push")],
         classes={"push": ActionClass.EXTERNAL}, gates=[GateOutcome.GREEN],
     )
-    assert ergebnis.halt is HaltClass.BLOCKED_EXTERNAL
+    assert result.halt is HaltClass.BLOCKED_EXTERNAL
     assert start.launched == [], "nothing may be dispatched before a captain gate"
 
 
-def test_divergenz_unbekannter_zustand_wird_verhindert_statt_erkannt(tmp_path):
+def test_divergence_an_unknown_state_is_prevented_not_detected(tmp_path):
     """S6 is the one scenario where the two sides *must* differ, and why.
 
     The prototype reads node status from JSON, so a state it does not know --
@@ -296,31 +296,31 @@ def test_divergenz_unbekannter_zustand_wird_verhindert_statt_erkannt(tmp_path):
     That is a strict improvement, and it is asserted here rather than papered
     over, because "the two agree everywhere" would otherwise be false.
     """
-    modul = prototyp()
-    proto_ende, _ = _prototyp_faehrt(
-        modul, [{"id": "a", "status": "VIELLEICHT", "dependencies": []}], gate_folge=[0]
+    module_ = prototype_()
+    proto_end, _ = _prototype_runs(
+        module_, [{"id": "a", "status": "VIELLEICHT", "dependencies": []}], gate_sequence=[0]
     )
-    assert proto_ende == "HALT_UNKLAR", "oracle should detect the unknown state at runtime"
+    assert proto_end == "HALT_UNKLAR", "oracle should detect the unknown state at runtime"
 
     with pytest.raises(Exception) as exc:
         TaskNode(id="a", lifecycle="VIELLEICHT")  # type: ignore[arg-type]
     assert "lifecycle" in str(exc.value).lower() or "VIELLEICHT" in str(exc.value)
 
 
-def test_paritaet_unbekanntes_verdikt_haelt_beide_an(tmp_path):
+def test_parity_an_unknown_verdict_halts_both(tmp_path):
     """S7: a verdict neither loop can classify halts it, in both."""
-    modul = prototyp()
-    proto_ende, _ = _prototyp_faehrt(
-        modul, [{"id": "a", "status": "READY", "dependencies": []}],
-        verdikte={"a": "FERTIG?"}, gate_folge=[0],
+    module_ = prototype_()
+    proto_end, _ = _prototype_runs(
+        module_, [{"id": "a", "status": "READY", "dependencies": []}],
+        verdict_list={"a": "FERTIG?"}, gate_sequence=[0],
     )
-    assert proto_ende == "HALT_UNKLAR"
+    assert proto_end == "HALT_UNKLAR"
 
-    ergebnis, _, store = fahre(
+    result, _, store = fahre(
         tmp_path, [TaskNode(id="a")],
         verdicts={"a": RunVerdict.UNDETERMINED}, gates=[GateOutcome.GREEN],
     )
-    assert ergebnis.halt is HaltClass.AMBIGUOUS, ergebnis.reason
+    assert result.halt is HaltClass.AMBIGUOUS, result.reason
     # And the product records why, where the next session will read it.
     assert store.read_state().node("a").lifecycle is Lifecycle.BLOCKED
 
@@ -329,66 +329,66 @@ def test_paritaet_unbekanntes_verdikt_haelt_beide_an(tmp_path):
 # Product-only: what the prototype never had, because it had no durable state
 # --------------------------------------------------------------------------- #
 
-def test_stale_writer_haelt_die_schleife_an(tmp_path):
+def test_a_stale_writer_halts_the_loop(tmp_path):
     """A second orchestrator that advanced the state fences this one out."""
     s = projekt(tmp_path, [TaskNode(id="a")])
 
-    class Dazwischen(Start):
+    class InBetween(Start):
         def launch(self, node):
             # Somebody else writes while this round is in flight.
-            fremd = ProjectStore(tmp_path, "p")
-            st = fremd.read_state()
+            foreign = ProjectStore(tmp_path, "p")
+            st = foreign.read_state()
             st.nodes.append(TaskNode(id="fremd"))
-            fremd.write_state(st)
+            foreign.write_state(st)
             return super().launch(node)
 
-    c = ProjectController(s, Dazwischen(), Gates([GateOutcome.GREEN]))
-    ergebnis = c.run()
-    assert ergebnis.halt is HaltClass.AMBIGUOUS
-    assert "advanced this project" in ergebnis.reason
+    c = ProjectController(s, InBetween(), Gates([GateOutcome.GREEN]))
+    result = c.run()
+    assert result.halt is HaltClass.AMBIGUOUS
+    assert "advanced this project" in result.reason
 
 
-def test_doppelter_orchestratorstart_wird_abgewiesen(tmp_path):
+def test_a_second_orchestrator_start_is_refused(tmp_path):
     s = projekt(tmp_path, [TaskNode(id="a")])
     with s.lock():
-        zweiter = ProjectController(ProjectStore(tmp_path, "p"),
+        second_one = ProjectController(ProjectStore(tmp_path, "p"),
                                     Start(), Gates([GateOutcome.GREEN]))
-        ergebnis = zweiter.run()
-    assert ergebnis.halt is HaltClass.BLOCKED_DEPENDENCY
-    assert "another orchestrator" in ergebnis.reason
+        result = second_one.run()
+    assert result.halt is HaltClass.BLOCKED_DEPENDENCY
+    assert "another orchestrator" in result.reason
 
 
-def test_absturz_vor_dem_statuswechsel_verliert_nichts(tmp_path):
+def test_a_crash_before_the_status_change_loses_nothing(tmp_path):
     """Killed before the lifecycle was written: the node is still READY."""
     s = projekt(tmp_path, [TaskNode(id="a")])
 
-    class Stirbt(Start):
+    class Dies(Start):
         def launch(self, node):
             raise KeyboardInterrupt("killed mid-dispatch")
 
-    c = ProjectController(s, Stirbt(), Gates([GateOutcome.GREEN]))
+    c = ProjectController(s, Dies(), Gates([GateOutcome.GREEN]))
     with pytest.raises(KeyboardInterrupt):
         c.run()
     # RUNNING was persisted before the dispatch, which is the point: the next
     # session sees an in-flight node and evaluates rather than re-dispatching.
     assert s.read_state().node("a").lifecycle is Lifecycle.RUNNING
-    weiter = ProjectController(ProjectStore(tmp_path, "p"), Start(), Gates([GateOutcome.GREEN]))
-    ergebnis = weiter.run()
-    assert ergebnis.halt is HaltClass.AMBIGUOUS
-    assert "RUNNING" in ergebnis.reason
+    further = ProjectController(ProjectStore(tmp_path, "p"), Start(), Gates([GateOutcome.GREEN]))
+    result = further.run()
+    assert result.halt is HaltClass.AMBIGUOUS
+    assert "RUNNING" in result.reason
 
 
-def test_absturz_nach_dem_merge_wird_nicht_doppelt_gemergt(tmp_path):
+def test_a_crash_after_the_merge_is_not_merged_twice(tmp_path):
     """Killed after MERGED was persisted: the next session does not re-merge."""
     s = projekt(tmp_path, [TaskNode(id="a", lifecycle=Lifecycle.MERGED)])
     start = Start()
     c = ProjectController(s, start, Gates([GateOutcome.GREEN]))
-    ergebnis = c.run()
-    assert ergebnis.halt is HaltClass.CLOSED
+    result = c.run()
+    assert result.halt is HaltClass.CLOSED
     assert start.launched == [] and start.merged == [], "already merged work is not redone"
 
 
-def test_akzeptiert_aber_nicht_gelandet_wird_nicht_geraten(tmp_path):
+def test_accepted_but_not_landed_is_not_guessed(tmp_path):
     """Accepted, merge did not land: nothing is resolved automatically.
 
     This fixture's launcher returns a bare `False`, the way an older launcher
@@ -396,20 +396,20 @@ def test_akzeptiert_aber_nicht_gelandet_wird_nicht_geraten(tmp_path):
     stays AMBIGUOUS -- the halt is honest about the tool having been silent,
     rather than inventing a category for it.
     """
-    ergebnis, start, store = fahre(
+    result, start, store = fahre(
         tmp_path, [TaskNode(id="a")], gates=[GateOutcome.GREEN], merge_lands=False
     )
-    assert ergebnis.halt is HaltClass.AMBIGUOUS
-    assert "did not say why" in ergebnis.reason
+    assert result.halt is HaltClass.AMBIGUOUS
+    assert "did not say why" in result.reason
     assert store.read_state().node("a").lifecycle is Lifecycle.BLOCKED
 
 
-def test_terminaler_dag_mit_roter_closure_erzeugt_reparatur(tmp_path):
-    ergebnis, _, store = fahre(
+def test_a_terminal_dag_with_a_red_closure_creates_a_repair(tmp_path):
+    result, _, store = fahre(
         tmp_path, [TaskNode(id="a")],
         gates=[GateOutcome.RED, GateOutcome.GREEN],
     )
-    assert ergebnis.halt is HaltClass.CLOSED, ergebnis.reason
+    assert result.halt is HaltClass.CLOSED, result.reason
     st = store.read_state()
     rep = [n for n in st.nodes if n.repair_of]
     assert len(rep) == 1, [n.id for n in st.nodes]
@@ -417,57 +417,57 @@ def test_terminaler_dag_mit_roter_closure_erzeugt_reparatur(tmp_path):
     assert st.closure_generation == 2, "closure ran twice: once red, once green"
 
 
-def test_reparatur_wird_als_entscheidung_festgehalten(tmp_path):
+def test_a_repair_is_recorded_as_a_decision(tmp_path):
     """Why a repair node exists survives the session that created it."""
     _, _, store = fahre(tmp_path, [TaskNode(id="a")],
                         gates=[GateOutcome.RED, GateOutcome.GREEN])
     st = store.read_state()
-    gruende = [d for d in st.decisions if d.kind.value == "CREATE_REPAIR_NODE"]
-    assert gruende, [d.kind for d in st.decisions]
-    assert "union" in gruende[0].reason
-    assert gruende[0].evidence and gruende[0].evidence[0].startswith("gate:union@")
+    reasons = [d for d in st.decisions if d.kind.value == "CREATE_REPAIR_NODE"]
+    assert reasons, [d.kind for d in st.decisions]
+    assert "union" in reasons[0].reason
+    assert reasons[0].evidence and reasons[0].evidence[0].startswith("gate:union@")
 
 
-def test_echter_fixpunkt_nennt_seinen_gegenstand(tmp_path):
-    ergebnis, _, store = fahre(tmp_path, [TaskNode(id="a")], gates=[GateOutcome.GREEN])
-    assert ergebnis.halt is HaltClass.CLOSED
+def test_a_real_fixpoint_names_its_subject(tmp_path):
+    result, _, store = fahre(tmp_path, [TaskNode(id="a")], gates=[GateOutcome.GREEN])
+    assert result.halt is HaltClass.CLOSED
     st = store.read_state()
     assert st.measurement_head == "abc1234"
     assert st.rc_closed()
-    assert "abc1234" in ergebnis.reason
+    assert "abc1234" in result.reason
 
 
-def test_nicht_ausgefuehrte_gates_sind_kein_fixpunkt(tmp_path):
-    ergebnis, _, store = fahre(tmp_path, [TaskNode(id="a")], gates=[GateOutcome.NOT_RUN])
-    assert ergebnis.halt is HaltClass.NOT_RUN
+def test_gates_that_did_not_run_are_not_a_fixpoint(tmp_path):
+    result, _, store = fahre(tmp_path, [TaskNode(id="a")], gates=[GateOutcome.NOT_RUN])
+    assert result.halt is HaltClass.NOT_RUN
     assert not store.read_state().rc_closed()
 
 
-def test_beschaedigter_zustand_haelt_an_statt_zu_ueberschreiben(tmp_path):
+def test_a_damaged_state_halts_instead_of_overwriting(tmp_path):
     s = projekt(tmp_path, [TaskNode(id="a")])
     st = s.read_state()
     st.nodes = [TaskNode(id="a", lifecycle=Lifecycle.MERGED)]
     s.write_state(st)
     s.state_path.write_text('{"project_id": "p", "nodes": [', encoding="utf-8")
     c = ProjectController(ProjectStore(tmp_path, "p"), Start(), Gates([GateOutcome.GREEN]))
-    ergebnis = c.run()
-    assert ergebnis.halt is HaltClass.CORRUPT_STATE
+    result = c.run()
+    assert result.halt is HaltClass.CORRUPT_STATE
     assert s.parked_states(), "the way back is still on disk"
 
 
-def test_unaufloesbare_abhaengigkeit_startet_nichts(tmp_path):
-    ergebnis, start, _ = fahre(
+def test_an_unresolvable_dependency_starts_nothing(tmp_path):
+    result, start, _ = fahre(
         tmp_path, [TaskNode(id="b", dependencies=["gibtesnicht"])], gates=[GateOutcome.GREEN]
     )
-    assert ergebnis.halt is HaltClass.BLOCKED_DEPENDENCY
-    assert "gibtesnicht" in ergebnis.reason
+    assert result.halt is HaltClass.BLOCKED_DEPENDENCY
+    assert "gibtesnicht" in result.reason
     assert start.launched == []
 
 
-def test_jeder_halt_traegt_eine_klasse(tmp_path):
+def test_every_halt_carries_a_class(tmp_path):
     """No exit leaves the loop without a name -- the measure of how far the
     automation reaches depends on it."""
-    faelle = [
+    cases_ = [
         (dict(nodes=[TaskNode(id="a")], gates=[GateOutcome.GREEN]), HaltClass.CLOSED),
         (dict(nodes=[TaskNode(id="a")], gates=[GateOutcome.NOT_RUN]), HaltClass.NOT_RUN),
         (dict(nodes=[TaskNode(id="a")], gates=[GateOutcome.RED], max_repairs=0),
@@ -475,23 +475,23 @@ def test_jeder_halt_traegt_eine_klasse(tmp_path):
         (dict(nodes=[TaskNode(id="b", dependencies=["x"])], gates=[GateOutcome.GREEN]),
          HaltClass.BLOCKED_DEPENDENCY),
     ]
-    for i, (kw, erwartet) in enumerate(faelle):
-        knoten = kw.pop("nodes")
+    for i, (kw, expected) in enumerate(cases_):
+        node_list = kw.pop("nodes")
         s = ProjectStore(tmp_path, f"f{i}")
         st = ProjectState(project_id=f"f{i}", repo_path=str(tmp_path))
-        st.nodes = knoten
+        st.nodes = node_list
         s.create(st)
         c = ProjectController(s, Start(), Gates(kw.pop("gates")), **kw)
-        ergebnis = c.run()
-        assert ergebnis.halt is erwartet, f"case {i}: {ergebnis.halt} {ergebnis.reason}"
-        assert ergebnis.reason, f"case {i} halted without a reason"
+        result = c.run()
+        assert result.halt is expected, f"case {i}: {result.halt} {result.reason}"
+        assert result.reason, f"case {i} halted without a reason"
 
 
 # --------------------------------------------------------------------------- #
 # Resume: a RUNNING node is read, not re-dispatched
 # --------------------------------------------------------------------------- #
 
-def test_laufender_knoten_wird_gelesen_nicht_neu_gestartet(tmp_path):
+def test_a_running_node_is_read_not_restarted(tmp_path):
     """The heart of exactly-once.
 
     A fresh process finding a node marked RUNNING must not re-dispatch it to
@@ -499,36 +499,36 @@ def test_laufender_knoten_wird_gelesen_nicht_neu_gestartet(tmp_path):
     have landed. It reads the run's own recorded state instead, which costs
     nothing and is decisive when the run finished.
     """
-    ergebnis, start, store = fahre(
+    result, start, store = fahre(
         tmp_path, [TaskNode(id="a", lifecycle=Lifecycle.RUNNING)],
         evaluations={"a": RunVerdict.ACCEPTED}, gates=[GateOutcome.GREEN],
     )
-    assert ergebnis.halt is HaltClass.CLOSED, ergebnis.reason
+    assert result.halt is HaltClass.CLOSED, result.reason
     assert start.evaluated == ["a"], "the run state must be read"
     assert start.launched == [], "and the run must not be dispatched again"
     assert start.merged == ["a"], "exactly one merge"
     assert store.read_state().node("a").lifecycle is Lifecycle.MERGED
 
 
-def test_laufender_knoten_ohne_erkennbares_ergebnis_haelt_an(tmp_path):
+def test_a_running_node_with_no_recognisable_result_halts(tmp_path):
     """When the run state cannot say, the loop stops rather than guessing."""
-    ergebnis, start, _ = fahre(
+    result, start, _ = fahre(
         tmp_path, [TaskNode(id="a", lifecycle=Lifecycle.RUNNING)],
         gates=[GateOutcome.GREEN],
     )
-    assert ergebnis.halt is HaltClass.AMBIGUOUS
-    assert "could repeat an acceptance" in ergebnis.reason
+    assert result.halt is HaltClass.AMBIGUOUS
+    assert "could repeat an acceptance" in result.reason
     assert start.launched == []
 
 
-def test_laufender_knoten_mit_ablehnung_geht_zurueck_in_die_schleife(tmp_path):
+def test_a_running_node_with_a_rejection_goes_back_into_the_loop(tmp_path):
     """A crashed dispatch whose run was rejected resumes as ordinary work."""
-    ergebnis, start, store = fahre(
+    result, start, store = fahre(
         tmp_path, [TaskNode(id="a", lifecycle=Lifecycle.RUNNING)],
         evaluations={"a": RunVerdict.REJECTED},
         verdicts={"a": RunVerdict.ACCEPTED}, gates=[GateOutcome.GREEN],
     )
-    assert ergebnis.halt is HaltClass.CLOSED, ergebnis.reason
+    assert result.halt is HaltClass.CLOSED, result.reason
     # Evaluated twice: once on resume, and once again before the dispatch. The
     # second read is what stops the loop paying for work a previous dispatch
     # already had accepted -- it costs nothing and it is the whole mechanism
@@ -538,7 +538,7 @@ def test_laufender_knoten_mit_ablehnung_geht_zurueck_in_die_schleife(tmp_path):
     assert store.read_state().node("a").rejections == 1
 
 
-def test_basislinie_wird_vor_dem_dispatch_persistiert(tmp_path):
+def test_the_baseline_is_persisted_before_the_dispatch(tmp_path):
     """What was accepted *before* a dispatch goes into state, not memory.
 
     A process that dies during the dispatch is exactly when it is needed: it is
@@ -553,17 +553,17 @@ def test_basislinie_wird_vor_dem_dispatch_persistiert(tmp_path):
 
         def launch(self, node):
             # What is on disk at the moment of dispatch is what a crash leaves.
-            self.gesehen = ProjectStore(tmp_path, "p").read_state().node("a").accepted_before
+            self.seen_ = ProjectStore(tmp_path, "p").read_state().node("a").accepted_before
             return super().launch(node)
 
     start = MerktBasislinie()
     c = ProjectController(s, start, Gates([GateOutcome.GREEN]))
-    ergebnis = c.run()
-    assert ergebnis.halt is HaltClass.CLOSED
-    assert start.gesehen == "a-i1", "the baseline must be durable before the dispatch"
+    result = c.run()
+    assert result.halt is HaltClass.CLOSED
+    assert start.seen_ == "a-i1", "the baseline must be durable before the dispatch"
 
 
-def test_bereits_angenommener_kandidat_wird_nicht_neu_dispatcht(tmp_path):
+def test_an_already_accepted_candidate_is_not_dispatched_again(tmp_path):
     """A node whose run already accepted something is merged, not re-run.
 
     The state this covers is real and was found by the first end-to-end run: a
@@ -573,27 +573,27 @@ def test_bereits_angenommener_kandidat_wird_nicht_neu_dispatcht(tmp_path):
     for verified work -- and could accept a second, different candidate for the
     same node.
     """
-    ergebnis, start, store = fahre(
+    result, start, store = fahre(
         tmp_path, [TaskNode(id="a")],
         evaluations={"a": RunVerdict.ACCEPTED}, gates=[GateOutcome.GREEN],
     )
-    assert ergebnis.halt is HaltClass.CLOSED, ergebnis.reason
+    assert result.halt is HaltClass.CLOSED, result.reason
     assert start.launched == [], "nothing may be dispatched when the work is already accepted"
     assert start.merged == ["a"], "exactly one merge"
-    assert any(s.kind == "ALREADY_ACCEPTED" for s in ergebnis.steps), \
-        [s.kind for s in ergebnis.steps]
+    assert any(s.kind == "ALREADY_ACCEPTED" for s in result.steps), \
+        [s.kind for s in result.steps]
 
 
-def test_nie_begonnener_knoten_wird_wieder_zu_arbeit(tmp_path):
+def test_a_node_that_never_started_becomes_work_again(tmp_path):
     """A RUNNING node whose run never started goes back to READY and is then
     dispatched -- rather than halting the loop on every round."""
-    ergebnis, start, store = fahre(
+    result, start, store = fahre(
         tmp_path, [TaskNode(id="a", lifecycle=Lifecycle.RUNNING)],
         evaluations={"a": RunVerdict.NOT_STARTED},
         verdicts={"a": RunVerdict.ACCEPTED}, gates=[GateOutcome.GREEN],
     )
-    assert ergebnis.halt is HaltClass.CLOSED, ergebnis.reason
+    assert result.halt is HaltClass.CLOSED, result.reason
     assert start.launched == ["a"], "it must actually be dispatched, exactly once"
-    assert any(s.kind == "RESET_TO_READY" for s in ergebnis.steps), \
-        [s.kind for s in ergebnis.steps]
+    assert any(s.kind == "RESET_TO_READY" for s in result.steps), \
+        [s.kind for s in result.steps]
     assert store.read_state().node("a").lifecycle is Lifecycle.MERGED

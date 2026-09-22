@@ -206,20 +206,20 @@ def marker_reading(text: str) -> dict[str, str]:
     surviving mutation in review: a short marker that silently became "ro" is
     the same weaker-source-as-proof class this whole area is about.
     """
-    zeilen = [z.strip() for z in text.splitlines() if z.strip()][:3]
-    schluessel = ("mnt_ns", "net_ns", "candidate_writable")
-    return dict(zip(schluessel, zeilen))
+    lines = [z.strip() for z in text.splitlines() if z.strip()][:3]
+    key = ("mnt_ns", "net_ns", "candidate_writable")
+    return dict(zip(key, lines))
 
 
 def own_namespaces() -> dict[str, str]:
     """The runner's own namespaces, for comparison with a marker."""
-    raus = {}
-    for kurz, pfad in (("mnt_ns", "/proc/self/ns/mnt"), ("net_ns", "/proc/self/ns/net")):
+    out_list = {}
+    for short_, path in (("mnt_ns", "/proc/self/ns/mnt"), ("net_ns", "/proc/self/ns/net")):
         try:
-            raus[kurz] = os.readlink(pfad)
+            out_list[short_] = os.readlink(path)
         except OSError:
             pass
-    return raus
+    return out_list
 
 
 def _limits_for(spec: SandboxSpec):
@@ -232,18 +232,18 @@ def _limits_for(spec: SandboxSpec):
     Returns None when nothing is limited, so no hook is installed at all rather
     than one that does nothing.
     """
-    gesetzt = (spec.memory_bytes, spec.max_open_files, spec.cpu_seconds,
+    set_ = (spec.memory_bytes, spec.max_open_files, spec.cpu_seconds,
                spec.file_size_bytes)
-    if all(g is None for g in gesetzt):
+    if all(g is None for g in set_):
         return None
 
-    def anwenden() -> None:                      # pragma: no cover - runs post-fork
+    def apply_now() -> None:                      # pragma: no cover - runs post-fork
         import resource
 
-        for kennung, wert in _rlimit_paare(spec):
+        for identifier_, value_ in _rlimit_pairs(spec):
             try:
-                _, hart = resource.getrlimit(kennung)
-                resource.setrlimit(kennung, (wert, hart))
+                _, hard = resource.getrlimit(identifier_)
+                resource.setrlimit(identifier_, (value_, hard))
             except (ValueError, OSError):
                 # The unsandboxed twin has always tolerated this. Without the
                 # guard a setrlimit failure surfaces in the parent as an
@@ -252,10 +252,10 @@ def _limits_for(spec: SandboxSpec):
                 # the receipt entirely.
                 continue
 
-    return anwenden
+    return apply_now
 
 
-def _rlimit_paare(spec: SandboxSpec):
+def _rlimit_pairs(spec: SandboxSpec):
     """The (resource, value) pairs actually applied, already clamped.
 
     Clamped against the **current soft limit** as well as the hard one. An
@@ -267,24 +267,24 @@ def _rlimit_paare(spec: SandboxSpec):
     """
     import resource
 
-    raus = []
-    for kennung, wert in (
+    out_list = []
+    for identifier_, value_ in (
         (resource.RLIMIT_AS, spec.memory_bytes),
         (resource.RLIMIT_NOFILE, spec.max_open_files),
         (resource.RLIMIT_CPU, spec.cpu_seconds),
         (resource.RLIMIT_FSIZE, spec.file_size_bytes),
     ):
-        if wert is None:
+        if value_ is None:
             continue
         try:
-            weich_jetzt, hart = resource.getrlimit(kennung)
+            soft_now, hard = resource.getrlimit(identifier_)
         except (ValueError, OSError):        # pragma: no cover - exotic platform
             continue
-        for grenze in (weich_jetzt, hart):
-            if grenze != resource.RLIM_INFINITY:
-                wert = min(wert, grenze)
-        raus.append((kennung, wert))
-    return raus
+        for limit_ in (soft_now, hard):
+            if limit_ != resource.RLIM_INFINITY:
+                value_ = min(value_, limit_)
+        out_list.append((identifier_, value_))
+    return out_list
 
 
 def applied_limits(spec: SandboxSpec) -> str:
@@ -297,15 +297,15 @@ def applied_limits(spec: SandboxSpec) -> str:
     """
     import resource
 
-    namen = {
+    names_ = {
         resource.RLIMIT_AS: "as",
         resource.RLIMIT_NOFILE: "nofile",
         resource.RLIMIT_CPU: "cpu",
         resource.RLIMIT_FSIZE: "fsize",
     }
-    teile = [f"{namen[k]}={v}" for k, v in _rlimit_paare(spec)]
-    teile.append(f"timeout={spec.timeout}s")
-    return ",".join(teile) if teile else "none"
+    parts = [f"{names_[k]}={v}" for k, v in _rlimit_pairs(spec)]
+    parts.append(f"timeout={spec.timeout}s")
+    return ",".join(parts) if parts else "none"
 
 
 def _env_for(spec: SandboxSpec) -> dict[str, str]:
@@ -420,27 +420,27 @@ class BubblewrapSandbox(SandboxBackend):
         proves nothing -- and a plan that proves nothing cannot be used to
         claim isolation was verified, which `run_check` enforces.
         """
-        gebaut = list(argv)
+        built = list(argv)
         # Only a *shell* script can carry a shell prologue. An earlier version
         # keyed on `-c` alone and spliced bash into `python3 -c`, which turned
         # a working check into a SyntaxError.
-        ist_shell = (
-            len(gebaut) == 3
-            and gebaut[1] == "-c"
-            and Path(gebaut[0]).name in ("bash", "sh", "dash", "zsh")
+        is_shell = (
+            len(built) == 3
+            and built[1] == "-c"
+            and Path(built[0]).name in ("bash", "sh", "dash", "zsh")
         )
-        beweist = ist_shell and spec.proof_fd is not None
-        if beweist:
-            gebaut[2] = MARKER_PROLOGUE + gebaut[2]
+        proves = is_shell and spec.proof_fd is not None
+        if proves:
+            built[2] = MARKER_PROLOGUE + built[2]
         return LaunchPlan(
-            argv=self._argv(gebaut, spec), env={}, cwd=None,
-            proves_isolation=beweist,
+            argv=self._argv(built, spec), env={}, cwd=None,
+            proves_isolation=proves,
         )
 
     def run(self, argv: list[str], spec: SandboxSpec) -> SandboxResult:
-        grund = self.unavailable()
-        if grund:
-            raise SandboxUnavailable(grund)
+        reason = self.unavailable()
+        if reason:
+            raise SandboxUnavailable(reason)
         plan = self.plan(argv, spec)
         p = subprocess.run(
             plan.argv, capture_output=True, text=True,
@@ -498,15 +498,15 @@ def select(isolation: Isolation, backends: list[SandboxBackend] | None = None) -
     """
     if isolation is Isolation.NONE:
         return NoSandbox()
-    kandidaten = backends if backends is not None else [BubblewrapSandbox()]
-    gruende = []
-    for b in kandidaten:
-        grund = b.unavailable()
-        if grund is None:
+    candidates = backends if backends is not None else [BubblewrapSandbox()]
+    reasons = []
+    for b in candidates:
+        reason = b.unavailable()
+        if reason is None:
             return b
-        gruende.append(f"{b.name}: {grund}")
+        reasons.append(f"{b.name}: {reason}")
     raise SandboxUnavailable(
-        f"no backend can provide {isolation.value} isolation. " + "; ".join(gruende)
+        f"no backend can provide {isolation.value} isolation. " + "; ".join(reasons)
     )
 
 
@@ -527,21 +527,21 @@ def verify_limit_6(arena: Path, backend: SandboxBackend, spec: SandboxSpec) -> d
     git should find no repository at all.
     """
     argv = ["git", "rev-parse", "--show-toplevel"]
-    draussen = subprocess.run(argv, cwd=str(arena), capture_output=True, text=True)
-    drinnen = backend.run(argv, spec)
-    ausserhalb = draussen.stdout.strip()
-    klettert = bool(ausserhalb) and Path(ausserhalb) != arena and draussen.returncode == 0
+    outside = subprocess.run(argv, cwd=str(arena), capture_output=True, text=True)
+    inside = backend.run(argv, spec)
+    outside_of = outside.stdout.strip()
+    climbs = bool(outside_of) and Path(outside_of) != arena and outside.returncode == 0
     return {
         "limit": 6,
-        "outside_exit": draussen.returncode,
-        "outside_toplevel": ausserhalb,
-        "outside_climbs_out": klettert,
-        "inside_exit": drinnen.exit_code,
-        "inside_toplevel": drinnen.stdout.strip(),
+        "outside_exit": outside.returncode,
+        "outside_toplevel": outside_of,
+        "outside_climbs_out": climbs,
+        "inside_exit": inside.exit_code,
+        "inside_toplevel": inside.stdout.strip(),
         "inside_climbs_out": (
-            drinnen.exit_code == 0
-            and bool(drinnen.stdout.strip())
-            and Path(drinnen.stdout.strip()) != arena
+            inside.exit_code == 0
+            and bool(inside.stdout.strip())
+            and Path(inside.stdout.strip()) != arena
         ),
-        "isolation": drinnen.isolation.value,
+        "isolation": inside.isolation.value,
     }

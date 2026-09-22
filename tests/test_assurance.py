@@ -41,18 +41,18 @@ from hoh.assurance import (
 )
 
 HEAD = "a" * 40
-ANDERER_HEAD = "b" * 40
+OTHER_HEAD = "b" * 40
 
 
 def git(metric_id="m", *, state=ResultState.VERIFIED, head=HEAD, **kw):
     """A record that is authoritative in every way, as the baseline to break."""
-    felder = {
+    fields_ = {
         "falsifier": FalsifierState.KILLED,
         "falsifier_detail": "a fabricated commit was injected; the count moved",
         "provenance": Provenance.MEASURED,
         "measured": 3,
     }
-    felder.update(kw)
+    fields_.update(kw)
     return AssuranceRecord(
         metric_id=metric_id,
         source=EvidenceSource(
@@ -60,7 +60,7 @@ def git(metric_id="m", *, state=ResultState.VERIFIED, head=HEAD, **kw):
         ),
         derivation="git log --no-merges --format=%H, counted",
         state=state,
-        **felder,
+        **fields_,
     )
 
 
@@ -110,8 +110,8 @@ def test_an_absent_source_is_reported_as_such_even_when_not_determinable():
         falsifier=FalsifierState.KILLED,
         falsifier_detail="d",
     )
-    gruende = r.weaknesses()
-    assert any("no source was read" in g for g in gruende)
+    reasons = r.weaknesses()
+    assert any("no source was read" in g for g in reasons)
     assert not r.authoritative()
 
 
@@ -227,20 +227,20 @@ def test_a_non_critical_log_read_may_stand():
 
 
 @pytest.mark.parametrize(
-    "zustand",
+    "condition",
     [s for s in ResultState if s is not ResultState.VERIFIED],
     ids=lambda s: s.value,
 )
-def test_every_non_verified_state_is_named_as_a_reason(zustand):
+def test_every_non_verified_state_is_named_as_a_reason(condition):
     """The previous version of this test asserted via `authoritative()`, which
     short-circuited on `state is VERIFIED` before the rule under test ever
     ran: with the whole branch deleted it still passed. It also parametrised
     over `NOT_A_PASS` itself, so removing a state from the set deleted the
     test case instead of failing it."""
-    gruende = git(state=zustand).weaknesses(subject_head=HEAD)
-    assert gruende, f"{zustand.value} produced no reason at all"
-    assert any(zustand.value in g or "measured a failure" in g for g in gruende)
-    assert not git(state=zustand).authoritative(subject_head=HEAD)
+    reasons = git(state=condition).weaknesses(subject_head=HEAD)
+    assert reasons, f"{condition.value} produced no reason at all"
+    assert any(condition.value in g or "measured a failure" in g for g in reasons)
+    assert not git(state=condition).authoritative(subject_head=HEAD)
 
 
 def test_not_a_pass_is_derived_from_the_enum_not_maintained_by_hand():
@@ -255,9 +255,9 @@ def test_not_a_pass_is_derived_from_the_enum_not_maintained_by_hand():
 def test_unsupported_environment_is_not_a_failure_but_is_not_a_pass():
     r = git(state=ResultState.UNSUPPORTED_ENVIRONMENT)
     c = AssuranceClosure(subject_head=HEAD, records=[r])
-    gruende = c.problems()["m"]
-    assert any("UNSUPPORTED_ENVIRONMENT, which is not a pass" in g for g in gruende)
-    assert not any("measured a failure" in g for g in gruende)
+    reasons = c.problems()["m"]
+    assert any("UNSUPPORTED_ENVIRONMENT, which is not a pass" in g for g in reasons)
+    assert not any("measured a failure" in g for g in reasons)
 
 
 def test_a_failed_metric_is_reported_as_a_failure_by_the_record_itself():
@@ -372,7 +372,7 @@ def test_an_empty_metric_id_or_derivation_is_rejected():
 
 
 def test_evidence_from_another_head_is_not_current_evidence():
-    r = git(head=ANDERER_HEAD)
+    r = git(head=OTHER_HEAD)
     assert any("but the subject is" in g for g in r.weaknesses(subject_head=HEAD))
 
 
@@ -408,7 +408,7 @@ def test_a_ci_step_is_not_head_bound():
 def test_the_closure_passes_its_subject_down():
     """No test in the first version ever put a stale record inside a closure,
     so a mutation that stopped passing the head down survived."""
-    c = AssuranceClosure(subject_head=HEAD, records=[git(head=ANDERER_HEAD)])
+    c = AssuranceClosure(subject_head=HEAD, records=[git(head=OTHER_HEAD)])
     assert not c.green()
     assert any("but the subject is" in g for g in c.problems()["m"])
 
@@ -498,9 +498,9 @@ def test_a_verified_but_weak_record_blocks_the_closure():
     """The closure's actual job. The first version's only coverage of it was a
     string in the report: a mutation replacing `green()` with "all states are
     VERIFIED" survived every closure test."""
-    schwach = git("schwach", provenance=Provenance.DECLARED)
-    assert schwach.state is ResultState.VERIFIED
-    c = AssuranceClosure(subject_head=HEAD, records=[schwach])
+    weak = git("schwach", provenance=Provenance.DECLARED)
+    assert weak.state is ResultState.VERIFIED
+    c = AssuranceClosure(subject_head=HEAD, records=[weak])
     assert not c.green()
 
 
@@ -515,7 +515,7 @@ def test_a_required_metric_with_no_record_is_a_missing_measurement():
 def test_a_record_cannot_lower_a_requirement_the_closure_imposes():
     """`critical=False` relaxes the record's own rules. It must not be able to
     remove the metric from the list of things that had to be measured."""
-    weich = AssuranceRecord(
+    soft = AssuranceRecord(
         metric_id="pflicht",
         source=EvidenceSource(kind=SourceKind.TRANSIENT_LOG, identity="l"),
         derivation="d",
@@ -523,7 +523,7 @@ def test_a_record_cannot_lower_a_requirement_the_closure_imposes():
         state=ResultState.NOT_RUN,
         critical=False,
     )
-    c = AssuranceClosure(records=[weich], required=["pflicht"])
+    c = AssuranceClosure(records=[soft], required=["pflicht"])
     assert not c.green()
     assert any("NOT_RUN" in g for g in c.problems()["pflicht"])
 
@@ -638,7 +638,7 @@ def test_a_skipped_ci_step_is_an_unsupported_environment_not_a_pass():
 
 
 @pytest.mark.parametrize(
-    "conclusion,erwartet",
+    "conclusion,expected",
     [
         ("success", ResultState.VERIFIED),
         ("failure", ResultState.FAILED),
@@ -647,12 +647,12 @@ def test_a_skipped_ci_step_is_an_unsupported_environment_not_a_pass():
         ("something-new", ResultState.NOT_DETERMINABLE),
     ],
 )
-def test_every_ci_conclusion_maps_to_a_state(conclusion, erwartet):
+def test_every_ci_conclusion_maps_to_a_state(conclusion, expected):
     r = from_ci_step(
         "x", run_id="1", step_name="s", conclusion=conclusion, derivation="d",
         falsifier=FalsifierState.KILLED, falsifier_detail="d",
     )
-    assert r.state is erwartet
+    assert r.state is expected
 
 
 # --------------------------------------------------------------------------- #
@@ -735,15 +735,15 @@ def test_false_green_5_a_green_job_whose_step_was_skipped():
 
 def _rec(metric_id, kind, *, head=HEAD, falsifier=FalsifierState.KILLED,
          cross=None, **kw):
-    felder = dict(
+    fields_ = dict(
         metric_id=metric_id,
         source=EvidenceSource(kind=kind, identity="x", subject_head=head),
         derivation="d", measured=1, state=ResultState.VERIFIED,
         falsifier=falsifier, falsifier_detail="d",
         provenance=Provenance.MEASURED, cross_check=cross,
     )
-    felder.update(kw)
-    return AssuranceRecord(**felder)
+    fields_.update(kw)
+    return AssuranceRecord(**fields_)
 
 
 def test_git_is_the_authority_for_a_landed_commit():
@@ -757,9 +757,9 @@ def test_git_is_the_authority_for_a_landed_commit():
 def test_git_does_not_get_to_answer_what_stage_a_run_is_in():
     """The whole reason a single ordering of sources was wrong. Git is the
     most durable source this project has and it cannot see a run's stage."""
-    gruende = _rec("node_lifecycle", SourceKind.REPOSITORY).weaknesses(
+    reasons = _rec("node_lifecycle", SourceKind.REPOSITORY).weaknesses(
         subject_head=HEAD)
-    assert any("cannot answer node_lifecycle" in g for g in gruende)
+    assert any("cannot answer node_lifecycle" in g for g in reasons)
     assert _rec("node_lifecycle", SourceKind.PROJECT_STATE).authoritative(
         subject_head=HEAD)
 
@@ -767,9 +767,9 @@ def test_git_does_not_get_to_answer_what_stage_a_run_is_in():
 def test_run_state_does_not_get_to_answer_where_a_commit_landed():
     """The converse, and it has to be tested separately: a state file saying
     a node is MERGED records an intention to merge."""
-    gruende = _rec("landed_commit", SourceKind.RUN_STATE).weaknesses(
+    reasons = _rec("landed_commit", SourceKind.RUN_STATE).weaknesses(
         subject_head=HEAD)
-    assert any("cannot answer landed_commit" in g for g in gruende)
+    assert any("cannot answer landed_commit" in g for g in reasons)
 
 
 def test_a_digest_alone_authorises_no_derived_metric():
@@ -777,14 +777,14 @@ def test_a_digest_alone_authorises_no_derived_metric():
     what they mean, so it is in no policy's allowed set."""
     for metric in ("landed_commit", "node_lifecycle", "run_accepted_candidate",
                    "check_executed_under_isolation"):
-        gruende = _rec(metric, SourceKind.DIGEST).weaknesses(subject_head=HEAD)
-        assert any("cannot answer" in g for g in gruende), metric
+        reasons = _rec(metric, SourceKind.DIGEST).weaknesses(subject_head=HEAD)
+        assert any("cannot answer" in g for g in reasons), metric
 
 
 def test_a_receipt_does_not_replace_the_project_states_lifecycle():
-    gruende = _rec("node_lifecycle", SourceKind.RECEIPT).weaknesses(
+    reasons = _rec("node_lifecycle", SourceKind.RECEIPT).weaknesses(
         subject_head=HEAD)
-    assert any("cannot answer node_lifecycle" in g for g in gruende)
+    assert any("cannot answer node_lifecycle" in g for g in reasons)
 
 
 def test_only_the_receipt_may_say_a_check_ran_isolated():
@@ -794,9 +794,9 @@ def test_only_the_receipt_may_say_a_check_ran_isolated():
         subject_head=HEAD)
     for k in (SourceKind.PROJECT_STATE, SourceKind.RUN_STATE,
               SourceKind.REPOSITORY, SourceKind.TRANSIENT_LOG):
-        gruende = _rec("check_executed_under_isolation", k).weaknesses(
+        reasons = _rec("check_executed_under_isolation", k).weaknesses(
             subject_head=HEAD)
-        assert any("cannot answer" in g for g in gruende), k.value
+        assert any("cannot answer" in g for g in reasons), k.value
 
 
 def test_a_ci_job_does_not_stand_in_for_the_named_step():
@@ -822,19 +822,19 @@ def test_a_metric_with_no_policy_is_judged_by_the_general_rules_only():
     still apply; what is absent is only the question-specific ownership."""
     r = _rec("something_nobody_declared", SourceKind.PROJECT_STATE)
     assert r.authoritative(subject_head=HEAD)
-    schwach = _rec("something_nobody_declared", SourceKind.PROJECT_STATE,
+    weak = _rec("something_nobody_declared", SourceKind.PROJECT_STATE,
                    falsifier=FalsifierState.NOT_RUN, falsifier_detail="")
-    assert not schwach.authoritative(subject_head=HEAD)
+    assert not weak.authoritative(subject_head=HEAD)
 
 
 def test_an_authoritative_source_still_needs_its_binding_and_falsifier():
-    ohne_head = _rec("landed_commit", SourceKind.REPOSITORY, head=None)
+    without_head = _rec("landed_commit", SourceKind.REPOSITORY, head=None)
     assert any("requires the commit it was measured at" in g
-               for g in ohne_head.weaknesses(subject_head=HEAD))
-    ohne_kontrolle = _rec("landed_commit", SourceKind.REPOSITORY,
+               for g in without_head.weaknesses(subject_head=HEAD))
+    without_control = _rec("landed_commit", SourceKind.REPOSITORY,
                           falsifier=FalsifierState.NOT_RUN, falsifier_detail="")
     assert any("negative control" in g
-               for g in ohne_kontrolle.weaknesses(subject_head=HEAD))
+               for g in without_control.weaknesses(subject_head=HEAD))
 
 
 def test_durability_says_only_how_long_a_source_lasts():
@@ -843,9 +843,9 @@ def test_durability_says_only_how_long_a_source_lasts():
     assert SourceKind.REPOSITORY.durability() > SourceKind.TRANSIENT_LOG.durability()
     assert not hasattr(SourceKind.REPOSITORY, "strength")
     # And durability does not rescue a source the policy excludes.
-    gruende = _rec("node_lifecycle", SourceKind.REPOSITORY).weaknesses(
+    reasons = _rec("node_lifecycle", SourceKind.REPOSITORY).weaknesses(
         subject_head=HEAD)
-    assert gruende, "the most durable source answered a question it does not own"
+    assert reasons, "the most durable source answered a question it does not own"
 
 
 def test_every_declared_policy_states_why():

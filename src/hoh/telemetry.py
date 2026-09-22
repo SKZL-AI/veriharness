@@ -174,7 +174,7 @@ class Summary(Strict):
     artefactual: int = 0
 
     def line(self) -> str:
-        teile = [
+        parts = [
             f"{self.dispatches} dispatch(es)",
             f"{self.wallclock_seconds:.1f}s wallclock"
             + (f" ({self.wallclock_unknown} unknown)" if self.wallclock_unknown else ""),
@@ -189,7 +189,7 @@ class Summary(Strict):
             f"{self.discriminating} discriminating"
             + (f" ({self.artefactual} artefactual)" if self.artefactual else ""),
         ]
-        return " · ".join(teile)
+        return " · ".join(parts)
 
 
 def summarise(records: list[DispatchRecord]) -> Summary:
@@ -202,8 +202,8 @@ def summarise(records: list[DispatchRecord]) -> Summary:
     about in other people's work.
     """
     s = Summary(dispatches=len(records))
-    unbekannt = 0
-    summe = 0
+    unknown_ = 0
+    total_ = 0
     for r in records:
         s.by_role[r.role] = s.by_role.get(r.role, 0) + 1
         s.by_outcome[r.outcome] = s.by_outcome.get(r.outcome, 0) + 1
@@ -215,17 +215,17 @@ def summarise(records: list[DispatchRecord]) -> Summary:
         else:
             s.wallclock_seconds += r.wallclock_seconds
         if r.cost_known():
-            summe += (r.tokens_in or 0) + (r.tokens_out or 0)
+            total_ += (r.tokens_in or 0) + (r.tokens_out or 0)
         else:
-            unbekannt += 1
+            unknown_ += 1
         s.retries += r.retries
         s.receipts += r.receipts
         s.discriminating += r.discriminating
         s.artefactual += r.artefactual
-    s.tokens_unknown = unbekannt
+    s.tokens_unknown = unknown_
     # All or nothing. A total over the records that happened to report is a
     # smaller number that reads like a complete one.
-    s.tokens = None if unbekannt else summe
+    s.tokens = None if unknown_ else total_
     return s
 
 
@@ -245,27 +245,27 @@ class TelemetryLog:
 
     def append(self, record: DispatchRecord) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        zeile = record.model_dump_json() + "\n"
+        text_line = record.model_dump_json() + "\n"
         with open(self.path, "a", encoding="utf-8") as fh:
-            fh.write(zeile)
+            fh.write(text_line)
             fh.flush()
             os.fsync(fh.fileno())
 
     def read(self) -> list[DispatchRecord]:
         if not self.path.exists():
             return []
-        raus: list[DispatchRecord] = []
-        for zeile in self.path.read_text(encoding="utf-8", errors="replace").splitlines():
-            zeile = zeile.strip()
-            if not zeile:
+        out_list: list[DispatchRecord] = []
+        for text_line in self.path.read_text(encoding="utf-8", errors="replace").splitlines():
+            text_line = text_line.strip()
+            if not text_line:
                 continue
             try:
-                raus.append(DispatchRecord.model_validate_json(zeile))
+                out_list.append(DispatchRecord.model_validate_json(text_line))
             except ValueError:
                 # A truncated last line from a killed writer. Skipped, not
                 # raised: the rest of the history is still evidence.
                 continue
-        return raus
+        return out_list
 
     def summary(self) -> Summary:
         return summarise(self.read())
@@ -278,11 +278,11 @@ class TelemetryLog:
         -- and it writes through a temporary file in the same directory so a
         crash leaves either the old log or the new one.
         """
-        satz = sorted(self.read(), key=lambda r: (r.started_at, r.run_id, r.role))
+        sentence = sorted(self.read(), key=lambda r: (r.started_at, r.run_id, r.role))
         fd, tmp = tempfile.mkstemp(dir=str(self.path.parent), prefix=".telemetry-")
         try:
             with os.fdopen(fd, "w", encoding="utf-8") as fh:
-                for r in satz:
+                for r in sentence:
                     fh.write(r.model_dump_json() + "\n")
                 fh.flush()
                 os.fsync(fh.fileno())
@@ -316,19 +316,19 @@ def record_from_role(
     something monotone to fill it with.
     """
     usage = usage or {}
-    dauer = None
+    duration_ = None
     try:
         from datetime import datetime
 
         a = datetime.fromisoformat(started_at.replace("Z", "+00:00"))
         b = datetime.fromisoformat(ended_at.replace("Z", "+00:00"))
-        dauer = max((b - a).total_seconds(), 0.0)
+        duration_ = max((b - a).total_seconds(), 0.0)
     except (ValueError, AttributeError):
-        dauer = None
+        duration_ = None
     proxy = usage.get("requests") if "requests" in usage else None
     return DispatchRecord(
         role=role, run_id=run_id, iteration=iteration, attempt=attempt,
-        started_at=started_at, ended_at=ended_at, wallclock_seconds=dauer,
+        started_at=started_at, ended_at=ended_at, wallclock_seconds=duration_,
         backend=backend, model=model, outcome=outcome,
         failure_class=failure_class, detail=detail,
         tokens_in=usage.get("input_tokens"),

@@ -42,8 +42,8 @@ class Approval:
     detail: str = ""
 
     def as_reason(self) -> str:
-        zustand = "granted" if self.granted else "refused"
-        return f"{self.provider} {zustand} trust for {self.worktree}" + (
+        state = "granted" if self.granted else "refused"
+        return f"{self.provider} {state} trust for {self.worktree}" + (
             f": {self.detail}" if self.detail else ""
         )
 
@@ -128,32 +128,32 @@ class PrefixScopedProvider(ApprovalProvider):
 
     #: Prefixes that would make the scope decorative. Refused on construction
     #: rather than at approval time, so a mistake is loud immediately.
-    VERBOTEN = ("/", "/home", "/root", "/tmp", "/usr", "/etc", "/var", "/opt",
+    FORBIDDEN = ("/", "/home", "/root", "/tmp", "/usr", "/etc", "/var", "/opt",
                 "/srv", "/mnt", "/media", "/Users")
 
     def __post_init__(self) -> None:
-        aufgeloest = self.prefix.expanduser().resolve()
-        zuhause = Path.home().resolve()
+        resolved_ = self.prefix.expanduser().resolve()
+        home_dir = Path.home().resolve()
         if (
-            str(aufgeloest) in self.VERBOTEN
-            or aufgeloest == zuhause
-            or aufgeloest in zuhause.parents
-            or len(aufgeloest.parts) < 3
+            str(resolved_) in self.FORBIDDEN
+            or resolved_ == home_dir
+            or resolved_ in home_dir.parents
+            or len(resolved_.parts) < 3
         ):
             raise ValueError(
-                f"{aufgeloest} is too broad to be a scope: a provider allowed "
+                f"{resolved_} is too broad to be a scope: a provider allowed "
                 "to approve anything under it is a provider with no scope at all"
             )
-        self.prefix = aufgeloest
+        self.prefix = resolved_
         if self.expected_repo is not None:
             self.expected_repo = self.expected_repo.expanduser().resolve()
 
     # -- Containment --------------------------------------------------------- #
 
-    def _identity(self, ziel: Path):
+    def _identity(self, target: Path):
         """(device, inode) of a real directory, or None."""
         try:
-            st = ziel.stat()
+            st = target.stat()
         except OSError:
             return None
         if not stat.S_ISDIR(st.st_mode):
@@ -163,78 +163,78 @@ class PrefixScopedProvider(ApprovalProvider):
     def _in_scope(self, worktree: Path) -> tuple[Path | None, str]:
         """The resolved target when it is inside the scope, else a reason."""
         try:
-            ziel = worktree.expanduser().resolve()
+            target = worktree.expanduser().resolve()
         except OSError as exc:
             return None, f"{worktree} cannot be resolved: {exc}"
-        if ziel == self.prefix:
-            return None, f"{ziel} is the scope itself, not a worktree inside it"
-        if self.prefix not in ziel.parents:
-            return None, f"{ziel} is not beneath this provider's scope {self.prefix}"
-        if self._identity(ziel) is None:
+        if target == self.prefix:
+            return None, f"{target} is the scope itself, not a worktree inside it"
+        if self.prefix not in target.parents:
+            return None, f"{target} is not beneath this provider's scope {self.prefix}"
+        if self._identity(target) is None:
             # Non-strict resolution means a path nobody has created resolves
             # perfectly well. Approving one would grant trust to whatever the
             # next writer decides to put there.
             return None, (
-                f"{ziel} does not exist as a directory; a scope check on a path "
+                f"{target} does not exist as a directory; a scope check on a path "
                 "that is not there approves whoever creates it next"
             )
-        return ziel, ""
+        return target, ""
 
-    def _belongs_to_repo(self, ziel: Path) -> str:
+    def _belongs_to_repo(self, target: Path) -> str:
         """Empty when the worktree belongs to `expected_repo`, else a reason."""
         if self.expected_repo is None:
             return ""
         p = subprocess.run(
-            ["git", "-C", str(ziel), "rev-parse", "--git-common-dir"],
+            ["git", "-C", str(target), "rev-parse", "--git-common-dir"],
             capture_output=True, text=True,
         )
         if p.returncode != 0:
-            return f"{ziel} is not a git worktree: {(p.stderr or p.stdout).strip()[:120]}"
-        gemeinsam = Path(p.stdout.strip())
-        if not gemeinsam.is_absolute():
-            gemeinsam = (ziel / gemeinsam).resolve()
-        erwartet = self.expected_repo
-        if erwartet.name != ".git":
-            erwartet = erwartet / ".git"
-        if gemeinsam.resolve() != erwartet.resolve():
+            return f"{target} is not a git worktree: {(p.stderr or p.stdout).strip()[:120]}"
+        shared = Path(p.stdout.strip())
+        if not shared.is_absolute():
+            shared = (target / shared).resolve()
+        expected = self.expected_repo
+        if expected.name != ".git":
+            expected = expected / ".git"
+        if shared.resolve() != expected.resolve():
             return (
-                f"{ziel} belongs to {gemeinsam}, not to this project's "
-                f"{erwartet}"
+                f"{target} belongs to {shared}, not to this project's "
+                f"{expected}"
             )
         return ""
 
     def may_approve(self, worktree: Path) -> bool:
-        ziel, _ = self._in_scope(worktree)
-        return ziel is not None and not self._belongs_to_repo(ziel)
+        target, _ = self._in_scope(worktree)
+        return target is not None and not self._belongs_to_repo(target)
 
     def approve(self, worktree: Path, repo: Path) -> Approval:
-        def nein(detail: str) -> Approval:
+        def refuse(detail: str) -> Approval:
             return Approval(granted=False, worktree=worktree, provider=self.name,
                             detail=detail)
 
-        ziel, grund = self._in_scope(worktree)
-        if ziel is None:
-            return nein(grund)
-        vorher = self._identity(ziel)
-        grund = self._belongs_to_repo(ziel)
-        if grund:
-            return nein(grund)
+        target, reason = self._in_scope(worktree)
+        if target is None:
+            return refuse(reason)
+        before = self._identity(target)
+        reason = self._belongs_to_repo(target)
+        if reason:
+            return refuse(reason)
         if not self.script.exists():
-            return nein(f"the configured approval helper {self.script} does not exist")
+            return refuse(f"the configured approval helper {self.script} does not exist")
 
         # Last look before handing the path to something that grants access.
         # Between the scope check and this line the directory could have been
         # replaced by a symlink to somewhere else entirely; the window is small
         # and the consequence is an agent with write access to that somewhere.
-        if self._identity(ziel) != vorher or vorher is None:
-            return nein(f"{ziel} changed identity between the scope check and the grant")
+        if self._identity(target) != before or before is None:
+            return refuse(f"{target} changed identity between the scope check and the grant")
 
-        p = subprocess.run([str(self.script), str(ziel), str(repo)],
+        p = subprocess.run([str(self.script), str(target), str(repo)],
                            capture_output=True, text=True, timeout=self.timeout)
         if p.returncode != 0:
-            return nein(f"helper exited {p.returncode}: {(p.stderr or p.stdout)[-160:]}")
-        self.granted.append(ziel)
-        return Approval(granted=True, worktree=ziel, provider=self.name,
+            return refuse(f"helper exited {p.returncode}: {(p.stderr or p.stdout)[-160:]}")
+        self.granted.append(target)
+        return Approval(granted=True, worktree=target, provider=self.name,
                         detail=f"approved by {self.script.name} under {self.prefix}")
 
 
@@ -262,8 +262,8 @@ class ScopedScriptProvider(ApprovalProvider):
     granted: list[Path] = field(default_factory=list)
 
     def may_approve(self, worktree: Path) -> bool:
-        ziel = worktree.resolve()
-        return any(ziel == p.resolve() for p in self.allowed)
+        target = worktree.resolve()
+        return any(target == p.resolve() for p in self.allowed)
 
     def approve(self, worktree: Path, repo: Path) -> Approval:
         if not self.may_approve(worktree):

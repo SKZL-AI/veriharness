@@ -1132,7 +1132,7 @@ _U2B_EXCLUDED_EXTENSIONS = frozenset({".py", ".json"})
 #: Acknowledged is not invisible: every entry is printed on every run, and
 #: `tests/test_export_manifest.py` pins this list so that it cannot grow
 #: without a test changing with it.
-U2B_ANERKANNT: dict[str, str] = {
+U2B_ACKNOWLEDGED: dict[str, str] = {
     "paper/REVIEW_A.md":
         "an independent reviewer's report, published as written. Its "
         "citations are what the reviewer read; rewriting them would make the "
@@ -1175,7 +1175,7 @@ U2B_ANERKANNT: dict[str, str] = {
 }
 
 
-def teile_u2b(findings: list[dict]) -> tuple[list[dict], list[dict]]:
+def parts_u2b(findings: list[dict]) -> tuple[list[dict], list[dict]]:
     """(findings that stand, findings whose reference is acknowledged).
 
     A key is either a whole document -- everything it cites -- or a single
@@ -1184,15 +1184,15 @@ def teile_u2b(findings: list[dict]) -> tuple[list[dict], list[dict]]:
     anything: `paper/AUDIT.md` has one reference that cannot be removed, and
     all its others must keep failing if they ever break.
     """
-    offen, anerkannt = [], []
+    open_, acknowledged = [], []
     for f in findings:
-        grund = (U2B_ANERKANNT.get(f"{f.get('from')} -> {f.get('to')}")
-                 or U2B_ANERKANNT.get(f.get("from")))
-        if grund:
-            anerkannt.append({**f, "acknowledged": grund})
+        reason = (U2B_ACKNOWLEDGED.get(f"{f.get('from')} -> {f.get('to')}")
+                 or U2B_ACKNOWLEDGED.get(f.get("from")))
+        if reason:
+            acknowledged.append({**f, "acknowledged": reason})
         else:
-            offen.append(f)
-    return offen, anerkannt
+            open_.append(f)
+    return open_, acknowledged
 
 
 def check_u2b(entries: list[dict], root: Path) -> list[dict]:
@@ -1429,15 +1429,15 @@ def cmd_check(args: argparse.Namespace) -> int:
         return 1
 
     findings = 0
-    offen, anerkannt = teile_u2b(check_u2b(on_disk_entries, root))
-    for f in offen:
+    open_, acknowledged = parts_u2b(check_u2b(on_disk_entries, root))
+    for f in open_:
         findings += 1
         print(f"FAIL: U2b: {f['from']} references {f['to']} -- {f['reason']}")
     # Printed on every run, never counted as a finding. A reference that has
     # been thought about and decided is a different state from one nobody has
     # looked at, and the difference is only worth anything if the decision
     # stays in front of the reader.
-    for f in anerkannt:
+    for f in acknowledged:
         print(f"ACKNOWLEDGED: {f['from']} references {f['to']} "
               f"-- {f['reason']}; {f['acknowledged']}")
     for f in scan_include_for_leaks(on_disk_entries, root):
@@ -1450,8 +1450,8 @@ def cmd_check(args: argparse.Namespace) -> int:
 
     print(f"OK: {manifest_path} matches a fresh derivation and passes U2b + "
           f"the leak scan ({len(on_disk_entries)} entries, "
-          f"{len(anerkannt)} acknowledged reference(s) in "
-          f"{len(U2B_ANERKANNT)} document(s))")
+          f"{len(acknowledged)} acknowledged reference(s) in "
+          f"{len(U2B_ACKNOWLEDGED)} document(s))")
     return 0
 
 

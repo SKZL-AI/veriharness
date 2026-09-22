@@ -55,9 +55,9 @@ def make_plan(**kw) -> DevelopmentPlan:
 
 
 def test_the_binding_distinguishes_a_dirty_tree():
-    sauber = make_candidate(tree_clean=True)
-    schmutzig = make_candidate(tree_clean=False)
-    assert sauber.binding() != schmutzig.binding()
+    clean_ = make_candidate(tree_clean=True)
+    dirty_ = make_candidate(tree_clean=False)
+    assert clean_.binding() != dirty_.binding()
 
 
 def test_the_binding_distinguishes_content_at_the_same_commit():
@@ -82,7 +82,7 @@ def test_an_unknown_field_is_rejected():
             objective="x",
             targets=["a"],
             acceptance_checks=[make_check()],
-            halluziniertes_feld="ja",  # type: ignore[call-arg]
+            hallucinated_field="ja",  # type: ignore[call-arg]
         )
 
 

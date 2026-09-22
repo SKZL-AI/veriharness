@@ -192,14 +192,14 @@ class MergeResult:
     candidate: str = ""
 
     def summary(self) -> str:
-        teile = [f"branch {self.branch}" if self.branch else ""]
+        parts = [f"branch {self.branch}" if self.branch else ""]
         if self.target_head_before:
-            teile.append(f"target was at {self.target_head_before}")
+            parts.append(f"target was at {self.target_head_before}")
         if self.merge_base:
-            teile.append(f"merge-base {self.merge_base}")
+            parts.append(f"merge-base {self.merge_base}")
         if self.conflicting_paths:
-            teile.append("conflicting: " + ", ".join(self.conflicting_paths[:6]))
-        return "; ".join(x for x in teile if x)
+            parts.append("conflicting: " + ", ".join(self.conflicting_paths[:6]))
+        return "; ".join(x for x in parts if x)
 
 
 class RunLauncher(Protocol):
@@ -391,23 +391,23 @@ class ProjectController:
             return Result(halt=HaltClass.CORRUPT_STATE, reason=str(exc))
 
     def _drive(self) -> Result:
-        schritte: list[Step] = []
+        steps_: list[Step] = []
         reparaturen = 0
 
         try:
             state = self.store.read_state()
         except StoreError as exc:
-            return Result(halt=HaltClass.CORRUPT_STATE, reason=str(exc), steps=schritte)
+            return Result(halt=HaltClass.CORRUPT_STATE, reason=str(exc), steps=steps_)
 
         # A node whose dependency names something that does not exist reads,
         # to a scheduler, exactly like a node whose dependency is satisfied.
-        unbekannt = state.unknown_dependencies()
-        if unbekannt:
-            grund = "dependencies naming nodes that do not exist: " + "; ".join(
-                f"{k} -> {v}" for k, v in sorted(unbekannt.items())
+        unknown_ = state.unknown_dependencies()
+        if unknown_:
+            why = "dependencies naming nodes that do not exist: " + "; ".join(
+                f"{k} -> {v}" for k, v in sorted(unknown_.items())
             )
-            schritte.append(Step(0, HaltClass.BLOCKED_DEPENDENCY, detail=grund))
-            return Result(HaltClass.BLOCKED_DEPENDENCY, grund, schritte)
+            steps_.append(Step(0, HaltClass.BLOCKED_DEPENDENCY, detail=why))
+            return Result(HaltClass.BLOCKED_DEPENDENCY, why, steps_)
 
         # A RUNNING node means a previous session died mid-dispatch. Rather
         # than halting on principle, ask the run's own recorded state what
@@ -416,59 +416,59 @@ class ProjectController:
         # an acceptance that may already have happened.
         laufend = [n for n in state.nodes if n.lifecycle is Lifecycle.RUNNING]
         for n in laufend:
-            ausgang = self.launcher.evaluate(n)
-            schritte.append(Step(0, "EVALUATED", n.id, f"{ausgang.verdict}: {ausgang.detail}"))
-            if ausgang.verdict is RunVerdict.NOT_STARTED:
+            outcome_ = self.launcher.evaluate(n)
+            steps_.append(Step(0, "EVALUATED", n.id, f"{outcome_.verdict}: {outcome_.detail}"))
+            if outcome_.verdict is RunVerdict.NOT_STARTED:
                 # Marked RUNNING, but the run never began -- a process died
                 # between persisting the lifecycle and dispatching. Nothing was
                 # spent and nothing can be repeated, so it simply becomes work
                 # again.
                 n.lifecycle = Lifecycle.READY
                 state = self._persist(state)
-                schritte.append(Step(0, "RESET_TO_READY", n.id, ausgang.detail))
+                steps_.append(Step(0, "RESET_TO_READY", n.id, outcome_.detail))
                 continue
-            if ausgang.verdict is RunVerdict.UNDETERMINED:
-                grund = (
+            if outcome_.verdict is RunVerdict.UNDETERMINED:
+                why = (
                     f"node {n.id} is recorded as RUNNING and its run state does not say "
-                    f"what happened: {ausgang.detail}. Re-dispatching could repeat an "
+                    f"what happened: {outcome_.detail}. Re-dispatching could repeat an "
                     "acceptance that already landed, so this is not decided here"
                 )
-                schritte.append(Step(0, HaltClass.AMBIGUOUS, n.id, grund))
-                return Result(HaltClass.AMBIGUOUS, grund, schritte)
-            state = self._settle(state, n.id, ausgang, 0, schritte)
+                steps_.append(Step(0, HaltClass.AMBIGUOUS, n.id, why))
+                return Result(HaltClass.AMBIGUOUS, why, steps_)
+            state = self._settle(state, n.id, outcome_, 0, steps_)
             if isinstance(state, Result):
-                state.steps = schritte
+                state.steps = steps_
                 return state
 
-        for runde in range(1, self.max_rounds + 1):
-            bereit = state.ready()
+        for round_ in range(1, self.max_rounds + 1):
+            ready_ = state.ready()
 
-            if not bereit:
-                ergebnis, state, neue = self._closure(state, runde, schritte, reparaturen)
-                reparaturen = neue
-                if ergebnis is not None:
-                    ergebnis.steps = schritte
-                    ergebnis.rounds = runde
-                    ergebnis.repairs_created = reparaturen
-                    return ergebnis
+            if not ready_:
+                result, state, new_ = self._closure(state, round_, steps_, reparaturen)
+                reparaturen = new_
+                if result is not None:
+                    result.steps = steps_
+                    result.rounds = round_
+                    result.repairs_created = reparaturen
+                    return result
                 continue
 
-            knoten = bereit[0]
+            task = ready_[0]
 
-            if self.launcher.action_class(knoten) is ActionClass.EXTERNAL:
-                grund = (
-                    f"node {knoten.id} carries an irreversible external action; "
+            if self.launcher.action_class(task) is ActionClass.EXTERNAL:
+                why = (
+                    f"node {task.id} carries an irreversible external action; "
                     "that decision is not delegated to the orchestrator"
                 )
-                schritte.append(Step(runde, HaltClass.BLOCKED_EXTERNAL, knoten.id, grund))
-                return Result(HaltClass.BLOCKED_EXTERNAL, grund, schritte, runde, reparaturen)
+                steps_.append(Step(round_, HaltClass.BLOCKED_EXTERNAL, task.id, why))
+                return Result(HaltClass.BLOCKED_EXTERNAL, why, steps_, round_, reparaturen)
 
             # Serialise only where a dependency is actually measured. A blanket
             # rule would be safe and would also throw away every parallel round.
-            for anderer in bereit[1:]:
-                if self.launcher.depends_on(knoten, anderer):
-                    schritte.append(
-                        Step(runde, "SERIALISED", f"{knoten.id}<->{anderer.id}",
+            for other_ in ready_[1:]:
+                if self.launcher.depends_on(task, other_):
+                    steps_.append(
+                        Step(round_, "SERIALISED", f"{task.id}<->{other_.id}",
                              "measured semantic dependency")
                     )
 
@@ -476,23 +476,23 @@ class ProjectController:
             # be made runnable first. If the launcher cannot, it blocks: a
             # dispatch into nothing produces a verdict about nothing.
             try:
-                hindernis = self.launcher.prepare(knoten)
-            except BudgetExhausted as leer:
-                knoten.lifecycle = Lifecycle.BLOCKED
-                knoten.note = str(leer)
+                obstacle = self.launcher.prepare(task)
+            except BudgetExhausted as empty:
+                task.lifecycle = Lifecycle.BLOCKED
+                task.note = str(empty)
                 state = self._persist(state)
-                grund = f"node {knoten.id} has no budget left: {leer}"
-                schritte.append(
-                    Step(runde, HaltClass.BUDGET_EXHAUSTED, knoten.id, grund))
-                return Result(HaltClass.BUDGET_EXHAUSTED, grund, schritte,
-                              runde, reparaturen)
-            if hindernis:
-                knoten.lifecycle = Lifecycle.BLOCKED
-                knoten.note = hindernis
+                why = f"node {task.id} has no budget left: {empty}"
+                steps_.append(
+                    Step(round_, HaltClass.BUDGET_EXHAUSTED, task.id, why))
+                return Result(HaltClass.BUDGET_EXHAUSTED, why, steps_,
+                              round_, reparaturen)
+            if obstacle:
+                task.lifecycle = Lifecycle.BLOCKED
+                task.note = obstacle
                 state = self._persist(state)
-                grund = f"node {knoten.id} cannot be made runnable: {hindernis}"
-                schritte.append(Step(runde, HaltClass.BLOCKED_DEPENDENCY, knoten.id, grund))
-                return Result(HaltClass.BLOCKED_DEPENDENCY, grund, schritte, runde, reparaturen)
+                why = f"node {task.id} cannot be made runnable: {obstacle}"
+                steps_.append(Step(round_, HaltClass.BLOCKED_DEPENDENCY, task.id, why))
+                return Result(HaltClass.BLOCKED_DEPENDENCY, why, steps_, round_, reparaturen)
 
             # Before spending anything, ask whether this node's run has
             # *already* accepted something newer than the baseline this node
@@ -505,50 +505,50 @@ class ProjectController:
             # accepted, the merge was blocked by untracked build output, and
             # after the obstruction was cleared the node was READY again with
             # its acceptance still sitting in the run record.
-            vorab = self.launcher.evaluate(knoten)
-            if vorab.verdict is RunVerdict.ACCEPTED:
-                schritte.append(Step(runde, "ALREADY_ACCEPTED", knoten.id, vorab.detail))
-                ergebnis = self._settle(state, knoten.id, vorab, runde, schritte)
-                if isinstance(ergebnis, Result):
-                    ergebnis.steps = schritte
-                    ergebnis.rounds = runde
-                    ergebnis.repairs_created = reparaturen
-                    return ergebnis
-                state = ergebnis
+            in_advance = self.launcher.evaluate(task)
+            if in_advance.verdict is RunVerdict.ACCEPTED:
+                steps_.append(Step(round_, "ALREADY_ACCEPTED", task.id, in_advance.detail))
+                result = self._settle(state, task.id, in_advance, round_, steps_)
+                if isinstance(result, Result):
+                    result.steps = steps_
+                    result.rounds = round_
+                    result.repairs_created = reparaturen
+                    return result
+                state = result
                 continue
 
-            knoten.lifecycle = Lifecycle.RUNNING
+            task.lifecycle = Lifecycle.RUNNING
             # The baseline goes into state before the dispatch, not after: it
             # is what a fresh process needs in order to tell an acceptance from
             # a run that ended where it started, and a process that dies during
             # the dispatch is exactly when it is needed.
-            knoten.accepted_before = self.launcher.accepted_baseline(knoten)
+            task.accepted_before = self.launcher.accepted_baseline(task)
             try:
                 state = self._persist(state)
             except StaleWrite as exc:
-                grund = f"another orchestrator advanced this project: {exc}"
-                schritte.append(Step(runde, HaltClass.AMBIGUOUS, knoten.id, grund))
-                return Result(HaltClass.AMBIGUOUS, grund, schritte, runde, reparaturen)
-            knoten = state.node(knoten.id)          # the re-read copy
-            assert knoten is not None
+                why = f"another orchestrator advanced this project: {exc}"
+                steps_.append(Step(round_, HaltClass.AMBIGUOUS, task.id, why))
+                return Result(HaltClass.AMBIGUOUS, why, steps_, round_, reparaturen)
+            task = state.node(task.id)          # the re-read copy
+            assert task is not None
 
-            ausgang = self.launcher.launch(knoten)
-            ergebnis = self._settle(state, knoten.id, ausgang, runde, schritte)
-            if isinstance(ergebnis, Result):
-                ergebnis.steps = schritte
-                ergebnis.rounds = runde
-                ergebnis.repairs_created = reparaturen
-                return ergebnis
-            state = ergebnis
+            outcome_ = self.launcher.launch(task)
+            result = self._settle(state, task.id, outcome_, round_, steps_)
+            if isinstance(result, Result):
+                result.steps = steps_
+                result.rounds = round_
+                result.repairs_created = reparaturen
+                return result
+            state = result
             continue
 
-        grund = f"{self.max_rounds} rounds without reaching a fixpoint"
-        schritte.append(Step(self.max_rounds, HaltClass.ROUND_LIMIT, detail=grund))
-        return Result(HaltClass.ROUND_LIMIT, grund, schritte, self.max_rounds, reparaturen)
+        why = f"{self.max_rounds} rounds without reaching a fixpoint"
+        steps_.append(Step(self.max_rounds, HaltClass.ROUND_LIMIT, detail=why))
+        return Result(HaltClass.ROUND_LIMIT, why, steps_, self.max_rounds, reparaturen)
 
     def _settle(
-        self, state: ProjectState, node_id: str, ausgang: RunOutcome,
-        runde: int, schritte: list[Step],
+        self, state: ProjectState, node_id: str, outcome_: RunOutcome,
+        round_: int, steps_: list[Step],
     ) -> "ProjectState | Result":
         """Turns one run outcome into a persisted lifecycle transition.
 
@@ -557,47 +557,47 @@ class ProjectController:
         from the session it is resuming -- and "differently" here means merging
         twice or discarding verified work.
         """
-        knoten = state.node(node_id)
-        assert knoten is not None
+        task = state.node(node_id)
+        assert task is not None
 
-        if ausgang.verdict is RunVerdict.PROVIDER_UNAVAILABLE:
-            knoten.lifecycle = Lifecycle.BLOCKED
-            knoten.note = ausgang.detail
+        if outcome_.verdict is RunVerdict.PROVIDER_UNAVAILABLE:
+            task.lifecycle = Lifecycle.BLOCKED
+            task.note = outcome_.detail
             self._persist(state)
-            grund = f"node {node_id}: {ausgang.detail or 'provider unavailable'}"
-            schritte.append(Step(runde, HaltClass.BLOCKED_PROVIDER, node_id, grund))
-            return Result(HaltClass.BLOCKED_PROVIDER, grund)
+            why = f"node {node_id}: {outcome_.detail or 'provider unavailable'}"
+            steps_.append(Step(round_, HaltClass.BLOCKED_PROVIDER, node_id, why))
+            return Result(HaltClass.BLOCKED_PROVIDER, why)
 
-        if ausgang.verdict is RunVerdict.NOT_STARTED:
-            knoten.lifecycle = Lifecycle.READY
-            schritte.append(Step(runde, "RESET_TO_READY", node_id, ausgang.detail))
+        if outcome_.verdict is RunVerdict.NOT_STARTED:
+            task.lifecycle = Lifecycle.READY
+            steps_.append(Step(round_, "RESET_TO_READY", node_id, outcome_.detail))
             return self._persist(state)
 
-        if ausgang.verdict is RunVerdict.NEEDS_APPROVAL:
-            knoten.lifecycle = Lifecycle.BLOCKED
-            knoten.note = ausgang.detail
+        if outcome_.verdict is RunVerdict.NEEDS_APPROVAL:
+            task.lifecycle = Lifecycle.BLOCKED
+            task.note = outcome_.detail
             self._persist(state)
-            grund = f"node {node_id} is waiting for a human approval: {ausgang.detail}"
-            schritte.append(Step(runde, HaltClass.BLOCKED_EXTERNAL, node_id, grund))
-            return Result(HaltClass.BLOCKED_EXTERNAL, grund)
+            why = f"node {node_id} is waiting for a human approval: {outcome_.detail}"
+            steps_.append(Step(round_, HaltClass.BLOCKED_EXTERNAL, node_id, why))
+            return Result(HaltClass.BLOCKED_EXTERNAL, why)
 
-        if ausgang.verdict is RunVerdict.BUDGET_EXHAUSTED:
-            knoten.lifecycle = Lifecycle.BLOCKED
-            knoten.note = ausgang.detail
+        if outcome_.verdict is RunVerdict.BUDGET_EXHAUSTED:
+            task.lifecycle = Lifecycle.BLOCKED
+            task.note = outcome_.detail
             self._persist(state)
-            grund = f"node {node_id} spent its budget: {ausgang.detail}"
-            schritte.append(Step(runde, HaltClass.BUDGET_EXHAUSTED, node_id, grund))
-            return Result(HaltClass.BUDGET_EXHAUSTED, grund)
+            why = f"node {node_id} spent its budget: {outcome_.detail}"
+            steps_.append(Step(round_, HaltClass.BUDGET_EXHAUSTED, node_id, why))
+            return Result(HaltClass.BUDGET_EXHAUSTED, why)
 
-        if ausgang.verdict is RunVerdict.NOT_RUN:
-            knoten.lifecycle = Lifecycle.READY
+        if outcome_.verdict is RunVerdict.NOT_RUN:
+            task.lifecycle = Lifecycle.READY
             self._persist(state)
-            grund = f"dry run: node {node_id} was not dispatched, so nothing was established"
-            schritte.append(Step(runde, HaltClass.NOT_RUN, node_id, grund))
-            return Result(HaltClass.NOT_RUN, grund)
+            why = f"dry run: node {node_id} was not dispatched, so nothing was established"
+            steps_.append(Step(round_, HaltClass.NOT_RUN, node_id, why))
+            return Result(HaltClass.NOT_RUN, why)
 
-        if ausgang.verdict is RunVerdict.ACCEPTED:
-            m = self.launcher.merge(knoten, ausgang)
+        if outcome_.verdict is RunVerdict.ACCEPTED:
+            m = self.launcher.merge(task, outcome_)
             if not isinstance(m, MergeResult):        # a bool, from an older launcher
                 m = MergeResult(landed=bool(m), failure=None if m else MergeFailure.UNKNOWN)
             if not m.landed:
@@ -606,48 +606,48 @@ class ProjectController:
                 # candidate twice, and abandoning discards verified work. What
                 # *is* decided here is which of those states it is, because git
                 # usually said.
-                klasse = {
+                class_name = {
                     MergeFailure.CONFLICT: HaltClass.MERGE_CONFLICT,
                     MergeFailure.OBSTRUCTED: HaltClass.MERGE_OBSTRUCTED,
                 }.get(m.failure, HaltClass.AMBIGUOUS)
                 was = {
                     HaltClass.MERGE_CONFLICT: "git reported a content conflict",
                     HaltClass.MERGE_OBSTRUCTED: "the working tree was in the way",
-                }.get(klasse, "the merge failed and git did not say why")
-                grund = (
+                }.get(class_name, "the merge failed and git did not say why")
+                why = (
                     f"node {node_id} was accepted but its candidate did not land: "
                     f"{was}. {m.summary()}"
                     + (f" -- {m.detail}" if m.detail else "")
                 )
-                knoten.lifecycle = Lifecycle.BLOCKED
-                knoten.note = grund
+                task.lifecycle = Lifecycle.BLOCKED
+                task.note = why
                 self._persist(state)
-                schritte.append(Step(runde, klasse, node_id, grund))
-                return Result(klasse, grund)
-            knoten.lifecycle = Lifecycle.MERGED
+                steps_.append(Step(round_, class_name, node_id, why))
+                return Result(class_name, why)
+            task.lifecycle = Lifecycle.MERGED
             self._record(
                 state, DecisionKind.MERGE_RELEASE,
                 f"every criterion passed and the candidate landed on "
-                f"{ausgang.candidate or 'the mainline'}",
-                {"node": node_id, "candidate": ausgang.candidate},
+                f"{outcome_.candidate or 'the mainline'}",
+                {"node": node_id, "candidate": outcome_.candidate},
             )
-            neu_state = self._persist(state)
-            schritte.append(Step(runde, "MERGED", node_id))
-            return neu_state
+            fresh_state = self._persist(state)
+            steps_.append(Step(round_, "MERGED", node_id))
+            return fresh_state
 
-        if ausgang.verdict is RunVerdict.REJECTED:
-            knoten.rejections += 1
-            if knoten.rejections > MAX_REJECTIONS:
-                knoten.lifecycle = Lifecycle.ABANDONED
+        if outcome_.verdict is RunVerdict.REJECTED:
+            task.rejections += 1
+            if task.rejections > MAX_REJECTIONS:
+                task.lifecycle = Lifecycle.ABANDONED
                 self._record(
                     state, DecisionKind.ABANDON_NODE,
-                    f"{knoten.rejections} rejections without progress",
+                    f"{task.rejections} rejections without progress",
                     {"node": node_id},
                 )
-                schritte.append(Step(runde, "ABANDONED", node_id, f"{knoten.rejections} rejections"))
+                steps_.append(Step(round_, "ABANDONED", node_id, f"{task.rejections} rejections"))
             else:
-                knoten.lifecycle = Lifecycle.READY
-                schritte.append(Step(runde, "REJECTED", node_id, f"attempt {knoten.rejections}"))
+                task.lifecycle = Lifecycle.READY
+                steps_.append(Step(round_, "REJECTED", node_id, f"attempt {task.rejections}"))
             return self._persist(state)
 
         # The detail is carried. It was dropped here and nowhere else, so the
@@ -655,108 +655,108 @@ class ProjectController:
         # that threw away the launcher's explanation -- a benchmark cell halted
         # AMBIGUOUS and the project state said only "unclassifiable", with the
         # reason sitting unused in `ausgang.detail`.
-        grund = (
+        why = (
             f"node {node_id}: unclassifiable verdict "
-            f"{ausgang.verdict.value}"
-            + (f" -- {ausgang.detail}" if ausgang.detail else
+            f"{outcome_.verdict.value}"
+            + (f" -- {outcome_.detail}" if outcome_.detail else
                " (and the launcher gave no detail)")
         )
-        knoten.lifecycle = Lifecycle.BLOCKED
-        knoten.note = grund
+        task.lifecycle = Lifecycle.BLOCKED
+        task.note = why
         self._persist(state)
-        schritte.append(Step(runde, HaltClass.AMBIGUOUS, node_id, grund))
-        return Result(HaltClass.AMBIGUOUS, grund)
+        steps_.append(Step(round_, HaltClass.AMBIGUOUS, node_id, why))
+        return Result(HaltClass.AMBIGUOUS, why)
 
     # -- global closure ---------------------------------------------------- #
 
     def _closure(
-        self, state: ProjectState, runde: int, schritte: list[Step], reparaturen: int
+        self, state: ProjectState, round_: int, steps_: list[Step], reparaturen: int
     ) -> tuple[Result | None, ProjectState, int]:
         """One closure attempt. Returns a Result only when the loop must stop."""
         if not state.dag_terminal():
             # Nothing runnable and not terminal: something is blocked or
             # contingent, and the state does not say what to do next.
-            blockiert = [n.id for n in state.nodes if n.lifecycle is Lifecycle.BLOCKED]
-            grund = (
+            blocked_ = [n.id for n in state.nodes if n.lifecycle is Lifecycle.BLOCKED]
+            why = (
                 "no node is runnable and the DAG is not terminal"
-                + (f"; blocked: {', '.join(blockiert)}" if blockiert else "")
+                + (f"; blocked: {', '.join(blocked_)}" if blocked_ else "")
             )
-            schritte.append(Step(runde, HaltClass.BLOCKED_DEPENDENCY, detail=grund))
-            return Result(HaltClass.BLOCKED_DEPENDENCY, grund), state, reparaturen
+            steps_.append(Step(round_, HaltClass.BLOCKED_DEPENDENCY, detail=why))
+            return Result(HaltClass.BLOCKED_DEPENDENCY, why), state, reparaturen
 
-        subjekt = self.gates.subject()
-        ergebnisse = self.gates.run(subjekt)
+        subject_ = self.gates.subject()
+        results = self.gates.run(subject_)
 
-        if any(g.outcome is GateOutcome.NOT_RUN for g in ergebnisse) and not any(
-            g.outcome is GateOutcome.RED for g in ergebnisse
+        if any(g.outcome is GateOutcome.NOT_RUN for g in results) and not any(
+            g.outcome is GateOutcome.RED for g in results
         ):
             # A dry run, or gates that could not execute. Not a fixpoint, and
             # explicitly not green.
-            grund = (
+            why = (
                 "global gates did not execute (NOT_RUN); a closure that checked "
                 "nothing has established nothing"
             )
-            state.gates.extend(ergebnisse)
+            state.gates.extend(results)
             state = self._persist(state)
-            schritte.append(Step(runde, HaltClass.NOT_RUN, detail=grund))
-            return Result(HaltClass.NOT_RUN, grund), state, reparaturen
+            steps_.append(Step(round_, HaltClass.NOT_RUN, detail=why))
+            return Result(HaltClass.NOT_RUN, why), state, reparaturen
 
         # Stamped with the pass they belong to, before the counter moves, so a
         # gate that stops running in a later pass cannot keep voting.
-        naechste = state.closure_generation + 1
-        for g in ergebnisse:
-            g.generation = naechste
-        state.gates.extend(ergebnisse)
-        state.measurement_head = subjekt
-        state.closure_generation = naechste
+        next_ = state.closure_generation + 1
+        for g in results:
+            g.generation = next_
+        state.gates.extend(results)
+        state.measurement_head = subject_
+        state.closure_generation = next_
         state = self._persist(state)
 
         if state.rc_closed():
-            grund = (
-                f"DAG terminal, every global gate green at {subjekt}, no outstanding "
+            why = (
+                f"DAG terminal, every global gate green at {subject_}, no outstanding "
                 f"repair node; closure generation {state.closure_generation}"
             )
-            self._record(state, DecisionKind.CLOSURE_VERDICT, grund,
-                         {"subject": subjekt, "generation": state.closure_generation})
+            self._record(state, DecisionKind.CLOSURE_VERDICT, why,
+                         {"subject": subject_, "generation": state.closure_generation})
             state = self._persist(state)
-            schritte.append(Step(runde, HaltClass.CLOSED, detail=grund))
-            return Result(HaltClass.CLOSED, grund), state, reparaturen
+            steps_.append(Step(round_, HaltClass.CLOSED, detail=why))
+            return Result(HaltClass.CLOSED, why), state, reparaturen
 
-        rot = [g for g in ergebnisse if g.outcome is GateOutcome.RED]
-        if not rot:
+        red = [g for g in results if g.outcome is GateOutcome.RED]
+        if not red:
             # Terminal, gates green, yet not closed: a repair node is still
             # outstanding. It will be picked up as READY on the next round.
-            offen = [n.id for n in state.nodes if n.repair_of and not n.settled]
-            grund = f"gates green but repair nodes outstanding: {', '.join(offen)}"
-            schritte.append(Step(runde, "CLOSURE_PENDING", detail=grund))
+            open_ = [n.id for n in state.nodes if n.repair_of and not n.settled]
+            why = f"gates green but repair nodes outstanding: {', '.join(open_)}"
+            steps_.append(Step(round_, "CLOSURE_PENDING", detail=why))
             return None, state, reparaturen
 
         if reparaturen >= self.max_repairs:
-            grund = (
+            why = (
                 f"repair ceiling of {self.max_repairs} reached and the global gates are "
-                f"still red: {', '.join(g.name for g in rot)}"
+                f"still red: {', '.join(g.name for g in red)}"
             )
-            schritte.append(Step(runde, HaltClass.ROUND_LIMIT, detail=grund))
-            return Result(HaltClass.ROUND_LIMIT, grund), state, reparaturen
+            steps_.append(Step(round_, HaltClass.ROUND_LIMIT, detail=why))
+            return Result(HaltClass.ROUND_LIMIT, why), state, reparaturen
 
         reparaturen += 1
-        vorgaenger = [n.id for n in state.nodes if n.lifecycle is Lifecycle.MERGED]
-        knoten = TaskNode(
+        predecessor_ = [n.id for n in state.nodes if n.lifecycle is Lifecycle.MERGED]
+        task = TaskNode(
             id=f"repair-{state.closure_generation}-{reparaturen}",
             lifecycle=Lifecycle.READY,
             action_class=ActionClass.INTERNAL,
-            dependencies=vorgaenger[-1:],
-            repair_of=vorgaenger[-1] if vorgaenger else None,
+            dependencies=predecessor_[-1:],
+            repair_of=predecessor_[-1] if predecessor_ else None,
             closure_generation=state.closure_generation,
-            note="; ".join(f"{g.name}: {g.detail or 'red'}" for g in rot),
+            note="; ".join(f"{g.name}: {g.detail or 'red'}" for g in red),
         )
-        state.nodes.append(knoten)
+        state.nodes.append(task)
         self._record(
             state, DecisionKind.CREATE_REPAIR_NODE,
-            f"global gates red at {subjekt}: {', '.join(g.name for g in rot)}",
-            {"node": knoten.id, "gates": [g.name for g in rot], "subject": subjekt},
-            evidence=[f"gate:{g.name}@{g.subject}" for g in rot],
+            f"global gates red at {subject_}: {', '.join(g.name for g in red)}",
+            {"node": task.id, "gates": [g.name for g in red], "subject": subject_},
+            evidence=[f"gate:{g.name}@{g.subject}" for g in red],
         )
         state = self._persist(state)
-        schritte.append(Step(runde, "REPAIR_CREATED", knoten.id, knoten.note))
+        steps_.append(Step(round_, "REPAIR_CREATED", task.id, task.note))
         return None, state, reparaturen

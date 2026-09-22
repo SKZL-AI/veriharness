@@ -66,7 +66,7 @@ def gate(name: str, outcome: GateOutcome = GateOutcome.GREEN, subject: str = "ab
 # The ten fault-injection points
 # --------------------------------------------------------------------------- #
 
-def test_kill_waehrend_planung_laesst_knoten_ready(tmp_path):
+def test_a_kill_during_planning_leaves_the_node_ready(tmp_path):
     """1. Killed before the run started: the node is still READY, resume it.
 
     Nothing was dispatched, so there is nothing to evaluate and nothing to
@@ -74,13 +74,13 @@ def test_kill_waehrend_planung_laesst_knoten_ready(tmp_path):
     """
     s = projekt(tmp_path)
     s.nodes = [TaskNode(id="a")]
-    verdikt, grund = resume_decision(s)
-    assert verdikt == RESUME, grund
-    assert "a" in grund
+    verdict, why = resume_decision(s)
+    assert verdict == RESUME, why
+    assert "a" in why
 
 
 @pytest.mark.parametrize("phase", ["development", "qa", "kurz vor dem Merge"])
-def test_kill_waehrend_eines_laufs_wird_ausgewertet_nicht_geraten(tmp_path, phase):
+def test_a_kill_during_a_run_is_evaluated_not_guessed(tmp_path, phase):
     """2, 3, 4. Killed mid-run: RUNNING with no live controller is ambiguous.
 
     Whether the work finished, crashed halfway through a merge, or is still
@@ -91,13 +91,13 @@ def test_kill_waehrend_eines_laufs_wird_ausgewertet_nicht_geraten(tmp_path, phas
     """
     s = projekt(tmp_path)
     s.nodes = [TaskNode(id="a", lifecycle=Lifecycle.RUNNING, run_id="a", note=phase)]
-    verdikt, grund = resume_decision(s)
-    assert verdikt == EVALUATE, grund
-    assert "RUNNING" in grund
-    assert "crashed" in grund or "finished" in grund
+    verdict, why = resume_decision(s)
+    assert verdict == EVALUATE, why
+    assert "RUNNING" in why
+    assert "crashed" in why or "finished" in why
 
 
-def test_kill_nach_merge_vor_globaler_closure_verlangt_reparatur(tmp_path):
+def test_a_kill_after_the_merge_and_before_global_closure_demands_a_repair(tmp_path):
     """5. Killed after the merge, before global closure ran.
 
     Every node has settled, so the DAG is terminal -- and this is exactly the
@@ -108,12 +108,12 @@ def test_kill_nach_merge_vor_globaler_closure_verlangt_reparatur(tmp_path):
     s.nodes = [TaskNode(id="a", lifecycle=Lifecycle.MERGED)]
     assert s.dag_terminal()
     assert not s.rc_closed()
-    verdikt, grund = resume_decision(s)
-    assert verdikt == REPAIR, grund
-    assert "no global gate has run" in grund
+    verdict, why = resume_decision(s)
+    assert verdict == REPAIR, why
+    assert "no global gate has run" in why
 
 
-def test_kill_waehrend_der_reparaturknoten_erzeugung(tmp_path):
+def test_a_kill_while_the_repair_node_is_being_created(tmp_path):
     """6. Killed while creating a repair node: the half-made node is READY.
 
     The gate that produced it is on record as red, the repair node exists and
@@ -127,38 +127,38 @@ def test_kill_waehrend_der_reparaturknoten_erzeugung(tmp_path):
     ]
     s.gates = [gate("union", GateOutcome.RED)]
     s.closure_generation = 1
-    verdikt, grund = resume_decision(s)
-    assert verdikt == RESUME, grund
-    assert "rep1" in grund
+    verdict, why = resume_decision(s)
+    assert verdict == RESUME, why
+    assert "rep1" in why
     assert not s.rc_closed(), "an outstanding repair node is not a closed release"
 
 
-def test_neuer_orchestrator_ohne_jeden_kontext_entscheidet_gleich(tmp_path):
+def test_a_fresh_orchestrator_with_no_context_decides_the_same(tmp_path):
     """7. Restart with a completely fresh context.
 
     The point of the whole module: a session that has never seen this project
     reads the file and reaches the same verdict as the one that wrote it. No
     conversation, no memory, no inference from git.
     """
-    laden = ProjectStore(tmp_path, "p")
+    load_ = ProjectStore(tmp_path, "p")
     s = projekt(tmp_path)
     s.nodes = [TaskNode(id="a", lifecycle=Lifecycle.MERGED), TaskNode(id="b", dependencies=["a"])]
-    laden.create(s)
+    load_.create(s)
 
     # A different store object, as a different process would construct it.
-    frisch = ProjectStore(tmp_path, "p").read_state()
-    assert resume_decision(frisch) == resume_decision(s)
-    assert resume_decision(frisch)[0] == RESUME
+    fresh_ = ProjectStore(tmp_path, "p").read_state()
+    assert resume_decision(fresh_) == resume_decision(s)
+    assert resume_decision(fresh_)[0] == RESUME
 
 
-def test_doppelter_orchestratorstart_wird_abgewiesen(tmp_path):
+def test_a_second_orchestrator_start_is_refused(tmp_path):
     """8. Two controllers: the second is refused, not queued behind the first."""
     s = ProjectStore(tmp_path, "p")
     s.create(projekt(tmp_path))
     with s.lock():
-        zweiter = ProjectStore(tmp_path, "p")
+        second_one = ProjectStore(tmp_path, "p")
         with pytest.raises(LockBusy) as exc:
-            with zweiter.lock():
+            with second_one.lock():
                 pass
     assert "already held" in str(exc.value)
     # Released afterwards -- a crashed orchestrator must not wedge the project.
@@ -166,7 +166,7 @@ def test_doppelter_orchestratorstart_wird_abgewiesen(tmp_path):
         pass
 
 
-def test_provider_ausfall_ist_kein_verdikt(tmp_path):
+def test_a_provider_outage_is_not_a_verdict(tmp_path):
     """9. A provider 429/529 leaves the node BLOCKED, and blocked is not failed.
 
     The distinction matters because a quota exhaustion looks, from inside the
@@ -175,19 +175,19 @@ def test_provider_ausfall_ist_kein_verdikt(tmp_path):
     """
     s = projekt(tmp_path)
     s.nodes = [TaskNode(id="a", lifecycle=Lifecycle.BLOCKED, note="provider 429")]
-    verdikt, grund = resume_decision(s)
-    assert verdikt == BLOCK, grund
-    assert "outside the orchestrator" in grund
+    verdict, why = resume_decision(s)
+    assert verdict == BLOCK, why
+    assert "outside the orchestrator" in why
     assert s.nodes[0].rejections == 0, "an outage is not a rejection"
 
 
-def test_beschaedigter_zustand_blockiert_statt_zu_ueberschreiben(tmp_path):
+def test_a_damaged_state_blocks_instead_of_overwriting(tmp_path):
     """10. Corrupted or incomplete state: unreadable blocks, it is not replaced."""
     s = ProjectStore(tmp_path, "p")
     s.create(projekt(tmp_path))
-    fortschritt = s.read_state()
-    fortschritt.nodes = [TaskNode(id="a", lifecycle=Lifecycle.MERGED)]
-    s.write_state(fortschritt)          # now a predecessor exists to fall back to
+    progress_ = s.read_state()
+    progress_.nodes = [TaskNode(id="a", lifecycle=Lifecycle.MERGED)]
+    s.write_state(progress_)          # now a predecessor exists to fall back to
 
     s.state_path.write_text('{"project_id": "p", "nodes": [ {"id": ', encoding="utf-8")
     with pytest.raises(StoreError) as exc:
@@ -199,17 +199,17 @@ def test_beschaedigter_zustand_blockiert_statt_zu_ueberschreiben(tmp_path):
     # it. Note what is *not* claimed: the very first write of a project has no
     # predecessor, so "there is always a way back" would be false. What holds
     # is that no write ever destroys one that existed.
-    geparkt = s.parked_states()
-    assert geparkt, "the parked predecessor is the way back"
-    zurueck = ProjectState.model_validate_json(geparkt[-1].read_text())
-    assert zurueck.project_id == "p"
+    parked = s.parked_states()
+    assert parked, "the parked predecessor is the way back"
+    back = ProjectState.model_validate_json(parked[-1].read_text())
+    assert back.project_id == "p"
 
 
 # --------------------------------------------------------------------------- #
 # Storage discipline
 # --------------------------------------------------------------------------- #
 
-def test_stale_writer_wird_abgewiesen(tmp_path):
+def test_a_stale_writer_is_refused(tmp_path):
     """The lock serializes; only the sequence number catches a stale writer.
 
     A crashed orchestrator releases its lock when its process dies, so the next
@@ -218,18 +218,18 @@ def test_stale_writer_wird_abgewiesen(tmp_path):
     """
     s = ProjectStore(tmp_path, "p")
     s.create(projekt(tmp_path))
-    alt = s.read_state()          # what a crashed session would still hold
-    neu = s.read_state()
-    neu.nodes = [TaskNode(id="a")]
-    s.write_state(neu)            # the live session advances
-    alt.nodes = [TaskNode(id="z")]
+    old = s.read_state()          # what a crashed session would still hold
+    fresh = s.read_state()
+    fresh.nodes = [TaskNode(id="a")]
+    s.write_state(fresh)            # the live session advances
+    old.nodes = [TaskNode(id="z")]
     with pytest.raises(StaleWrite) as exc:
-        s.write_state(alt)
+        s.write_state(old)
     assert "reload instead of overwriting" in str(exc.value)
     assert [n.id for n in s.read_state().nodes] == ["a"]
 
 
-def test_schreiben_loescht_nie_den_vorgaenger(tmp_path):
+def test_a_write_never_deletes_its_predecessor(tmp_path):
     """Replace by versioned rename, never delete -- and the counter never
     collides, even when earlier versions are moved away."""
     s = ProjectStore(tmp_path, "p")
@@ -238,59 +238,59 @@ def test_schreiben_loescht_nie_den_vorgaenger(tmp_path):
         st = s.read_state()
         st.nodes = [TaskNode(id=f"n{i}")]
         s.write_state(st)
-    geparkt = s.parked_states()
-    assert len(geparkt) == 3, geparkt
-    versionen = sorted(int(p.name.split(".v")[1].split(".")[0]) for p in geparkt)
-    assert versionen == [1, 2, 3]
+    parked = s.parked_states()
+    assert len(parked) == 3, parked
+    versions_ = sorted(int(p.name.split(".v")[1].split(".")[0]) for p in parked)
+    assert versions_ == [1, 2, 3]
 
     # Archive the earliest, as pruning would, then write again: a count-based
     # counter would now reuse v3 and collide.
     archiv = s.dir / "attic"
     archiv.mkdir()
-    geparkt[0].rename(archiv / geparkt[0].name)
+    parked[0].rename(archiv / parked[0].name)
     st = s.read_state()
     st.nodes = [TaskNode(id="danach")]
     s.write_state(st)
-    neu = [int(p.name.split(".v")[1].split(".")[0]) for p in s.parked_states()]
-    assert max(neu) == 4, f"counter jumped backwards: {neu}"
+    fresh = [int(p.name.split(".v")[1].split(".")[0]) for p in s.parked_states()]
+    assert max(fresh) == 4, f"counter jumped backwards: {fresh}"
 
 
-def test_start_ist_idempotent(tmp_path):
+def test_start_is_idempotent(tmp_path):
     """A retried start returns the existing project rather than replacing it.
 
     Retrying a command is the most ordinary thing a resuming session does; a
     start that overwrote would make it data loss.
     """
     s = ProjectStore(tmp_path, "p")
-    erst = projekt(tmp_path)
-    erst.nodes = [TaskNode(id="a")]
-    s.create(erst)
+    first_ = projekt(tmp_path)
+    first_.nodes = [TaskNode(id="a")]
+    s.create(first_)
     wieder = s.create(projekt(tmp_path, project_id="p"))
     assert [n.id for n in wieder.nodes] == ["a"]
 
 
-def _halte_lock(pfad: str, bereit, weiter):
-    store = ProjectStore(pfad, "p")
+def _hold_lock(path: str, ready_, further):
+    store = ProjectStore(path, "p")
     with store.lock():
-        bereit.set()
-        weiter.wait(timeout=10)
+        ready_.set()
+        further.wait(timeout=10)
 
 
-def test_lock_haelt_ueber_prozessgrenzen(tmp_path):
+def test_the_lock_holds_across_process_boundaries(tmp_path):
     """The lock is a real file lock, not an in-process convention."""
     s = ProjectStore(tmp_path, "p")
     s.create(projekt(tmp_path))
     ctx = multiprocessing.get_context("fork")
-    bereit, weiter = ctx.Event(), ctx.Event()
-    p = ctx.Process(target=_halte_lock, args=(str(tmp_path), bereit, weiter))
+    ready_, further = ctx.Event(), ctx.Event()
+    p = ctx.Process(target=_hold_lock, args=(str(tmp_path), ready_, further))
     p.start()
     try:
-        assert bereit.wait(timeout=10), "child never took the lock"
+        assert ready_.wait(timeout=10), "child never took the lock"
         with pytest.raises(LockBusy):
             with s.lock():
                 pass
     finally:
-        weiter.set()
+        further.set()
         p.join(timeout=10)
     with s.lock():
         pass
@@ -300,7 +300,7 @@ def test_lock_haelt_ueber_prozessgrenzen(tmp_path):
 # Closure is a fixpoint, not the end of a list
 # --------------------------------------------------------------------------- #
 
-def test_terminaler_dag_ist_keine_geschlossene_freigabe(tmp_path):
+def test_a_terminal_dag_is_not_a_closed_release(tmp_path):
     """The distinction this project had to learn twice, as an assertion."""
     s = projekt(tmp_path)
     s.nodes = [TaskNode(id="a", lifecycle=Lifecycle.MERGED)]
@@ -313,7 +313,7 @@ def test_terminaler_dag_ist_keine_geschlossene_freigabe(tmp_path):
     assert resume_decision(s)[0] == CLOSED
 
 
-def test_not_run_zaehlt_nie_als_gruen(tmp_path):
+def test_not_run_never_counts_as_green(tmp_path):
     """A gate that did not run is not a gate that passed."""
     g = gate("union", GateOutcome.NOT_RUN)
     assert not g.counts_as_green
@@ -322,12 +322,12 @@ def test_not_run_zaehlt_nie_als_gruen(tmp_path):
     s.gates = [g]
     assert not s.gates_green()
     assert not s.rc_closed()
-    verdikt, grund = resume_decision(s)
-    assert verdikt == REPAIR
-    assert "union" in grund
+    verdict, why = resume_decision(s)
+    assert verdict == REPAIR
+    assert "union" in why
 
 
-def test_leere_gate_menge_ist_nicht_gruen(tmp_path):
+def test_an_empty_gate_set_is_not_green(tmp_path):
     """Zero gates is not green. Returning True for an empty set is the purest
     form of the failure this project exists to prevent."""
     s = projekt(tmp_path)
@@ -336,7 +336,7 @@ def test_leere_gate_menge_ist_nicht_gruen(tmp_path):
     assert not s.gates_green()
 
 
-def test_offener_reparaturknoten_verhindert_closure(tmp_path):
+def test_an_open_repair_node_prevents_closure(tmp_path):
     """Green gates plus an outstanding repair node is still not closed."""
     s = projekt(tmp_path)
     s.nodes = [
@@ -350,7 +350,7 @@ def test_offener_reparaturknoten_verhindert_closure(tmp_path):
     assert s.rc_closed()
 
 
-def test_nur_das_juengste_ergebnis_je_gate_zaehlt(tmp_path):
+def test_only_the_most_recent_result_per_gate_counts(tmp_path):
     """A gate that was red and is now green counts as green -- and the reverse."""
     s = projekt(tmp_path)
     s.nodes = [TaskNode(id="a", lifecycle=Lifecycle.MERGED)]
@@ -364,19 +364,19 @@ def test_nur_das_juengste_ergebnis_je_gate_zaehlt(tmp_path):
 # The DAG itself
 # --------------------------------------------------------------------------- #
 
-def test_unbekannte_abhaengigkeit_blockiert_statt_zu_starten(tmp_path):
+def test_an_unknown_dependency_blocks_instead_of_starting(tmp_path):
     """A dependency on a node that does not exist reads, to a scheduler,
     exactly like a satisfied one. It must not."""
     s = projekt(tmp_path)
     s.nodes = [TaskNode(id="b", dependencies=["gibtesnicht"])]
     assert s.ready() == []
     assert s.unknown_dependencies() == {"b": ["gibtesnicht"]}
-    verdikt, grund = resume_decision(s)
-    assert verdikt == BLOCK
-    assert "gibtesnicht" in grund
+    verdict, why = resume_decision(s)
+    assert verdict == BLOCK
+    assert "gibtesnicht" in why
 
 
-def test_aufgegebener_knoten_blockiert_seine_nachfolger_nicht(tmp_path):
+def test_an_abandoned_node_does_not_block_its_successors(tmp_path):
     """ABANDONED settles a node: a dependent may proceed.
 
     Otherwise one abandoned node wedges every path behind it, and the only way
@@ -387,16 +387,16 @@ def test_aufgegebener_knoten_blockiert_seine_nachfolger_nicht(tmp_path):
     assert [n.id for n in s.ready()] == ["b"]
 
 
-def test_ablehnung_ist_eingabe_der_naechsten_iteration(tmp_path):
+def test_a_rejection_is_input_to_the_next_iteration(tmp_path):
     """A rejected node returns as READY, and the verdict says retry, not resume."""
     s = projekt(tmp_path)
     s.nodes = [TaskNode(id="a", rejections=2)]
-    verdikt, grund = resume_decision(s)
-    assert verdikt == RETRY, grund
-    assert "not an endpoint" in grund
+    verdict, why = resume_decision(s)
+    assert verdict == RETRY, why
+    assert "not an endpoint" in why
 
 
-def test_externe_aktion_bleibt_als_solche_erkennbar(tmp_path):
+def test_an_external_action_stays_recognisable_as_one(tmp_path):
     """The action class survives a restart: it is state, not a judgement the
     next session has to make again."""
     s = ProjectStore(tmp_path, "p")
@@ -410,7 +410,7 @@ def test_externe_aktion_bleibt_als_solche_erkennbar(tmp_path):
 # Decisions are records, not remembered intentions
 # --------------------------------------------------------------------------- #
 
-def test_entscheidung_ist_an_ihren_inhalt_gebunden(tmp_path):
+def test_a_decision_is_bound_to_its_content(tmp_path):
     """A decision record's digest is derived from its payload, and a mismatch
     is refused: a rebound record is a new record, not an edited one."""
     d = DecisionRecord(
@@ -434,14 +434,14 @@ def test_entscheidung_ist_an_ihren_inhalt_gebunden(tmp_path):
     assert "does not match its payload" in str(exc.value)
 
 
-def test_digest_ist_reihenfolgeunabhaengig(tmp_path):
+def test_the_digest_is_order_independent(tmp_path):
     """Same decision, different key order, same digest -- otherwise binding is
     decorative."""
     assert digest_obj({"a": 1, "b": 2}) == digest_obj({"b": 2, "a": 1})
     assert digest_obj({"a": 1}) != digest_obj({"a": 2})
 
 
-def test_entscheidungen_ueberleben_den_neustart(tmp_path):
+def test_decisions_survive_the_restart(tmp_path):
     """The record of *why* survives, not just the resulting state.
 
     This is what a fresh session cannot otherwise recover: the tree shows that
@@ -462,12 +462,12 @@ def test_entscheidungen_ueberleben_den_neustart(tmp_path):
         )
     ]
     s.create(st)
-    zurueck = ProjectStore(tmp_path, "p").read_state()
-    assert zurueck.decisions[0].reason.startswith("premise disproved")
-    assert zurueck.decisions[0].payload_digest == st.decisions[0].payload_digest
+    back = ProjectStore(tmp_path, "p").read_state()
+    assert back.decisions[0].reason.startswith("premise disproved")
+    assert back.decisions[0].payload_digest == st.decisions[0].payload_digest
 
 
-def test_gate_ergebnis_traegt_seinen_gegenstand(tmp_path):
+def test_a_gate_result_carries_its_subject(tmp_path):
     """A gate result names the commit it ran against.
 
     A green recorded without its subject cannot later be told apart from a
@@ -480,14 +480,14 @@ def test_gate_ergebnis_traegt_seinen_gegenstand(tmp_path):
         GateResult(name="union", outcome=GateOutcome.GREEN)  # type: ignore[call-arg]
 
 
-def test_projekte_werden_aufgelistet(tmp_path):
+def test_projects_are_listed(tmp_path):
     assert list_projects(tmp_path) == []
     ProjectStore(tmp_path, "eins").create(projekt(tmp_path, project_id="eins"))
     ProjectStore(tmp_path, "zwei").create(projekt(tmp_path, project_id="zwei"))
     assert list_projects(tmp_path) == ["eins", "zwei"]
 
 
-def test_zustand_ist_reines_json_und_wieder_einlesbar(tmp_path):
+def test_the_state_is_plain_json_and_can_be_read_back(tmp_path):
     """The state file is readable by something that is not this code.
 
     A durable state that only its own writer can parse is a slightly more
@@ -498,17 +498,17 @@ def test_zustand_ist_reines_json_und_wieder_einlesbar(tmp_path):
     st.nodes = [TaskNode(id="a", writes=["README.md"], semantic_reads=["tools/x.py"])]
     st.gates = [gate("union")]
     s.create(st)
-    roh = json.loads(s.state_path.read_text())
-    assert roh["nodes"][0]["writes"] == ["README.md"]
-    assert roh["gates"][0]["subject"] == "abc1234"
-    assert roh["schema_version"] >= 1
+    raw_ = json.loads(s.state_path.read_text())
+    assert raw_["nodes"][0]["writes"] == ["README.md"]
+    assert raw_["gates"][0]["subject"] == "abc1234"
+    assert raw_["schema_version"] >= 1
 
 
 # --------------------------------------------------------------------------- #
 # The CLI surface
 # --------------------------------------------------------------------------- #
 
-def test_cli_meldet_unlesbaren_zustand_mit_eigenem_exitcode(tmp_path, capsys):
+def test_the_cli_reports_an_unreadable_state_with_its_own_exit_code(tmp_path, capsys):
     """A script reading `hoh project` must not see 0 for a damaged state.
 
     Three distinct codes, because the remedies differ: 0 answered, 2 no such
@@ -522,14 +522,14 @@ def test_cli_meldet_unlesbaren_zustand_mit_eigenem_exitcode(tmp_path, capsys):
     assert main(["--root", str(tmp_path), "project", "resume", "p"]) == 0
     assert main(["--root", str(tmp_path), "project", "status", "gibtesnicht"]) == 2
 
-    fortschritt = s.read_state()
-    fortschritt.nodes = [TaskNode(id="a")]
-    s.write_state(fortschritt)
+    progress_ = s.read_state()
+    progress_.nodes = [TaskNode(id="a")]
+    s.write_state(progress_)
     s.state_path.write_text("{ not json", encoding="utf-8")
     assert main(["--root", str(tmp_path), "project", "status", "p"]) == 3
 
 
-def test_cli_resume_ist_maschinenlesbar(tmp_path, capsys):
+def test_cli_resume_is_machine_readable(tmp_path, capsys):
     """`resume` prints JSON: the verdict is for a caller, not only a reader."""
     from hoh.cli import main
 
@@ -542,28 +542,28 @@ def test_cli_resume_ist_maschinenlesbar(tmp_path, capsys):
 
     capsys.readouterr()
     assert main(["--root", str(tmp_path), "project", "resume", "p"]) == 0
-    daten = json.loads(capsys.readouterr().out)
-    assert daten["verdict"] == CLOSED
-    assert daten["rc_closed"] is True
-    assert daten["measurement_head"] == "abc1234"
+    data_ = json.loads(capsys.readouterr().out)
+    assert data_["verdict"] == CLOSED
+    assert data_["rc_closed"] is True
+    assert data_["measurement_head"] == "abc1234"
 
 
-def test_cli_list_zeigt_jedes_projekt_mit_verdikt(tmp_path, capsys):
+def test_cli_list_shows_every_project_with_its_verdict(tmp_path, capsys):
     from hoh.cli import main
 
     ProjectStore(tmp_path, "eins").create(projekt(tmp_path, project_id="eins"))
     ProjectStore(tmp_path, "zwei").create(projekt(tmp_path, project_id="zwei"))
     capsys.readouterr()
     assert main(["--root", str(tmp_path), "project", "list"]) == 0
-    aus = capsys.readouterr().out
-    assert "eins" in aus and "zwei" in aus
+    output = capsys.readouterr().out
+    assert "eins" in output and "zwei" in output
 
 
 # --------------------------------------------------------------------------- #
 # A blocked node needs a way back, and it has to leave a record
 # --------------------------------------------------------------------------- #
 
-def test_unblock_verlangt_einen_grund_und_schreibt_ihn_auf(tmp_path):
+def test_unblock_demands_a_reason_and_writes_it_down(tmp_path):
     """Refusing to decide was right; leaving no way back is not.
 
     Without this the only route out of a blocked project is editing the state
@@ -579,20 +579,20 @@ def test_unblock_verlangt_einen_grund_und_schreibt_ihn_auf(tmp_path):
                          note="accepted but the candidate did not land")]
     s.create(st)
 
-    nachher = unblock(s, "a", "untracked build output removed; the merge can land now")
-    n = nachher.node("a")
+    after = unblock(s, "a", "untracked build output removed; the merge can land now")
+    n = after.node("a")
     assert n.lifecycle is Lifecycle.READY
     # The original reason stays readable: what it was blocked for matters after
     # it is running again.
     assert "did not land" in n.note
     assert "untracked build output" in n.note
-    d = nachher.decisions[-1]
+    d = after.decisions[-1]
     assert d.actor == "human"
     assert "untracked build output" in d.reason
     assert d.payload["was_blocked_for"].startswith("accepted but")
 
 
-def test_unblock_verweigert_was_nicht_blockiert_ist(tmp_path):
+def test_unblock_refuses_what_is_not_blocked(tmp_path):
     """Unblocking something that is not blocked would hide whatever it is
     actually doing."""
     from hoh.projectstore import unblock
@@ -606,7 +606,7 @@ def test_unblock_verweigert_was_nicht_blockiert_ist(tmp_path):
     assert "not BLOCKED" in str(exc.value)
 
 
-def test_unblock_kennt_unbekannte_knoten_nicht(tmp_path):
+def test_unblock_does_not_know_unknown_nodes(tmp_path):
     from hoh.projectstore import unblock
 
     s = ProjectStore(tmp_path, "p")
@@ -615,7 +615,7 @@ def test_unblock_kennt_unbekannte_knoten_nicht(tmp_path):
         unblock(s, "gibtesnicht", "x")
 
 
-def test_cli_unblock_hat_einen_eigenen_exitcode_fuer_verweigerung(tmp_path, capsys):
+def test_cli_unblock_has_its_own_exit_code_for_a_refusal(tmp_path, capsys):
     from hoh.cli import main
 
     s = ProjectStore(tmp_path, "p")
@@ -635,7 +635,7 @@ def test_cli_unblock_hat_einen_eigenen_exitcode_fuer_verweigerung(tmp_path, caps
 # Repository changes made outside the loop
 # --------------------------------------------------------------------------- #
 
-def test_externe_aenderung_wird_mit_beiden_koepfen_festgehalten(tmp_path):
+def test_an_external_change_is_recorded_with_both_heads(tmp_path):
     """The gap the first real end-to-end run exposed.
 
     A merge conflict was resolved by a person, in git, and nothing about it
@@ -649,11 +649,11 @@ def test_externe_aenderung_wird_mit_beiden_koepfen_festgehalten(tmp_path):
     st.nodes = [TaskNode(id="a", lifecycle=Lifecycle.BLOCKED)]
     s.create(st)
 
-    nachher = record_external_action(
+    after = record_external_action(
         s, actor="human", reason="resolved a modify/delete conflict on build output",
         node="a", head_before="abc1234", head_after="def5678",
     )
-    r = nachher.external_actions[-1]
+    r = after.external_actions[-1]
     assert r.actor == "human"
     assert r.head_before == "abc1234" and r.head_after == "def5678"
     assert r.changed_the_tree is True
@@ -662,7 +662,7 @@ def test_externe_aenderung_wird_mit_beiden_koepfen_festgehalten(tmp_path):
     assert r.write_seq >= 1
 
 
-def test_externe_aenderungen_stehen_nicht_unter_den_entscheidungen(tmp_path):
+def test_external_changes_do_not_sit_among_the_decisions(tmp_path):
     """A decision is something this system chose; an external action is
     something that happened to it. Collapsing them would let the record imply
     authorship it does not have."""
@@ -670,12 +670,12 @@ def test_externe_aenderungen_stehen_nicht_unter_den_entscheidungen(tmp_path):
 
     s = ProjectStore(tmp_path, "p")
     s.create(projekt(tmp_path))
-    nachher = record_external_action(s, actor="operator", reason="cleaned build output")
-    assert len(nachher.external_actions) == 1
-    assert nachher.decisions == []
+    after = record_external_action(s, actor="operator", reason="cleaned build output")
+    assert len(after.external_actions) == 1
+    assert after.decisions == []
 
 
-def test_eine_aenderung_die_nichts_bewegt_ist_auch_eine(tmp_path):
+def test_a_change_that_moves_nothing_is_still_a_change(tmp_path):
     """An aborted merge is worth recording, and it is a different thing from
     one that landed -- a reader should not have to compare digits to find out.
     """
@@ -683,14 +683,14 @@ def test_eine_aenderung_die_nichts_bewegt_ist_auch_eine(tmp_path):
 
     s = ProjectStore(tmp_path, "p")
     s.create(projekt(tmp_path))
-    nachher = record_external_action(
+    after = record_external_action(
         s, actor="operator", reason="attempted a merge, aborted it",
         head_before="abc1234", head_after="abc1234",
     )
-    assert nachher.external_actions[-1].changed_the_tree is False
+    assert after.external_actions[-1].changed_the_tree is False
 
 
-def test_externe_aenderung_an_einem_unbekannten_knoten_wird_verweigert(tmp_path):
+def test_an_external_change_to_an_unknown_node_is_refused(tmp_path):
     from hoh.projectstore import record_external_action
 
     s = ProjectStore(tmp_path, "p")
@@ -699,19 +699,19 @@ def test_externe_aenderung_an_einem_unbekannten_knoten_wird_verweigert(tmp_path)
         record_external_action(s, actor="human", reason="x", node="gibtesnicht")
 
 
-def test_externe_aenderungen_ueberleben_den_neustart(tmp_path):
+def test_external_changes_survive_the_restart(tmp_path):
     from hoh.projectstore import record_external_action
 
     s = ProjectStore(tmp_path, "p")
     s.create(projekt(tmp_path))
     record_external_action(s, actor="human", reason="resolved a conflict by hand",
                           head_before="a1", head_after="b2")
-    zurueck = ProjectStore(tmp_path, "p").read_state()
-    assert zurueck.external_actions[-1].reason == "resolved a conflict by hand"
-    assert zurueck.external_actions[-1].action_id == "X0001"
+    back = ProjectStore(tmp_path, "p").read_state()
+    assert back.external_actions[-1].reason == "resolved a conflict by hand"
+    assert back.external_actions[-1].action_id == "X0001"
 
 
-def test_cli_record_action_misst_den_head_selbst(tmp_path, capsys):
+def test_cli_record_action_measures_the_head_itself(tmp_path, capsys):
     """The head after is measured, not typed: a record whose numbers came from
     the person being recorded proves nothing."""
     import subprocess
@@ -726,7 +726,7 @@ def test_cli_record_action_misst_den_head_selbst(tmp_path, capsys):
     (repo / "f.txt").write_text("x\n")
     subprocess.run(["git", "add", "-A"], cwd=repo, check=True)
     subprocess.run(["git", "commit", "-q", "-m", "init"], cwd=repo, check=True)
-    echter = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=repo,
+    real_one = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=repo,
                             capture_output=True, text=True).stdout.strip()
 
     s = ProjectStore(tmp_path, "p")
@@ -738,7 +738,7 @@ def test_cli_record_action_misst_den_head_selbst(tmp_path, capsys):
                  "--actor", "human", "--reason", "resolved a conflict",
                  "--head-before", "0000000"]) == 0
     r = s.read_state().external_actions[-1]
-    assert r.head_after == echter, f"{r.head_after} != {echter}"
+    assert r.head_after == real_one, f"{r.head_after} != {real_one}"
     assert r.head_before == "0000000"
 
 
@@ -747,7 +747,7 @@ def test_cli_record_action_misst_den_head_selbst(tmp_path, capsys):
 # --------------------------------------------------------------------------- #
 
 
-def _projekt_mit_knoten(tmp_path, lifecycle):
+def _project_with_nodes(tmp_path, lifecycle):
     from hoh.project import ActionClass, ProjectState, TaskNode
     from hoh.projectstore import ProjectStore
 
@@ -771,22 +771,22 @@ def test_a_node_can_be_abandoned_with_a_reason(tmp_path):
     from hoh.project import Lifecycle
     from hoh.projectstore import abandon
 
-    store = _projekt_mit_knoten(tmp_path, Lifecycle.READY)
+    store = _project_with_nodes(tmp_path, Lifecycle.READY)
     st = abandon(store, "repair-1-1",
                  "the gate failure it repairs came from the driver, not the "
                  "merged state, which was green", actor="main-session")
-    knoten = st.node("repair-1-1")
-    assert knoten.lifecycle is Lifecycle.ABANDONED
-    assert knoten.settled
-    assert "abandoned" in knoten.note
-    assert "the suite failed" in knoten.note, "the original note was overwritten"
+    task = st.node("repair-1-1")
+    assert task.lifecycle is Lifecycle.ABANDONED
+    assert task.settled
+    assert "abandoned" in task.note
+    assert "the suite failed" in task.note, "the original note was overwritten"
 
 
 def test_abandoning_records_who_and_why(tmp_path):
     from hoh.project import DecisionKind, Lifecycle
     from hoh.projectstore import abandon
 
-    store = _projekt_mit_knoten(tmp_path, Lifecycle.BLOCKED)
+    store = _project_with_nodes(tmp_path, Lifecycle.BLOCKED)
     st = abandon(store, "repair-1-1", "no defect to repair", actor="captain")
     e = st.decisions[-1]
     assert e.kind is DecisionKind.ABANDON_NODE
@@ -801,7 +801,7 @@ def test_a_settled_node_is_not_re_settled(tmp_path):
     from hoh.project import Lifecycle
     from hoh.projectstore import StoreError, abandon
 
-    store = _projekt_mit_knoten(tmp_path, Lifecycle.MERGED)
+    store = _project_with_nodes(tmp_path, Lifecycle.MERGED)
     with pytest.raises(StoreError, match="already MERGED"):
         abandon(store, "repair-1-1", "x")
 
@@ -810,7 +810,7 @@ def test_abandoning_an_unknown_node_is_refused(tmp_path):
     from hoh.project import Lifecycle
     from hoh.projectstore import StoreError, abandon
 
-    store = _projekt_mit_knoten(tmp_path, Lifecycle.READY)
+    store = _project_with_nodes(tmp_path, Lifecycle.READY)
     with pytest.raises(StoreError, match="has no node"):
         abandon(store, "nope", "x")
 
@@ -822,7 +822,7 @@ def test_an_abandoned_node_no_longer_blocks_closure(tmp_path):
     from hoh.project import GateOutcome, GateResult, Lifecycle
     from hoh.projectstore import abandon
 
-    store = _projekt_mit_knoten(tmp_path, Lifecycle.READY)
+    store = _project_with_nodes(tmp_path, Lifecycle.READY)
     st = store.read_state()
     st.nodes[0].lifecycle = Lifecycle.READY
     st.gates.append(GateResult(name="suite", subject="a" * 12,
@@ -841,11 +841,11 @@ def test_an_unevaluable_gate_is_not_green():
     cannot be evaluated has not been shown to be closed."""
     from hoh.project import GateOutcome, GateResult
 
-    for ergebnis in (GateOutcome.NOT_RUN, GateOutcome.UNSUPPORTED_ENVIRONMENT,
+    for result in (GateOutcome.NOT_RUN, GateOutcome.UNSUPPORTED_ENVIRONMENT,
                      GateOutcome.RED):
-        g = GateResult(name="claims", subject="a" * 12, outcome=ergebnis,
+        g = GateResult(name="claims", subject="a" * 12, outcome=result,
                        exit_code=1)
-        assert not g.counts_as_green, ergebnis.value
+        assert not g.counts_as_green, result.value
     assert GateResult(name="claims", subject="a" * 12,
                       outcome=GateOutcome.GREEN, exit_code=0).counts_as_green
 
@@ -865,7 +865,7 @@ def test_an_unevaluable_gate_blocks_closure(tmp_path):
 # --------------------------------------------------------------------------- #
 
 
-def _mit_gates(tmp_path, *gates):
+def _with_gates(tmp_path, *gates):
     from hoh.project import GateResult, ProjectState
 
     st = ProjectState(project_id="p", repo_path=str(tmp_path))
@@ -883,7 +883,7 @@ def test_a_renamed_gate_does_not_block_closure_for_ever(tmp_path):
     by a check that no longer ran."""
     from hoh.project import GateOutcome as G
 
-    st = _mit_gates(
+    st = _with_gates(
         tmp_path,
         ("claims", G.RED, 1),
         ("suite", G.GREEN, 1),
@@ -902,7 +902,7 @@ def test_a_red_gate_in_the_latest_pass_still_blocks(tmp_path):
     failing gate to age out of relevance."""
     from hoh.project import GateOutcome as G
 
-    st = _mit_gates(tmp_path, ("suite", G.GREEN, 1), ("suite", G.RED, 2))
+    st = _with_gates(tmp_path, ("suite", G.GREEN, 1), ("suite", G.RED, 2))
     assert not st.gates_green()
 
 
@@ -911,18 +911,18 @@ def test_results_from_before_the_field_existed_behave_as_they_did(tmp_path):
     those states reading exactly as they used to."""
     from hoh.project import GateOutcome as G
 
-    st = _mit_gates(tmp_path, ("suite", G.RED, 0), ("suite", G.GREEN, 0))
+    st = _with_gates(tmp_path, ("suite", G.RED, 0), ("suite", G.GREEN, 0))
     assert st.gates_green(), "the later result still wins within one generation"
     assert st.retired_gates() == []
 
-    st2 = _mit_gates(tmp_path, ("suite", G.GREEN, 0), ("claims", G.RED, 0))
+    st2 = _with_gates(tmp_path, ("suite", G.GREEN, 0), ("claims", G.RED, 0))
     assert not st2.gates_green()
 
 
 def test_nothing_is_retired_when_every_gate_still_reports(tmp_path):
     from hoh.project import GateOutcome as G
 
-    st = _mit_gates(tmp_path, ("suite", G.GREEN, 1), ("suite", G.GREEN, 2))
+    st = _with_gates(tmp_path, ("suite", G.GREEN, 1), ("suite", G.GREEN, 2))
     assert st.retired_gates() == []
 
 
@@ -932,5 +932,5 @@ def test_the_orchestrator_stamps_the_pass_on_every_result(tmp_path):
 
     from hoh import orchestrator
 
-    quelle = inspect.getsource(orchestrator)
-    assert "g.generation = naechste" in quelle
+    source = inspect.getsource(orchestrator)
+    assert "g.generation = next_" in source

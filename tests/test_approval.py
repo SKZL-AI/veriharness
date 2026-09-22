@@ -20,7 +20,7 @@ import pytest
 from hoh.approval import Approval, NoApprovalProvider, ScopedScriptProvider
 
 
-def test_ohne_provider_wird_nichts_freigegeben(tmp_path):
+def test_without_a_provider_nothing_is_approved(tmp_path):
     """Adding this module changes nothing for a deployment that configures no
     authority: the run blocks and a person answers, exactly as before."""
     p = NoApprovalProvider()
@@ -31,71 +31,71 @@ def test_ohne_provider_wird_nichts_freigegeben(tmp_path):
     assert str(tmp_path) in a.as_reason()
 
 
-def test_ein_provider_gibt_nur_seinen_eigenen_worktree_frei(tmp_path):
+def test_a_provider_approves_only_its_own_worktree(tmp_path):
     """The scope is the point.
 
     A helper that can trust any path turns "HoH will not trust arbitrary
     directories" back into "HoH will trust arbitrary directories, via this".
     """
-    erlaubt = tmp_path / "meins"
-    erlaubt.mkdir()
-    fremd = tmp_path / "fremd"
-    fremd.mkdir()
-    skript = tmp_path / "ja.sh"
-    skript.write_text("#!/bin/sh\nexit 0\n")
-    skript.chmod(0o755)
+    allowed_ = tmp_path / "meins"
+    allowed_.mkdir()
+    foreign = tmp_path / "fremd"
+    foreign.mkdir()
+    script_ = tmp_path / "ja.sh"
+    script_.write_text("#!/bin/sh\nexit 0\n")
+    script_.chmod(0o755)
 
-    p = ScopedScriptProvider(script=skript, allowed=(erlaubt,))
-    assert p.may_approve(erlaubt) is True
-    assert p.may_approve(fremd) is False
+    p = ScopedScriptProvider(script=script_, allowed=(allowed_,))
+    assert p.may_approve(allowed_) is True
+    assert p.may_approve(foreign) is False
 
-    a = p.approve(fremd, tmp_path)
+    a = p.approve(foreign, tmp_path)
     assert a.granted is False
     assert "not in this provider's scope" in a.detail
     assert p.granted == [], "a refused worktree must not be recorded as granted"
 
-    b = p.approve(erlaubt, tmp_path)
+    b = p.approve(allowed_, tmp_path)
     assert b.granted is True
-    assert p.granted == [erlaubt]
+    assert p.granted == [allowed_]
 
 
-def test_der_pfad_wird_aufgeloest_bevor_er_verglichen_wird(tmp_path):
+def test_the_path_is_resolved_before_it_is_compared(tmp_path):
     """`allowed/../allowed` is the same worktree; `allowed/../other` is not.
 
     Comparing unresolved strings would let a caller walk out of the scope with
     a relative path, which is the one trick this check exists to stop.
     """
-    erlaubt = tmp_path / "meins"
-    erlaubt.mkdir()
+    allowed_ = tmp_path / "meins"
+    allowed_.mkdir()
     (tmp_path / "fremd").mkdir()
-    p = ScopedScriptProvider(script=tmp_path / "x.sh", allowed=(erlaubt,))
+    p = ScopedScriptProvider(script=tmp_path / "x.sh", allowed=(allowed_,))
     assert p.may_approve(tmp_path / "meins" / ".." / "meins") is True
     assert p.may_approve(tmp_path / "meins" / ".." / "fremd") is False
 
 
-def test_ein_fehlendes_hilfsskript_gibt_nicht_frei(tmp_path):
-    erlaubt = tmp_path / "meins"
-    erlaubt.mkdir()
-    p = ScopedScriptProvider(script=tmp_path / "gibtesnicht.sh", allowed=(erlaubt,))
-    a = p.approve(erlaubt, tmp_path)
+def test_a_missing_helper_script_does_not_approve(tmp_path):
+    allowed_ = tmp_path / "meins"
+    allowed_.mkdir()
+    p = ScopedScriptProvider(script=tmp_path / "gibtesnicht.sh", allowed=(allowed_,))
+    a = p.approve(allowed_, tmp_path)
     assert a.granted is False
     assert "does not exist" in a.detail
 
 
-def test_ein_scheiterndes_hilfsskript_gibt_nicht_frei(tmp_path):
-    erlaubt = tmp_path / "meins"
-    erlaubt.mkdir()
-    skript = tmp_path / "nein.sh"
-    skript.write_text("#!/bin/sh\necho 'user declined' >&2\nexit 3\n")
-    skript.chmod(0o755)
-    p = ScopedScriptProvider(script=skript, allowed=(erlaubt,))
-    a = p.approve(erlaubt, tmp_path)
+def test_a_failing_helper_script_does_not_approve(tmp_path):
+    allowed_ = tmp_path / "meins"
+    allowed_.mkdir()
+    script_ = tmp_path / "nein.sh"
+    script_.write_text("#!/bin/sh\necho 'user declined' >&2\nexit 3\n")
+    script_.chmod(0o755)
+    p = ScopedScriptProvider(script=script_, allowed=(allowed_,))
+    a = p.approve(allowed_, tmp_path)
     assert a.granted is False
     assert "exited 3" in a.detail
     assert "user declined" in a.detail
 
 
-def test_die_antwort_sagt_wofuer_sie_galt(tmp_path):
+def test_the_answer_says_what_it_was_for(tmp_path):
     """"Trust was granted" without saying to what is the same shape of claim
     this project keeps having to correct."""
     a = Approval(granted=True, worktree=Path("/w/t"), provider="p", detail="ok")
@@ -104,7 +104,7 @@ def test_die_antwort_sagt_wofuer_sie_galt(tmp_path):
     assert "refused" in b.as_reason() and "nope" in b.as_reason()
 
 
-def test_der_launcher_hat_ohne_konfiguration_keine_autoritaet(tmp_path):
+def test_the_launcher_has_no_authority_without_configuration(tmp_path):
     """No hardcoded path anywhere: a machine's layout must not become a product
     requirement."""
     from hoh.launcher import HohRunLauncher
@@ -114,24 +114,24 @@ def test_der_launcher_hat_ohne_konfiguration_keine_autoritaet(tmp_path):
     assert l.approvals.approve(tmp_path, tmp_path).granted is False
 
 
-def test_der_launcher_haelt_jede_antwort_fest(tmp_path):
+def test_the_launcher_records_every_answer(tmp_path):
     from hoh.launcher import HohRunLauncher
 
-    erlaubt = tmp_path / "wt"
-    erlaubt.mkdir()
-    skript = tmp_path / "ja.sh"
-    skript.write_text("#!/bin/sh\nexit 0\n")
-    skript.chmod(0o755)
+    allowed_ = tmp_path / "wt"
+    allowed_.mkdir()
+    script_ = tmp_path / "ja.sh"
+    script_.write_text("#!/bin/sh\nexit 0\n")
+    script_.chmod(0o755)
     l = HohRunLauncher(
         tmp_path, tmp_path,
-        approvals=ScopedScriptProvider(script=skript, allowed=(erlaubt,)),
+        approvals=ScopedScriptProvider(script=script_, allowed=(allowed_,)),
     )
-    assert l._approve(erlaubt).granted is True
+    assert l._approve(allowed_).granted is True
     assert l._approve(tmp_path / "anderswo").granted is False
     assert len(l.approvals_given) == 2, "every answer goes on the record, including refusals"
 
 
-def test_ein_verzeichnis_als_scope_deckt_auch_kuenftige_worktrees(tmp_path):
+def test_a_directory_as_scope_covers_future_worktrees_too(tmp_path):
     """A fixed list cannot cover work that does not exist yet.
 
     A repair node is created by a gate failure, gets its own worktree, and
@@ -139,41 +139,41 @@ def test_ein_verzeichnis_als_scope_deckt_auch_kuenftige_worktrees(tmp_path):
     """
     from hoh.approval import PrefixScopedProvider
 
-    wurzel = tmp_path / "worktrees" / "projekt"
-    (wurzel / "hoh-a").mkdir(parents=True)
-    skript = tmp_path / "ja.sh"
-    skript.write_text("#!/bin/sh\nexit 0\n")
-    skript.chmod(0o755)
+    root = tmp_path / "worktrees" / "projekt"
+    (root / "hoh-a").mkdir(parents=True)
+    script_ = tmp_path / "ja.sh"
+    script_.write_text("#!/bin/sh\nexit 0\n")
+    script_.chmod(0o755)
 
-    p = PrefixScopedProvider(script=skript, prefix=wurzel)
-    assert p.may_approve(wurzel / "hoh-a") is True
+    p = PrefixScopedProvider(script=script_, prefix=root)
+    assert p.may_approve(root / "hoh-a") is True
 
     # The repair-node case, in the order it actually happens: the scope is
     # configured before the worktree exists, and approval is asked for after
     # Herdr has created it. A name nobody has created yet is NOT approvable --
     # `Path.resolve()` is non-strict, so such a path resolves perfectly well,
     # and granting on it would trust whatever the next writer puts there.
-    kuenftig = wurzel / "hoh-repair-2-1"
-    assert p.may_approve(kuenftig) is False
-    kuenftig.mkdir()
-    assert p.may_approve(kuenftig) is True
+    future_ = root / "hoh-repair-2-1"
+    assert p.may_approve(future_) is False
+    future_.mkdir()
+    assert p.may_approve(future_) is True
 
     # Outside the prefix, and the prefix itself.
     assert p.may_approve(tmp_path / "woanders") is False
-    assert p.may_approve(wurzel) is False
+    assert p.may_approve(root) is False
     # And a relative path cannot walk out of it.
-    assert p.may_approve(wurzel / "hoh-a" / ".." / ".." / "fremd") is False
+    assert p.may_approve(root / "hoh-a" / ".." / ".." / "fremd") is False
 
 
-def test_ein_zu_weiter_scope_wird_sofort_abgelehnt(tmp_path):
+def test_a_scope_that_is_too_broad_is_refused_at_once(tmp_path):
     """A provider allowed to approve anything under `/` or a home directory has
     no scope at all, and should fail when it is built rather than when it is
     used."""
     from hoh.approval import PrefixScopedProvider
 
-    for zu_weit in (Path("/"), Path("/home"), Path.home(), Path("/tmp")):
+    for too_broad in (Path("/"), Path("/home"), Path.home(), Path("/tmp")):
         with pytest.raises(ValueError) as exc:
-            PrefixScopedProvider(script=tmp_path / "x.sh", prefix=zu_weit)
+            PrefixScopedProvider(script=tmp_path / "x.sh", prefix=too_broad)
         assert "too broad" in str(exc.value)
 
 
@@ -185,12 +185,12 @@ def test_ein_zu_weiter_scope_wird_sofort_abgelehnt(tmp_path):
 def _provider(tmp_path, **kw):
     from hoh.approval import PrefixScopedProvider
 
-    wurzel = tmp_path / "worktrees" / "projekt"
-    wurzel.mkdir(parents=True, exist_ok=True)
-    skript = tmp_path / "ja.sh"
-    skript.write_text("#!/bin/sh\nexit 0\n")
-    skript.chmod(0o755)
-    return PrefixScopedProvider(script=skript, prefix=wurzel, **kw), wurzel
+    root = tmp_path / "worktrees" / "projekt"
+    root.mkdir(parents=True, exist_ok=True)
+    script_ = tmp_path / "ja.sh"
+    script_.write_text("#!/bin/sh\nexit 0\n")
+    script_.chmod(0o755)
+    return PrefixScopedProvider(script=script_, prefix=root, **kw), root
 
 
 def test_a_sibling_with_a_longer_name_is_not_inside_the_scope(tmp_path):
@@ -199,27 +199,27 @@ def test_a_sibling_with_a_longer_name_is_not_inside_the_scope(tmp_path):
     outside the scope getting an agent's write access."""
     from hoh.approval import PrefixScopedProvider
 
-    innen = tmp_path / "wt" / "projekt"
-    innen.mkdir(parents=True)
-    geschwister = tmp_path / "wt" / "projekt-anderes"
-    geschwister.mkdir()
-    skript = tmp_path / "ja.sh"
-    skript.write_text("#!/bin/sh\nexit 0\n")
-    skript.chmod(0o755)
+    inside_ = tmp_path / "wt" / "projekt"
+    inside_.mkdir(parents=True)
+    siblings = tmp_path / "wt" / "projekt-anderes"
+    siblings.mkdir()
+    script_ = tmp_path / "ja.sh"
+    script_.write_text("#!/bin/sh\nexit 0\n")
+    script_.chmod(0o755)
 
-    p = PrefixScopedProvider(script=skript, prefix=innen)
-    assert str(geschwister).startswith(str(innen)), "the trap this test is about"
-    assert p.may_approve(geschwister) is False
-    assert "not beneath" in p.approve(geschwister, tmp_path).detail
+    p = PrefixScopedProvider(script=script_, prefix=inside_)
+    assert str(siblings).startswith(str(inside_)), "the trap this test is about"
+    assert p.may_approve(siblings) is False
+    assert "not beneath" in p.approve(siblings, tmp_path).detail
 
 
 def test_a_symlink_out_of_the_scope_is_refused(tmp_path):
     """The scope is about where the directory *is*, not what it is called."""
-    p, wurzel = _provider(tmp_path)
-    draussen = tmp_path / "geheim"
-    draussen.mkdir()
-    link = wurzel / "sieht-harmlos-aus"
-    link.symlink_to(draussen)
+    p, root = _provider(tmp_path)
+    outside = tmp_path / "geheim"
+    outside.mkdir()
+    link = root / "sieht-harmlos-aus"
+    link.symlink_to(outside)
 
     assert p.may_approve(link) is False
     a = p.approve(link, tmp_path)
@@ -231,54 +231,54 @@ def test_a_symlink_out_of_the_scope_is_refused(tmp_path):
 def test_a_symlink_inside_the_scope_is_still_approved(tmp_path):
     """The control for the test above: refusing every symlink would be easy
     and would also refuse legitimate layouts. What is refused is escaping."""
-    p, wurzel = _provider(tmp_path)
-    echt = wurzel / "echt"
-    echt.mkdir()
-    link = wurzel / "zeigt-nach-innen"
-    link.symlink_to(echt)
+    p, root = _provider(tmp_path)
+    real = root / "echt"
+    real.mkdir()
+    link = root / "zeigt-nach-innen"
+    link.symlink_to(real)
     assert p.may_approve(link) is True
 
 
 def test_a_dotdot_escape_is_refused(tmp_path):
-    p, wurzel = _provider(tmp_path)
-    (wurzel / "a").mkdir()
-    fremd = tmp_path / "fremd"
-    fremd.mkdir()
-    assert p.may_approve(wurzel / "a" / ".." / ".." / "fremd") is False
+    p, root = _provider(tmp_path)
+    (root / "a").mkdir()
+    foreign = tmp_path / "fremd"
+    foreign.mkdir()
+    assert p.may_approve(root / "a" / ".." / ".." / "fremd") is False
 
 
 def test_a_file_is_not_a_worktree(tmp_path):
-    p, wurzel = _provider(tmp_path)
-    datei = wurzel / "keine-mappe"
-    datei.write_text("x")
-    assert p.may_approve(datei) is False
-    assert "does not exist as a directory" in p.approve(datei, tmp_path).detail
+    p, root = _provider(tmp_path)
+    file = root / "keine-mappe"
+    file.write_text("x")
+    assert p.may_approve(file) is False
+    assert "does not exist as a directory" in p.approve(file, tmp_path).detail
 
 
 def test_a_target_swapped_after_the_check_is_refused(tmp_path):
     """Time-of-check to time-of-use. The window is small; what is on the other
     side of it is an agent with write access to wherever the path now points."""
-    p, wurzel = _provider(tmp_path)
-    ziel = wurzel / "wt"
-    ziel.mkdir()
-    draussen = tmp_path / "woanders"
-    draussen.mkdir()
+    p, root = _provider(tmp_path)
+    target = root / "wt"
+    target.mkdir()
+    outside = tmp_path / "woanders"
+    outside.mkdir()
 
-    echte_identitaet = p._identity
+    real_identity = p._identity
 
-    zaehler = {"n": 0}
+    counter = {"n": 0}
 
-    def wechselnd(pfad):
+    def alternating(path):
         # The scope check and the identity taken with it see the real
         # directory; the last look, immediately before the grant, sees
         # something else.
-        zaehler["n"] += 1
-        if zaehler["n"] <= 2:
-            return echte_identitaet(pfad)
-        return echte_identitaet(draussen)
+        counter["n"] += 1
+        if counter["n"] <= 2:
+            return real_identity(path)
+        return real_identity(outside)
 
-    p._identity = wechselnd
-    a = p.approve(ziel, tmp_path)
+    p._identity = alternating
+    a = p.approve(target, tmp_path)
     assert a.granted is False
     assert "changed identity" in a.detail
     assert p.granted == []
@@ -287,17 +287,17 @@ def test_a_target_swapped_after_the_check_is_refused(tmp_path):
 def test_a_scope_that_is_only_one_level_deep_is_refused(tmp_path):
     from hoh.approval import PrefixScopedProvider
 
-    for zu_weit in (Path("/opt"), Path("/srv"), Path("/anything")):
+    for too_broad in (Path("/opt"), Path("/srv"), Path("/anything")):
         with pytest.raises(ValueError, match="too broad"):
-            PrefixScopedProvider(script=tmp_path / "x.sh", prefix=zu_weit)
+            PrefixScopedProvider(script=tmp_path / "x.sh", prefix=too_broad)
 
 
 def test_a_parent_of_the_home_directory_is_refused(tmp_path):
     from hoh.approval import PrefixScopedProvider
 
-    eltern = Path.home().resolve().parent
+    parent_dir = Path.home().resolve().parent
     with pytest.raises(ValueError, match="too broad"):
-        PrefixScopedProvider(script=tmp_path / "x.sh", prefix=eltern)
+        PrefixScopedProvider(script=tmp_path / "x.sh", prefix=parent_dir)
 
 
 # --------------------------------------------------------------------------- #
@@ -305,18 +305,18 @@ def test_a_parent_of_the_home_directory_is_refused(tmp_path):
 # --------------------------------------------------------------------------- #
 
 
-def _repo(pfad: Path) -> Path:
+def _repo(path: Path) -> Path:
     import subprocess
 
-    pfad.mkdir(parents=True, exist_ok=True)
-    subprocess.run(["git", "init", "-q"], cwd=pfad, check=True)
-    (pfad / "a.txt").write_text("x")
-    subprocess.run(["git", "add", "-A"], cwd=pfad, check=True)
+    path.mkdir(parents=True, exist_ok=True)
+    subprocess.run(["git", "init", "-q"], cwd=path, check=True)
+    (path / "a.txt").write_text("x")
+    subprocess.run(["git", "add", "-A"], cwd=path, check=True)
     subprocess.run(
         ["git", "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", "one"],
-        cwd=pfad, check=True,
+        cwd=path, check=True,
     )
-    return pfad
+    return path
 
 
 def test_only_worktrees_of_this_project_are_approved(tmp_path):
@@ -328,57 +328,57 @@ def test_only_worktrees_of_this_project_are_approved(tmp_path):
     import subprocess
 
     meins = _repo(tmp_path / "meins")
-    fremd = _repo(tmp_path / "fremd")
-    wurzel = tmp_path / "worktrees" / "gemeinsam"
-    wurzel.mkdir(parents=True)
-    subprocess.run(["git", "worktree", "add", "-q", str(wurzel / "meins-wt"), "-b", "x"],
+    foreign = _repo(tmp_path / "fremd")
+    root = tmp_path / "worktrees" / "gemeinsam"
+    root.mkdir(parents=True)
+    subprocess.run(["git", "worktree", "add", "-q", str(root / "meins-wt"), "-b", "x"],
                    cwd=meins, check=True)
-    subprocess.run(["git", "worktree", "add", "-q", str(wurzel / "fremd-wt"), "-b", "y"],
-                   cwd=fremd, check=True)
+    subprocess.run(["git", "worktree", "add", "-q", str(root / "fremd-wt"), "-b", "y"],
+                   cwd=foreign, check=True)
 
-    skript = tmp_path / "ja.sh"
-    skript.write_text("#!/bin/sh\nexit 0\n")
-    skript.chmod(0o755)
+    script_ = tmp_path / "ja.sh"
+    script_.write_text("#!/bin/sh\nexit 0\n")
+    script_.chmod(0o755)
 
     from hoh.approval import PrefixScopedProvider
 
-    p = PrefixScopedProvider(script=skript, prefix=wurzel, expected_repo=meins)
-    assert p.may_approve(wurzel / "meins-wt") is True
-    assert p.may_approve(wurzel / "fremd-wt") is False
-    a = p.approve(wurzel / "fremd-wt", fremd)
+    p = PrefixScopedProvider(script=script_, prefix=root, expected_repo=meins)
+    assert p.may_approve(root / "meins-wt") is True
+    assert p.may_approve(root / "fremd-wt") is False
+    a = p.approve(root / "fremd-wt", foreign)
     assert a.granted is False
     assert "not to this project" in a.detail
 
     # Without the binding, both are in scope -- which is the state this option
     # exists to improve on, kept visible rather than implied.
-    offen = PrefixScopedProvider(script=skript, prefix=wurzel)
-    assert offen.may_approve(wurzel / "fremd-wt") is True
+    open_ = PrefixScopedProvider(script=script_, prefix=root)
+    assert open_.may_approve(root / "fremd-wt") is True
 
 
 def test_a_directory_that_is_no_worktree_at_all_is_refused_when_bound(tmp_path):
     meins = _repo(tmp_path / "meins")
-    wurzel = tmp_path / "worktrees" / "projekt"
-    (wurzel / "kein-repo").mkdir(parents=True)
-    skript = tmp_path / "ja.sh"
-    skript.write_text("#!/bin/sh\nexit 0\n")
-    skript.chmod(0o755)
+    root = tmp_path / "worktrees" / "projekt"
+    (root / "kein-repo").mkdir(parents=True)
+    script_ = tmp_path / "ja.sh"
+    script_.write_text("#!/bin/sh\nexit 0\n")
+    script_.chmod(0o755)
 
     from hoh.approval import PrefixScopedProvider
 
-    p = PrefixScopedProvider(script=skript, prefix=wurzel, expected_repo=meins)
-    a = p.approve(wurzel / "kein-repo", meins)
+    p = PrefixScopedProvider(script=script_, prefix=root, expected_repo=meins)
+    a = p.approve(root / "kein-repo", meins)
     assert a.granted is False
     assert "not a git worktree" in a.detail or "not to this project" in a.detail
 
 
 def test_the_grant_records_the_resolved_path_not_the_one_it_was_asked_about(tmp_path):
     """What was trusted has to be readable afterwards without re-deriving it."""
-    p, wurzel = _provider(tmp_path)
-    echt = wurzel / "echt"
-    echt.mkdir()
-    link = wurzel / "zeigt-nach-innen"
-    link.symlink_to(echt)
+    p, root = _provider(tmp_path)
+    real = root / "echt"
+    real.mkdir()
+    link = root / "zeigt-nach-innen"
+    link.symlink_to(real)
     a = p.approve(link, tmp_path)
     assert a.granted is True
-    assert a.worktree == echt.resolve()
-    assert p.granted == [echt.resolve()]
+    assert a.worktree == real.resolve()
+    assert p.granted == [real.resolve()]

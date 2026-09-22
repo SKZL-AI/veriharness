@@ -524,7 +524,7 @@ class RunStore:
             # to file them alongside their arena could never match, and they
             # accumulated forever. They are filed on their own age instead,
             # keeping as many as there are arenas.
-            sandkasten = sorted(
+            sandbox_ = sorted(
                 (d for d in arena.iterdir()
                  if d.is_dir() and d.name.startswith(".hoh-scratch-")),
                 key=lambda d: d.stat().st_mtime,
@@ -534,25 +534,25 @@ class RunStore:
             # directories. They are transcripts, they are small, and they are
             # kept -- but they are kept in the attic, not in the tree the next
             # run's roles work in.
-            protokolle = sorted(
+            logs_ = sorted(
                 (f for f in arena.glob(".hoh-out-*.log") if f.is_file()),
                 key=lambda f: f.stat().st_mtime,
             )
-            if len(protokolle) > keep_arenas:
+            if len(logs_) > keep_arenas:
                 target = attic / "arenas"
                 target.mkdir(parents=True, exist_ok=True)
-                for f in protokolle[: len(protokolle) - keep_arenas]:
-                    ziel = target / f.name
-                    if not ziel.exists():
-                        f.rename(ziel)
+                for f in logs_[: len(logs_) - keep_arenas]:
+                    destination = target / f.name
+                    if not destination.exists():
+                        f.rename(destination)
                         moved["arenas"].append(f.name)
-            if len(sandkasten) > keep_arenas:
+            if len(sandbox_) > keep_arenas:
                 target = attic / "arenas"
                 target.mkdir(parents=True, exist_ok=True)
-                for d in sandkasten[: len(sandkasten) - keep_arenas]:
-                    ziel = target / d.name
-                    if not ziel.exists():
-                        d.rename(ziel)
+                for d in sandbox_[: len(sandbox_) - keep_arenas]:
+                    destination = target / d.name
+                    if not destination.exists():
+                        d.rename(destination)
                         moved["arenas"].append(d.name)
 
             if len(arena_runs) > keep_arenas:

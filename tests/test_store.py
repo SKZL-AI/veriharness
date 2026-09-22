@@ -325,18 +325,18 @@ def test_prune_files_sandbox_scratch_directories_too(tmp_path):
 
     store = RunStore(tmp_path / "runs", "r1")
     store.ensure()
-    arenen = store.arenas_dir
-    arenen.mkdir(parents=True, exist_ok=True)
+    arenas = store.arenas_dir
+    arenas.mkdir(parents=True, exist_ok=True)
     for i in range(5):
-        (arenen / f"{i:012x}").mkdir()
-        (arenen / f".hoh-scratch-r1-i{i}-a1-K1").mkdir()
+        (arenas / f"{i:012x}").mkdir()
+        (arenas / f".hoh-scratch-r1-i{i}-a1-K1").mkdir()
 
-    bewegt = store.prune(keep_arenas=2)
+    moved_ = store.prune(keep_arenas=2)
 
-    uebrig = sorted(d.name for d in arenen.iterdir() if d.is_dir())
-    sandkasten = [n for n in uebrig if n.startswith(".hoh-scratch-")]
-    assert len(sandkasten) == 2, uebrig
-    assert any(n.startswith(".hoh-scratch-") for n in bewegt["arenas"])
+    remaining_ = sorted(d.name for d in arenas.iterdir() if d.is_dir())
+    sandbox_ = [n for n in remaining_ if n.startswith(".hoh-scratch-")]
+    assert len(sandbox_) == 2, remaining_
+    assert any(n.startswith(".hoh-scratch-") for n in moved_["arenas"])
 
 
 def test_prune_keeps_the_arenas_it_promises_beside_parked_scratch(tmp_path):
@@ -347,18 +347,18 @@ def test_prune_keeps_the_arenas_it_promises_beside_parked_scratch(tmp_path):
 
     store = RunStore(tmp_path / "runs", "r2")
     store.ensure()
-    arenen = store.arenas_dir
-    arenen.mkdir(parents=True, exist_ok=True)
+    arenas = store.arenas_dir
+    arenas.mkdir(parents=True, exist_ok=True)
     for i in range(4):
-        (arenen / f"{i:012x}").mkdir()
-        (arenen / f"{i:012x}.scratch").mkdir()
-        (arenen / f"{i:012x}.scratch.v20260913T{i:06d}Z").mkdir()
+        (arenas / f"{i:012x}").mkdir()
+        (arenas / f"{i:012x}.scratch").mkdir()
+        (arenas / f"{i:012x}.scratch.v20260913T{i:06d}Z").mkdir()
 
     store.prune(keep_arenas=3)
 
-    uebrig = sorted(d.name for d in arenen.iterdir()
+    remaining_ = sorted(d.name for d in arenas.iterdir()
                     if d.is_dir() and ".scratch" not in d.name)
-    assert len(uebrig) == 3, uebrig
+    assert len(remaining_) == 3, remaining_
 
 
 def test_prune_does_not_file_the_planner_root_as_an_arena(tmp_path):
@@ -371,15 +371,15 @@ def test_prune_does_not_file_the_planner_root_as_an_arena(tmp_path):
 
     store = RunStore(tmp_path / "runs", "r3")
     store.ensure()
-    arenen = store.arenas_dir
-    arenen.mkdir(parents=True, exist_ok=True)
-    (arenen / "planner").mkdir()
+    arenas = store.arenas_dir
+    arenas.mkdir(parents=True, exist_ok=True)
+    (arenas / "planner").mkdir()
     for i in range(4):
-        (arenen / f"{i:012x}").mkdir()
+        (arenas / f"{i:012x}").mkdir()
 
     store.prune(keep_arenas=1)
 
-    assert (arenen / "planner").is_dir(), "the planner's root was filed away"
+    assert (arenas / "planner").is_dir(), "the planner's root was filed away"
 
 
 def test_prune_files_the_check_transcripts_it_never_touched(tmp_path):
@@ -389,14 +389,14 @@ def test_prune_files_the_check_transcripts_it_never_touched(tmp_path):
 
     store = RunStore(tmp_path / "runs", "r4")
     store.ensure()
-    arenen = store.arenas_dir
-    arenen.mkdir(parents=True, exist_ok=True)
+    arenas = store.arenas_dir
+    arenas.mkdir(parents=True, exist_ok=True)
     for i in range(5):
-        (arenen / f".hoh-out-r4-i{i}-a1-K1.log").write_text("transcript\n")
+        (arenas / f".hoh-out-r4-i{i}-a1-K1.log").write_text("transcript\n")
 
     store.prune(keep_arenas=2)
 
-    uebrig = sorted(f.name for f in arenen.glob(".hoh-out-*.log"))
-    assert len(uebrig) == 2, uebrig
-    geparkt = sorted((store.dir / "attic" / "arenas").glob(".hoh-out-*.log"))
-    assert len(geparkt) == 3, "the transcripts were removed rather than filed"
+    remaining_ = sorted(f.name for f in arenas.glob(".hoh-out-*.log"))
+    assert len(remaining_) == 2, remaining_
+    parked_files = sorted((store.dir / "attic" / "arenas").glob(".hoh-out-*.log"))
+    assert len(parked_files) == 3, "the transcripts were removed rather than filed"

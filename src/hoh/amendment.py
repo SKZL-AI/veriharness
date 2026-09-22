@@ -148,16 +148,16 @@ class SpecAmendment(Strict):
         """
         if not self.acceptance_affecting():
             return []
-        betroffen = set(self.affected_criteria)
-        raus = []
+        affected = set(self.affected_criteria)
+        out_list = []
         for rid in receipt_ids:
-            teile = rid.split("-")
-            if not teile:
+            parts = rid.split("-")
+            if not parts:
                 continue
-            kandidat = teile[-2] if rid.endswith("-basis") else teile[-1]
-            if kandidat in betroffen:
-                raus.append(rid)
-        return raus
+            candidate = parts[-2] if rid.endswith("-basis") else parts[-1]
+            if candidate in affected:
+                out_list.append(rid)
+        return out_list
 
     def requires_revalidation(self) -> list[str]:
         """Criteria that must be measured again before acceptance can stand.
@@ -170,15 +170,15 @@ class SpecAmendment(Strict):
         return list(self.affected_criteria) if self.acceptance_affecting() else []
 
     def summary(self) -> str:
-        teile = [
+        parts = [
             f"{self.amendment_id} {self.kind.value} by {self.actor}",
             f"{self.from_digest} -> {self.to_digest}",
         ]
         if self.affected_criteria:
-            teile.append("affects " + ", ".join(sorted(self.affected_criteria)))
+            parts.append("affects " + ", ".join(sorted(self.affected_criteria)))
         if self.after_acceptance:
-            teile.append("AFTER ACCEPTANCE")
-        return " · ".join(teile)
+            parts.append("AFTER ACCEPTANCE")
+        return " · ".join(parts)
 
 
 class AmendmentLedger(Strict):
@@ -192,15 +192,15 @@ class AmendmentLedger(Strict):
 
     @model_validator(mode="after")
     def _chain_is_continuous(self) -> AmendmentLedger:
-        erwartet = self.origin_digest
+        expected = self.origin_digest
         for a in self.amendments:
-            if a.from_digest != erwartet:
+            if a.from_digest != expected:
                 raise ValueError(
                     f"{a.amendment_id} amends {a.from_digest}, but the "
-                    f"specification was at {erwartet}. A chain with a gap "
+                    f"specification was at {expected}. A chain with a gap "
                     "cannot say what the run promised at any point in it"
                 )
-            erwartet = a.to_digest
+            expected = a.to_digest
         ids = [a.amendment_id for a in self.amendments]
         if len(ids) != len(set(ids)):
             raise ValueError("two amendments share an id")
@@ -219,33 +219,33 @@ class AmendmentLedger(Strict):
         that is when it stopped counting, and a later one cannot un-supersede
         it.
         """
-        raus: dict[str, str] = {}
+        out_list: dict[str, str] = {}
         for a in self.amendments:
             for rid in a.invalidates(receipt_ids):
-                raus.setdefault(rid, a.amendment_id)
-        return raus
+                out_list.setdefault(rid, a.amendment_id)
+        return out_list
 
     def revalidation_needed(self) -> set[str]:
-        noetig: set[str] = set()
+        needed: set[str] = set()
         for a in self.amendments:
-            noetig.update(a.requires_revalidation())
-        return noetig
+            needed.update(a.requires_revalidation())
+        return needed
 
     def report(self) -> str:
         if not self.amendments:
             return f"{self.run_id}: no amendments; specification at {self.origin_digest}"
-        zeilen = [f"{self.run_id}: {len(self.amendments)} amendment(s)"]
+        lines = [f"{self.run_id}: {len(self.amendments)} amendment(s)"]
         for a in self.amendments:
-            zeilen.append("  " + a.summary())
-            zeilen.append(f"      reason: {a.reason}")
+            lines.append("  " + a.summary())
+            lines.append(f"      reason: {a.reason}")
             if a.evidence:
-                zeilen.append("      evidence: " + ", ".join(a.evidence))
-        noetig = self.revalidation_needed()
-        zeilen.append(
+                lines.append("      evidence: " + ", ".join(a.evidence))
+        needed = self.revalidation_needed()
+        lines.append(
             "  revalidation required for: "
-            + (", ".join(sorted(noetig)) if noetig else "nothing")
+            + (", ".join(sorted(needed)) if needed else "nothing")
         )
-        return "\n".join(zeilen)
+        return "\n".join(lines)
 
 
 def park_and_amend(
@@ -271,16 +271,16 @@ def park_and_amend(
     Raises before writing anything if the text is unchanged: a no-op amendment
     would leave a record of an intention and no change to go with it.
     """
-    pfad = Path(spec_path).expanduser()
-    alt = pfad.read_text(encoding="utf-8")
-    von, nach = text_digest(alt), text_digest(new_text)
-    if von == nach:
+    path = Path(spec_path).expanduser()
+    old = path.read_text(encoding="utf-8")
+    from_, after = text_digest(old), text_digest(new_text)
+    if from_ == after:
         raise ValueError(
             f"{amendment_id}: the new text is identical to the old one "
-            f"({von}); there is nothing to amend"
+            f"({from_}); there is nothing to amend"
         )
-    geparkt = pfad.with_name(
-        f"{pfad.name}.v{utcnow().replace(':', '-')}.{von}"
+    parked = path.with_name(
+        f"{path.name}.v{utcnow().replace(':', '-')}.{from_}"
     )
     # **Validated before anything on disk moves.** It was the other way round,
     # and a refused amendment -- a CLARIFY naming affected criteria, a
@@ -288,13 +288,13 @@ def park_and_amend(
     # The run then blocked on a specification nobody had amended, and the
     # obvious retry was refused for being identical to what the failed attempt
     # had already written. "Refused" has to be true of the filesystem too.
-    datensatz = SpecAmendment(
+    record_ = SpecAmendment(
         amendment_id=amendment_id,
         run_id=run_id,
-        from_digest=von,
-        to_digest=nach,
-        from_path=str(geparkt),
-        to_path=str(pfad),
+        from_digest=from_,
+        to_digest=after,
+        from_path=str(parked),
+        to_path=str(path),
         kind=kind,
         actor=actor,
         reason=reason,
@@ -303,6 +303,6 @@ def park_and_amend(
         after_acceptance=after_acceptance,
         write_seq=write_seq,
     )
-    pfad.rename(geparkt)
-    pfad.write_text(new_text, encoding="utf-8")
-    return datensatz
+    path.rename(parked)
+    path.write_text(new_text, encoding="utf-8")
+    return record_

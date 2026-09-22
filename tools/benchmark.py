@@ -39,17 +39,17 @@ import tempfile
 import time
 from pathlib import Path
 
-HIER = Path(__file__).resolve().parent
-HOH = HIER.parent
+HERE = Path(__file__).resolve().parent
+HOH = HERE.parent
 sys.path.insert(0, str(HOH / "src"))
 
-AUFGABEN = HOH / "dogfood/benchmark/tasks"
-ERGEBNISSE = HOH / "dogfood/benchmark/results"
+TASKS = HOH / "dogfood/benchmark/tasks"
+RESULTS = HOH / "dogfood/benchmark/results"
 
 #: Campaign v1's cells live in `results/` and are never touched again: the
 #: protocol marks that campaign `PRE-O125-CLOSURE` and a benchmark edited after
 #: its result is known is not a benchmark. A replication writes beside it.
-KAMPAGNEN = {
+CAMPAIGNS = {
     "v1": HOH / "dogfood/benchmark/results",
     "v2": HOH / "dogfood/benchmark/results-v2",
     "v3": HOH / "dogfood/benchmark/results-v3",
@@ -62,11 +62,11 @@ KAMPAGNEN = {
 }
 
 
-def ergebnisse_fuer(kampagne: str) -> Path:
-    if kampagne not in KAMPAGNEN:
-        raise SystemExit(f"unknown campaign: {kampagne}. "
-                         f"Known: {', '.join(sorted(KAMPAGNEN))}")
-    return KAMPAGNEN[kampagne]
+def results_for(campaign_: str) -> Path:
+    if campaign_ not in CAMPAIGNS:
+        raise SystemExit(f"unknown campaign: {campaign_}. "
+                         f"Known: {', '.join(sorted(CAMPAIGNS))}")
+    return CAMPAIGNS[campaign_]
 
 #: Where this deployment's trust helper lives, and where its harness puts
 #: worktrees. Read from the environment with **no default**, for the reason
@@ -78,9 +78,9 @@ TRUST_HELPER_ENV = "HOH_TRUST_HELPER"
 WORKTREE_ROOT_ENV = "HOH_WORKTREE_ROOT"
 
 
-def _konfiguriert(name: str) -> Path:
-    wert = os.environ.get(name, "").strip()
-    if not wert:
+def _configured(name: str) -> Path:
+    value_ = os.environ.get(name, "").strip()
+    if not value_:
         raise SystemExit(
             f"{name} is not set. The benchmark dispatches real agents into "
             "worktrees, which needs this deployment's trust helper and the "
@@ -88,7 +88,7 @@ def _konfiguriert(name: str) -> Path:
             "default: a hardcoded path would make one machine's layout a "
             "requirement of the tool."
         )
-    return Path(wert).expanduser()
+    return Path(value_).expanduser()
 
 
 #: Fixed by the protocol. Not a parameter: making it one is how a matched
@@ -96,7 +96,7 @@ def _konfiguriert(name: str) -> Path:
 DISPATCH_BUDGET = 9
 
 
-def dispatch_zaehlung(root: Path) -> dict:
+def dispatch_count(root: Path) -> dict:
     """Provider calls this arm spent, counted from the dispatch logs.
 
     It was `min(iterations * 3, DISPATCH_BUDGET)` -- a **constant** in arm C,
@@ -116,38 +116,38 @@ def dispatch_zaehlung(root: Path) -> dict:
     as `lines_without_the_figure` rather than scored as one call each --
     silently reading an old line as "1" is how the asserted figure got in.
     """
-    aufrufe = 0
-    zeilen = 0
-    stumm = 0
+    calls_ = 0
+    lines = 0
+    silent_ = 0
     for f in sorted(root.rglob("telemetry.jsonl")):
         try:
-            inhalt = f.read_text()
+            content_ = f.read_text()
         except OSError:                            # pragma: no cover
             continue
-        for z in inhalt.splitlines():
+        for z in content_.splitlines():
             if not z.strip():
                 continue
-            zeilen += 1
+            lines += 1
             try:
                 n = json.loads(z).get("provider_calls")
             except ValueError:                     # pragma: no cover - partial
                 n = None
             if n is None:
-                stumm += 1
+                silent_ += 1
             else:
-                aufrufe += int(n)
-    return {"provider_calls": aufrufe, "lines": zeilen,
-            "lines_without_the_figure": stumm}
+                calls_ += int(n)
+    return {"provider_calls": calls_, "lines": lines,
+            "lines_without_the_figure": silent_}
 
 
-def gezaehlte_dispatches(root: Path) -> int:
+def counted_dispatches(root: Path) -> int:
     """`dispatch_zaehlung`'s call count, for callers that want one number.
 
     A root whose lines predate `provider_calls` returns the count of the ones
     that could answer -- which is why the cell records the full breakdown and
     the repetition plan reads *that*, not this.
     """
-    return dispatch_zaehlung(root)["provider_calls"]
+    return dispatch_count(root)["provider_calls"]
 
 
 #: Where the harness records which directories an agent may work in. Read here
@@ -156,15 +156,15 @@ def gezaehlte_dispatches(root: Path) -> int:
 TRUST_REGISTRY = Path.home() / ".claude.json"
 
 
-def _ist_vertraut(pfad: Path) -> bool:
+def _is_trusted(file_path: Path) -> bool:
     try:
-        daten = json.loads(TRUST_REGISTRY.read_text())
+        data_ = json.loads(TRUST_REGISTRY.read_text())
     except (OSError, ValueError):
         return False
-    return str(pfad) in (daten.get("projects") or {})
+    return str(file_path) in (data_.get("projects") or {})
 
 
-def trust_und_pruefen(worktree: Path, repo: Path, *, versuche: int = 3) -> dict:
+def trust_and_check(worktree: Path, repo: Path, *, attempts_: int = 3) -> dict:
     """Registers trust for a worktree and checks that the registration stuck.
 
     Firing the helper and moving on is not enough, and the benchmark is where
@@ -178,17 +178,17 @@ def trust_und_pruefen(worktree: Path, repo: Path, *, versuche: int = 3) -> dict:
     fails because an agent could not be given permission to work says nothing
     about the arm, and it must be possible to tell that from the record.
     """
-    letzte = ""
-    for n in range(1, versuche + 1):
+    last_ = ""
+    for n in range(1, attempts_ + 1):
         p = subprocess.run(
-            [str(_konfiguriert(TRUST_HELPER_ENV)), str(worktree), str(repo)],
+            [str(_configured(TRUST_HELPER_ENV)), str(worktree), str(repo)],
             capture_output=True, text=True, timeout=120,
         )
-        letzte = (p.stdout or p.stderr).strip()[-200:]
-        if _ist_vertraut(worktree):
-            return {"registered": True, "attempts": n, "said": letzte}
+        last_ = (p.stdout or p.stderr).strip()[-200:]
+        if _is_trusted(worktree):
+            return {"registered": True, "attempts": n, "said": last_}
         time.sleep(1.0)
-    return {"registered": False, "attempts": versuche, "said": letzte}
+    return {"registered": False, "attempts": attempts_, "said": last_}
 
 
 def _git(repo: Path, *args: str) -> subprocess.CompletedProcess:
@@ -197,7 +197,7 @@ def _git(repo: Path, *args: str) -> subprocess.CompletedProcess:
     )
 
 
-def arbeitsbaum(task: str, arm: str, lauf: int) -> Path:
+def working_tree(task: str, arm: str, one_run: int) -> Path:
     """A fresh repository at the task's base state, named uniquely per attempt.
 
     The name carries the temp directory's own nonce, and that is not cosmetic.
@@ -209,10 +209,10 @@ def arbeitsbaum(task: str, arm: str, lauf: int) -> Path:
     in a tenth of a second each, for a reason that had nothing to do with the
     arms. This project has met the same collision once before, in a fixture.
     """
-    basis = Path(tempfile.mkdtemp(prefix=f"bench-{task}-{arm}{lauf}-"))
-    repo = basis / f"bm-{task}-{arm}{lauf}-{basis.name.rsplit('-', 1)[-1]}"
+    baseline = Path(tempfile.mkdtemp(prefix=f"bench-{task}-{arm}{one_run}-"))
+    repo = baseline / f"bm-{task}-{arm}{one_run}-{baseline.name.rsplit('-', 1)[-1]}"
     repo.mkdir(parents=True)
-    for f in sorted((AUFGABEN / task / "base").iterdir()):
+    for f in sorted((TASKS / task / "base").iterdir()):
         shutil.copy2(f, repo / f.name)
     (repo / ".gitignore").write_text("__pycache__/\n.pytest_cache/\n*.pyc\n")
     _git(repo, "init", "-q", "-b", "main")
@@ -225,7 +225,7 @@ def arbeitsbaum(task: str, arm: str, lauf: int) -> Path:
     return repo
 
 
-def unveraendert(repo: Path, task: str) -> bool:
+def unchanged_(repo: Path, task: str) -> bool:
     """True when the arm left the tree byte-identical to the base state.
 
     The protocol's exclusion rule, made checkable and arm-agnostic: a cell is
@@ -239,10 +239,10 @@ def unveraendert(repo: Path, task: str) -> bool:
     off it: the rule itself is in the protocol, committed before the first arm
     ran.
     """
-    basis = AUFGABEN / task / "base"
-    for f in sorted(basis.iterdir()):
-        ziel = repo / f.name
-        if not ziel.is_file() or ziel.read_bytes() != f.read_bytes():
+    baseline = TASKS / task / "base"
+    for f in sorted(baseline.iterdir()):
+        target = repo / f.name
+        if not target.is_file() or target.read_bytes() != f.read_bytes():
             return False
     return True
 
@@ -255,16 +255,16 @@ def hidden_verdict(repo: Path, task: str) -> dict:
     same thing.
     """
     with tempfile.TemporaryDirectory(prefix="bench-verdict-") as d:
-        oben = Path(d)
-        ziel = oben / "kandidat"
-        ziel.mkdir()
-        beschattet = []
+        above = Path(d)
+        target = above / "kandidat"
+        target.mkdir()
+        shadowed = []
         for f in repo.iterdir():
             if f.is_file() and f.suffix == ".py":
                 if f.stem in sys.stdlib_module_names:
-                    beschattet.append(f.name)
-                shutil.copy2(f, ziel / f.name)
-        shutil.copy2(AUFGABEN / task / "hidden_test.py", ziel / "hidden_test.py")
+                    shadowed.append(f.name)
+                shutil.copy2(f, target / f.name)
+        shutil.copy2(TASKS / task / "hidden_test.py", target / "hidden_test.py")
         # `python -m unittest` from inside the candidate puts the candidate at
         # the FRONT of `sys.path`, ahead of the standard library. A file the
         # arm happened to write named `unittest.py` -- or `types.py`, `copy.py`,
@@ -278,18 +278,18 @@ def hidden_verdict(repo: Path, task: str) -> dict:
         # candidate **appended** to `sys.path` by the runner below. The
         # standard library then wins every name, and the candidate is still
         # importable.
-        laeufer = oben / "auffuehren.py"
-        laeufer.write_text(
+        runner = above / "auffuehren.py"
+        runner.write_text(
             "import sys, unittest\n"
-            f"sys.path.append({str(ziel)!r})\n"
+            f"sys.path.append({str(target)!r})\n"
             "unittest.main(module=None, argv=['hidden', 'hidden_test', '-v'],\n"
             "              exit=True)\n",
             encoding="utf-8")
         p = subprocess.run(
-            [sys.executable, "-P", str(laeufer)],
-            cwd=str(oben), capture_output=True, text=True, timeout=300,
+            [sys.executable, "-P", str(runner)],
+            cwd=str(above), capture_output=True, text=True, timeout=300,
             env={"PATH": os.environ.get("PATH", "/usr/bin:/bin"),
-                 "HOME": str(oben), "PYTHONDONTWRITEBYTECODE": "1",
+                 "HOME": str(above), "PYTHONDONTWRITEBYTECODE": "1",
                  "PYTHONSAFEPATH": "1"},
         )
     text = p.stdout + p.stderr
@@ -302,7 +302,7 @@ def hidden_verdict(repo: Path, task: str) -> dict:
         # whose candidate carries a file named after a standard-library module
         # is worth seeing, and a reader should not have to take the import
         # order on trust.
-        "shadowed_stdlib_modules": beschattet,
+        "shadowed_stdlib_modules": shadowed,
         "tail": text.strip().splitlines()[-3:],
     }
 
@@ -312,7 +312,7 @@ def hidden_verdict(repo: Path, task: str) -> dict:
 # --------------------------------------------------------------------------- #
 
 
-def arm_a(task: str, repo: Path, lauf: int) -> dict:
+def arm_a(task: str, repo: Path, one_run: int) -> dict:
     """One agent, the specification, the repository, and nothing else.
 
     Deliberately the baseline anybody already has: no acceptance checks, no
@@ -323,9 +323,9 @@ def arm_a(task: str, repo: Path, lauf: int) -> dict:
     from hoh.contracts import Role
     from hoh.dispatchers import build_dispatcher
 
-    spec = (AUFGABEN / task / "SPEC.md").read_text()
-    antworten = repo.parent / "answers"
-    antworten.mkdir(exist_ok=True)
+    spec = (TASKS / task / "SPEC.md").read_text()
+    answers = repo.parent / "answers"
+    answers.mkdir(exist_ok=True)
     herdr.require_herdr()
     # The agent works in a worktree, exactly as arms B and C do. Two reasons,
     # and only the second is about fairness:
@@ -336,17 +336,17 @@ def arm_a(task: str, repo: Path, lauf: int) -> dict:
     # * an arm that worked directly in the checkout would differ from B and C
     #   in two ways at once, and the comparison is supposed to isolate the
     #   harness, not the working arrangement.
-    arbeit = repo.parent / f"{repo.name}-wt"
+    work_ = repo.parent / f"{repo.name}-wt"
     subprocess.run(
-        ["git", "-C", str(repo), "worktree", "add", "-q", str(arbeit),
-         "-b", f"arm-a-{lauf}"],
+        ["git", "-C", str(repo), "worktree", "add", "-q", str(work_),
+         "-b", f"arm-a-{one_run}"],
         capture_output=True, text=True, timeout=120,
     )
-    trust = trust_und_pruefen(arbeit, repo)
+    trust = trust_and_check(work_, repo)
     d = build_dispatcher(
-        answers_dir=antworten,
+        answers_dir=answers,
         profiles={Role.DEVELOPER: "claude"},
-        cwd=arbeit,
+        cwd=work_,
         prefer_herdr=True,
         timeout_ms=1800 * 1000,
     )
@@ -357,13 +357,13 @@ def arm_a(task: str, repo: Path, lauf: int) -> dict:
     # attempt at this arm did, in 0.1 seconds, five times.
     from hoh.controller import Controller
 
-    zustand = Controller.new_state(
-        run_id=f"bma{task[:6]}{lauf}{_nonce(repo)}".replace("_", ""),
-        repo_path=arbeit,
+    condition = Controller.new_state(
+        run_id=f"bma{task[:6]}{one_run}{_nonce(repo)}".replace("_", ""),
+        repo_path=work_,
         project_name=f"benchmark-{task}",
-        spec_path=AUFGABEN / task / "SPEC.md",
+        spec_path=TASKS / task / "SPEC.md",
     )
-    zustand.iteration, zustand.attempt = 1, 1
+    condition.iteration, condition.attempt = 1, 1
 
     prompt = (
         "You are working in a git repository. Implement what the specification "
@@ -375,37 +375,37 @@ def arm_a(task: str, repo: Path, lauf: int) -> dict:
         "When you are done, reply with a one-line summary."
     )
     t0 = time.monotonic()
-    fehler = ""
+    error = ""
     # Counted, not asserted. It is 1 by construction -- this arm is a single
     # agent turn and there is no loop above it -- but `"dispatches": 1` was a
     # constant beside a result, which is the exact shape the campaign's cost
     # figure was caught in (O140). A constant that happens to be right is
     # still not a measurement, and `repetition_plan` rightly reported every
     # arm-A cell as UNKNOWN_FIGURE_WAS_ASSERTED.
-    aufrufe = 0
+    calls_ = 0
     try:
-        aufrufe += 1
-        antwort = d.dispatch(Role.DEVELOPER, prompt, state=zustand)
+        calls_ += 1
+        answer = d.dispatch(Role.DEVELOPER, prompt, state=condition)
     except Exception as exc:
-        antwort, fehler = "", f"{type(exc).__name__}: {exc}"
-    dauer = time.monotonic() - t0
+        answer, error = "", f"{type(exc).__name__}: {exc}"
+    duration_ = time.monotonic() - t0
     try:
         d.close_own()
     except Exception:
         pass
     return {
-        "dispatches": aufrufe,
-        "dispatch_count": {"provider_calls": aufrufe, "lines": 0,
+        "dispatches": calls_,
+        "dispatch_count": {"provider_calls": calls_, "lines": 0,
                            "lines_without_the_figure": 0,
                            "source": "counted in arm_a: this arm makes its "
                                      "provider calls directly, without a "
                                      "controller writing telemetry"},
         "dispatch_budget": DISPATCH_BUDGET,
         "single_shot": True,
-        "wallclock_seconds": round(dauer, 1),
-        "answer_chars": len(antwort or ""),
-        "error": fehler,
-        "worktree": str(arbeit),
+        "wallclock_seconds": round(duration_, 1),
+        "answer_chars": len(answer or ""),
+        "error": error,
+        "worktree": str(work_),
         "trust": trust,
     }
 
@@ -430,23 +430,23 @@ def _nonce(repo: Path) -> str:
     return repo.name.rsplit("-", 1)[-1][:8].replace("_", "")
 
 
-def arm_b(task: str, repo: Path, lauf: int, isolation: str) -> dict:
+def arm_b(task: str, repo: Path, one_run: int, isolation: str) -> dict:
     root = repo.parent / "root"
-    run_id = f"bmb{task[:6]}{lauf}{_nonce(repo)}".replace("_", "")
-    umgebung = dict(os.environ, PYTHONPATH=str(HOH / "src"))
-    spec = AUFGABEN / task / "SPEC.md"
+    run_id = f"bmb{task[:6]}{one_run}{_nonce(repo)}".replace("_", "")
+    environment_ = dict(os.environ, PYTHONPATH=str(HOH / "src"))
+    spec = TASKS / task / "SPEC.md"
 
     wt = subprocess.run(
         [sys.executable, "-m", "hoh.cli", "--root", str(root), "worktree",
          "--repo", str(repo), "--branch", f"bench-{run_id}"],
-        capture_output=True, text=True, env=umgebung, timeout=300,
+        capture_output=True, text=True, env=environment_, timeout=300,
     )
-    worktree = _worktree_aus(wt.stdout) or repo
+    worktree = _worktree_from(wt.stdout) or repo
     # Recorded, not fired and forgotten. A cell that came back with the agent
     # sitting on a trust dialog could not say whether the helper had refused,
     # had never been reached, or had been given the wrong path -- so the
     # answer goes into the cell.
-    trust = trust_und_pruefen(worktree, repo)
+    trust = trust_and_check(worktree, repo)
     trust["worktree"] = str(worktree)
     st = subprocess.run(
         [sys.executable, "-m", "hoh.cli", "--root", str(root), "start",
@@ -457,7 +457,7 @@ def arm_b(task: str, repo: Path, lauf: int, isolation: str) -> dict:
          # transient retry is a further provider call and nothing stopped one.
          # The protocol says the ceiling is nine, so the ceiling is passed.
          "--max-dispatches", str(DISPATCH_BUDGET)],
-        capture_output=True, text=True, env=umgebung, timeout=300,
+        capture_output=True, text=True, env=environment_, timeout=300,
     )
     if st.returncode != 0:
         return {"dispatches": 0, "error": (st.stderr or st.stdout)[-300:],
@@ -468,21 +468,21 @@ def arm_b(task: str, repo: Path, lauf: int, isolation: str) -> dict:
         [sys.executable, "-m", "hoh.cli", "--root", str(root), "run", run_id,
          "--iterations", "3", "--planner", "claude", "--developer", "claude",
          "--qa", "claude", "--isolation", isolation],
-        capture_output=True, text=True, env=umgebung, timeout=5400,
+        capture_output=True, text=True, env=environment_, timeout=5400,
     )
-    dauer = time.monotonic() - t0
-    zustand = _run_state(root / run_id / "state.json")
+    duration_ = time.monotonic() - t0
+    condition = _run_state(root / run_id / "state.json")
     # Three roles per iteration is the budget's unit.
-    iterationen = zustand.get("iteration", 0)
-    zaehlung = dispatch_zaehlung(root)
+    iterations_ = condition.get("iteration", 0)
+    count_ = dispatch_count(root)
     return {
-        "dispatches": zaehlung["provider_calls"],
-        "dispatch_count": zaehlung,
+        "dispatches": count_["provider_calls"],
+        "dispatch_count": count_,
         "dispatch_budget": DISPATCH_BUDGET,
-        "over_budget": zaehlung["provider_calls"] > DISPATCH_BUDGET,
-        "iterations": iterationen,
-        "wallclock_seconds": round(dauer, 1),
-        "accepted": bool(zustand.get("last_accepted_candidate")),
+        "over_budget": count_["provider_calls"] > DISPATCH_BUDGET,
+        "iterations": iterations_,
+        "wallclock_seconds": round(duration_, 1),
+        "accepted": bool(condition.get("last_accepted_candidate")),
         "receipts": len(list((root / run_id / "receipts").glob("*.json")))
         if (root / run_id / "receipts").is_dir() else 0,
         "worktree": str(worktree),
@@ -494,26 +494,26 @@ def arm_b(task: str, repo: Path, lauf: int, isolation: str) -> dict:
     }
 
 
-def _worktree_aus(stdout: str) -> Path | None:
+def _worktree_from(stdout: str) -> Path | None:
     try:
         d = json.loads(stdout)
     except ValueError:
         return None
-    stapel = [d]
-    while stapel:
-        k = stapel.pop()
+    stack_ = [d]
+    while stack_:
+        k = stack_.pop()
         if isinstance(k, dict):
             if "checkout_path" in k:
                 return Path(k["checkout_path"])
-            stapel.extend(k.values())
+            stack_.extend(k.values())
         elif isinstance(k, list):
-            stapel.extend(k)
+            stack_.extend(k)
     return None
 
 
-def _run_state(pfad: Path) -> dict:
+def _run_state(file_path: Path) -> dict:
     try:
-        return json.loads(pfad.read_text())
+        return json.loads(file_path.read_text())
     except (OSError, ValueError):
         return {}
 
@@ -523,7 +523,7 @@ def _run_state(pfad: Path) -> dict:
 # --------------------------------------------------------------------------- #
 
 
-class _GeprueftesScope:
+class _CheckedScope:
     """`PrefixScopedProvider` that checks its grant actually landed.
 
     Same scope rules, same refusals -- the only addition is that a grant is
@@ -550,27 +550,27 @@ class _GeprueftesScope:
         a = self._inner.approve(worktree, repo)
         if not a.granted:
             return a
-        ziel = a.worktree
-        if _ist_vertraut(ziel):
-            self.granted.append(ziel)
+        target = a.worktree
+        if _is_trusted(target):
+            self.granted.append(target)
             return a
-        ergebnis = trust_und_pruefen(ziel, repo)
-        if ergebnis["registered"]:
-            self.granted.append(ziel)
+        result = trust_and_check(target, repo)
+        if result["registered"]:
+            self.granted.append(target)
             return Approval(
-                granted=True, worktree=ziel, provider=self.name,
-                detail=f"{a.detail}; verified after {ergebnis['attempts']} attempt(s)",
+                granted=True, worktree=target, provider=self.name,
+                detail=f"{a.detail}; verified after {result['attempts']} attempt(s)",
             )
         return Approval(
-            granted=False, worktree=ziel, provider=self.name,
-            detail=(f"the helper answered '{ergebnis['said']}' but {ziel} is not "
-                    f"in the registry after {ergebnis['attempts']} attempt(s); "
+            granted=False, worktree=target, provider=self.name,
+            detail=(f"the helper answered '{result['said']}' but {target} is not "
+                    f"in the registry after {result['attempts']} attempt(s); "
                     "refusing rather than dispatching an agent that will stop "
                     "at a dialog nobody is there to answer"),
         )
 
 
-def arm_c(task: str, repo: Path, lauf: int, isolation: str) -> dict:
+def arm_c(task: str, repo: Path, one_run: int, isolation: str) -> dict:
     """One node, the repository's own gates over the merged state, closure.
 
     On a single-node task C differs from B only by the global gates and the
@@ -592,7 +592,7 @@ def arm_c(task: str, repo: Path, lauf: int, isolation: str) -> dict:
 
     os.environ["PYTHONPATH"] = str(HOH / "src")
     root = repo.parent / "root"
-    spec = AUFGABEN / task / "SPEC.md"
+    spec = TASKS / task / "SPEC.md"
 
     class Gates(GateRunner):
         def __init__(self, r: Path):
@@ -618,10 +618,10 @@ def arm_c(task: str, repo: Path, lauf: int, isolation: str) -> dict:
                 detail=((p.stdout + p.stderr).strip().splitlines() or ["-"])[-1][:160],
             )]
 
-    store = ProjectStore(root, f"bmc{lauf}{_nonce(repo)}")
+    store = ProjectStore(root, f"bmc{one_run}{_nonce(repo)}")
     if not store.exists():
         store.write_state(ProjectState(
-            project_id=f"bmc{lauf}{_nonce(repo)}",
+            project_id=f"bmc{one_run}{_nonce(repo)}",
             repo_path=str(repo),
             nodes=[TaskNode(
                 id=f"n{task[:6]}{_nonce(repo)}".replace("_", ""),
@@ -640,32 +640,32 @@ def arm_c(task: str, repo: Path, lauf: int, isolation: str) -> dict:
         # existed there was no way to say it, and three of campaign v2's five
         # arm-C cells spent 18 against 9 without being stopped (O140).
         dispatch_budget=DISPATCH_BUDGET,
-        approvals=_GeprueftesScope(
-            script=_konfiguriert(TRUST_HELPER_ENV),
-            prefix=_konfiguriert(WORKTREE_ROOT_ENV) / repo.name,
+        approvals=_CheckedScope(
+            script=_configured(TRUST_HELPER_ENV),
+            prefix=_configured(WORKTREE_ROOT_ENV) / repo.name,
         ),
     )
     t0 = time.monotonic()
-    ergebnis = ProjectController(store, starter, Gates(repo)).run()
-    dauer = time.monotonic() - t0
-    nach = store.read_state()
-    zaehlung = dispatch_zaehlung(root)
+    result = ProjectController(store, starter, Gates(repo)).run()
+    duration_ = time.monotonic() - t0
+    after = store.read_state()
+    count_ = dispatch_count(root)
     return {
-        "dispatches": zaehlung["provider_calls"],
-        "dispatch_count": zaehlung,
+        "dispatches": count_["provider_calls"],
+        "dispatch_count": count_,
         "dispatch_budget": DISPATCH_BUDGET,
-        "over_budget": zaehlung["provider_calls"] > DISPATCH_BUDGET,
-        "wallclock_seconds": round(dauer, 1),
-        "halt": str(ergebnis.halt),
-        "reason": ergebnis.reason[:200],
-        "rc_closed": nach.rc_closed(),
-        "closure_generation": nach.closure_generation,
-        "repair_nodes": [n.id for n in nach.nodes if n.repair_of],
+        "over_budget": count_["provider_calls"] > DISPATCH_BUDGET,
+        "wallclock_seconds": round(duration_, 1),
+        "halt": str(result.halt),
+        "reason": result.reason[:200],
+        "rc_closed": after.rc_closed(),
+        "closure_generation": after.closure_generation,
+        "repair_nodes": [n.id for n in after.nodes if n.repair_of],
         "human_decisions": len(
-            [d for d in nach.decisions if d.actor not in ("orchestrator", None)]
+            [d for d in after.decisions if d.actor not in ("orchestrator", None)]
         ),
-        "steps": [f"{s.kind}:{s.node or ''}" for s in ergebnis.steps],
-        "closed": ergebnis.halt is HaltClass.CLOSED,
+        "steps": [f"{s.kind}:{s.node or ''}" for s in result.steps],
+        "closed": result.halt is HaltClass.CLOSED,
         "approvals": [
             {"granted": a.granted, "detail": a.detail[:200]}
             for a in starter.approvals_given
@@ -683,69 +683,69 @@ def _digest(text: str) -> str:
 
 
 def cmd_run(args) -> int:
-    task, arm, lauf = args.task, args.arm.upper(), args.rep
-    if not (AUFGABEN / task).is_dir():
+    task, arm, one_run = args.task, args.arm.upper(), args.rep
+    if not (TASKS / task).is_dir():
         print(f"no such task: {task}", file=sys.stderr)
         return 2
-    ziel_dir = ergebnisse_fuer(getattr(args, "campaign", "v1"))
-    ziel_dir.mkdir(parents=True, exist_ok=True)
-    ziel = ziel_dir / f"{task}.{arm}.{lauf}.json"
-    if ziel.exists() and not args.again:
-        print(f"cell already run: {ziel.name}", file=sys.stderr)
+    target_dir = results_for(getattr(args, "campaign", "v1"))
+    target_dir.mkdir(parents=True, exist_ok=True)
+    target = target_dir / f"{task}.{arm}.{one_run}.json"
+    if target.exists() and not args.again:
+        print(f"cell already run: {target.name}", file=sys.stderr)
         return 0
 
-    repo = arbeitsbaum(task, arm, lauf)
+    repo = working_tree(task, arm, one_run)
     t0 = time.time()
     try:
         if arm == "A":
-            roh = arm_a(task, repo, lauf)
-            gemessen = Path(roh.get("worktree") or repo)
+            raw_ = arm_a(task, repo, one_run)
+            measured_ = Path(raw_.get("worktree") or repo)
         elif arm == "B":
-            roh = arm_b(task, repo, lauf, args.isolation)
-            gemessen = Path(roh.get("worktree") or repo)
+            raw_ = arm_b(task, repo, one_run, args.isolation)
+            measured_ = Path(raw_.get("worktree") or repo)
         elif arm == "C":
-            roh = arm_c(task, repo, lauf, args.isolation)
-            gemessen = repo
+            raw_ = arm_c(task, repo, one_run, args.isolation)
+            measured_ = repo
         else:
             print(f"unknown arm: {arm}", file=sys.stderr)
             return 2
-        fehler = ""
+        error = ""
     except Exception as exc:
-        roh, gemessen, fehler = {}, repo, f"{type(exc).__name__}: {exc}"
+        raw_, measured_, error = {}, repo, f"{type(exc).__name__}: {exc}"
 
-    verdikt = hidden_verdict(gemessen, task) if gemessen.is_dir() else {
+    verdict = hidden_verdict(measured_, task) if measured_.is_dir() else {
         "passed": False, "exit_code": -1, "tail": ["no final state to measure"],
     }
-    zelle = {
-        "task": task, "arm": arm, "repetition": lauf,
+    cell = {
+        "task": task, "arm": arm, "repetition": one_run,
         "started_at": t0, "seconds": round(time.time() - t0, 1),
-        "arm_detail": roh,
-        "harness_error": fehler,
-        "hidden_suite": verdikt,
+        "arm_detail": raw_,
+        "harness_error": error,
+        "hidden_suite": verdict,
         # The headline number: the arm said it was done and the hidden suite
         # disagrees. Only meaningful where the arm reported success at all.
-        "false_accept": bool(roh.get("accepted") or roh.get("closed"))
-                        and not verdikt["passed"],
-        "measured_tree": str(gemessen),
+        "false_accept": bool(raw_.get("accepted") or raw_.get("closed"))
+                        and not verdict["passed"],
+        "measured_tree": str(measured_),
         "budget": DISPATCH_BUDGET,
         # The protocol's exclusion rule. An arm that changed nothing never
         # produced a final state, and a cell like that says nothing about the
         # method -- but it is kept, reported, and named.
         "produced_final_state": (
-            gemessen.is_dir() and not unveraendert(gemessen, task)
+            measured_.is_dir() and not unchanged_(measured_, task)
         ),
     }
-    ziel.write_text(json.dumps(zelle, indent=2) + "\n")
-    print(json.dumps({k: zelle[k] for k in
+    target.write_text(json.dumps(cell, indent=2) + "\n")
+    print(json.dumps({k: cell[k] for k in
                       ("task", "arm", "repetition", "false_accept", "seconds")}))
-    print("  hidden suite:", "PASS" if verdikt["passed"] else "FAIL",
-          verdikt["tail"][-1] if verdikt["tail"] else "")
-    if fehler:
-        print("  harness error:", fehler)
+    print("  hidden suite:", "PASS" if verdict["passed"] else "FAIL",
+          verdict["tail"][-1] if verdict["tail"] else "")
+    if error:
+        print("  harness error:", error)
     return 0
 
 
-def _vergleich(zellen: list[dict]) -> list[str]:
+def _comparison(cells: list[dict]) -> list[str]:
     """Each replicated cell against its v1 counterpart, and nothing else.
 
     The protocol allows exactly this comparison: the cells present on **both**
@@ -753,45 +753,45 @@ def _vergleich(zellen: list[dict]) -> list[str]:
     be comparing a subset with a whole, which is the thing the protocol was
     frozen to prevent.
     """
-    alt_dir = KAMPAGNEN["v1"]
-    if not alt_dir.is_dir():
+    old_dir = CAMPAIGNS["v1"]
+    if not old_dir.is_dir():
         return ["Campaign v1's cells are not in this checkout, so no",
                 "comparison is possible here."]
-    alt = {}
-    for f in sorted(alt_dir.glob("*.json")):
-        if ".attempt" in f.name or _geparkt(f):
+    old = {}
+    for f in sorted(old_dir.glob("*.json")):
+        if ".attempt" in f.name or _parked(f):
             continue
         z = json.loads(f.read_text())
-        alt[(z["task"], z["arm"])] = z
-    zeilen = [
+        old[(z["task"], z["arm"])] = z
+    lines = [
         "| task | arm | v1 final state | v2 final state | v1 hidden | v2 hidden |",
         "|---|---|---|---|---|---|",
     ]
-    paare = 0
-    for z in sorted(zellen, key=lambda x: (x["task"], x["arm"])):
-        a = alt.get((z["task"], z["arm"]))
+    pairs = 0
+    for z in sorted(cells, key=lambda x: (x["task"], x["arm"])):
+        a = old.get((z["task"], z["arm"]))
         if a is None:
             continue
-        paare += 1
-        def f(zelle, feld):
-            if feld == "final":
-                return "yes" if zelle.get("produced_final_state") else "**no**"
+        pairs += 1
+        def f(cell, field_):
+            if field_ == "final":
+                return "yes" if cell.get("produced_final_state") else "**no**"
             # The protocol excludes a cell with no final state from the
             # correctness comparison, so its suite result is not shown as one.
             # It ran -- arm C's tree exists whatever the orchestrator did --
             # and it measured a state the arm never finished, which is a
             # different thing from a failed candidate.
-            if not zelle.get("produced_final_state"):
+            if not cell.get("produced_final_state"):
                 return "(excluded)"
-            return "PASS" if zelle["hidden_suite"]["passed"] else "FAIL"
-        zeilen.append(
+            return "PASS" if cell["hidden_suite"]["passed"] else "FAIL"
+        lines.append(
             f"| `{z['task']}` | {z['arm']} | {f(a, 'final')} | {f(z, 'final')} "
             f"| {f(a, 'hidden')} | {f(z, 'hidden')} |")
-    if not paare:
+    if not pairs:
         return ["No cell of this campaign has a v1 counterpart yet."]
-    zeilen += [
+    lines += [
         "",
-        f"{paare} cell(s) appear on both sides. Cells that ran in only one",
+        f"{pairs} cell(s) appear on both sides. Cells that ran in only one",
         "campaign are not in this table and are not counted anywhere in it.",
         "",
         "`(excluded)` is the protocol's own rule, not a missing number: an arm",
@@ -800,45 +800,45 @@ def _vergleich(zellen: list[dict]) -> list[str]:
         "run -- arm C's tree exists whatever the orchestrator did -- and what",
         "it measured was a state the arm never finished.",
     ]
-    return zeilen
+    return lines
 
 
-def _kostenzeilen(zellen: list[dict]) -> list[str]:
-    raus = []
+def _kostenzeilen(cells: list[dict]) -> list[str]:
+    out_list = []
     # Sorted and labelled by repetition. Without the repetition column three
     # cells of the same (task, arm) that spent the same number printed three
     # byte-identical rows: a reader could not tell which cell a row was about,
     # and neither could the claims ledger, which refused to anchor them
     # (AMBIGUOUS). Three indistinguishable rows are not three measurements.
-    for z in sorted(zellen,
+    for z in sorted(cells,
                     key=lambda x: (x["task"], x["arm"], x.get("repetition", 1))):
         d = z.get("arm_detail") or {}
-        gezaehlt = d.get("dispatches_recounted")
-        aufgezeichnet = d.get("dispatches_as_recorded", d.get("dispatches"))
+        counted = d.get("dispatches_recounted")
+        recorded_ = d.get("dispatches_as_recorded", d.get("dispatches"))
         # A cell that carries no `dispatch_budget` predates the counting: its
         # figure came from `min(iterations * 3, DISPATCH_BUDGET)` and is an
         # assertion, not a measurement. Saying so in the cell that shows it is
         # cheaper than a footnote nobody reads.
-        behauptet = not gezaehlt and "dispatch_budget" not in d
-        if gezaehlt:
-            zahl = f"{gezaehlt} (recorded as {aufgezeichnet})"
-        elif aufgezeichnet is None:
-            zahl = "-"
+        claimed_ = not counted and "dispatch_budget" not in d
+        if counted:
+            number_ = f"{counted} (recorded as {recorded_})"
+        elif recorded_ is None:
+            number_ = "-"
         else:
-            zahl = f"{aufgezeichnet}" + (" (asserted, not counted)" if behauptet else "")
+            number_ = f"{recorded_}" + (" (asserted, not counted)" if claimed_ else "")
         budget = d.get("dispatch_budget", DISPATCH_BUDGET)
-        wirklich = gezaehlt if gezaehlt else aufgezeichnet
-        drueber = ("unknown" if behauptet
-                   else "yes" if isinstance(wirklich, int) and wirklich > budget
-                   else "no" if isinstance(wirklich, int) else "-")
-        raus.append(f"| `{z['task']}` | {z['arm']} | {z.get('repetition', 1)} "
-                    f"| {zahl} | {budget} | {drueber} |")
-    return raus
+        genuinely = counted if counted else recorded_
+        above_it = ("unknown" if claimed_
+                   else "yes" if isinstance(genuinely, int) and genuinely > budget
+                   else "no" if isinstance(genuinely, int) else "-")
+        out_list.append(f"| `{z['task']}` | {z['arm']} | {z.get('repetition', 1)} "
+                    f"| {number_} | {budget} | {above_it} |")
+    return out_list
 
 
-def _kampagnenkopf(kampagne: str) -> list[str]:
+def _campaign_head(campaign_: str) -> list[str]:
     """What a reader has to know about this campaign before the tables."""
-    if kampagne == "v1":
+    if campaign_ == "v1":
         return [
             "## Campaign `v1`, status `PRE-O125-CLOSURE`",
             "",
@@ -866,7 +866,7 @@ def _kampagnenkopf(kampagne: str) -> list[str]:
             "shape before it runs.",
             "",
         ]
-    if kampagne == "v3":
+    if campaign_ == "v3":
         return [
             "## Campaign `v3`, pre-registered in full before the first dispatch",
             "",
@@ -912,7 +912,7 @@ def _kampagnenkopf(kampagne: str) -> list[str]:
             "",
         ]
     return [
-        f"## Campaign `{kampagne}`, the declared replication",
+        f"## Campaign `{campaign_}`, the declared replication",
         "",
         "**Read arm C's closures with O137 beside them.** The global gate runs",
         "`unittest discover` over the merged state, and every task's base is a",
@@ -942,7 +942,7 @@ def _kampagnenkopf(kampagne: str) -> list[str]:
     ]
 
 
-def _erforderliche_wiederholungen(kampagne: str) -> int:
+def _required_repetitions(campaign_: str) -> int:
     """How many repetitions this campaign's own frozen text requires.
 
     Read, not typed: a campaign that declares a different number must not be
@@ -953,17 +953,17 @@ def _erforderliche_wiederholungen(kampagne: str) -> int:
         import importlib.util as _il
 
         spec = _il.spec_from_file_location(
-            "repetition_plan", HIER / "repetition_plan.py")
+            "repetition_plan", HERE / "repetition_plan.py")
         rp = _il.module_from_spec(spec)
         spec.loader.exec_module(rp)
-        text = rp.frozen_text(rp.frozen_protocol_commit(kampagne))
+        text = rp.frozen_text(rp.frozen_protocol_commit(campaign_))
         n = rp.repetition_requirement(text).get("required_repetitions")
         return int(n) if n else 1
     except Exception:                              # pragma: no cover - exotic
         return 1
 
 
-def _zellen_gruppiert(zellen: list[dict]) -> dict[tuple[str, str], list[dict]]:
+def _cells_grouped(cells: list[dict]) -> dict[tuple[str, str], list[dict]]:
     """(task, arm) -> its repetitions, in order.
 
     It was `{(task, arm): cell}`, a dict comprehension over the same list --
@@ -971,12 +971,12 @@ def _zellen_gruppiert(zellen: list[dict]) -> dict[tuple[str, str], list[dict]]:
     invisible while every cell had exactly one repetition and would have
     reported one third of campaign v3.
     """
-    raus: dict[tuple[str, str], list[dict]] = {}
-    for z in zellen:
-        raus.setdefault((z.get("task"), z.get("arm")), []).append(z)
-    for schluessel in raus:
-        raus[schluessel].sort(key=lambda z: z.get("repetition", 1))
-    return raus
+    out_list: dict[tuple[str, str], list[dict]] = {}
+    for z in cells:
+        out_list.setdefault((z.get("task"), z.get("arm")), []).append(z)
+    for lookup_key in out_list:
+        out_list[lookup_key].sort(key=lambda z: z.get("repetition", 1))
+    return out_list
 
 
 #: What a repetition records, in the order the protocol's §"What is measured"
@@ -984,7 +984,7 @@ def _zellen_gruppiert(zellen: list[dict]) -> dict[tuple[str, str], list[dict]]:
 #: field does not exist for that arm -- and an absent field is printed as `-`,
 #: never as 0. A zero that means "not applicable" cannot be told apart from a
 #: zero that was measured.
-def _endzustand(z: dict) -> str:
+def _end_state(z: dict) -> str:
     d = z.get("arm_detail") or {}
     if z.get("harness_error"):
         return "harness error"
@@ -997,7 +997,7 @@ def _endzustand(z: dict) -> str:
     return "answered" if d.get("answer_chars") else "no answer"
 
 
-def _budget_erschoepft(z: dict) -> bool:
+def _budget_exhausted(z: dict) -> bool:
     d = z.get("arm_detail") or {}
     text = " ".join(str(x) for x in
                     (d.get("halt", ""), d.get("reason", ""),
@@ -1015,30 +1015,30 @@ def _providerfehler(z: dict) -> bool:
     return bool(z.get("harness_error") or d.get("error"))
 
 
-def _wiederholungszeilen(zellen: list[dict]) -> list[str]:
+def _wiederholungszeilen(cells: list[dict]) -> list[str]:
     """One row per repetition, with everything the protocol says to record."""
-    raus = []
-    for (task, arm), gruppe in sorted(_zellen_gruppiert(zellen).items()):
-        for z in gruppe:
+    out_list = []
+    for (task, arm), group_ in sorted(_cells_grouped(cells).items()):
+        for z in group_:
             d = z.get("arm_detail") or {}
             reparaturen = d.get("repair_nodes")
-            menschen = d.get("human_decisions")
-            raus.append(
+            humans = d.get("human_decisions")
+            out_list.append(
                 f"| `{task}` | {arm} | {z.get('repetition', 1)} "
-                f"| {_endzustand(z)} "
+                f"| {_end_state(z)} "
                 f"| {'PASS' if (z.get('hidden_suite') or {}).get('passed') else 'FAIL'} "
                 f"| {'yes' if z.get('false_accept') else 'no'} "
                 f"| {d.get('dispatches', '-')} "
-                f"| {'yes' if _budget_erschoepft(z) else 'no'} "
+                f"| {'yes' if _budget_exhausted(z) else 'no'} "
                 f"| {len(reparaturen) if reparaturen is not None else '-'} "
-                f"| {menschen if menschen is not None else '-'} "
+                f"| {humans if humans is not None else '-'} "
                 f"| {d.get('wallclock_seconds', z.get('seconds', '-'))} "
                 f"| {'yes' if _providerfehler(z) else 'no'} "
                 f"| {'yes' if _mehrdeutig(z) else 'no'} |")
-    return raus
+    return out_list
 
 
-def _aggregatzeilen(zellen: list[dict]) -> list[str]:
+def _aggregate_rows(cells: list[dict]) -> list[str]:
     """Per (task, arm) over its repetitions. Counts, never means.
 
     n=3 does not support a mean and the protocol says so: what is aggregated
@@ -1046,26 +1046,26 @@ def _aggregatzeilen(zellen: list[dict]) -> list[str]:
     of what they spent. A single averaged number over three runs would read as
     a measurement of the method.
     """
-    raus = []
-    for (task, arm), gruppe in sorted(_zellen_gruppiert(zellen).items()):
-        gemessen = [z for z in gruppe if z.get("produced_final_state", True)]
-        bestanden = sum(1 for z in gemessen
+    out_list = []
+    for (task, arm), group_ in sorted(_cells_grouped(cells).items()):
+        measured_ = [z for z in group_ if z.get("produced_final_state", True)]
+        passed_ = sum(1 for z in measured_
                         if (z.get("hidden_suite") or {}).get("passed"))
-        falsch = sum(1 for z in gruppe if z.get("false_accept"))
-        ausgaben = [(z.get("arm_detail") or {}).get("dispatches")
-                    for z in gruppe]
-        ausgaben = [x for x in ausgaben if isinstance(x, int)]
-        spanne = (f"{min(ausgaben)}-{max(ausgaben)}" if len(set(ausgaben)) > 1
-                  else str(ausgaben[0]) if ausgaben else "-")
-        erschoepft = sum(1 for z in gruppe if _budget_erschoepft(z))
-        ausgeschlossen = len(gruppe) - len(gemessen)
-        raus.append(
-            f"| `{task}` | {arm} | {len(gruppe)} | {bestanden}/{len(gemessen)} "
-            f"| {falsch} | {spanne} | {erschoepft} | {ausgeschlossen} |")
-    return raus
+        wrong = sum(1 for z in group_ if z.get("false_accept"))
+        outputs_ = [(z.get("arm_detail") or {}).get("dispatches")
+                    for z in group_]
+        outputs_ = [x for x in outputs_ if isinstance(x, int)]
+        span = (f"{min(outputs_)}-{max(outputs_)}" if len(set(outputs_)) > 1
+                  else str(outputs_[0]) if outputs_ else "-")
+        exhausted_ = sum(1 for z in group_ if _budget_exhausted(z))
+        excluded_ = len(group_) - len(measured_)
+        out_list.append(
+            f"| `{task}` | {arm} | {len(group_)} | {passed_}/{len(measured_)} "
+            f"| {wrong} | {span} | {exhausted_} | {excluded_} |")
+    return out_list
 
 
-def markdown(zellen: list[dict], kampagne: str = "v1") -> str:
+def markdown(cells: list[dict], campaign_: str = "v1") -> str:
     """The results document the protocol asks for, from the cells that ran.
 
     It names the cells that did not run, in full. A results table that shows
@@ -1073,30 +1073,30 @@ def markdown(zellen: list[dict], kampagne: str = "v1") -> str:
     which ones to report -- and the protocol was frozen before any arm ran
     precisely so that could not happen.
     """
-    aufgaben = sorted(p.name for p in AUFGABEN.iterdir() if p.is_dir())
+    tasks_ = sorted(p.name for p in TASKS.iterdir() if p.is_dir())
     # `{(task, arm): cell}` kept the **last** repetition of three and dropped
     # the rest, silently, and would have reported a third of campaign v3
     # (O154). The grouping is what the tables below read; `vorhanden` survives
     # only as "did this cell run at all".
-    gruppen = _zellen_gruppiert(zellen)
-    vorhanden = {k: v[-1] for k, v in gruppen.items()}
-    fehlend = [f"{t}/{a}" for t in aufgaben for a in "ABC"
-               if (t, a) not in vorhanden]
+    groups_ = _cells_grouped(cells)
+    present = {k: v[-1] for k, v in groups_.items()}
+    missing_ = [f"{t}/{a}" for t in tasks_ for a in "ABC"
+               if (t, a) not in present]
 
-    zeilen = [
+    lines = [
         "# Matched-budget benchmark: results",
         "",
-        f"Generated by `python3 tools/benchmark.py report --campaign {kampagne}"
+        f"Generated by `python3 tools/benchmark.py report --campaign {campaign_}"
         " --write` from",
-        f"the cells in `{KAMPAGNEN[kampagne].relative_to(HOH)}/`. The protocol "
+        f"the cells in `{CAMPAIGNS[campaign_].relative_to(HOH)}/`. The protocol "
         "in `docs/BENCHMARK_PROTOCOL.md`",
         "was committed before the first arm ran and is not re-decidable here.",
         "",
-        *(_kampagnenkopf(kampagne)),
-        f"**{len(zellen)} of {len(aufgaben) * 3} cells have run.**",
+        *(_campaign_head(campaign_)),
+        f"**{len(cells)} of {len(tasks_) * 3} cells have run.**",
         "",
         *(["## Against campaign v1, cell by cell", "",
-           *_vergleich(zellen), ""] if kampagne != "v1" else []),
+           *_comparison(cells), ""] if campaign_ != "v1" else []),
         "## What each cell cost, counted",
         "",
         "Provider calls, summed from the `provider_calls` field each dispatch",
@@ -1109,7 +1109,7 @@ def markdown(zellen: list[dict], kampagne: str = "v1") -> str:
         "",
         "| task | arm | rep | dispatches | budget | over budget |",
         "|---|---|---|---|---|---|",
-        *(_kostenzeilen(zellen)),
+        *(_kostenzeilen(cells)),
         "",
         "## Every repetition, as it ran",
         "",
@@ -1122,7 +1122,7 @@ def markdown(zellen: list[dict], kampagne: str = "v1") -> str:
         "| budget exhausted | repairs | human decisions | wallclock | provider "
         "failure | ambiguous |",
         "|---|---|---|---|---|---|---|---|---|---|---|---|---|",
-        *(_wiederholungszeilen(zellen)),
+        *(_wiederholungszeilen(cells)),
         "",
         "## Per (task, arm), over its repetitions",
         "",
@@ -1132,7 +1132,7 @@ def markdown(zellen: list[dict], kampagne: str = "v1") -> str:
         "| task | arm | reps | hidden PASS | false accepts | dispatches "
         "| budget exhausted | excluded |",
         "|---|---|---|---|---|---|---|---|",
-        *(_aggregatzeilen(zellen)),
+        *(_aggregate_rows(cells)),
         "",
         "## Final correctness, by the hidden suite",
         "",
@@ -1142,21 +1142,21 @@ def markdown(zellen: list[dict], kampagne: str = "v1") -> str:
         "| task | A: plain agent | B: one HoH run | C: full control plane |",
         "|---|---|---|---|",
     ]
-    ausgeschlossen = []
-    for task in aufgaben:
-        felder = []
+    excluded_ = []
+    for task in tasks_:
+        fields_ = []
         for arm in "ABC":
-            z = vorhanden.get((task, arm))
+            z = present.get((task, arm))
             if z is None:
-                felder.append("not run")
+                fields_.append("not run")
             elif not z.get("produced_final_state", True):
-                felder.append("no final state")
-                ausgeschlossen.append(f"{task}/{arm}")
+                fields_.append("no final state")
+                excluded_.append(f"{task}/{arm}")
             else:
-                felder.append("PASS" if z["hidden_suite"]["passed"] else "FAIL")
-        zeilen.append(f"| `{task}` | " + " | ".join(felder) + " |")
-    if ausgeschlossen:
-        zeilen += [
+                fields_.append("PASS" if z["hidden_suite"]["passed"] else "FAIL")
+        lines.append(f"| `{task}` | " + " | ".join(fields_) + " |")
+    if excluded_:
+        lines += [
             "",
             "**Excluded from the correctness comparison**, by the rule the "
             "protocol fixes",
@@ -1168,15 +1168,15 @@ def markdown(zellen: list[dict], kampagne: str = "v1") -> str:
             "| cell | why it produced no final state |",
             "|---|---|",
         ]
-        for x in ausgeschlossen:
+        for x in excluded_:
             task, arm = x.split("/")
-            z = vorhanden[(task, arm)]
+            z = present[(task, arm)]
             a = z["arm_detail"]
-            grund = (a.get("reason") or a.get("error")
+            why = (a.get("reason") or a.get("error")
                      or (a.get("tail") or [""])[-1] or "not recorded")
-            zeilen.append(f"| `{x}` | {grund[:180].replace(chr(10), ' ')} |")
+            lines.append(f"| `{x}` | {why[:180].replace(chr(10), ' ')} |")
 
-    zeilen += [
+    lines += [
         "",
         "## False accepts",
         "",
@@ -1187,26 +1187,26 @@ def markdown(zellen: list[dict], kampagne: str = "v1") -> str:
         "| task | A | B | C |",
         "|---|---|---|---|",
     ]
-    for task in aufgaben:
-        felder = []
+    for task in tasks_:
+        fields_ = []
         for arm in "ABC":
-            z = vorhanden.get((task, arm))
-            felder.append("not run" if z is None else str(z["false_accept"]))
-        zeilen.append(f"| `{task}` | " + " | ".join(felder) + " |")
+            z = present.get((task, arm))
+            fields_.append("not run" if z is None else str(z["false_accept"]))
+        lines.append(f"| `{task}` | " + " | ".join(fields_) + " |")
 
-    zeilen += ["", "## Cost", "", "| task | arm | seconds | dispatches |",
+    lines += ["", "## Cost", "", "| task | arm | seconds | dispatches |",
                "|---|---|---|---|"]
-    for task in aufgaben:
+    for task in tasks_:
         for arm in "ABC":
-            z = vorhanden.get((task, arm))
+            z = present.get((task, arm))
             if z is None:
                 continue
-            zeilen.append(
+            lines.append(
                 f"| `{task}` | {arm} | {z['seconds']:.0f} | "
                 f"{z['arm_detail'].get('dispatches', '?')} |"
             )
 
-    zeilen += [
+    lines += [
         "",
         "Tokens are not reported. The harness in use does not return usage for "
         "these",
@@ -1217,9 +1217,9 @@ def markdown(zellen: list[dict], kampagne: str = "v1") -> str:
         "## Cells that did not run",
         "",
     ]
-    zeilen.append(", ".join(f"`{f}`" for f in fehlend) if fehlend
+    lines.append(", ".join(f"`{f}`" for f in missing_) if missing_
                   else "None: every cell was attempted.")
-    zeilen += [
+    lines += [
         "",
         "## The one thing this run could not measure",
         "",
@@ -1260,16 +1260,16 @@ def markdown(zellen: list[dict], kampagne: str = "v1") -> str:
         "which is a finding about the benchmark, not a verdict on an arm.",
         "",
     ]
-    return "\n".join(zeilen)
+    return "\n".join(lines)
 
 
 #: `<task>.<arm>.<rep>.v<UTC timestamp>.json` -- a cell as it stood before a
 #: recount. Kept, never read as a cell: the file without the stamp is the cell.
-_GEPARKT = re.compile(r"\.v\d{8}T\d{6}Z\.json$")
+_PARKED = re.compile(r"\.v\d{8}T\d{6}Z\.json$")
 
 
-def _geparkt(f: Path) -> bool:
-    return bool(_GEPARKT.search(f.name))
+def _parked(f: Path) -> bool:
+    return bool(_PARKED.search(f.name))
 
 
 def cmd_recount(args) -> int:
@@ -1283,21 +1283,21 @@ def cmd_recount(args) -> int:
     Nothing is overwritten and nothing is invented; a cell whose tree is gone
     is left alone and reported as such.
     """
-    quelle = ergebnisse_fuer(args.campaign)
-    if not quelle.is_dir():
+    source = results_for(args.campaign)
+    if not source.is_dir():
         print("no cells have run")
         return 1
-    stempel = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
-    beruehrt, uebersprungen = [], []
-    for f in sorted(quelle.glob("*.json")):
+    stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
+    touched, skipped_ = [], []
+    for f in sorted(source.glob("*.json")):
         if ".attempt" in f.name:
             continue
         z = json.loads(f.read_text())
         detail = z.get("arm_detail") or {}
         if "dispatches_recounted" in detail:
             continue
-        gemessen = Path(z.get("measured_tree") or "")
-        baum = gemessen.parent / "root"
+        measured_ = Path(z.get("measured_tree") or "")
+        tree_ = measured_.parent / "root"
         # The tree has to be *this* cell's. A temp path is reusable, and a
         # figure taken from the wrong directory is worse than an old one.
         # Arm C records the repository directory (`bm-<task>-<arm><rep>-…`);
@@ -1305,62 +1305,62 @@ def cmd_recount(args) -> int:
         # harness chooses. So the identity test accepts either the directory
         # itself or its parent temp directory (`bench-<task>-<arm><rep>-…`),
         # and still refuses a tree belonging to some other cell.
-        erwartet = (f"bm-{z['task']}-{z['arm']}{z.get('repetition', 1)}-",
+        expected = (f"bm-{z['task']}-{z['arm']}{z.get('repetition', 1)}-",
                     f"bench-{z['task']}-{z['arm']}{z.get('repetition', 1)}-")
-        if not (gemessen.name.startswith(erwartet)
-                or gemessen.parent.name.startswith(erwartet)):
-            uebersprungen.append(
-                f"{f.name} (its recorded tree {gemessen.name!r} is not this cell's)")
+        if not (measured_.name.startswith(expected)
+                or measured_.parent.name.startswith(expected)):
+            skipped_.append(
+                f"{f.name} (its recorded tree {measured_.name!r} is not this cell's)")
             continue
-        if not baum.is_dir():
-            uebersprungen.append(f"{f.name} (its run tree is gone)")
+        if not tree_.is_dir():
+            skipped_.append(f"{f.name} (its run tree is gone)")
             continue
-        echt = gezaehlte_dispatches(baum)
-        if not echt or echt == detail.get("dispatches"):
+        real = counted_dispatches(tree_)
+        if not real or real == detail.get("dispatches"):
             continue
-        f.rename(f.with_name(f"{f.stem}.v{stempel}{f.suffix}"))
+        f.rename(f.with_name(f"{f.stem}.v{stamp}{f.suffix}"))
         detail["dispatches_as_recorded"] = detail.get("dispatches")
-        detail["dispatches_recounted"] = echt
-        detail["recounted_at"] = stempel
+        detail["dispatches_recounted"] = real
+        detail["recounted_at"] = stamp
         z["arm_detail"] = detail
         f.write_text(json.dumps(z, indent=2) + "\n")
-        beruehrt.append(f"{f.name}: {detail['dispatches_as_recorded']} -> {echt}")
-    for z in beruehrt:
+        touched.append(f"{f.name}: {detail['dispatches_as_recorded']} -> {real}")
+    for z in touched:
         print("recounted", z)
-    for z in uebersprungen:
+    for z in skipped_:
         print("skipped  ", z)
-    if not beruehrt and not uebersprungen:
+    if not touched and not skipped_:
         print("nothing to recount")
     return 0
 
 
 def cmd_report(args) -> int:
-    quelle = ergebnisse_fuer(getattr(args, "campaign", "v1"))
-    if not quelle.is_dir():
+    source = results_for(getattr(args, "campaign", "v1"))
+    if not source.is_dir():
         print("no cells have run")
         return 1
     # `*.attemptN.v<timestamp>.json` are preserved earlier attempts at a cell,
     # kept because nothing here is deleted. They are not the cell: a re-run
     # replaces what the cell reports, and the attempt that did not deliver
     # stays on disk for anyone who wants to see what happened.
-    zellen = [json.loads(f.read_text()) for f in sorted(quelle.glob("*.json"))
-              if ".attempt" not in f.name and not _geparkt(f)]
+    cells = [json.loads(f.read_text()) for f in sorted(source.glob("*.json"))
+              if ".attempt" not in f.name and not _parked(f)]
     # No opportunistic recount here. Reading whatever still sits at a cell's
     # recorded temp path attached a figure of 1 to a v1 arm-C cell whose tree
     # had long since been reused -- a number from the wrong directory is worse
     # than an old one. The recount is an explicit command that checks the
     # tree's identity and writes its result into the cell, by addition.
-    aufgaben = sorted({z["task"] for z in zellen})
-    zellen_gesamt = len([p for p in AUFGABEN.iterdir() if p.is_dir()]) * 3
-    noetig = _erforderliche_wiederholungen(getattr(args, "campaign", "v1"))
-    print(f"{len(zellen)} run(s) of {zellen_gesamt * noetig} planned "
-          f"({len(aufgaben) or len(list(AUFGABEN.iterdir()))} tasks x 3 arms x "
-          f"{noetig} repetition(s))")
+    tasks_ = sorted({z["task"] for z in cells})
+    cells_total = len([p for p in TASKS.iterdir() if p.is_dir()]) * 3
+    needed = _required_repetitions(getattr(args, "campaign", "v1"))
+    print(f"{len(cells)} run(s) of {cells_total * needed} planned "
+          f"({len(tasks_) or len(list(TASKS.iterdir()))} tasks x 3 arms x "
+          f"{needed} repetition(s))")
     print()
     print(f"{'task':<18s} {'arm':<4s} {'rep':<4s} {'hidden':<8s} "
           f"{'false accept':<13s} {'dispatches':>11s} {'seconds':>8s}")
-    for t in aufgaben:
-        for z in sorted([x for x in zellen if x["task"] == t],
+    for t in tasks_:
+        for z in sorted([x for x in cells if x["task"] == t],
                         key=lambda x: (x["arm"], x.get("repetition", 1))):
             d = z.get("arm_detail") or {}
             print(f"{z['task']:<18s} {z['arm']:<4s} "
@@ -1368,23 +1368,23 @@ def cmd_report(args) -> int:
                   f"{'PASS' if z['hidden_suite']['passed'] else 'FAIL':<8s} "
                   f"{str(z['false_accept']):<13s} "
                   f"{str(d.get('dispatches', '-')):>11s} {z['seconds']:>8.0f}")
-    fehlend = []
-    for t in sorted(p.name for p in AUFGABEN.iterdir() if p.is_dir()):
+    missing_ = []
+    for t in sorted(p.name for p in TASKS.iterdir() if p.is_dir()):
         for a in ("A", "B", "C"):
-            if not any(z["task"] == t and z["arm"] == a for z in zellen):
-                fehlend.append(f"{t}/{a}")
+            if not any(z["task"] == t and z["arm"] == a for z in cells):
+                missing_.append(f"{t}/{a}")
     print()
-    print(f"cells not run: {len(fehlend)}"
-          + (" -- " + ", ".join(fehlend) if fehlend else ""))
+    print(f"cells not run: {len(missing_)}"
+          + (" -- " + ", ".join(missing_) if missing_ else ""))
     if getattr(args, "write", False):
         # Each campaign writes its own document. v1's stays where every
         # reference to it points; a replication cannot overwrite the campaign
         # it replicates by forgetting a flag.
-        kampagne = getattr(args, "campaign", "v1")
-        ziel = (HOH / "docs/BENCHMARK_RESULTS.md" if kampagne == "v1"
-                else HOH / f"docs/BENCHMARK_RESULTS_{kampagne}.md")
-        ziel.write_text(markdown(zellen, kampagne), encoding="utf-8")
-        print(f"wrote {ziel}")
+        campaign_ = getattr(args, "campaign", "v1")
+        target = (HOH / "docs/BENCHMARK_RESULTS.md" if campaign_ == "v1"
+                else HOH / f"docs/BENCHMARK_RESULTS_{campaign_}.md")
+        target.write_text(markdown(cells, campaign_), encoding="utf-8")
+        print(f"wrote {target}")
     return 0
 
 
@@ -1397,7 +1397,7 @@ def main(argv=None) -> int:
     r.add_argument("--rep", type=int, default=1)
     r.add_argument("--isolation", default="none")
     r.add_argument("--again", action="store_true")
-    r.add_argument("--campaign", default="v1", choices=sorted(KAMPAGNEN),
+    r.add_argument("--campaign", default="v1", choices=sorted(CAMPAIGNS),
                    help="which campaign's cells this belongs to. v1 is the "
                         "PRE-O125-CLOSURE campaign and is never re-run; v2 is "
                         "the replication the protocol declares in advance")
@@ -1405,13 +1405,13 @@ def main(argv=None) -> int:
     b = sub.add_parser("report")
     b.add_argument("--write", action="store_true",
                    help="also write docs/BENCHMARK_RESULTS.md")
-    b.add_argument("--campaign", default="v1", choices=sorted(KAMPAGNEN))
+    b.add_argument("--campaign", default="v1", choices=sorted(CAMPAIGNS))
     b.set_defaults(fn=cmd_report)
     rc = sub.add_parser(
         "recount",
         help="carry the counted dispatch figure into cells recorded with the "
              "old constant, by addition")
-    rc.add_argument("--campaign", default="v2", choices=sorted(KAMPAGNEN))
+    rc.add_argument("--campaign", default="v2", choices=sorted(CAMPAIGNS))
     rc.set_defaults(fn=cmd_recount)
     args = ap.parse_args(argv)
     return args.fn(args)

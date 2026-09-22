@@ -22,34 +22,34 @@ from conftest import (
     RUN_EVIDENCE_V1,
     HIDDEN_FIXTURES,
     RUN_EVIDENCE_V2,
-    braucht_evidenz,
+    needs_evidence,
 )
 
-WURZEL = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parent.parent
 
 
-def _laden():
+def _load():
     spec = importlib.util.spec_from_file_location(
-        "benchmark", WURZEL / "tools" / "benchmark.py")
+        "benchmark", ROOT / "tools" / "benchmark.py")
     mod = importlib.util.module_from_spec(spec)
     sys.modules.setdefault("benchmark", mod)
     spec.loader.exec_module(mod)
     return mod
 
 
-bm = _laden()
+bm = _load()
 
 
 def test_the_two_campaigns_write_to_different_directories():
-    assert bm.ergebnisse_fuer("v1") != bm.ergebnisse_fuer("v2")
-    assert bm.ergebnisse_fuer("v1").name == "results"
-    assert bm.ergebnisse_fuer("v2").name == "results-v2"
+    assert bm.results_for("v1") != bm.results_for("v2")
+    assert bm.results_for("v1").name == "results"
+    assert bm.results_for("v2").name == "results-v2"
 
 
 def test_an_unknown_campaign_is_refused_rather_than_defaulted():
     """Defaulting would put a replication's cells in the campaign it replicates."""
     with pytest.raises(SystemExit):
-        bm.ergebnisse_fuer("v9")
+        bm.results_for("v9")
 
 
 def test_campaign_v1_still_holds_the_fifteen_cells_it_was_measured_with():
@@ -60,15 +60,15 @@ def test_campaign_v1_still_holds_the_fifteen_cells_it_was_measured_with():
     reports, and a sixteenth appearing here means a replication wrote into the
     campaign it was replicating.
     """
-    quelle = bm.ergebnisse_fuer("v1")
-    if not quelle.is_dir():
-        braucht_evidenz(RUN_EVIDENCE_V1)
-    zellen = [f for f in quelle.glob("*.json") if ".attempt" not in f.name]
-    assert len(zellen) == 15, sorted(f.name for f in zellen)
+    source = bm.results_for("v1")
+    if not source.is_dir():
+        needs_evidence(RUN_EVIDENCE_V1)
+    cells = [f for f in source.glob("*.json") if ".attempt" not in f.name]
+    assert len(cells) == 15, sorted(f.name for f in cells)
 
 
 def test_the_report_reads_the_campaign_it_is_asked_for(tmp_path, monkeypatch):
-    braucht_evidenz(HIDDEN_FIXTURES)
+    needs_evidence(HIDDEN_FIXTURES)
     import json
 
     v2 = tmp_path / "results-v2"
@@ -78,7 +78,7 @@ def test_the_report_reads_the_campaign_it_is_asked_for(tmp_path, monkeypatch):
         "hidden_suite": {"passed": True}, "false_accept": False,
         "produced_final_state": True,
     }))
-    monkeypatch.setitem(bm.KAMPAGNEN, "v2", v2)
+    monkeypatch.setitem(bm.CAMPAIGNS, "v2", v2)
 
     class Args:
         campaign = "v2"
@@ -90,7 +90,7 @@ def test_the_report_reads_the_campaign_it_is_asked_for(tmp_path, monkeypatch):
 def test_a_replication_cannot_overwrite_the_document_it_replicates(tmp_path,
                                                                    monkeypatch):
     """One forgotten flag would have rewritten v1's results in place."""
-    braucht_evidenz(RUN_EVIDENCE_V2)
+    needs_evidence(RUN_EVIDENCE_V2)
     import json
 
     v2 = tmp_path / "results-v2"
@@ -100,7 +100,7 @@ def test_a_replication_cannot_overwrite_the_document_it_replicates(tmp_path,
         "hidden_suite": {"passed": True}, "false_accept": False,
         "produced_final_state": True,
     }))
-    monkeypatch.setitem(bm.KAMPAGNEN, "v2", v2)
+    monkeypatch.setitem(bm.CAMPAIGNS, "v2", v2)
     monkeypatch.setattr(bm, "HOH", tmp_path)
     (tmp_path / "docs").mkdir()
     (tmp_path / "docs" / "BENCHMARK_RESULTS.md").write_text("v1, untouched\n")
@@ -117,13 +117,13 @@ def test_a_replication_cannot_overwrite_the_document_it_replicates(tmp_path,
 
 
 def test_the_replication_header_says_it_is_one_and_names_what_it_may_not_claim():
-    kopf = "\n".join(bm._kampagnenkopf("v2"))
-    assert "declared replication" in kopf
-    assert "partial" in kopf
-    assert "would not license" in kopf
+    head = "\n".join(bm._campaign_head("v2"))
+    assert "declared replication" in head
+    assert "partial" in head
+    assert "would not license" in head
 
 
-def _log(d: Path, *aufrufe) -> None:
+def _log(d: Path, *calls_) -> None:
     """Writes a dispatch log. `None` stands for a line that predates the field."""
     import json
 
@@ -131,7 +131,7 @@ def _log(d: Path, *aufrufe) -> None:
     (d / "telemetry.jsonl").write_text("".join(
         json.dumps({"role": "planner"} if n is None
                    else {"role": "planner", "provider_calls": n}) + "\n"
-        for n in aufrufe))
+        for n in calls_))
 
 
 def test_dispatches_are_counted_from_the_logs_and_not_asserted(tmp_path):
@@ -145,8 +145,8 @@ def test_dispatches_are_counted_from_the_logs_and_not_asserted(tmp_path):
     _log(root / "node1", *([1] * 9))
     _log(root / "repair-1-1", *([1] * 9))
 
-    assert bm.gezaehlte_dispatches(root) == 18
-    assert bm.gezaehlte_dispatches(root) > bm.DISPATCH_BUDGET
+    assert bm.counted_dispatches(root) == 18
+    assert bm.counted_dispatches(root) > bm.DISPATCH_BUDGET
 
 
 def test_a_line_is_not_a_call_in_either_direction(tmp_path):
@@ -160,7 +160,7 @@ def test_a_line_is_not_a_call_in_either_direction(tmp_path):
     root = tmp_path / "root"
     _log(root / "node1", 3, 0, 1)
 
-    z = bm.dispatch_zaehlung(root)
+    z = bm.dispatch_count(root)
     assert z["lines"] == 3
     assert z["provider_calls"] == 4
     assert z["lines_without_the_figure"] == 0
@@ -176,15 +176,15 @@ def test_a_line_that_predates_the_figure_is_reported_not_scored_as_one(tmp_path)
     root = tmp_path / "root"
     _log(root / "node1", None, None, 2)
 
-    z = bm.dispatch_zaehlung(root)
+    z = bm.dispatch_count(root)
     assert z["provider_calls"] == 2
     assert z["lines_without_the_figure"] == 2
     assert z["lines"] == 3
 
 
 def test_a_run_tree_with_no_log_counts_zero_rather_than_guessing(tmp_path):
-    assert bm.gezaehlte_dispatches(tmp_path) == 0
-    assert bm.dispatch_zaehlung(tmp_path) == {
+    assert bm.counted_dispatches(tmp_path) == 0
+    assert bm.dispatch_count(tmp_path) == {
         "provider_calls": 0, "lines": 0, "lines_without_the_figure": 0}
 
 
@@ -207,17 +207,17 @@ def test_the_comparison_pairs_cells_and_counts_only_the_pairs(tmp_path,
             "hidden_suite": {"passed": passed}, "false_accept": False,
             "produced_final_state": final,
         }))
-    monkeypatch.setitem(bm.KAMPAGNEN, "v1", v1)
+    monkeypatch.setitem(bm.CAMPAIGNS, "v1", v1)
 
-    zellen = [
+    cells = [
         {"task": "a", "arm": "C", "hidden_suite": {"passed": True},
          "produced_final_state": True},
         # no v1 counterpart: must not appear
         {"task": "z", "arm": "C", "hidden_suite": {"passed": True},
          "produced_final_state": True},
     ]
-    zeilen = bm._vergleich(zellen)
-    text = "\n".join(zeilen)
+    lines = bm._comparison(cells)
+    text = "\n".join(lines)
 
     assert "`a`" in text
     assert "`z`" not in text, "a cell with no counterpart was compared anyway"
@@ -233,11 +233,11 @@ def test_the_comparison_pairs_cells_and_counts_only_the_pairs(tmp_path,
 def test_a_campaign_with_no_counterparts_says_so(tmp_path, monkeypatch):
     v1 = tmp_path / "results"
     v1.mkdir()
-    monkeypatch.setitem(bm.KAMPAGNEN, "v1", v1)
-    zeilen = bm._vergleich([{"task": "z", "arm": "C",
+    monkeypatch.setitem(bm.CAMPAIGNS, "v1", v1)
+    lines = bm._comparison([{"task": "z", "arm": "C",
                              "hidden_suite": {"passed": True},
                              "produced_final_state": True}])
-    assert "No cell of this campaign has a v1 counterpart yet." in zeilen
+    assert "No cell of this campaign has a v1 counterpart yet." in lines
 
 
 def test_a_candidate_file_named_after_a_stdlib_module_cannot_change_the_verdict(
@@ -250,26 +250,26 @@ def test_a_candidate_file_named_after_a_stdlib_module_cannot_change_the_verdict(
     `false_accept` to false. No malice is needed: `types.py`, `copy.py`,
     `string.py`, `token.py` are all plausible names for an arm to write.
     """
-    aufgabe = tmp_path / "tasks" / "shadow"
-    aufgabe.mkdir(parents=True)
-    (aufgabe / "hidden_test.py").write_text(
+    task_ = tmp_path / "tasks" / "shadow"
+    task_.mkdir(parents=True)
+    (task_ / "hidden_test.py").write_text(
         "import unittest\n"
         "class T(unittest.TestCase):\n"
         "    def test_it_fails(self):\n"
         "        self.assertEqual(1, 2)\n", encoding="utf-8")
 
-    kandidat = tmp_path / "kandidat"
-    kandidat.mkdir()
-    (kandidat / "app.py").write_text("x = 1\n", encoding="utf-8")
+    candidate = tmp_path / "kandidat"
+    candidate.mkdir()
+    (candidate / "app.py").write_text("x = 1\n", encoding="utf-8")
     # The hijack: a module the suite imports, answered by the candidate.
-    (kandidat / "unittest.py").write_text(
+    (candidate / "unittest.py").write_text(
         "class TestCase:\n"
         "    def __init__(self, *a, **k): pass\n"
         "def main(*a, **k):\n"
         "    raise SystemExit(0)\n", encoding="utf-8")
 
-    bm.AUFGABEN = tmp_path / "tasks"
-    v = bm.hidden_verdict(kandidat, "shadow")
+    bm.TASKS = tmp_path / "tasks"
+    v = bm.hidden_verdict(candidate, "shadow")
 
     assert not v["passed"], (
         "the candidate answered the suite's import and the verdict flipped")

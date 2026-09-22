@@ -22,44 +22,44 @@ from pathlib import Path
 
 import pytest
 
-WURZEL = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parent.parent
 
 
-def _laden():
+def _load():
     spec = importlib.util.spec_from_file_location(
-        "attribution", WURZEL / "tools" / "attribution.py")
+        "attribution", ROOT / "tools" / "attribution.py")
     mod = importlib.util.module_from_spec(spec)
     sys.modules.setdefault("attribution", mod)
     spec.loader.exec_module(mod)
     return mod
 
 
-at = _laden()
+at = _load()
 
 
 def _ledger() -> dict:
-    return json.loads((WURZEL / "dogfood" / "ATTRIBUTION.json").read_text())
+    return json.loads((ROOT / "dogfood" / "ATTRIBUTION.json").read_text())
 
 
 def test_no_entry_claims_a_range_that_ends_at_head():
     """An open range grows with the history and claims what it cannot know."""
     for e in _ledger()["entries"]:
-        ziel = str((e.get("range") or {}).get("to", ""))
-        assert ziel.upper() not in ("HEAD", "@"), e["id"]
+        target = str((e.get("range") or {}).get("to", ""))
+        assert target.upper() not in ("HEAD", "@"), e["id"]
 
 
 def test_an_open_range_is_reported_as_a_problem(tmp_path):
-    bericht = at.pruefe(WURZEL, {
+    report = at.check(ROOT, {
         "anchor": "HEAD",
         "entries": [{
             "id": "offen", "category": "MAIN_ORCHESTRATOR_DIRECT",
             "range": {"from": "HEAD", "to": "HEAD"},
         }],
     })
-    assert any("ends at HEAD" in p for p in bericht["problems"])
+    assert any("ends at HEAD" in p for p in report["problems"])
 
 
-def _fremde_historie() -> bool:
+def _foreign_history() -> bool:
     """Is this a clone that does not contain the history the ledger describes?
 
     A published export is a different repository with different commits, so
@@ -68,41 +68,41 @@ def _fremde_historie() -> bool:
     entries reported as naming commits "not after the anchor", when the truth
     was that the anchor is not in that clone either.
     """
-    anker = _ledger()["anchor"]
-    return not at._anker_vorhanden(WURZEL, anker)
+    anchor = _ledger()["anchor"]
+    return not at._anchor_exists(ROOT, anchor)
 
 
 def test_the_real_ledger_still_tiles_the_history():
-    if not (WURZEL / ".git").exists():
+    if not (ROOT / ".git").exists():
         pytest.skip("not a git checkout")
-    bericht = at.pruefe(WURZEL, _ledger())
-    if bericht.get("environment_gap"):
-        assert bericht["problems"] == [], (
+    report = at.check(ROOT, _ledger())
+    if report.get("environment_gap"):
+        assert report["problems"] == [], (
             "a clone without this history reports the gap, not defects")
-        pytest.skip(bericht["environment_gap"])
-    assert bericht["problems"] == [], bericht["problems"]
+        pytest.skip(report["environment_gap"])
+    assert report["problems"] == [], report["problems"]
 
 
 def test_a_clone_without_the_history_reports_a_gap_rather_than_defects():
     """The control for the skip above: the gap has to be *stated*, not
     inferred from an empty problem list."""
-    bericht = at.pruefe(WURZEL, {"anchor": "0" * 40, "entries": []})
-    assert bericht["problems"] == []
-    assert "does not contain the anchor commit" in bericht["environment_gap"]
+    report = at.check(ROOT, {"anchor": "0" * 40, "entries": []})
+    assert report["problems"] == []
+    assert "does not contain the anchor commit" in report["environment_gap"]
 
 
 def test_every_commit_after_the_anchor_belongs_to_exactly_one_entry():
     """Stated as its own test, because it is the denominator."""
-    if not (WURZEL / ".git").exists():
+    if not (ROOT / ".git").exists():
         pytest.skip("not a git checkout")
-    if _fremde_historie():
+    if _foreign_history():
         pytest.skip("this clone does not contain the history the ledger describes")
     ledger = _ledger()
-    gesehen: dict[str, str] = {}
+    seen_: dict[str, str] = {}
     for e in ledger["entries"]:
-        for sha in at._shas(WURZEL, e, []):
-            assert sha not in gesehen, f"{sha[:12]} claimed twice"
-            gesehen[sha] = e["id"]
+        for sha in at._shas(ROOT, e, []):
+            assert sha not in seen_, f"{sha[:12]} claimed twice"
+            seen_[sha] = e["id"]
     # The gap question is asked of the tool, not re-implemented here. This
     # test used to carry its own copy of the tolerance rule -- "HEAD and
     # exactly HEAD" -- and when O169 widened that rule by one shape, the tool
@@ -110,9 +110,9 @@ def test_every_commit_after_the_anchor_belongs_to_exactly_one_entry():
     # written down twice is a rule that will disagree with itself; the part
     # that belongs here is the one above, which the tool does not check: that
     # no commit is claimed by two entries.
-    bericht = at.pruefe(WURZEL, ledger)
-    luecken = [p for p in bericht["problems"] if "belong to no entry" in p]
-    assert not luecken, "; ".join(luecken)
+    report = at.check(ROOT, ledger)
+    gaps = [p for p in report["problems"] if "belong to no entry" in p]
+    assert not gaps, "; ".join(gaps)
 
 
 def test_a_veriharness_claim_must_point_at_a_state_that_exists():
@@ -124,15 +124,15 @@ def test_a_veriharness_claim_must_point_at_a_state_that_exists():
     are classified EXCLUDE and a published clone does not carry them, which is
     the export working rather than a missing state.
     """
-    fremd = _fremde_historie()
+    foreign = _foreign_history()
     for e in _ledger()["entries"]:
         if e["category"] != "VERIHARNESS_RUN":
             continue
-        zustand = e.get("project_state", "")
-        assert zustand, e["id"]
-        if fremd:
+        state = e.get("project_state", "")
+        assert state, e["id"]
+        if foreign:
             continue
-        assert (WURZEL / zustand).is_file(), f"{e['id']}: {zustand}"
+        assert (ROOT / state).is_file(), f"{e['id']}: {state}"
 
 
 def test_the_ratio_is_derived_and_not_written_down():
@@ -150,24 +150,24 @@ def test_todays_work_is_not_attributed_to_the_product():
     path were written by the main session. An entry saying otherwise would be
     the fake attribution this phase was explicitly told not to produce.
     """
-    if not (WURZEL / ".git").exists():
+    if not (ROOT / ".git").exists():
         pytest.skip("not a git checkout")
     ledger = _ledger()
-    nach_sha = {}
+    by_sha = {}
     for e in ledger["entries"]:
-        for sha in at._shas(WURZEL, e, []):
-            nach_sha[sha] = e["category"]
+        for sha in at._shas(ROOT, e, []):
+            by_sha[sha] = e["category"]
     log = subprocess.run(
-        ["git", "-C", str(WURZEL), "log", "--format=%H %s", "-20"],
+        ["git", "-C", str(ROOT), "log", "--format=%H %s", "-20"],
         capture_output=True, text=True).stdout.splitlines()
-    for zeile in log:
-        sha, betreff = zeile.split(" ", 1)
-        if sha not in nach_sha:
+    for line in log:
+        sha, subject = line.split(" ", 1)
+        if sha not in by_sha:
             continue
-        if any(k in betreff for k in ("O125", "O129", "O132", "O126/O127")):
-            assert nach_sha[sha] == "MAIN_ORCHESTRATOR_DIRECT", (
-                f"{sha[:12]} ({betreff[:50]}) is attributed to "
-                f"{nach_sha[sha]}, and the session wrote it by hand")
+        if any(k in subject for k in ("O125", "O129", "O132", "O126/O127")):
+            assert by_sha[sha] == "MAIN_ORCHESTRATOR_DIRECT", (
+                f"{sha[:12]} ({subject[:50]}) is attributed to "
+                f"{by_sha[sha]}, and the session wrote it by hand")
 
 
 def _scratch_history(tmp, commits):
@@ -186,11 +186,11 @@ def _scratch_history(tmp, commits):
     (repo / "a.txt").write_text("0\n")
     g("add", "-A"); g("commit", "-q", "-m", "anchor")
     shas = {"anchor": g("rev-parse", "HEAD")}
-    for message, dateien in commits:
-        for rel, inhalt in dateien.items():
-            ziel = repo / rel
-            ziel.parent.mkdir(parents=True, exist_ok=True)
-            ziel.write_text(inhalt)
+    for message, files in commits:
+        for rel, content_ in files.items():
+            target = repo / rel
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(content_)
         g("add", "-A"); g("commit", "-q", "-m", message)
         shas[message] = g("rev-parse", "HEAD")
     return repo, shas
@@ -209,11 +209,11 @@ def test_two_unattributed_commits_are_still_a_gap(tmp_path):
         ("work two", {"a.txt": "2\n"}),
         ("tip", {"a.txt": "3\n"}),
     ])
-    bericht = at.pruefe(repo, {"anchor": shas["anchor"], "entries": []})
-    assert any("belong to no entry" in p for p in bericht["problems"])
+    report = at.check(repo, {"anchor": shas["anchor"], "entries": []})
+    assert any("belong to no entry" in p for p in report["problems"])
     # And named, both of them: a count without the shas is not actionable.
-    assert shas["work one"][:12] in " ".join(bericht["problems"])
-    assert shas["work two"][:12] in " ".join(bericht["problems"])
+    assert shas["work one"][:12] in " ".join(report["problems"])
+    assert shas["work two"][:12] in " ".join(report["problems"])
 
 
 def test_a_capsule_only_commit_is_bookkeeping_and_a_mixed_one_is_not(tmp_path):
@@ -222,12 +222,12 @@ def test_a_capsule_only_commit_is_bookkeeping_and_a_mixed_one_is_not(tmp_path):
     closing that one needed another capsule commit. The same argument as the
     ledger, and it stops at exactly the same place -- one bookkeeping file,
     nothing beside it."""
-    kapsel = "dogfood/succession/SUCCESSION.json"
+    capsule_ = "dogfood/succession/SUCCESSION.json"
     repo, shas = _scratch_history(tmp_path, [
         ("work", {"a.txt": "1\n"}),
-        ("capsule only", {kapsel: '{"c": 1}\n'}),
-        ("capsule and more", {kapsel: '{"c": 2}\n', "a.txt": "2\n"}),
-        ("both ledgers", {kapsel: '{"c": 3}\n',
+        ("capsule only", {capsule_: '{"c": 1}\n'}),
+        ("capsule and more", {capsule_: '{"c": 2}\n', "a.txt": "2\n"}),
+        ("both ledgers", {capsule_: '{"c": 3}\n',
                           "dogfood/ATTRIBUTION.json": '{"x": 1}\n'}),
         ("tip", {"a.txt": "3\n"}),
     ])
@@ -236,10 +236,10 @@ def test_a_capsule_only_commit_is_bookkeeping_and_a_mixed_one_is_not(tmp_path):
          "is_development_node": False, "commits": [shas["work"]],
          "why_not_the_product": "fixture"},
     ]}
-    offen = " ".join(at.pruefe(repo, ledger)["problems"])
-    assert shas["capsule only"][:12] not in offen, "a capsule-only commit is bookkeeping"
-    assert shas["capsule and more"][:12] in offen, "anything beside it is work"
-    assert shas["both ledgers"][:12] in offen, (
+    open_ = " ".join(at.check(repo, ledger)["problems"])
+    assert shas["capsule only"][:12] not in open_, "a capsule-only commit is bookkeeping"
+    assert shas["capsule and more"][:12] in open_, "anything beside it is work"
+    assert shas["both ledgers"][:12] in open_, (
         "two bookkeeping files in one commit is a commit doing two things")
 
 def test_a_ledger_only_commit_is_tolerated_and_anything_else_is_not():
@@ -284,21 +284,21 @@ def test_a_ledger_only_commit_is_tolerated_and_anything_else_is_not():
         g("config", "user.name", "t")
         (repo / "a.txt").write_text("1\n")
         g("add", "-A"); g("commit", "-q", "-m", "anchor")
-        anker = g("rev-parse", "HEAD")
+        anchor = g("rev-parse", "HEAD")
 
         led = repo / "dogfood" / "ATTRIBUTION.json"
         led.parent.mkdir(parents=True)
         led.write_text("{}\n")
         (repo / "a.txt").write_text("2\n")
         g("add", "-A"); g("commit", "-q", "-m", "work plus ledger")
-        arbeit = g("rev-parse", "HEAD")
+        work_ = g("rev-parse", "HEAD")
 
         led.write_text('{"x": 1}\n')
         g("add", "-A"); g("commit", "-q", "-m", "ledger only")
 
         (repo / "a.txt").write_text("3\n")
         g("add", "-A"); g("commit", "-q", "-m", "more work")
-        spaeter = g("rev-parse", "HEAD")
+        later = g("rev-parse", "HEAD")
 
         (repo / "a.txt").write_text("4\n")
         g("add", "-A"); g("commit", "-q", "-m", "tip")
@@ -306,22 +306,22 @@ def test_a_ledger_only_commit_is_tolerated_and_anything_else_is_not():
         # `spaeter` is named, so the ledger-only commit is neither the tip nor
         # part of a trailing run of unattributed commits. Under the first
         # version of this rule -- a trailing run -- this fixture went red.
-        ledger = {"anchor": anker, "entries": [
+        ledger = {"anchor": anchor, "entries": [
             {"id": "e", "category": "MAIN_ORCHESTRATOR_DIRECT",
-             "is_development_node": False, "commits": [arbeit, spaeter],
+             "is_development_node": False, "commits": [work_, later],
              "why_not_the_product": "fixture"},
         ]}
-        bericht = at.pruefe(repo, ledger)
+        report = at.check(repo, ledger)
         # `tip` is tolerated as the tip; `more work` and `work plus ledger` are
         # named; the ledger-only commit is buried between named commits and is
         # tolerated on what it touched rather than on where it is.
-        assert not any("belong to no entry" in p for p in bericht["problems"]), (
-            bericht["problems"])
+        assert not any("belong to no entry" in p for p in report["problems"]), (
+            report["problems"])
 
         # Negative control: leave `work plus ledger` unnamed. It touched a.txt
         # as well, so the widening must not reach it and this must be a gap.
-        bericht = at.pruefe(repo, {"anchor": anker, "entries": []})
-        assert any("belong to no entry" in p for p in bericht["problems"]), (
+        report = at.check(repo, {"anchor": anchor, "entries": []})
+        assert any("belong to no entry" in p for p in report["problems"]), (
             "a trailing commit that touched more than the ledger was excused, "
             "so the widening swallowed the check it was supposed to narrow"
         )
@@ -343,16 +343,16 @@ def _fixture_repo(tmp):
     g("config", "user.name", "t")
     (repo / "a.txt").write_text("1\n")
     g("add", "-A"); g("commit", "-q", "-m", "anchor")
-    anker = g("rev-parse", "HEAD")
+    anchor = g("rev-parse", "HEAD")
     (repo / "a.txt").write_text("2\n")
     g("add", "-A"); g("commit", "-q", "-m", "work")
-    arbeit = g("rev-parse", "HEAD")
+    work_ = g("rev-parse", "HEAD")
     (repo / "a.txt").write_text("3\n")
     g("add", "-A"); g("commit", "-q", "-m", "tip")
-    return repo, anker, arbeit
+    return repo, anchor, work_
 
 
-FREMD_SHA = "8edb1a2a1af6fe07f2db5bdaedfa6d2e041c289d"
+FOREIGN_SHA = "8edb1a2a1af6fe07f2db5bdaedfa6d2e041c289d"
 
 
 def test_an_entry_for_another_history_is_recorded_and_not_resolved():
@@ -372,22 +372,22 @@ def test_an_entry_for_another_history_is_recorded_and_not_resolved():
     import tempfile as _tf
 
     with _tf.TemporaryDirectory() as tmp:
-        repo, anker, arbeit = _fixture_repo(tmp)
-        basis = {"id": "e", "category": "MAIN_ORCHESTRATOR_DIRECT",
-                 "is_development_node": False, "commits": [FREMD_SHA],
+        repo, anchor, work_ = _fixture_repo(tmp)
+        baseline = {"id": "e", "category": "MAIN_ORCHESTRATOR_DIRECT",
+                 "is_development_node": False, "commits": [FOREIGN_SHA],
                  "why_not_the_product": "fixture"}
 
-        mit = at.pruefe(repo, {"anchor": anker, "entries": [
-            {**basis, "history": "public-export"},
+        with_ = at.check(repo, {"anchor": anchor, "entries": [
+            {**baseline, "history": "public-export"},
             {"id": "i", "category": "MAIN_ORCHESTRATOR_DIRECT",
-             "is_development_node": False, "commits": [arbeit],
+             "is_development_node": False, "commits": [work_],
              "why_not_the_product": "fixture"}]})
-        assert not mit["problems"], mit["problems"]
-        assert mit["other_histories"]["public-export"][
+        assert not with_["problems"], with_["problems"]
+        assert with_["other_histories"]["public-export"][
             "commits_by_category"]["MAIN_ORCHESTRATOR_DIRECT"] == 1
 
-        ohne = at.pruefe(repo, {"anchor": anker, "entries": [basis]})
-        assert any("not a commit after" in p for p in ohne["problems"]), (
+        without = at.check(repo, {"anchor": anchor, "entries": [baseline]})
+        assert any("not a commit after" in p for p in without["problems"]), (
             "an unmarked foreign sha was accepted, so the marker is not doing "
             "the work -- the check would pass for any sha at all"
         )
@@ -404,17 +404,17 @@ def test_another_history_never_enters_the_internal_denominator():
     import tempfile as _tf
 
     with _tf.TemporaryDirectory() as tmp:
-        repo, anker, arbeit = _fixture_repo(tmp)
-        intern_nur = {"id": "i", "category": "MAIN_ORCHESTRATOR_DIRECT",
-                      "is_development_node": True, "commits": [arbeit],
+        repo, anchor, work_ = _fixture_repo(tmp)
+        internal_only = {"id": "i", "category": "MAIN_ORCHESTRATOR_DIRECT",
+                      "is_development_node": True, "commits": [work_],
                       "why_not_the_product": "fixture"}
-        fremd = {"id": "e", "category": "MAIN_ORCHESTRATOR_DIRECT",
+        foreign = {"id": "e", "category": "MAIN_ORCHESTRATOR_DIRECT",
                  "history": "public-export", "is_development_node": True,
-                 "commits": [FREMD_SHA, FREMD_SHA[:-1] + "0"],
+                 "commits": [FOREIGN_SHA, FOREIGN_SHA[:-1] + "0"],
                  "why_not_the_product": "fixture"}
 
-        a = at.pruefe(repo, {"anchor": anker, "entries": [intern_nur]})
-        b = at.pruefe(repo, {"anchor": anker, "entries": [intern_nur, fremd]})
+        a = at.check(repo, {"anchor": anchor, "entries": [internal_only]})
+        b = at.check(repo, {"anchor": anchor, "entries": [internal_only, foreign]})
         assert a["commits_by_category"] == b["commits_by_category"]
         assert a["development_nodes"] == b["development_nodes"], (
             "a foreign-history entry moved the node denominator"
@@ -428,32 +428,32 @@ def test_a_foreign_history_entry_is_still_checked_on_what_is_checkable():
     import tempfile as _tf
 
     with _tf.TemporaryDirectory() as tmp:
-        repo, anker, arbeit = _fixture_repo(tmp)
+        repo, anchor, work_ = _fixture_repo(tmp)
         # The internal commit needs its own entry, or every case below also
         # reports the gap it leaves -- which would hide what is being tested.
-        intern = {"id": "i", "category": "MAIN_ORCHESTRATOR_DIRECT",
-                  "is_development_node": False, "commits": [arbeit],
+        internal_ = {"id": "i", "category": "MAIN_ORCHESTRATOR_DIRECT",
+                  "is_development_node": False, "commits": [work_],
                   "why_not_the_product": "fixture"}
 
-        def probleme(**ueberschreiben):
+        def problems(**overwrite_):
             e = {"id": "e", "category": "MAIN_ORCHESTRATOR_DIRECT",
                  "history": "public-export", "is_development_node": False,
-                 "commits": [FREMD_SHA], "why_not_the_product": "fixture"}
-            e.update(ueberschreiben)
-            return at.pruefe(
-                repo, {"anchor": anker, "entries": [intern, e]})["problems"]
+                 "commits": [FOREIGN_SHA], "why_not_the_product": "fixture"}
+            e.update(overwrite_)
+            return at.check(
+                repo, {"anchor": anchor, "entries": [internal_, e]})["problems"]
 
-        assert any("unknown history" in p for p in probleme(history="erfunden"))
-        assert any("unknown category" in p for p in probleme(category="ERFUNDEN"))
+        assert any("unknown history" in p for p in problems(history="erfunden"))
+        assert any("unknown category" in p for p in problems(category="ERFUNDEN"))
         assert any("names a range" in p
-                   for p in probleme(range={"from": "a", "to": "b"}))
-        assert any("names no commits" in p for p in probleme(commits=[]))
+                   for p in problems(range={"from": "a", "to": "b"}))
+        assert any("names no commits" in p for p in problems(commits=[]))
         assert any("cannot be checked where it is made" in p
-                   for p in probleme(category="VERIHARNESS_RUN")), (
+                   for p in problems(category="VERIHARNESS_RUN")), (
             "a foreign-history entry was allowed to claim the product executed "
             "it, in a repository that does not carry the run state to check"
         )
-        assert not probleme()
+        assert not problems()
 
 
 def test_a_missing_anchor_reports_an_environment_gap_instead_of_crashing():
@@ -472,16 +472,16 @@ def test_a_missing_anchor_reports_an_environment_gap_instead_of_crashing():
 
     with _tf.TemporaryDirectory() as tmp:
         repo, _, _ = _fixture_repo(tmp)
-        bericht = at.pruefe(repo, {"anchor": "0" * 40, "entries": []})
-        assert bericht.get("environment_gap")
-        for schluessel in ("commits_by_category", "sentence", "ok",
+        report = at.check(repo, {"anchor": "0" * 40, "entries": []})
+        assert report.get("environment_gap")
+        for key in ("commits_by_category", "sentence", "ok",
                            "commits_after_anchor", "problems",
                            "other_histories"):
-            assert schluessel in bericht, (
-                f"{schluessel} missing from the environment-gap report; the "
+            assert key in report, (
+                f"{key} missing from the environment-gap report; the "
                 "CLI reads it unconditionally and would crash again"
             )
-        assert bericht["ok"] is False, (
+        assert report["ok"] is False, (
             "an environment gap reported ok=True would be a pass for a run "
             "that verified nothing"
         )
@@ -504,48 +504,48 @@ def test_both_output_modes_carry_the_same_exit_semantics():
     import tempfile as _tf
     from pathlib import Path as _P
 
-    werkzeug = str(WURZEL / "tools" / "attribution.py")
+    tool_ = str(ROOT / "tools" / "attribution.py")
 
-    def lauf(*extra):
-        return _sp.run([_sys.executable, werkzeug, *extra],
+    def one_run(*extra):
+        return _sp.run([_sys.executable, tool_, *extra],
                        capture_output=True, text=True)
 
     with _tf.TemporaryDirectory() as tmp:
-        repo, anker, arbeit = _fixture_repo(tmp)
+        repo, anchor, work_ = _fixture_repo(tmp)
         ledger = _P(tmp) / "ledger.json"
 
         # 1. An environment gap: this repository does not carry the anchor.
         ledger.write_text(_json.dumps({"anchor": "0" * 40, "entries": []}))
-        for modus in ([], ["--json"]):
-            r = lauf("--repo", str(repo), "--ledger", str(ledger), *modus)
+        for mode_ in ([], ["--json"]):
+            r = one_run("--repo", str(repo), "--ledger", str(ledger), *mode_)
             assert r.returncode == 3, (
-                f"{modus or ['text']}: an environment gap exited "
+                f"{mode_ or ['text']}: an environment gap exited "
                 f"{r.returncode}, not 3 -- 0 would report a run that verified "
                 "nothing as a pass"
             )
 
         # 2. A finding: a commit no entry claims.
-        ledger.write_text(_json.dumps({"anchor": anker, "entries": []}))
-        rc_text = lauf("--repo", str(repo), "--ledger", str(ledger)).returncode
-        rc_json = lauf("--repo", str(repo), "--ledger", str(ledger),
+        ledger.write_text(_json.dumps({"anchor": anchor, "entries": []}))
+        rc_text = one_run("--repo", str(repo), "--ledger", str(ledger)).returncode
+        rc_json = one_run("--repo", str(repo), "--ledger", str(ledger),
                        "--json").returncode
         assert rc_text == rc_json == 1, (f"text={rc_text} json={rc_json}")
 
         # 3. A verified pass.
-        ledger.write_text(_json.dumps({"anchor": anker, "entries": [
+        ledger.write_text(_json.dumps({"anchor": anchor, "entries": [
             {"id": "i", "category": "MAIN_ORCHESTRATOR_DIRECT",
-             "is_development_node": False, "commits": [arbeit],
+             "is_development_node": False, "commits": [work_],
              "why_not_the_product": "fixture"}]}))
-        rc_text = lauf("--repo", str(repo), "--ledger", str(ledger)).returncode
-        rc_json = lauf("--repo", str(repo), "--ledger", str(ledger),
+        rc_text = one_run("--repo", str(repo), "--ledger", str(ledger)).returncode
+        rc_json = one_run("--repo", str(repo), "--ledger", str(ledger),
                        "--json").returncode
         assert rc_text == rc_json == 0, (f"text={rc_text} json={rc_json}")
 
 
-def _lauf_zustand(pfad, candidate_id, tree_digest):
+def _run_state(path, candidate_id, tree_digest):
     import json as _json
-    pfad.parent.mkdir(parents=True, exist_ok=True)
-    pfad.write_text(_json.dumps({"last_accepted_candidate": {
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(_json.dumps({"last_accepted_candidate": {
         "candidate_id": candidate_id, "tree_digest": tree_digest}}))
 
 
@@ -567,41 +567,41 @@ def test_a_plain_run_entry_must_point_at_the_contents_that_were_accepted():
     from pathlib import Path as _P
 
     with _tf.TemporaryDirectory() as tmp:
-        repo, anker, arbeit = _fixture_repo(tmp)
-        baum = at._git(repo, "rev-parse", f"{arbeit}^{{tree}}").strip()
-        zustand = _P(tmp) / "runs" / "r1" / "state.json"
-        _lauf_zustand(repo / "runs/r1/state.json", "r1-i2", baum)
+        repo, anchor, work_ = _fixture_repo(tmp)
+        tree_ = at._git(repo, "rev-parse", f"{work_}^{{tree}}").strip()
+        state = _P(tmp) / "runs" / "r1" / "state.json"
+        _run_state(repo / "runs/r1/state.json", "r1-i2", tree_)
 
-        def probleme(**ueberschreiben):
+        def problems(**overwrite_):
             e = {"id": "e", "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
-                 "is_development_node": True, "commits": [arbeit],
+                 "is_development_node": True, "commits": [work_],
                  "run_state": "runs/r1/state.json", "candidate_id": "r1-i2",
                  "why_not_the_product": "fixture"}
-            e.update(ueberschreiben)
-            return at.pruefe(repo, {"anchor": anker, "entries": [e]})["problems"]
+            e.update(overwrite_)
+            return at.check(repo, {"anchor": anchor, "entries": [e]})["problems"]
 
-        assert not probleme(), probleme()
+        assert not problems(), problems()
 
         # Each way of claiming without pointing.
-        assert any("names no run state" in p for p in probleme(run_state=""))
+        assert any("names no run state" in p for p in problems(run_state=""))
         assert any("not there" in p
-                   for p in probleme(run_state="runs/nope/state.json"))
-        assert any("no candidate_id" in p for p in probleme(candidate_id=""))
+                   for p in problems(run_state="runs/nope/state.json"))
+        assert any("no candidate_id" in p for p in problems(candidate_id=""))
         assert any("records" in p and "as the accepted one" in p
-                   for p in probleme(candidate_id="r1-i9")), (
+                   for p in problems(candidate_id="r1-i9")), (
             "an entry could name one run and mean another iteration of it")
 
         # The negative control that matters: the right run, the right
         # candidate, and contents that are not the ones this entry claims.
-        anderer = at._git(repo, "rev-parse", f"{anker}^{{tree}}").strip()
-        assert anderer != baum
-        _lauf_zustand(repo / "runs/r1/state.json", "r1-i2", anderer)
+        other_ = at._git(repo, "rev-parse", f"{anchor}^{{tree}}").strip()
+        assert other_ != tree_
+        _run_state(repo / "runs/r1/state.json", "r1-i2", other_)
         assert any("is not the tree of any commit this entry claims" in p
-                   for p in probleme()), (
+                   for p in problems()), (
             "the entry was accepted while the run's accepted contents were "
             "somewhere else -- the binding to bytes is not doing its work"
         )
-        assert zustand or True  # kept: the fixture path is inside the repo
+        assert state or True  # kept: the fixture path is inside the repo
 
 
 def test_the_new_category_moves_neither_number_it_sits_between():
@@ -615,24 +615,24 @@ def test_the_new_category_moves_neither_number_it_sits_between():
     import tempfile as _tf
 
     with _tf.TemporaryDirectory() as tmp:
-        repo, anker, arbeit = _fixture_repo(tmp)
-        baum = at._git(repo, "rev-parse", f"{arbeit}^{{tree}}").strip()
-        _lauf_zustand(repo / "runs/r1/state.json", "r1-i2", baum)
+        repo, anchor, work_ = _fixture_repo(tmp)
+        tree_ = at._git(repo, "rev-parse", f"{work_}^{{tree}}").strip()
+        _run_state(repo / "runs/r1/state.json", "r1-i2", tree_)
 
-        ohne = at.pruefe(repo, {"anchor": anker, "entries": [
+        without = at.check(repo, {"anchor": anchor, "entries": [
             {"id": "i", "category": "MAIN_ORCHESTRATOR_DIRECT",
-             "is_development_node": True, "commits": [arbeit],
+             "is_development_node": True, "commits": [work_],
              "why_not_the_product": "fixture"}]})
-        mit = at.pruefe(repo, {"anchor": anker, "entries": [
+        with_ = at.check(repo, {"anchor": anchor, "entries": [
             {"id": "i", "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
-             "is_development_node": True, "commits": [arbeit],
+             "is_development_node": True, "commits": [work_],
              "run_state": "runs/r1/state.json", "candidate_id": "r1-i2",
              "why_not_the_product": "fixture"}]})
-        assert mit["nodes_through_the_product"] == \
-            ohne["nodes_through_the_product"] == 0, (
+        assert with_["nodes_through_the_product"] == \
+            without["nodes_through_the_product"] == 0, (
             "the new category inflated the ratio's numerator")
-        assert mit["development_nodes"] == ohne["development_nodes"] == 1
-        assert mit["nodes_developed_by_the_product_merged_by_the_orchestrator"] == 1
-        assert ohne[
+        assert with_["development_nodes"] == without["development_nodes"] == 1
+        assert with_["nodes_developed_by_the_product_merged_by_the_orchestrator"] == 1
+        assert without[
             "nodes_developed_by_the_product_merged_by_the_orchestrator"] == 0
 

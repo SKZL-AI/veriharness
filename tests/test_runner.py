@@ -469,19 +469,19 @@ def test_a_pre_existing_scratch_directory_is_parked_not_reused(tmp_path):
 
     arena = tmp_path / "aaaa1111"
     arena.mkdir()
-    vorher = arena.with_name("aaaa1111.scratch")
-    (vorher / "lib" / "python3.13" / "site-packages").mkdir(parents=True)
-    (vorher / "lib" / "python3.13" / "site-packages" / "usercustomize.py").write_text(
+    before = arena.with_name("aaaa1111.scratch")
+    (before / "lib" / "python3.13" / "site-packages").mkdir(parents=True)
+    (before / "lib" / "python3.13" / "site-packages" / "usercustomize.py").write_text(
         "raise SystemExit('planted')\n")
 
-    frisch = _scratch_dir(arena)
+    fresh_ = _scratch_dir(arena)
 
-    assert frisch == vorher
-    assert not (frisch / "lib").exists(), "the planted tree is still in the way"
-    geparkt = [p for p in arena.parent.iterdir()
+    assert fresh_ == before
+    assert not (fresh_ / "lib").exists(), "the planted tree is still in the way"
+    parked = [p for p in arena.parent.iterdir()
                if p.name.startswith("aaaa1111.scratch.v")]
-    assert geparkt, "the old directory was removed rather than parked"
-    assert (geparkt[0] / "lib" / "python3.13" / "site-packages"
+    assert parked, "the old directory was removed rather than parked"
+    assert (parked[0] / "lib" / "python3.13" / "site-packages"
             / "usercustomize.py").is_file(), "parked means kept, not deleted"
 
 

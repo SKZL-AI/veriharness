@@ -21,15 +21,15 @@ from hoh.amendment import (
 )
 
 
-def _a(aid="A-1", *, kind=AmendmentKind.CORRECT, von="aaaa", nach="bbbb",
-       kriterien=("K1",), **kw) -> SpecAmendment:
-    felder = dict(
-        amendment_id=aid, run_id="r", from_digest=von, to_digest=nach,
+def _a(aid="A-1", *, kind=AmendmentKind.CORRECT, from_="aaaa", after="bbbb",
+       criteria_=("K1",), **kw) -> SpecAmendment:
+    fields_ = dict(
+        amendment_id=aid, run_id="r", from_digest=from_, to_digest=after,
         kind=kind, actor="captain", reason="the old text asked for something "
-        "impossible", affected_criteria=list(kriterien),
+        "impossible", affected_criteria=list(criteria_),
     )
-    felder.update(kw)
-    return SpecAmendment(**felder)
+    fields_.update(kw)
+    return SpecAmendment(**fields_)
 
 
 # --------------------------------------------------------------------------- #
@@ -39,7 +39,7 @@ def _a(aid="A-1", *, kind=AmendmentKind.CORRECT, von="aaaa", nach="bbbb",
 
 def test_an_amendment_that_changes_nothing_is_rejected():
     with pytest.raises(ValidationError, match="did not change"):
-        _a(von="aaaa", nach="aaaa")
+        _a(from_="aaaa", after="aaaa")
 
 
 def test_an_acceptance_affecting_amendment_must_name_its_criteria():
@@ -47,17 +47,17 @@ def test_an_acceptance_affecting_amendment_must_name_its_criteria():
     holds, and "all of it" would make every amendment ruinous."""
     for kind in (AmendmentKind.NARROW, AmendmentKind.WIDEN, AmendmentKind.CORRECT):
         with pytest.raises(ValidationError, match="must name the criteria"):
-            _a(kind=kind, kriterien=())
+            _a(kind=kind, criteria_=())
 
 
 def test_a_clarification_that_touches_criteria_is_not_a_clarification():
     """The one kind that claims to change nothing is held to the claim."""
     with pytest.raises(ValidationError, match="is not a clarification"):
-        _a(kind=AmendmentKind.CLARIFY, kriterien=("K1",))
+        _a(kind=AmendmentKind.CLARIFY, criteria_=("K1",))
 
 
 def test_a_genuine_clarification_is_allowed_and_costs_nothing():
-    a = _a(kind=AmendmentKind.CLARIFY, kriterien=())
+    a = _a(kind=AmendmentKind.CLARIFY, criteria_=())
     assert not a.acceptance_affecting()
     assert a.invalidates(["r-i1-a1-K1"]) == []
     assert a.requires_revalidation() == []
@@ -87,25 +87,25 @@ def test_an_amendment_names_a_person_not_a_default():
 
 
 def test_only_the_affected_criteria_lose_their_evidence():
-    a = _a(kriterien=("K2",))
-    quittungen = ["r-i1-a1-K1", "r-i1-a1-K2", "r-i1-a1-K3", "r-i1-a1-K2-basis"]
-    assert sorted(a.invalidates(quittungen)) == ["r-i1-a1-K2", "r-i1-a1-K2-basis"]
+    a = _a(criteria_=("K2",))
+    receipts_ = ["r-i1-a1-K1", "r-i1-a1-K2", "r-i1-a1-K3", "r-i1-a1-K2-basis"]
+    assert sorted(a.invalidates(receipts_)) == ["r-i1-a1-K2", "r-i1-a1-K2-basis"]
 
 
 def test_a_baseline_receipt_is_invalidated_with_its_criterion():
     """The baseline is what makes a criterion discriminating. Keeping it while
     dropping the candidate measurement would leave half a comparison."""
-    a = _a(kriterien=("K1",))
+    a = _a(criteria_=("K1",))
     assert "r-i2-a1-K1-basis" in a.invalidates(["r-i2-a1-K1-basis"])
 
 
 def test_a_clarification_invalidates_nothing():
-    a = _a(kind=AmendmentKind.CLARIFY, kriterien=())
+    a = _a(kind=AmendmentKind.CLARIFY, criteria_=())
     assert a.invalidates(["r-i1-a1-K1", "r-i1-a1-K2"]) == []
 
 
 def test_widening_requires_the_affected_criteria_to_be_measured_again():
-    a = _a(kind=AmendmentKind.WIDEN, kriterien=("K1", "K2"))
+    a = _a(kind=AmendmentKind.WIDEN, criteria_=("K1", "K2"))
     assert sorted(a.requires_revalidation()) == ["K1", "K2"]
 
 
@@ -116,7 +116,7 @@ def test_an_amendment_after_acceptance_says_so():
 
 
 def test_the_summary_names_the_direction_and_the_actor():
-    text = _a(kind=AmendmentKind.NARROW, kriterien=("K7",)).summary()
+    text = _a(kind=AmendmentKind.NARROW, criteria_=("K7",)).summary()
     assert "narrow" in text and "captain" in text and "K7" in text
 
 
@@ -130,16 +130,16 @@ def test_a_ledger_with_a_gap_is_rejected():
     with pytest.raises(ValidationError, match="cannot say what the run promised"):
         AmendmentLedger(
             run_id="r", origin_digest="aaaa",
-            amendments=[_a("A-1", von="aaaa", nach="bbbb"),
-                        _a("A-2", von="cccc", nach="dddd")],
+            amendments=[_a("A-1", from_="aaaa", after="bbbb"),
+                        _a("A-2", from_="cccc", after="dddd")],
         )
 
 
 def test_a_continuous_chain_reports_the_current_digest():
     led = AmendmentLedger(
         run_id="r", origin_digest="aaaa",
-        amendments=[_a("A-1", von="aaaa", nach="bbbb"),
-                    _a("A-2", von="bbbb", nach="cccc")],
+        amendments=[_a("A-1", from_="aaaa", after="bbbb"),
+                    _a("A-2", from_="bbbb", after="cccc")],
     )
     assert led.current_digest() == "cccc"
 
@@ -154,8 +154,8 @@ def test_two_amendments_cannot_share_an_id():
     with pytest.raises(ValidationError, match="share an id"):
         AmendmentLedger(
             run_id="r", origin_digest="aaaa",
-            amendments=[_a("A-1", von="aaaa", nach="bbbb"),
-                        _a("A-1", von="bbbb", nach="cccc")],
+            amendments=[_a("A-1", from_="aaaa", after="bbbb"),
+                        _a("A-1", from_="bbbb", after="cccc")],
         )
 
 
@@ -165,22 +165,22 @@ def test_a_receipt_invalidated_twice_keeps_the_first_amendment():
     led = AmendmentLedger(
         run_id="r", origin_digest="aaaa",
         amendments=[
-            _a("A-1", von="aaaa", nach="bbbb", kriterien=("K1",)),
-            _a("A-2", von="bbbb", nach="cccc", kriterien=("K1", "K2")),
+            _a("A-1", from_="aaaa", after="bbbb", criteria_=("K1",)),
+            _a("A-2", from_="bbbb", after="cccc", criteria_=("K1", "K2")),
         ],
     )
-    ungueltig = led.invalidated_receipts(["r-i1-a1-K1", "r-i1-a1-K2"])
-    assert ungueltig["r-i1-a1-K1"] == "A-1"
-    assert ungueltig["r-i1-a1-K2"] == "A-2"
+    invalid_ = led.invalidated_receipts(["r-i1-a1-K1", "r-i1-a1-K2"])
+    assert invalid_["r-i1-a1-K1"] == "A-1"
+    assert invalid_["r-i1-a1-K2"] == "A-2"
 
 
 def test_the_ledger_collects_every_criterion_needing_revalidation():
     led = AmendmentLedger(
         run_id="r", origin_digest="aaaa",
         amendments=[
-            _a("A-1", von="aaaa", nach="bbbb", kriterien=("K1",)),
-            _a("A-2", von="bbbb", nach="cccc", kind=AmendmentKind.WIDEN,
-               kriterien=("K3",)),
+            _a("A-1", from_="aaaa", after="bbbb", criteria_=("K1",)),
+            _a("A-2", from_="bbbb", after="cccc", kind=AmendmentKind.WIDEN,
+               criteria_=("K3",)),
         ],
     )
     assert led.revalidation_needed() == {"K1", "K3"}
@@ -190,8 +190,8 @@ def test_the_ledger_collects_every_criterion_needing_revalidation():
 def test_a_ledger_of_clarifications_needs_no_revalidation():
     led = AmendmentLedger(
         run_id="r", origin_digest="aaaa",
-        amendments=[_a("A-1", von="aaaa", nach="bbbb",
-                       kind=AmendmentKind.CLARIFY, kriterien=())],
+        amendments=[_a("A-1", from_="aaaa", after="bbbb",
+                       kind=AmendmentKind.CLARIFY, criteria_=())],
     )
     assert led.revalidation_needed() == set()
     assert "revalidation required for: nothing" in led.report()
@@ -205,7 +205,7 @@ def test_a_ledger_of_clarifications_needs_no_revalidation():
 def test_the_superseded_text_is_kept_and_named(tmp_path):
     spec = tmp_path / "spec.md"
     spec.write_text("# Goal\n\nDo the thing.\n")
-    alt_digest = text_digest(spec.read_text())
+    old_digest = text_digest(spec.read_text())
 
     a = park_and_amend(
         spec, "# Goal\n\nDo the other thing.\n",
@@ -213,12 +213,12 @@ def test_the_superseded_text_is_kept_and_named(tmp_path):
         actor="captain", reason="the thing turned out to be impossible",
         affected_criteria=["K1"],
     )
-    assert a.from_digest == alt_digest
+    assert a.from_digest == old_digest
     assert spec.read_text() == "# Goal\n\nDo the other thing.\n"
-    geparkt = tmp_path / a.from_path.split("/")[-1]
-    assert geparkt.exists(), "the superseded text must remain readable"
-    assert geparkt.read_text() == "# Goal\n\nDo the thing.\n"
-    assert text_digest(geparkt.read_text()) == a.from_digest
+    parked = tmp_path / a.from_path.split("/")[-1]
+    assert parked.exists(), "the superseded text must remain readable"
+    assert parked.read_text() == "# Goal\n\nDo the thing.\n"
+    assert text_digest(parked.read_text()) == a.from_digest
 
 
 def test_amending_to_the_identical_text_writes_nothing(tmp_path):

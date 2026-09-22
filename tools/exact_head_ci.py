@@ -38,8 +38,8 @@ import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
 
-HIER = Path(__file__).resolve().parent
-HOH = HIER.parent
+HERE = Path(__file__).resolve().parent
+HOH = HERE.parent
 
 
 def export_path_digests(root: Path = HOH) -> dict[str, str]:
@@ -55,10 +55,10 @@ def export_path_digests(root: Path = HOH) -> dict[str, str]:
     With per-path digests the row can say which paths differ and decide.
     """
     manifest = root / "EXPORT_MANIFEST.json"
-    daten = json.loads(manifest.read_text(encoding="utf-8"))
-    eintraege = daten.get("entries") if isinstance(daten, dict) else daten
-    raus = {}
-    for e in eintraege or []:
+    data_ = json.loads(manifest.read_text(encoding="utf-8"))
+    entries = data_.get("entries") if isinstance(data_, dict) else data_
+    out_list = {}
+    for e in entries or []:
         if e.get("decision") != "INCLUDE":
             continue
         f = root / e["path"]
@@ -66,8 +66,8 @@ def export_path_digests(root: Path = HOH) -> dict[str, str]:
             raise SystemExit(
                 f"{e['path']} is INCLUDE but absent: the export cannot be "
                 f"digested, and a CI result about it would be about nothing")
-        raus[e["path"]] = hashlib.sha256(f.read_bytes()).hexdigest()
-    return raus
+        out_list[e["path"]] = hashlib.sha256(f.read_bytes()).hexdigest()
+    return out_list
 
 
 def export_content_digest(root: Path = HOH) -> tuple[str, int]:
@@ -78,13 +78,13 @@ def export_content_digest(root: Path = HOH) -> tuple[str, int]:
     export are the same thing to a CI result.
     """
     manifest = root / "EXPORT_MANIFEST.json"
-    daten = json.loads(manifest.read_text(encoding="utf-8"))
-    eintraege = daten.get("entries") if isinstance(daten, dict) else daten
-    pfade = sorted(e["path"] for e in eintraege or []
+    data_ = json.loads(manifest.read_text(encoding="utf-8"))
+    entries = data_.get("entries") if isinstance(data_, dict) else data_
+    paths = sorted(e["path"] for e in entries or []
                    if e.get("decision") == "INCLUDE")
     h = hashlib.sha256()
     n = 0
-    for rel in pfade:
+    for rel in paths:
         f = root / rel
         if not f.is_file():
             raise SystemExit(
@@ -115,19 +115,19 @@ def commit_path_digests(repo: Path, commit: str) -> dict[str, str]:
             f"{repo} cannot read {commit[:12]}: "
             f"{(p.stderr or p.stdout).strip()[:160]}. The export commit has to "
             f"be readable somewhere, or the recording is about nothing.")
-    raus = {}
-    for zeile in p.stdout.splitlines():
+    out_list = {}
+    for line in p.stdout.splitlines():
         try:
-            kopf, pfad = zeile.split("\t", 1)
-            _modus, art, blob = kopf.split()
+            head, path = line.split("\t", 1)
+            _mode, art, blob = head.split()
         except ValueError:                          # pragma: no cover - exotic
             continue
         if art != "blob":
             continue
-        inhalt = subprocess.run(["git", "-C", str(repo), "cat-file", "blob", blob],
+        content_ = subprocess.run(["git", "-C", str(repo), "cat-file", "blob", blob],
                                 capture_output=True)
-        raus[pfad] = hashlib.sha256(inhalt.stdout).hexdigest()
-    return raus
+        out_list[path] = hashlib.sha256(content_.stdout).hexdigest()
+    return out_list
 
 
 def _gh(*args: str) -> str:
@@ -150,49 +150,49 @@ def main(argv=None) -> int:
                     default=HOH / "dogfood/external-ci/EXACT_HEAD_CI.json")
     args = ap.parse_args(argv)
 
-    lauf = json.loads(_gh("run", "view", args.run_id, "--repo", args.repo,
+    one_run = json.loads(_gh("run", "view", args.run_id, "--repo", args.repo,
                           "--json", "headSha,conclusion,status,jobs"))
-    if lauf["headSha"] != args.export_commit:
+    if one_run["headSha"] != args.export_commit:
         raise SystemExit(
-            f"run {args.run_id} ran on {lauf['headSha'][:12]}, not on the "
+            f"run {args.run_id} ran on {one_run['headSha'][:12]}, not on the "
             f"export commit {args.export_commit[:12]}: that is a different "
             f"head and the evidence would not be about this export")
 
     jobs = []
     sandbox = "NOT_PRESENT"
-    for j in lauf["jobs"]:
-        schritte = [{"name": s["name"], "conclusion": s["conclusion"]}
+    for j in one_run["jobs"]:
+        steps_ = [{"name": s["name"], "conclusion": s["conclusion"]}
                     for s in j.get("steps") or []]
         jobs.append({"name": j["name"], "conclusion": j["conclusion"],
-                     "steps": schritte})
+                     "steps": steps_})
         if "sandbox" in j["name"].lower():
-            echt = [s for s in schritte if "must actually run" in s["name"]]
-            if echt and echt[0]["conclusion"] == "skipped":
+            real = [s for s in steps_ if "must actually run" in s["name"]]
+            if real and real[0]["conclusion"] == "skipped":
                 sandbox = "UNSUPPORTED_ENVIRONMENT"
-            elif echt and echt[0]["conclusion"] == "success":
+            elif real and real[0]["conclusion"] == "success":
                 sandbox = "VERIFIED"
             else:
                 sandbox = "NOT_DETERMINABLE"
 
-    je_pfad = commit_path_digests(args.export_repo, args.export_commit)
+    per_path = commit_path_digests(args.export_repo, args.export_commit)
     h = hashlib.sha256()
-    for rel in sorted(je_pfad):
+    for rel in sorted(per_path):
         h.update(rel.encode())
         h.update(b"\0")
-        h.update(bytes.fromhex(je_pfad[rel]))
-    digest, n = h.hexdigest(), len(je_pfad)
-    intern = subprocess.run(["git", "-C", str(HOH), "rev-parse", "HEAD"],
+        h.update(bytes.fromhex(per_path[rel]))
+    digest, n = h.hexdigest(), len(per_path)
+    internal_ = subprocess.run(["git", "-C", str(HOH), "rev-parse", "HEAD"],
                             capture_output=True, text=True, check=True).stdout.strip()
-    daten = {
+    data_ = {
         "repo": args.repo,
         "run_id": args.run_id,
-        "run_conclusion": lauf["conclusion"],
-        "run_status": lauf["status"],
+        "run_conclusion": one_run["conclusion"],
+        "run_status": one_run["status"],
         "export_commit": args.export_commit,
-        "internal_commit": intern,
+        "internal_commit": internal_,
         "export_content_digest": digest,
         "export_paths": n,
-        "path_digests": je_pfad,
+        "path_digests": per_path,
         "jobs": jobs,
         "sandbox_external_env": sandbox,
         "measured_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -203,13 +203,13 @@ def main(argv=None) -> int:
             "has measured nothing."),
     }
     args.out.parent.mkdir(parents=True, exist_ok=True)
-    args.out.write_text(json.dumps(daten, indent=2) + "\n", encoding="utf-8")
+    args.out.write_text(json.dumps(data_, indent=2) + "\n", encoding="utf-8")
     print(f"wrote {args.out.relative_to(HOH)}")
     for j in jobs:
         print(f"  {j['conclusion']:<10s} {j['name']}")
     print(f"  sandbox_external_env = {sandbox}")
     print(f"  export digest {digest[:16]} over {n} path(s)")
-    return 0 if lauf["conclusion"] == "success" else 1
+    return 0 if one_run["conclusion"] == "success" else 1
 
 
 if __name__ == "__main__":

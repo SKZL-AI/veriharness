@@ -15,9 +15,9 @@ import sys
 import tempfile
 from pathlib import Path
 
-WURZEL = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parent.parent
 _spec = importlib.util.spec_from_file_location(
-    "export_sync_probe", WURZEL / "tools" / "export_sync.py")
+    "export_sync_probe", ROOT / "tools" / "export_sync.py")
 es = importlib.util.module_from_spec(_spec)
 sys.modules.setdefault("export_sync_probe", es)
 _spec.loader.exec_module(es)
@@ -32,9 +32,9 @@ def test_our_change_is_written_and_their_change_stops_the_run():
     answers. Asserting both in one test is deliberate: a change that made the
     guard permissive would satisfy the first half and break the second.
     """
-    unser = es.plane({"f": A}, {"f": B}, {"f": A})
-    assert unser["schreiben"] == ["f"], unser
-    assert not unser["konflikt"]
+    ours = es.plane({"f": A}, {"f": B}, {"f": A})
+    assert ours["schreiben"] == ["f"], ours
+    assert not ours["konflikt"]
 
     ihrer = es.plane({"f": A}, {"f": A}, {"f": B})
     assert not ihrer["schreiben"]
@@ -69,10 +69,10 @@ def test_recording_a_new_base_turns_their_change_into_agreement():
     """Integrating is expressed by recording a new base, and that is the only
     way to clear a conflict. Before: they moved, we did not -- stop. After
     recording their state as the base and taking their content: agreement."""
-    vorher = es.plane({"f": A}, {"f": A}, {"f": B})
-    assert vorher["konflikt"]
-    nachher = es.plane({"f": B}, {"f": B}, {"f": B})
-    assert not nachher["konflikt"] and nachher["unveraendert"] == ["f"]
+    before = es.plane({"f": A}, {"f": A}, {"f": B})
+    assert before["konflikt"]
+    after = es.plane({"f": B}, {"f": B}, {"f": B})
+    assert not after["konflikt"] and after["unveraendert"] == ["f"]
 
 
 def test_our_work_after_integrating_is_ours_not_a_conflict():
@@ -101,27 +101,27 @@ def test_no_path_is_exempt_from_the_comparison():
     our own regeneration of it must still be written -- otherwise removing
     the exemption would have deadlocked every export instead of guarding it.
     """
-    assert es.BERICHTE == frozenset(), (
+    assert es.REPORTS == frozenset(), (
         "a path was exempted again; the kept-empty set is the record of why "
         "that is the wrong shape"
     )
-    for pfad in ("docs/READINESS.md", "CLAIMS.md", "CLAIMS.json"):
-        ihre = es.plane({pfad: A}, {pfad: A}, {pfad: B})
-        assert [p for p, _ in ihre["konflikt"]] == [pfad], (
-            f"a public change to {pfad} was not reported"
+    for path in ("docs/READINESS.md", "CLAIMS.md", "CLAIMS.json"):
+        ihre = es.plane({path: A}, {path: A}, {path: B})
+        assert [p for p, _ in ihre["konflikt"]] == [path], (
+            f"a public change to {path} was not reported"
         )
-        unsere = es.plane({pfad: A}, {pfad: B}, {pfad: A})
-        assert unsere["schreiben"] == [pfad], (
-            f"our own regeneration of {pfad} was blocked, which would "
+        ours_ = es.plane({path: A}, {path: B}, {path: A})
+        assert ours_["schreiben"] == [path], (
+            f"our own regeneration of {path} was blocked, which would "
             "deadlock every export after a gate run"
         )
 
 
 def test_no_force_push_anywhere_in_the_tool():
     """A guard that can be stepped over with a flag is not a guard."""
-    quelle = (WURZEL / "tools" / "export_sync.py").read_text()
-    for verboten in ("--force", "force-with-lease", "+refs/", "push -f"):
-        assert verboten not in quelle, f"{verboten!r} appears in the tool"
+    source = (ROOT / "tools" / "export_sync.py").read_text()
+    for forbidden in ("--force", "force-with-lease", "+refs/", "push -f"):
+        assert forbidden not in source, f"{forbidden!r} appears in the tool"
 
 
 def test_a_missing_sync_state_refuses_instead_of_assuming_one():
@@ -129,14 +129,14 @@ def test_a_missing_sync_state_refuses_instead_of_assuming_one():
     base would classify every one of their files as new and ours."""
     import pytest
 
-    echt = es.STATE
+    real = es.STATE
     try:
         es.STATE = Path(tempfile.gettempdir()) / "nicht-vorhanden-export-sync.json"
-        with pytest.raises(es.Abbruch) as exc:
-            es.lade_zustand()
+        with pytest.raises(es.Abort) as exc:
+            es.load_state()
         assert "no sync state" in str(exc.value)
     finally:
-        es.STATE = echt
+        es.STATE = real
 
 
 def test_blob_digests_read_the_commit_and_not_the_worktree():
@@ -158,10 +158,10 @@ def test_blob_digests_read_the_commit_and_not_the_worktree():
         (repo / "f.txt").write_text("committed\n")
         g("add", "-A")
         g("commit", "-q", "-m", "one")
-        festgeschrieben = es.blob_digests(repo, "HEAD")["f.txt"]
+        committed_ = es.blob_digests(repo, "HEAD")["f.txt"]
 
         (repo / "f.txt").write_text("uncommitted edit\n")
-        assert es.blob_digests(repo, "HEAD")["f.txt"] == festgeschrieben, (
+        assert es.blob_digests(repo, "HEAD")["f.txt"] == committed_, (
             "an uncommitted edit changed the digest, so the comparison would "
             "be against a tree the public repository never published")
 
@@ -179,21 +179,21 @@ def test_a_head_that_moves_between_check_and_push_stops_the_run():
     import json as _json
 
     with tempfile.TemporaryDirectory() as tmp:
-        wurzel = Path(tmp)
-        fern, staging, intern = wurzel / "fern.git", wurzel / "s", wurzel / "i"
+        root = Path(tmp)
+        remote_, staging, internal_ = root / "fern.git", root / "s", root / "i"
 
         def g(repo, *a, check=True):
             return subprocess.run(["git", "-C", str(repo), *a],
                                   capture_output=True, text=True,
                                   check=check).stdout.strip()
 
-        subprocess.run(["git", "init", "-q", "--bare", "-b", "main", str(fern)],
+        subprocess.run(["git", "init", "-q", "--bare", "-b", "main", str(remote_)],
                        check=True)
         subprocess.run(["git", "init", "-q", "-b", "main", str(staging)],
                        check=True)
         g(staging, "config", "user.email", "t@example.invalid")
         g(staging, "config", "user.name", "t")
-        g(staging, "remote", "add", "origin", str(fern))
+        g(staging, "remote", "add", "origin", str(remote_))
         (staging / "f.txt").write_text("eins\n")
         (staging / "EXPORT_MANIFEST.json").write_text(_json.dumps(
             {"entries": [{"path": "f.txt", "decision": "INCLUDE"},
@@ -202,69 +202,69 @@ def test_a_head_that_moves_between_check_and_push_stops_the_run():
         g(staging, "commit", "-q", "-m", "eins")
         g(staging, "push", "-q", "origin", "main")
         g(staging, "fetch", "-q", "origin")
-        kopf_eins = g(staging, "rev-parse", "origin/main")
+        head_one = g(staging, "rev-parse", "origin/main")
 
-        intern.mkdir()
+        internal_.mkdir()
         shutil_src = staging
-        (intern / "f.txt").write_text("unsere aenderung\n")
-        (intern / "EXPORT_MANIFEST.json").write_text(
+        (internal_ / "f.txt").write_text("unsere aenderung\n")
+        (internal_ / "EXPORT_MANIFEST.json").write_text(
             (shutil_src / "EXPORT_MANIFEST.json").read_text())
 
-        echt_hoh, echt_staging, echt_state = es.HOH, es.STAGING, es.STATE
-        echt_git = es._git   # bound before the try, or a failure
+        real_hoh, real_staging, real_state = es.HOH, es.STAGING, es.STATE
+        real_git = es._git   # bound before the try, or a failure
                              # inside it is masked by NameError here
         try:
-            es.HOH, es.STAGING = intern, staging
-            es.STATE = wurzel / "state.json"
-            assert es.record(kopf_eins) == 0
+            es.HOH, es.STAGING = internal_, staging
+            es.STATE = root / "state.json"
+            assert es.record(head_one) == 0
 
             # Someone else pushes while our comparison is already made. The
             # push deliberately lands *our own* content, so the comparison
             # finds nothing to object to and the run reaches the push check --
             # otherwise this test would pass on the conflict branch and say
             # nothing about the head at all.
-            zweit = wurzel / "z"
-            subprocess.run(["git", "clone", "-q", str(fern), str(zweit)],
+            second_ = root / "z"
+            subprocess.run(["git", "clone", "-q", str(remote_), str(second_)],
                            check=True)
-            g(zweit, "config", "user.email", "o@example.invalid")
-            g(zweit, "config", "user.name", "o")
-            (zweit / "f.txt").write_text("unsere aenderung\n")
-            g(zweit, "add", "-A")
-            g(zweit, "commit", "-q", "-m", "gleiche inhalte, neuer kopf")
+            g(second_, "config", "user.email", "o@example.invalid")
+            g(second_, "config", "user.name", "o")
+            (second_ / "f.txt").write_text("unsere aenderung\n")
+            g(second_, "add", "-A")
+            g(second_, "commit", "-q", "-m", "gleiche inhalte, neuer kopf")
 
             # The push has to land *between* the two fetches, or both see the
             # same head and this test would assert nothing. Pushing it on the
             # second fetch is what "the head moved while this ran" means.
-            zustand = {"fetches": 0}
+            state = {"fetches": 0}
 
-            def git_mit_rennen(repo, *args, **kw):
+            def git_with_race(repo, *args, **kw):
                 if args[:1] == ("fetch",):
-                    zustand["fetches"] += 1
-                    if zustand["fetches"] == 2:
-                        g(zweit, "push", "-q", "origin", "main")
-                return echt_git(repo, *args, **kw)
+                    state["fetches"] += 1
+                    if state["fetches"] == 2:
+                        g(second_, "push", "-q", "origin", "main")
+                return real_git(repo, *args, **kw)
 
-            es._git = git_mit_rennen
+            es._git = git_with_race
 
             import io
             from contextlib import redirect_stdout
-            puffer = io.StringIO()
-            with redirect_stdout(puffer):
+            buffer_ = io.StringIO()
+            with redirect_stdout(buffer_):
                 rc = es.export(push=True)
-            ausgabe = puffer.getvalue()
+            output_ = buffer_.getvalue()
             assert rc == 1, (
                 "the export reported success after the public head moved "
                 "under it")
-            assert "the public head moved" in ausgabe, (
+            assert "the public head moved" in output_, (
                 "the run stopped, but not for the head movement -- this test "
                 "would then pass without ever exercising the check it names. "
-                f"Output was: {ausgabe[-300:]}")
-            assert "conflict:" not in ausgabe, (
+                f"Output was: {output_[-300:]}")
+            assert "conflict:" not in output_, (
                 "the comparison objected, so the push check was never reached")
-            assert zustand["fetches"] >= 2, "the second fetch never happened"
+            assert state["fetches"] >= 2, "the second fetch never happened"
         finally:
-            es.HOH, es.STAGING, es.STATE = echt_hoh, echt_staging, echt_state
-            es._git = echt_git
+            es.HOH, es.STAGING, es.STATE = real_hoh, real_staging, real_state
+            es._git = real_git
 
 
 def test_the_tool_carries_no_path_from_the_machine_that_wrote_it():
@@ -277,24 +277,24 @@ def test_the_tool_carries_no_path_from_the_machine_that_wrote_it():
     files under src/hoh/policy/ have to contain home-path patterns. So the
     check lives here, next to the tool it is about.
     """
-    quelle = (WURZEL / "tools" / "export_sync.py").read_text()
-    for muster in ("/home/", "/Users/", "/root/"):
-        assert muster not in quelle, (
-            f"{muster!r} appears in a file that ships to every reader")
-    assert "VERIHARNESS_EXPORT_CHECKOUT" in quelle
+    source = (ROOT / "tools" / "export_sync.py").read_text()
+    for pattern_ in ("/home/", "/Users/", "/root/"):
+        assert pattern_ not in source, (
+            f"{pattern_!r} appears in a file that ships to every reader")
+    assert "VERIHARNESS_EXPORT_CHECKOUT" in source
 
 
 def test_without_a_checkout_it_refuses_instead_of_guessing_one():
     import pytest
 
-    echt = es.STAGING
+    real = es.STAGING
     try:
         es.STAGING = None
-        with pytest.raises(es.Abbruch) as exc:
+        with pytest.raises(es.Abort) as exc:
             es.staging()
         assert "no export checkout" in str(exc.value)
     finally:
-        es.STAGING = echt
+        es.STAGING = real
 
 
 def _staging_fixture(w):
@@ -302,18 +302,18 @@ def _staging_fixture(w):
     differs from it by one file."""
     import json as _json
 
-    fern, st, intern = w / "f.git", w / "s", w / "i"
+    remote_, st, internal_ = w / "f.git", w / "s", w / "i"
 
     def g(repo, *a):
         return subprocess.run(["git", "-C", str(repo), *a], capture_output=True,
                               text=True, check=True).stdout.strip()
 
-    subprocess.run(["git", "init", "-q", "--bare", "-b", "main", str(fern)],
+    subprocess.run(["git", "init", "-q", "--bare", "-b", "main", str(remote_)],
                    check=True)
     subprocess.run(["git", "init", "-q", "-b", "main", str(st)], check=True)
     g(st, "config", "user.email", "t@example.invalid")
     g(st, "config", "user.name", "t")
-    g(st, "remote", "add", "origin", str(fern))
+    g(st, "remote", "add", "origin", str(remote_))
     (st / "f.txt").write_text("base\n")
     (st / "EXPORT_MANIFEST.json").write_text(_json.dumps({"entries": [
         {"path": "f.txt", "decision": "INCLUDE"},
@@ -322,31 +322,31 @@ def _staging_fixture(w):
     g(st, "commit", "-q", "-m", "base")
     g(st, "push", "-q", "origin", "main")
     g(st, "fetch", "-q", "origin")
-    intern.mkdir()
-    (intern / "f.txt").write_text("internal change\n")
-    (intern / "EXPORT_MANIFEST.json").write_text(
+    internal_.mkdir()
+    (internal_ / "f.txt").write_text("internal change\n")
+    (internal_ / "EXPORT_MANIFEST.json").write_text(
         (st / "EXPORT_MANIFEST.json").read_text())
-    return st, intern, g, g(st, "rev-parse", "origin/main")
+    return st, internal_, g, g(st, "rev-parse", "origin/main")
 
 
-def _export_im_fixture(w, vorbereiten):
+def _export_in_fixture(w, prepare_):
     """Record a base, let `vorbereiten` dirty the staging tree, then export."""
     import io
     from contextlib import redirect_stdout
 
-    st, intern, g, kopf = _staging_fixture(w)
-    echt = es.HOH, es.STAGING, es.STATE
+    st, internal_, g, head = _staging_fixture(w)
+    real = es.HOH, es.STAGING, es.STATE
     try:
-        es.HOH, es.STAGING, es.STATE = intern, st, w / "state.json"
+        es.HOH, es.STAGING, es.STATE = internal_, st, w / "state.json"
         with redirect_stdout(io.StringIO()):
-            assert es.record(kopf) == 0
-        vorbereiten(st, intern, g)
-        puffer = io.StringIO()
-        with redirect_stdout(puffer):
+            assert es.record(head) == 0
+        prepare_(st, internal_, g)
+        buffer_ = io.StringIO()
+        with redirect_stdout(buffer_):
             rc = es.export(push=False)
-        return rc, puffer.getvalue(), st
+        return rc, buffer_.getvalue(), st
     finally:
-        es.HOH, es.STAGING, es.STATE = echt
+        es.HOH, es.STAGING, es.STATE = real
 
 
 def test_uncommitted_work_in_the_staging_checkout_is_not_written_over():
@@ -362,33 +362,33 @@ def test_uncommitted_work_in_the_staging_checkout_is_not_written_over():
     staged, and untracked. The assertion that matters in every case is not
     the exit code but the file: it must come back byte-for-byte.
     """
-    faelle = {
-        "unstaged": lambda st, intern, g: (st / "f.txt").write_text("THEIRS\n"),
-        "staged": lambda st, intern, g: ((st / "f.txt").write_text("THEIRS\n"),
+    cases_ = {
+        "unstaged": lambda st, internal_, g: (st / "f.txt").write_text("THEIRS\n"),
+        "staged": lambda st, internal_, g: ((st / "f.txt").write_text("THEIRS\n"),
                                          g(st, "add", "f.txt")),
     }
-    for name, vorbereiten in faelle.items():
+    for name, prepare_ in cases_.items():
         with tempfile.TemporaryDirectory() as tmp:
-            rc, aus, st = _export_im_fixture(Path(tmp), vorbereiten)
+            rc, out, st = _export_in_fixture(Path(tmp), prepare_)
             assert rc == 1, f"{name}: the export reported success"
             assert (st / "f.txt").read_text() == "THEIRS\n", (
                 f"{name}: uncommitted work in the staging checkout was "
                 "overwritten -- the defect this test exists for"
             )
-            assert "not committed in the staging checkout" in aus
+            assert "not committed in the staging checkout" in out
 
     # Untracked, and a path we would newly create rather than replace.
-    def untracked(st, intern, g):
+    def untracked(st, internal_, g):
         import json as _json
-        (intern / "neu.md").write_text("ours\n")
-        (intern / "EXPORT_MANIFEST.json").write_text(_json.dumps({"entries": [
+        (internal_ / "neu.md").write_text("ours\n")
+        (internal_ / "EXPORT_MANIFEST.json").write_text(_json.dumps({"entries": [
             {"path": "f.txt", "decision": "INCLUDE"},
             {"path": "neu.md", "decision": "INCLUDE"},
             {"path": "EXPORT_MANIFEST.json", "decision": "INCLUDE"}]}))
         (st / "neu.md").write_text("THEIRS UNTRACKED\n")
 
     with tempfile.TemporaryDirectory() as tmp:
-        rc, aus, st = _export_im_fixture(Path(tmp), untracked)
+        rc, out, st = _export_in_fixture(Path(tmp), untracked)
         assert rc == 1
         assert (st / "neu.md").read_text() == "THEIRS UNTRACKED\n", (
             "an untracked file in the staging checkout was overwritten"
@@ -398,15 +398,15 @@ def test_uncommitted_work_in_the_staging_checkout_is_not_written_over():
 def test_a_staging_checkout_at_another_head_is_refused():
     """Writing into a tree that is not at the commit the comparison was made
     against produces a mixture of two states that nobody reviewed."""
-    def zurueck(st, intern, g):
+    def back(st, internal_, g):
         (st / "andere.txt").write_text("x\n")
         g(st, "add", "-A")
         g(st, "commit", "-q", "-m", "staging moved on its own")
 
     with tempfile.TemporaryDirectory() as tmp:
-        rc, aus, st = _export_im_fixture(Path(tmp), zurueck)
+        rc, out, st = _export_in_fixture(Path(tmp), back)
         assert rc == 1
-        assert "not at the head this comparison was made against" in aus
+        assert "not at the head this comparison was made against" in out
         assert (st / "f.txt").read_text() == "base\n", (
             "the export wrote into a checkout at a different head"
         )
@@ -416,19 +416,19 @@ def test_a_clean_staging_checkout_is_still_written_to():
     """The negative control for the two refusals above. A guard that refuses
     everything is not a guard, and this is the case the tool exists to do."""
     with tempfile.TemporaryDirectory() as tmp:
-        rc, aus, st = _export_im_fixture(Path(tmp), lambda st, i, g: None)
-        assert rc == 0, aus
+        rc, out, st = _export_in_fixture(Path(tmp), lambda st, i, g: None)
+        assert rc == 0, out
         assert (st / "f.txt").read_text() == "internal change\n"
 
 
 def test_nothing_here_resets_stashes_or_removes_foreign_work():
     """The refusal is the whole mechanism. A tool that tidied the staging
     checkout to get past its own guard would be the defect with a extra step."""
-    quelle = (WURZEL / "tools" / "export_sync.py").read_text()
-    for verboten in ("reset --hard", "git stash", "clean -", "checkout --",
+    source = (ROOT / "tools" / "export_sync.py").read_text()
+    for forbidden in ("reset --hard", "git stash", "clean -", "checkout --",
                      "shutil.rmtree", "os.remove", "unlink("):
-        assert verboten not in quelle, (
-            f"{verboten!r} appears in a tool whose contract is that it never "
+        assert forbidden not in source, (
+            f"{forbidden!r} appears in a tool whose contract is that it never "
             "decides whose work survives"
         )
 
@@ -445,18 +445,18 @@ def test_the_timestamp_comes_from_the_standard_library():
     """
     import ast
 
-    quelle = (WURZEL / "tools" / "export_sync.py").read_text()
-    baum = ast.parse(quelle)
-    for knoten in ast.walk(baum):
-        if not isinstance(knoten, ast.Call) or not knoten.args:
+    source = (ROOT / "tools" / "export_sync.py").read_text()
+    tree_ = ast.parse(source)
+    for nodes in ast.walk(tree_):
+        if not isinstance(nodes, ast.Call) or not nodes.args:
             continue
-        erstes = knoten.args[0]
-        if not isinstance(erstes, ast.List) or not erstes.elts:
+        first_item = nodes.args[0]
+        if not isinstance(first_item, ast.List) or not first_item.elts:
             continue
-        kopf = erstes.elts[0]
-        if isinstance(kopf, ast.Constant) and kopf.value == "date":
+        head = first_item.elts[0]
+        if isinstance(head, ast.Constant) and head.value == "date":
             raise AssertionError(
-                f"a subprocess call to `date` survives at line {knoten.lineno}"
+                f"a subprocess call to `date` survives at line {nodes.lineno}"
             )
-    assert "datetime.now(UTC)" in quelle
+    assert "datetime.now(UTC)" in source
 

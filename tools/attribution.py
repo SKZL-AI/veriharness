@@ -42,12 +42,12 @@ import subprocess
 import sys
 from pathlib import Path
 
-HIER = Path(__file__).resolve().parent
-HOH = HIER.parent
+HERE = Path(__file__).resolve().parent
+HOH = HERE.parent
 
 #: How a unit of work got done. The distinction that matters is the first two:
 #: everything else is either not development or not a choice.
-KATEGORIEN = (
+CATEGORIES = (
     # Executed through the shipped control plane: a ProjectState node, a real
     # run, acceptance checks, receipts, a merge the product decided.
     "VERIHARNESS_RUN",
@@ -105,7 +105,7 @@ def _git(repo: Path, *args: str) -> str:
 #: Data rather than a branch, for the same reason the export manifest keeps
 #: its acknowledged references as data: a decision that can be read and
 #: counted is a different thing from a special case inside a function.
-FREMDE_HISTORIEN: dict[str, str] = {
+FOREIGN_HISTORIES: dict[str, str] = {
     "public-export": (
         "the published export repository SKZL-AI/veriharness. Its history is "
         "an export of this one and its commits are its own; docs/READINESS.md "
@@ -114,7 +114,7 @@ FREMDE_HISTORIEN: dict[str, str] = {
 }
 
 
-def commits_since(repo: Path, anker: str) -> list[str]:
+def commits_since(repo: Path, anchor: str) -> list[str]:
     """Every commit after the anchor, oldest first, merges included.
 
     Merges are included deliberately. Excluding them is the sort of choice
@@ -122,11 +122,11 @@ def commits_since(repo: Path, anker: str) -> list[str]:
     correct one number for exactly that (`--no-merges` on an attribution
     table).
     """
-    text = _git(repo, "rev-list", "--reverse", f"{anker}..HEAD")
+    text = _git(repo, "rev-list", "--reverse", f"{anchor}..HEAD")
     return text.splitlines() if text else []
 
 
-def _shas(repo: Path, eintrag: dict, probleme: list[str]) -> list[str]:
+def _shas(repo: Path, entry: dict, problems: list[str]) -> list[str]:
     """The commits an entry claims: an explicit list, or a resolved range.
 
     A range exists for one reason. The entry that records *this* ledger cannot
@@ -140,22 +140,22 @@ def _shas(repo: Path, eintrag: dict, probleme: list[str]) -> list[str]:
     at every point in time. It is not a loophole: the range is declared, and
     everything inside it is still claimed by exactly one entry.
     """
-    if "commits" in eintrag:
-        return list(eintrag["commits"])
-    r = eintrag.get("range")
+    if "commits" in entry:
+        return list(entry["commits"])
+    r = entry.get("range")
     if not r:
-        probleme.append(f"{eintrag['id']}: names neither commits nor a range")
+        problems.append(f"{entry['id']}: names neither commits nor a range")
         return []
     text = _git(repo, "rev-list", "--reverse", f"{r['from']}..{r['to']}")
     if not text:
-        probleme.append(
-            f"{eintrag['id']}: the range {r['from'][:12]}..{r['to']} is empty"
+        problems.append(
+            f"{entry['id']}: the range {r['from'][:12]}..{r['to']} is empty"
         )
         return []
     return text.splitlines()
 
 
-def _lauf_nachweis(repo: Path, eintrag: dict) -> list[str]:
+def _run_evidence(repo: Path, entry: dict) -> list[str]:
     """What an entry claiming a plain run has to point at.
 
     Claiming it is free; pointing at what it left is not -- the same sentence
@@ -175,42 +175,42 @@ def _lauf_nachweis(repo: Path, eintrag: dict) -> list[str]:
     because an entry legitimately names the run's own commits and the merge
     that brought them in, and only one of those carries the accepted tree.
     """
-    pfad = eintrag.get("run_state", "")
-    if not pfad:
-        return [f"{eintrag['id']}: claims a run produced it and names no run "
+    path = entry.get("run_state", "")
+    if not path:
+        return [f"{entry['id']}: claims a run produced it and names no run "
                 "state. Pointing at what the run left is the whole difference "
                 "between this and a claim"]
-    voll = repo / pfad
-    if not voll.is_file():
-        return [f"{eintrag['id']}: names a run state that is not there: {pfad}"]
+    full_ = repo / path
+    if not full_.is_file():
+        return [f"{entry['id']}: names a run state that is not there: {path}"]
     try:
-        zustand = json.loads(voll.read_text())
+        state = json.loads(full_.read_text())
     except (OSError, ValueError) as exc:
-        return [f"{eintrag['id']}: {pfad} unreadable: {exc}"]
+        return [f"{entry['id']}: {path} unreadable: {exc}"]
 
-    kandidat = zustand.get("last_accepted_candidate") or {}
-    if not kandidat:
-        return [f"{eintrag['id']}: {pfad} records no accepted candidate, so "
+    candidate = state.get("last_accepted_candidate") or {}
+    if not candidate:
+        return [f"{entry['id']}: {path} records no accepted candidate, so "
                 "nothing in it was accepted"]
-    verlangt = eintrag.get("candidate_id", "")
-    if not verlangt:
-        return [f"{eintrag['id']}: names a run state and no candidate_id"]
-    if kandidat.get("candidate_id") != verlangt:
-        return [f"{eintrag['id']}: names candidate {verlangt}, but {pfad} "
-                f"records {kandidat.get('candidate_id') or 'none'} as the "
+    demands = entry.get("candidate_id", "")
+    if not demands:
+        return [f"{entry['id']}: names a run state and no candidate_id"]
+    if candidate.get("candidate_id") != demands:
+        return [f"{entry['id']}: names candidate {demands}, but {path} "
+                f"records {candidate.get('candidate_id') or 'none'} as the "
                 "accepted one"]
 
-    digest = kandidat.get("tree_digest")
+    digest = candidate.get("tree_digest")
     if not digest:
-        return [f"{eintrag['id']}: the accepted candidate in {pfad} carries no "
+        return [f"{entry['id']}: the accepted candidate in {path} carries no "
                 "tree_digest, so the claim cannot be bound to any contents"]
-    baeume = set()
-    for sha in eintrag.get("commits") or []:
-        baum = _git(repo, "rev-parse", f"{sha}^{{tree}}").strip()
-        if baum:
-            baeume.add(baum)
-    if digest not in baeume:
-        return [f"{eintrag['id']}: the accepted candidate's tree {digest[:12]} "
+    trees_ = set()
+    for sha in entry.get("commits") or []:
+        tree_ = _git(repo, "rev-parse", f"{sha}^{{tree}}").strip()
+        if tree_:
+            trees_.add(tree_)
+    if digest not in trees_:
+        return [f"{entry['id']}: the accepted candidate's tree {digest[:12]} "
                 "is not the tree of any commit this entry claims. The entry "
                 "points at a run whose accepted contents are somewhere else"]
     return []
@@ -227,7 +227,7 @@ BOOKKEEPING_PATHS = frozenset({
 })
 
 
-def _nur_das_ledger(repo: Path, sha: str) -> bool:
+def _only_the_ledger(repo: Path, sha: str) -> bool:
     """Did this commit touch exactly one bookkeeping file and nothing else?
 
     A commit that changed only this ledger is the ledger recording earlier
@@ -246,11 +246,11 @@ def _nur_das_ledger(repo: Path, sha: str) -> bool:
     that an entry has to claim.
     """
     text = _git(repo, "show", "--name-only", "--format=", sha)
-    pfade = {z.strip() for z in text.splitlines() if z.strip()}
-    return len(pfade) == 1 and pfade <= BOOKKEEPING_PATHS
+    paths = {z.strip() for z in text.splitlines() if z.strip()}
+    return len(paths) == 1 and paths <= BOOKKEEPING_PATHS
 
 
-def _anker_vorhanden(repo: Path, anker: str) -> bool:
+def _anchor_exists(repo: Path, anchor: str) -> bool:
     """Does this repository contain the anchor commit at all?
 
     The ledger describes the history of the repository that produced it. A
@@ -267,23 +267,23 @@ def _anker_vorhanden(repo: Path, anker: str) -> bool:
     # its silence as "different history" would be the fail-open shape this
     # project has been removing: the check would go quiet exactly when it
     # cannot see.
-    versuch = subprocess.run(
+    attempt_ = subprocess.run(
         ["git", "-C", str(repo), "rev-parse", "--is-inside-work-tree"],
         capture_output=True, text=True)
-    if versuch.returncode != 0 or versuch.stdout.strip() != "true":
+    if attempt_.returncode != 0 or attempt_.stdout.strip() != "true":
         raise RuntimeError(
             f"{repo} is not a git work tree, or git could not answer: "
-            f"{(versuch.stderr or versuch.stdout).strip()[:120]}. Whether this "
+            f"{(attempt_.stderr or attempt_.stdout).strip()[:120]}. Whether this "
             f"repository contains the ledger's anchor is then unknown, and "
             f"unknown is not an environment gap.")
-    p = subprocess.run(["git", "-C", str(repo), "cat-file", "-e", f"{anker}^{{commit}}"],
+    p = subprocess.run(["git", "-C", str(repo), "cat-file", "-e", f"{anchor}^{{commit}}"],
                        capture_output=True, text=True)
     return p.returncode == 0
 
 
-def pruefe(repo: Path, ledger: dict) -> dict:
-    anker = ledger["anchor"]
-    if not _anker_vorhanden(repo, anker):
+def check(repo: Path, ledger: dict) -> dict:
+    anchor = ledger["anchor"]
+    if not _anchor_exists(repo, anchor):
         # O171: this used to return half a report -- no `commits_by_category`,
         # no `sentence`, no `ok` -- and the CLI read those keys unconditionally,
         # so running this in an export clone ended in `KeyError:
@@ -292,7 +292,7 @@ def pruefe(repo: Path, ledger: dict) -> dict:
         # cannot check this here" reports nothing at all, which is the one
         # outcome this project treats as worse than a red result.
         return {
-            "anchor": anker,
+            "anchor": anchor,
             "commits_after_anchor": 0,
             "commits_by_category": {},
             "categories": {},
@@ -306,107 +306,107 @@ def pruefe(repo: Path, ledger: dict) -> dict:
             "ok": False,
             "environment_gap": (
                 f"this repository does not contain the anchor commit "
-                f"{anker[:12]}, so it is not the history this ledger "
+                f"{anchor[:12]}, so it is not the history this ledger "
                 f"describes. Published exports carry the ledger as a record "
                 f"and cannot verify it; the repository that produced it can."
             ),
         }
-    alle = commits_since(repo, anker)
-    bekannt = set(alle)
-    gesehen: dict[str, str] = {}
-    probleme: list[str] = []
+    all_ = commits_since(repo, anchor)
+    known = set(all_)
+    seen_: dict[str, str] = {}
+    problems: list[str] = []
 
-    fremd: dict[str, list[str]] = {}
-    for eintrag in ledger["entries"]:
-        herkunft = eintrag.get("history")
-        if herkunft is not None:
+    foreign: dict[str, list[str]] = {}
+    for entry in ledger["entries"]:
+        origin = entry.get("history")
+        if origin is not None:
             # Recorded, not resolved. Validated on what can be checked here:
             # a known history, a known category, an explicit commit list (a
             # range cannot be resolved in a history this repository does not
             # have), and a reason.
-            if herkunft not in FREMDE_HISTORIEN:
-                probleme.append(
-                    f"{eintrag['id']}: unknown history {herkunft!r}; known are "
-                    + ", ".join(sorted(FREMDE_HISTORIEN))
+            if origin not in FOREIGN_HISTORIES:
+                problems.append(
+                    f"{entry['id']}: unknown history {origin!r}; known are "
+                    + ", ".join(sorted(FOREIGN_HISTORIES))
                 )
-            if eintrag["category"] not in KATEGORIEN:
-                probleme.append(
-                    f"{eintrag['id']}: unknown category {eintrag['category']!r}"
+            if entry["category"] not in CATEGORIES:
+                problems.append(
+                    f"{entry['id']}: unknown category {entry['category']!r}"
                 )
-            if eintrag.get("range"):
-                probleme.append(
-                    f"{eintrag['id']}: describes {herkunft} and names a range. "
+            if entry.get("range"):
+                problems.append(
+                    f"{entry['id']}: describes {origin} and names a range. "
                     "A range is resolved with git rev-list, which cannot run "
                     "against a history this repository does not have; name the "
                     "commits explicitly"
                 )
-            if not eintrag.get("commits"):
-                probleme.append(
-                    f"{eintrag['id']}: describes {herkunft} and names no commits"
+            if not entry.get("commits"):
+                problems.append(
+                    f"{entry['id']}: describes {origin} and names no commits"
                 )
-            if eintrag["category"] == "VERIHARNESS_RUN":
-                probleme.append(
-                    f"{eintrag['id']}: claims the product executed it in "
-                    f"{herkunft}, whose run state this repository does not "
+            if entry["category"] == "VERIHARNESS_RUN":
+                problems.append(
+                    f"{entry['id']}: claims the product executed it in "
+                    f"{origin}, whose run state this repository does not "
                     "carry, so the claim cannot be checked where it is made"
                 )
-            fremd.setdefault(herkunft, []).extend(eintrag.get("commits") or [])
+            foreign.setdefault(origin, []).extend(entry.get("commits") or [])
             continue
-        bereich = eintrag.get("range") or {}
-        if str(bereich.get("to", "")).upper() in ("HEAD", "@"):
-            probleme.append(
-                f"{eintrag['id']}: its range ends at HEAD. An open range grows "
+        region = entry.get("range") or {}
+        if str(region.get("to", "")).upper() in ("HEAD", "@"):
+            problems.append(
+                f"{entry['id']}: its range ends at HEAD. An open range grows "
                 "with the history and silently claims work the entry knows "
                 "nothing about; close it and describe the rest in a second "
                 "entry"
             )
-        if eintrag["category"] not in KATEGORIEN:
-            probleme.append(
-                f"{eintrag['id']}: unknown category {eintrag['category']!r}"
+        if entry["category"] not in CATEGORIES:
+            problems.append(
+                f"{entry['id']}: unknown category {entry['category']!r}"
             )
-        for sha in _shas(repo, eintrag, probleme):
-            if sha not in bekannt:
-                probleme.append(
-                    f"{eintrag['id']}: names {sha[:12]}, which is not a commit "
-                    f"after {anker[:12]}"
+        for sha in _shas(repo, entry, problems):
+            if sha not in known:
+                problems.append(
+                    f"{entry['id']}: names {sha[:12]}, which is not a commit "
+                    f"after {anchor[:12]}"
                 )
-            elif sha in gesehen:
-                probleme.append(
-                    f"{sha[:12]} is claimed by both {gesehen[sha]} and "
-                    f"{eintrag['id']}"
+            elif sha in seen_:
+                problems.append(
+                    f"{sha[:12]} is claimed by both {seen_[sha]} and "
+                    f"{entry['id']}"
                 )
             else:
-                gesehen[sha] = eintrag["id"]
-        if eintrag["category"] == "VERIHARNESS_RUN":
-            zustand = eintrag.get("project_state", "")
-            pfad = (repo / zustand) if zustand else None
-            if not zustand:
-                probleme.append(
-                    f"{eintrag['id']}: claims the product executed it and names "
+                seen_[sha] = entry["id"]
+        if entry["category"] == "VERIHARNESS_RUN":
+            state = entry.get("project_state", "")
+            path = (repo / state) if state else None
+            if not state:
+                problems.append(
+                    f"{entry['id']}: claims the product executed it and names "
                     "no project state. Claiming it is free; pointing at what it "
                     "left is not"
                 )
-            elif not pfad.exists():
-                probleme.append(
-                    f"{eintrag['id']}: names a project state that is not there: "
-                    f"{zustand}"
+            elif not path.exists():
+                problems.append(
+                    f"{entry['id']}: names a project state that is not there: "
+                    f"{state}"
                 )
             else:
                 try:
-                    st = json.loads(pfad.read_text())
-                    knoten = {n["id"]: n.get("lifecycle") for n in st.get("nodes", [])}
-                    verlangt = eintrag.get("node_id", "")
-                    if verlangt and knoten.get(verlangt) != "MERGED":
-                        probleme.append(
-                            f"{eintrag['id']}: node {verlangt} in {zustand} is "
-                            f"{knoten.get(verlangt) or 'absent'}, not MERGED"
+                    st = json.loads(path.read_text())
+                    nodes = {n["id"]: n.get("lifecycle") for n in st.get("nodes", [])}
+                    demands = entry.get("node_id", "")
+                    if demands and nodes.get(demands) != "MERGED":
+                        problems.append(
+                            f"{entry['id']}: node {demands} in {state} is "
+                            f"{nodes.get(demands) or 'absent'}, not MERGED"
                         )
                 except (OSError, ValueError) as exc:
-                    probleme.append(f"{eintrag['id']}: {zustand} unreadable: {exc}")
-        if eintrag["category"] == "VERIHARNESS_RUN_ORCHESTRATOR_MERGED":
-            probleme.extend(_lauf_nachweis(repo, eintrag))
+                    problems.append(f"{entry['id']}: {state} unreadable: {exc}")
+        if entry["category"] == "VERIHARNESS_RUN_ORCHESTRATOR_MERGED":
+            problems.extend(_run_evidence(repo, entry))
 
-    nicht_zugeordnet = [c for c in alle if c not in gesehen]
+    unattributed = [c for c in all_ if c not in seen_]
     # `HEAD` itself may be unattributed, and exactly it: a commit cannot name
     # its own sha, so the entry describing a commit is written in the next one.
     # That is the price of closing the ranges, and it is one commit, bounded.
@@ -428,67 +428,67 @@ def pruefe(repo: Path, ledger: dict) -> dict:
     # again. The property that makes it safe is what it touched, not where it
     # is. Anything that touched more than the ledger is still a gap, at the end
     # or in the middle.
-    nicht_zugeordnet = [
-        c for c in nicht_zugeordnet
-        if c != alle[-1] and not _nur_das_ledger(repo, c)
+    unattributed = [
+        c for c in unattributed
+        if c != all_[-1] and not _only_the_ledger(repo, c)
     ]
-    if nicht_zugeordnet:
-        probleme.append(
-            f"{len(nicht_zugeordnet)} commit(s) after the anchor belong to no "
-            "entry: " + ", ".join(c[:12] for c in nicht_zugeordnet[:8])
+    if unattributed:
+        problems.append(
+            f"{len(unattributed)} commit(s) after the anchor belong to no "
+            "entry: " + ", ".join(c[:12] for c in unattributed[:8])
         )
 
-    nach_kategorie: dict[str, int] = {k: 0 for k in KATEGORIEN}
-    knoten_gesamt = 0
-    knoten_produkt = 0
-    knoten_entwickelt = 0
-    fremd_nach_kategorie: dict[str, dict[str, int]] = {}
-    for eintrag in ledger["entries"]:
-        herkunft = eintrag.get("history")
-        if herkunft is not None:
+    by_category: dict[str, int] = {k: 0 for k in CATEGORIES}
+    nodes_total = 0
+    nodes_by_product = 0
+    nodes_developed = 0
+    foreign_by_category: dict[str, dict[str, int]] = {}
+    for entry in ledger["entries"]:
+        origin = entry.get("history")
+        if origin is not None:
             # Never in the internal denominator. The ratio this tool reports is
             # about the history the anchor names; adding commits from another
             # repository to it would change a number without changing anything
             # it measures.
-            k = fremd_nach_kategorie.setdefault(herkunft, {})
-            k[eintrag["category"]] = k.get(eintrag["category"], 0) + len(
-                eintrag.get("commits") or [])
+            k = foreign_by_category.setdefault(origin, {})
+            k[entry["category"]] = k.get(entry["category"], 0) + len(
+                entry.get("commits") or [])
             continue
-        n = len(_shas(repo, eintrag, []))
-        nach_kategorie[eintrag["category"]] = nach_kategorie.get(
-            eintrag["category"], 0
+        n = len(_shas(repo, entry, []))
+        by_category[entry["category"]] = by_category.get(
+            entry["category"], 0
         ) + n
-        if eintrag.get("is_development_node"):
-            knoten_gesamt += 1
-            if eintrag["category"] == "VERIHARNESS_RUN":
-                knoten_produkt += 1
-            elif eintrag["category"] == "VERIHARNESS_RUN_ORCHESTRATOR_MERGED":
+        if entry.get("is_development_node"):
+            nodes_total += 1
+            if entry["category"] == "VERIHARNESS_RUN":
+                nodes_by_product += 1
+            elif entry["category"] == "VERIHARNESS_RUN_ORCHESTRATOR_MERGED":
                 # Its own count, reported on its own line. Folding it into the
                 # numerator would claim the product decided a merge it did not
                 # decide; leaving it only in the denominator would deny that
                 # the product developed the node at all. Both are false, so
                 # neither number moves and a third one says what happened.
-                knoten_entwickelt += 1
+                nodes_developed += 1
 
     return {
-        "anchor": anker,
-        "commits_after_anchor": len(alle),
-        "commits_by_category": {k: v for k, v in nach_kategorie.items() if v},
-        "development_nodes": knoten_gesamt,
-        "nodes_through_the_product": knoten_produkt,
+        "anchor": anchor,
+        "commits_after_anchor": len(all_),
+        "commits_by_category": {k: v for k, v in by_category.items() if v},
+        "development_nodes": nodes_total,
+        "nodes_through_the_product": nodes_by_product,
         "nodes_developed_by_the_product_merged_by_the_orchestrator":
-            knoten_entwickelt,
+            nodes_developed,
         "sentence": (
-            f"{knoten_produkt} of {knoten_gesamt} post-anchor development nodes "
+            f"{nodes_by_product} of {nodes_total} post-anchor development nodes "
             "were executed through the shipped control plane"
         ),
         "other_histories": {
             h: {"commits_by_category": k,
-                "what": FREMDE_HISTORIEN.get(h, "unknown history")}
-            for h, k in sorted(fremd_nach_kategorie.items())
+                "what": FOREIGN_HISTORIES.get(h, "unknown history")}
+            for h, k in sorted(foreign_by_category.items())
         },
-        "problems": probleme,
-        "ok": not probleme,
+        "problems": problems,
+        "ok": not problems,
     }
 
 
@@ -504,44 +504,44 @@ def main(argv=None) -> int:
         print(f"no ledger at {args.ledger}", file=sys.stderr)
         return 2
     ledger = json.loads(args.ledger.read_text())
-    bericht = pruefe(args.repo.resolve(), ledger)
+    report = check(args.repo.resolve(), ledger)
     if args.json:
-        print(json.dumps(bericht, indent=2))
+        print(json.dumps(report, indent=2))
         # One exit semantics for both output formats: 3 an environment gap,
         # 1 a finding, 0 a verified pass. The first version of this line
         # returned 0 for the gap, so `--json` reported as success exactly the
         # state the text mode had been given its own code to avoid -- the
         # repair of O171 in one format and not the other.
-        if bericht.get("environment_gap"):
+        if report.get("environment_gap"):
             return 3
-        return 0 if bericht["ok"] else 1
-    if bericht.get("environment_gap"):
+        return 0 if report["ok"] else 1
+    if report.get("environment_gap"):
         # Not a pass and not a violation: a third state, printed as itself and
         # given its own exit code so that `attribution.py && echo ok` cannot
         # print ok for a run that verified nothing (O171).
         print("ENVIRONMENT_GAP: nothing was verified here")
-        print(f"  {bericht['environment_gap']}")
+        print(f"  {report['environment_gap']}")
         return 3
     else:
-        print(f"anchor {bericht['anchor'][:12]}, "
-              f"{bericht['commits_after_anchor']} commit(s) after it")
-        for k, v in sorted(bericht["commits_by_category"].items()):
+        print(f"anchor {report['anchor'][:12]}, "
+              f"{report['commits_after_anchor']} commit(s) after it")
+        for k, v in sorted(report["commits_by_category"].items()):
             print(f"  {k:<26s} {v:>3d} commit(s)")
         print()
-        print("  " + bericht["sentence"])
-        n = bericht.get(
+        print("  " + report["sentence"])
+        n = report.get(
             "nodes_developed_by_the_product_merged_by_the_orchestrator", 0)
         if n:
             print(f"  {n} further node(s) the product developed and the "
                   "orchestrator merged after review, counted in neither "
                   "number above")
-        for h, d in (bericht.get("other_histories") or {}).items():
-            summe = sum(d["commits_by_category"].values())
-            print(f"  recorded from {h}: {summe} commit(s), "
+        for h, d in (report.get("other_histories") or {}).items():
+            total_ = sum(d["commits_by_category"].values())
+            print(f"  recorded from {h}: {total_} commit(s), "
                   "not counted in the ratio above")
-        for p in bericht["problems"]:
+        for p in report["problems"]:
             print(f"  PROBLEM: {p}")
-    return 0 if bericht["ok"] else 1
+    return 0 if report["ok"] else 1
 
 
 if __name__ == "__main__":

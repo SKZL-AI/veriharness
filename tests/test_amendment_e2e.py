@@ -33,8 +33,8 @@ from hoh.contracts import Budgets, Role, RunState, Stage
 from hoh.controller import Controller
 from hoh.store import RunStore
 
-ALT = "# Spec\nadd(a, b) must add correctly.\n"
-NEU = "# Spec\nadd(a, b) must add correctly, and must reject a string.\n"
+OLD = "# Spec\nadd(a, b) must add correctly.\n"
+FRESH = "# Spec\nadd(a, b) must add correctly, and must reject a string.\n"
 
 
 def git(repo: Path, *args: str) -> None:
@@ -57,7 +57,7 @@ def repo(tmp_path: Path) -> Path:
 @pytest.fixture
 def spec(tmp_path: Path) -> Path:
     p = tmp_path / "spec.md"
-    p.write_text(ALT, encoding="utf-8")
+    p.write_text(OLD, encoding="utf-8")
     return p
 
 
@@ -74,7 +74,7 @@ class Dispatcher:
         self.store = store
         self.develop = develop or (
             lambda r, n: (r / f"step{n}.txt").write_text("ok\n", encoding="utf-8"))
-        self.iterationen = 0
+        self.iterations_ = 0
 
     def _plan(self, state: RunState) -> dict:
         base = state.last_accepted_candidate or state.base_candidate
@@ -112,7 +112,7 @@ class Dispatcher:
         if role is Role.PLANNER:
             return json.dumps(self._plan(state))
         if role is Role.DEVELOPER:
-            self.iterationen += 1
+            self.iterations_ += 1
             self.develop(self.repo, state.iteration)
             return "done"
         return json.dumps(self._qa(state))
@@ -135,20 +135,20 @@ def build(tmp_path: Path, repo: Path, spec: Path, dispatcher):
 def amend(store, state, spec: Path, *, kind=AmendmentKind.CORRECT,
           affects=("K1",), amendment_id="A1"):
     """What `hoh amend` does, without the argument parsing."""
-    kette = store.read_amendments(origin_digest=state.spec_digest)
+    chain = store.read_amendments(origin_digest=state.spec_digest)
     a = park_and_amend(
-        spec, NEU, run_id=state.run_id, amendment_id=amendment_id, kind=kind,
+        spec, FRESH, run_id=state.run_id, amendment_id=amendment_id, kind=kind,
         actor="the captain", reason="the old text was wrong about strings",
         affected_criteria=list(affects),
         after_acceptance=state.last_accepted_candidate is not None,
         write_seq=state.write_seq,
     )
-    kette = AmendmentLedger(run_id=kette.run_id, origin_digest=kette.origin_digest,
-                            amendments=[*kette.amendments, a])
-    store.write_amendments(kette)
+    chain = AmendmentLedger(run_id=chain.run_id, origin_digest=chain.origin_digest,
+                            amendments=[*chain.amendments, a])
+    store.write_amendments(chain)
     from hoh.amendment import text_digest
 
-    state.spec_digest = text_digest(NEU)
+    state.spec_digest = text_digest(FRESH)
     store.write_state(state)
     return a
 
@@ -165,11 +165,11 @@ def test_the_whole_path_from_an_old_spec_to_a_correct_final_decision(
     ctrl, state, store = build(tmp_path, repo, spec, d)
 
     # 1. the old text, a candidate, accepted on its own evidence
-    erste = ctrl.run_iteration(state)
-    assert erste.accepted, erste.reason
+    first = ctrl.run_iteration(state)
+    assert first.accepted, first.reason
     assert state.last_accepted_candidate is not None
-    alte_quittungen = sorted(p.stem for p in (store.dir / "receipts").glob("*.json"))
-    assert any("K1" in n for n in alte_quittungen)
+    old_receipts = sorted(p.stem for p in (store.dir / "receipts").glob("*.json"))
+    assert any("K1" in n for n in old_receipts)
 
     # 2. an acceptance-affecting amendment naming K1
     a = amend(store, state, spec)
@@ -177,29 +177,29 @@ def test_the_whole_path_from_an_old_spec_to_a_correct_final_decision(
     assert a.after_acceptance, "it reopens a decision already made, and says so"
 
     # 3. K1's old receipts stop counting
-    kette = store.read_amendments()
-    entwertet = kette.invalidated_receipts(alte_quittungen)
-    assert entwertet, "the amendment invalidated nothing"
-    assert all(v == "A1" for v in entwertet.values())
-    assert kette.revalidation_needed() == {"K1"}
+    chain = store.read_amendments()
+    invalidated = chain.invalidated_receipts(old_receipts)
+    assert invalidated, "the amendment invalidated nothing"
+    assert all(v == "A1" for v in invalidated.values())
+    assert chain.revalidation_needed() == {"K1"}
 
     # 4. the specification on disk is the new one, and the old one is readable
-    assert spec.read_text() == NEU
-    assert Path(a.from_path).read_text() == ALT
+    assert spec.read_text() == FRESH
+    assert Path(a.from_path).read_text() == OLD
 
     # 5. a candidate that does not re-measure K1 is refused
     d.checks = lambda i: ["K2"]
-    zweite = ctrl.run_iteration(state)
-    assert not zweite.accepted
-    assert "K1" in zweite.reason
-    assert "amended" in zweite.reason
+    second = ctrl.run_iteration(state)
+    assert not second.accepted
+    assert "K1" in second.reason
+    assert "amended" in second.reason
 
     # 6. one that does re-measure it is accepted
     d.checks = lambda i: ["K1", "K2"]
-    dritte = ctrl.run_iteration(state)
-    assert dritte.accepted, dritte.reason
+    third = ctrl.run_iteration(state)
+    assert third.accepted, third.reason
     assert state.stage is Stage.CHECKPOINTED
-    assert state.last_accepted_candidate.candidate_id != erste.candidate_id
+    assert state.last_accepted_candidate.candidate_id != first.candidate_id
 
 
 # --------------------------------------------------------------------------- #
@@ -294,7 +294,7 @@ def test_an_unrecorded_edit_still_blocks_the_run(tmp_path, repo, spec):
     ctrl, state, _ = build(tmp_path, repo, spec, d)
     assert ctrl.run_iteration(state).accepted
 
-    spec.write_text(NEU, encoding="utf-8")          # no amendment recorded
+    spec.write_text(FRESH, encoding="utf-8")          # no amendment recorded
 
     out = ctrl.run_iteration(state)
     assert not out.accepted
@@ -321,23 +321,23 @@ def test_the_chain_says_what_the_run_promised_at_each_point(tmp_path, repo, spec
     ctrl, state, store = build(tmp_path, repo, spec, d)
     assert ctrl.run_iteration(state).accepted
 
-    erste = amend(store, state, spec, amendment_id="A1")
-    spec.write_text(NEU, encoding="utf-8")
-    zweite_text = NEU + "\nAnd it must be fast.\n"
-    kette = store.read_amendments()
-    zweite = park_and_amend(
-        spec, zweite_text, run_id="r1", amendment_id="A2",
+    first = amend(store, state, spec, amendment_id="A1")
+    spec.write_text(FRESH, encoding="utf-8")
+    second_text = FRESH + "\nAnd it must be fast.\n"
+    chain = store.read_amendments()
+    second = park_and_amend(
+        spec, second_text, run_id="r1", amendment_id="A2",
         kind=AmendmentKind.WIDEN, actor="the captain", reason="speed matters",
         affected_criteria=["K2"], after_acceptance=True, write_seq=state.write_seq)
-    kette = AmendmentLedger(run_id="r1", origin_digest=kette.origin_digest,
-                            amendments=[*kette.amendments, zweite])
-    store.write_amendments(kette)
+    chain = AmendmentLedger(run_id="r1", origin_digest=chain.origin_digest,
+                            amendments=[*chain.amendments, second])
+    store.write_amendments(chain)
 
-    assert kette.current_digest() == zweite.to_digest
-    assert kette.revalidation_needed() == {"K1", "K2"}
-    assert Path(erste.from_path).read_text() == ALT
-    assert Path(zweite.from_path).read_text() == NEU
-    assert "A1" in kette.report() and "A2" in kette.report()
+    assert chain.current_digest() == second.to_digest
+    assert chain.revalidation_needed() == {"K1", "K2"}
+    assert Path(first.from_path).read_text() == OLD
+    assert Path(second.from_path).read_text() == FRESH
+    assert "A1" in chain.report() and "A2" in chain.report()
 
 
 # --------------------------------------------------------------------------- #
@@ -359,8 +359,8 @@ def test_the_amended_criterion_can_actually_be_measured_against_the_new_text(
     d = Dispatcher(repo=repo, checks=lambda i: ["K1"])
     ctrl, state, store = build(tmp_path, repo, spec, d)
     assert ctrl.run_iteration(state).accepted
-    alt = store.read_checks()["K1"].command
-    assert alt == "test -f step1.txt"
+    old = store.read_checks()["K1"].command
+    assert old == "test -f step1.txt"
 
     amend(store, state, spec)
 
@@ -370,8 +370,8 @@ def test_the_amended_criterion_can_actually_be_measured_against_the_new_text(
     assert ctrl.run_iteration(state).accepted
 
     assert any("reopened by amendment" in h for h in state.history)
-    neu = store.read_checks()["K1"].command
-    assert neu != alt, (
+    fresh = store.read_checks()["K1"].command
+    assert fresh != old, (
         "the criterion was re-measured with its pre-amendment command, so the "
         "gate was answered by the measurement the amendment invalidated")
     assert not any("protected against redefinition: K1" in h
@@ -385,24 +385,24 @@ def test_the_planner_is_told_which_criteria_an_amendment_reopened(
     A real planner had to guess -- and the one thing it could not guess is that
     the criterion's old definition no longer applies.
     """
-    gesehen = {}
+    seen_ = {}
 
-    class Merkend(Dispatcher):
+    class Remembering(Dispatcher):
         def dispatch(self, role, prompt, *, state):
             if role is Role.PLANNER:
-                gesehen[state.iteration] = prompt
+                seen_[state.iteration] = prompt
             return super().dispatch(role, prompt, state=state)
 
-    d = Merkend(repo=repo, checks=lambda i: ["K1"])
+    d = Remembering(repo=repo, checks=lambda i: ["K1"])
     ctrl, state, store = build(tmp_path, repo, spec, d)
     assert ctrl.run_iteration(state).accepted
-    assert "reopened-by-an-amendment" not in gesehen[1]
+    assert "reopened-by-an-amendment" not in seen_[1]
 
     amend(store, state, spec)
     ctrl.run_iteration(state)
 
-    assert "reopened-by-an-amendment" in gesehen[2]
-    assert "K1" in gesehen[2].split("/reopened-by-an-amendment")[1][:400]
+    assert "reopened-by-an-amendment" in seen_[2]
+    assert "K1" in seen_[2].split("/reopened-by-an-amendment")[1][:400]
 
 
 def test_the_obligation_clears_once_it_has_been_answered(tmp_path, repo, spec):
@@ -421,8 +421,8 @@ def test_the_obligation_clears_once_it_has_been_answered(tmp_path, repo, spec):
     assert "K1" in state.revalidated
 
     d.checks = lambda i: ["K7"]
-    dritte = ctrl.run_iteration(state)
-    assert "has not been measured against the new text" not in dritte.reason
+    third = ctrl.run_iteration(state)
+    assert "has not been measured against the new text" not in third.reason
 
 
 def test_a_qa_outage_is_not_reported_as_an_unmeasured_criterion(
@@ -434,18 +434,18 @@ def test_a_qa_outage_is_not_reported_as_an_unmeasured_criterion(
     """
     from hoh.controller import DispatchError
 
-    class Ausfall(Dispatcher):
+    class Outage(Dispatcher):
         def dispatch(self, role, prompt, *, state):
             if role is Role.QA:
                 raise DispatchError("quota exhausted", transient=False)
             return super().dispatch(role, prompt, state=state)
 
-    d = Ausfall(repo=repo, checks=lambda i: ["K1"])
+    d = Outage(repo=repo, checks=lambda i: ["K1"])
     ctrl, state, store = build(tmp_path, repo, spec, d)
     ctrl.run_iteration(state)          # iteration 1 already cannot be accepted
 
-    kette = AmendmentLedger(run_id="r1", origin_digest=state.spec_digest)
-    store.write_amendments(kette)
+    chain = AmendmentLedger(run_id="r1", origin_digest=state.spec_digest)
+    store.write_amendments(chain)
     amend(store, state, spec)
 
     out = ctrl.run_iteration(state)
@@ -462,9 +462,9 @@ def test_a_chain_naming_another_run_is_ignored(tmp_path, repo, spec):
     assert ctrl.run_iteration(state).accepted
 
     a = amend(store, state, spec)
-    fremd = AmendmentLedger(run_id="a-completely-different-run",
+    foreign = AmendmentLedger(run_id="a-completely-different-run",
                             origin_digest=a.from_digest, amendments=[a])
-    store.write_amendments(fremd)
+    store.write_amendments(foreign)
     state.spec_digest = a.from_digest        # as if nothing had been amended
     store.write_state(state)
 
@@ -495,13 +495,13 @@ def test_a_refused_amendment_leaves_the_specification_alone(tmp_path, repo, spec
     the run blocked on a text nobody had amended and the obvious retry was
     refused for being identical to what the failed attempt had written.
     """
-    vorher = spec.read_text()
+    before = spec.read_text()
     with pytest.raises(ValueError):
-        park_and_amend(spec, NEU, run_id="r1", amendment_id="A1",
+        park_and_amend(spec, FRESH, run_id="r1", amendment_id="A1",
                        kind=AmendmentKind.CLARIFY, actor="the captain",
                        reason="wording", affected_criteria=["K1"],
                        after_acceptance=False, write_seq=0)
-    assert spec.read_text() == vorher
+    assert spec.read_text() == before
     assert not list(spec.parent.glob(f"{spec.name}.v*"))
 
 
@@ -524,24 +524,24 @@ def test_the_amend_command_records_a_chain_and_parks_the_old_text(
     ctrl, state, store = build(tmp_path, repo, spec, d)
     assert ctrl.run_iteration(state).accepted
 
-    neu = tmp_path / "neu.md"
-    neu.write_text(NEU, encoding="utf-8")
+    fresh = tmp_path / "neu.md"
+    fresh.write_text(FRESH, encoding="utf-8")
     rc = cli.main([
         "--root", str(tmp_path / "runs"), "amend", "r1",
-        "--spec-file", str(neu), "--amendment-id", "A1", "--kind", "correct",
+        "--spec-file", str(fresh), "--amendment-id", "A1", "--kind", "correct",
         "--actor", "the captain", "--reason", "the old text was wrong",
         "--affects", "K1",
     ])
     assert rc == 0
-    aus = capsys.readouterr().out
-    assert "A1" in aus
-    assert "K1" in aus
+    output = capsys.readouterr().out
+    assert "A1" in output
+    assert "K1" in output
 
-    kette = store.read_amendments()
-    assert [a.amendment_id for a in kette.amendments] == ["A1"]
-    assert kette.revalidation_needed() == {"K1"}
-    assert spec.read_text() == NEU
-    assert Path(kette.amendments[0].from_path).read_text() == ALT
+    chain = store.read_amendments()
+    assert [a.amendment_id for a in chain.amendments] == ["A1"]
+    assert chain.revalidation_needed() == {"K1"}
+    assert spec.read_text() == FRESH
+    assert Path(chain.amendments[0].from_path).read_text() == OLD
 
 
 def test_the_amend_command_refuses_a_clarify_that_names_criteria(
@@ -552,19 +552,19 @@ def test_the_amend_command_refuses_a_clarify_that_names_criteria(
     d = Dispatcher(repo=repo, checks=lambda i: ["K1"])
     ctrl, state, store = build(tmp_path, repo, spec, d)
     assert ctrl.run_iteration(state).accepted
-    vorher = spec.read_text()
+    before = spec.read_text()
 
-    neu = tmp_path / "neu.md"
-    neu.write_text(NEU, encoding="utf-8")
+    fresh = tmp_path / "neu.md"
+    fresh.write_text(FRESH, encoding="utf-8")
     rc = cli.main([
         "--root", str(tmp_path / "runs"), "amend", "r1",
-        "--spec-file", str(neu), "--amendment-id", "A1", "--kind", "clarify",
+        "--spec-file", str(fresh), "--amendment-id", "A1", "--kind", "clarify",
         "--actor", "the captain", "--reason", "wording", "--affects", "K1",
     ])
 
     assert rc == 2
     assert "refused" in capsys.readouterr().err
-    assert spec.read_text() == vorher
+    assert spec.read_text() == before
     assert not store.amendments_path.exists()
 
 
@@ -575,15 +575,15 @@ def test_the_amend_command_refuses_a_duplicate_id(tmp_path, repo, spec, capsys):
     ctrl, state, store = build(tmp_path, repo, spec, d)
     assert ctrl.run_iteration(state).accepted
 
-    for text, rc_erwartet in ((NEU, 0), (NEU + "\nmore\n", 2)):
-        neu = tmp_path / "neu.md"
-        neu.write_text(text, encoding="utf-8")
+    for text, rc_expected in ((FRESH, 0), (FRESH + "\nmore\n", 2)):
+        fresh = tmp_path / "neu.md"
+        fresh.write_text(text, encoding="utf-8")
         rc = cli.main([
             "--root", str(tmp_path / "runs"), "amend", "r1",
-            "--spec-file", str(neu), "--amendment-id", "A1", "--kind", "widen",
+            "--spec-file", str(fresh), "--amendment-id", "A1", "--kind", "widen",
             "--actor", "the captain", "--reason", "more", "--affects", "K2",
         ])
-        assert rc == rc_erwartet, capsys.readouterr()
+        assert rc == rc_expected, capsys.readouterr()
     assert len(store.read_amendments().amendments) == 1
 
 
@@ -626,15 +626,15 @@ def test_the_planner_stops_being_told_about_a_criterion_it_has_answered(
         tmp_path, repo, spec):
     """A prompt that asks for work already done is one a role has to guess
     its way past."""
-    gesehen = {}
+    seen_ = {}
 
-    class Merkend(Dispatcher):
+    class Remembering(Dispatcher):
         def dispatch(self, role, prompt, *, state):
             if role is Role.PLANNER:
-                gesehen[state.iteration] = prompt
+                seen_[state.iteration] = prompt
             return super().dispatch(role, prompt, state=state)
 
-    d = Merkend(repo=repo, checks=lambda i: ["K1"])
+    d = Remembering(repo=repo, checks=lambda i: ["K1"])
     ctrl, state, store = build(tmp_path, repo, spec, d)
     assert ctrl.run_iteration(state).accepted
     amend(store, state, spec)
@@ -645,5 +645,5 @@ def test_the_planner_stops_being_told_about_a_criterion_it_has_answered(
     d.checks = lambda i: ["K5"]
     ctrl.run_iteration(state)
 
-    letzte = max(gesehen)
-    assert "reopened-by-an-amendment" not in gesehen[letzte]
+    last_ = max(seen_)
+    assert "reopened-by-an-amendment" not in seen_[last_]

@@ -90,7 +90,7 @@ def _mnt_pattern() -> re.Pattern:
 #: is indistinguishable from a token to the export's own token-shaped scan --
 #: which flagged this very line. Building it from `string` is also the better
 #: code.
-_PFAD_ZEICHEN = frozenset(string.ascii_letters + string.digits + "._-/")
+_PATH_CHARS = frozenset(string.ascii_letters + string.digits + "._-/")
 
 
 def find_home_paths(text: str) -> list[str]:
@@ -112,7 +112,7 @@ def find_home_paths(text: str) -> list[str]:
     for needle in _home_needles():
         pos = text.find(needle)
         while pos != -1:
-            if pos == 0 or text[pos - 1] not in _PFAD_ZEICHEN:
+            if pos == 0 or text[pos - 1] not in _PATH_CHARS:
                 hits.append(needle)
                 break
             pos = text.find(needle, pos + 1)
@@ -294,15 +294,15 @@ def _recompute_discrimination(run: str, iteration: int) -> tuple[int, int]:
         m = rx.match(name)
         if not m:
             continue
-        _attempt, check_id, is_basis = m.groups()
-        checks.setdefault(check_id, {})[bool(is_basis)] = name
+        _attempt, check_id, is_baseline = m.groups()
+        checks.setdefault(check_id, {})[bool(is_baseline)] = name
     k = n = 0
     for _check_id, pair in checks.items():
         if True in pair and False in pair:
             n += 1
-            basis_exit = json.loads((rdir / pair[True]).read_text(encoding="utf-8"))["exit_code"]
+            baseline_exit = json.loads((rdir / pair[True]).read_text(encoding="utf-8"))["exit_code"]
             cand_exit = json.loads((rdir / pair[False]).read_text(encoding="utf-8"))["exit_code"]
-            if basis_exit != cand_exit:
+            if baseline_exit != cand_exit:
                 k += 1
     return k, n
 
@@ -322,37 +322,37 @@ def _runs_root_missing() -> bool:
     return not (REPO_ROOT / "runs").is_dir()
 
 
-def _ist_ausgeschlossen(path_str: str) -> bool:
+def _is_excluded(path_str: str) -> bool:
     """Does the export manifest classify this path as not shipped?
 
     Read from `EXPORT_MANIFEST.json` rather than guessed from the path, and
     read at most once. A tree with no manifest answers `False`: absent
     evidence is then an ordinary defect, which is the safe direction.
     """
-    global _AUSGESCHLOSSEN
-    if _AUSGESCHLOSSEN is None:
-        _AUSGESCHLOSSEN = set()
-        pfad = REPO_ROOT / "EXPORT_MANIFEST.json"
+    global _EXCLUDED
+    if _EXCLUDED is None:
+        _EXCLUDED = set()
+        file_path = REPO_ROOT / "EXPORT_MANIFEST.json"
         try:
-            daten = json.loads(pfad.read_text(encoding="utf-8"))
+            data_ = json.loads(file_path.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             return False
-        eintraege = daten.get("entries") if isinstance(daten, dict) else daten
-        for e in eintraege or []:
+        records = data_.get("entries") if isinstance(data_, dict) else data_
+        for e in records or []:
             if isinstance(e, dict) and e.get("decision") == "EXCLUDE":
-                _AUSGESCHLOSSEN.add(e.get("path", ""))
+                _EXCLUDED.add(e.get("path", ""))
                 # A pruned subtree is recorded with a trailing slash and
                 # stands for everything under it.
                 if str(e.get("path", "")).endswith("/"):
-                    _AUSGESCHLOSSEN.add(str(e["path"]).rstrip("/"))
-    if path_str in _AUSGESCHLOSSEN:
+                    _EXCLUDED.add(str(e["path"]).rstrip("/"))
+    if path_str in _EXCLUDED:
         return True
-    return any(path_str.startswith(p) for p in _AUSGESCHLOSSEN
+    return any(path_str.startswith(p) for p in _EXCLUDED
                if p.endswith("/"))
 
 
 #: Filled on first use by `_ist_ausgeschlossen`; `None` means "not yet read".
-_AUSGESCHLOSSEN: set[str] | None = None
+_EXCLUDED: set[str] | None = None
 
 
 def _export_gap_failure(ref: str, path_str: str) -> tuple[bool, str]:
@@ -427,7 +427,7 @@ def resolve_evidence(ref: str, *, pytest_nodeids: set[str] | None) -> tuple[bool
             # a clone carries the environment-gap marker and invites them to
             # check it; 163 of these did not, which made that invitation
             # wrong. The manifest is what knows the difference, so it is asked.
-            if _ist_ausgeschlossen(path_str):
+            if _is_excluded(path_str):
                 return _export_gap_failure(ref, path_str)
             return False, f"{ref}: file does not exist"
         line_no = int(line_str)

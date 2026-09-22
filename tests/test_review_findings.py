@@ -3169,10 +3169,10 @@ def test_an_earlier_irrelevant_fence_does_not_displace_later_valid_json():
     from hoh.roles import extract_json, RoleOutputError
 
     fence = "```"
-    gemischt = (f"First, the command I ran:\n{fence}sh\nhoh worktree --repo x\n{fence}\n"
+    mixed_ = (f"First, the command I ran:\n{fence}sh\nhoh worktree --repo x\n{fence}\n"
                 f"And here is the answer:\n{fence}json\n" '{"objective": "x", "n": 3}'
                 f"\n{fence}\n")
-    assert extract_json(gemischt) == {"objective": "x", "n": 3}
+    assert extract_json(mixed_) == {"objective": "x", "n": 3}
 
     # The brace fallback reads the ORIGINAL text, not a fence's content.
     assert extract_json(f"{fence}sh\nls\n{fence}\n" '{"b": 2}') == {"b": 2}

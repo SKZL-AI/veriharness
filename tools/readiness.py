@@ -34,31 +34,31 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 
-HIER = Path(__file__).resolve().parent
-HOH = HIER.parent
+HERE = Path(__file__).resolve().parent
+HOH = HERE.parent
 sys.path.insert(0, str(HOH / "src"))
 
 PASS, FAIL, NOT_RUN = "PASS", "FAIL", "NOT_RUN"
 
 
 @dataclass
-class Zeile:
+class Row:
     """One condition, what it measured, and how."""
 
     name: str
-    zustand: str
-    wert: str
-    befehl: str
-    warum: str = ""
+    state: str
+    value_: str
+    command: str
+    why_text: str = ""
     #: True when this row's failure does not block a technically stable
     #: release -- a tracked limitation rather than a broken gate. Named per
     #: row rather than decided at the bottom, so a reader can disagree with
     #: one row without discarding the verdict.
-    beratend: bool = False
-    notizen: list[str] = field(default_factory=list)
+    advisory: bool = False
+    notes_: list[str] = field(default_factory=list)
 
 
-def _lauf(*args: str, cwd: Path = HOH, timeout: int = 1800) -> tuple[int, str]:
+def _run(*args: str, cwd: Path = HOH, timeout: int = 1800) -> tuple[int, str]:
     # The caller's PATH is kept. A reduced one is right for a *check command*
     # -- that is `runner.py`'s job and its reasons -- and wrong here: this
     # tool runs the project's own development tools, and pinning them to
@@ -74,7 +74,7 @@ def _lauf(*args: str, cwd: Path = HOH, timeout: int = 1800) -> tuple[int, str]:
 
 
 def _py(*args: str, **kw) -> tuple[int, str]:
-    return _lauf(sys.executable, *args, **kw)
+    return _run(sys.executable, *args, **kw)
 
 
 # --------------------------------------------------------------------------- #
@@ -82,108 +82,204 @@ def _py(*args: str, **kw) -> tuple[int, str]:
 # --------------------------------------------------------------------------- #
 
 
-def zeile_tests(quick: bool) -> Zeile:
-    befehl = "python3 -m pytest -q"
+def row_tests(quick: bool) -> Row:
+    command = "python3 -m pytest -q"
     if quick:
-        return Zeile("tests", NOT_RUN, "not run in --quick", befehl,
+        return Row("tests", NOT_RUN, "not run in --quick", command,
                      "the suite is the slowest row and is skipped on request")
-    rc, aus = _py("-m", "pytest", "-q")
-    m = re.search(r"(\d+) passed", aus)
-    schlecht = re.search(r"(\d+) failed", aus)
-    return Zeile(
+    rc, out = _py("-m", "pytest", "-q")
+    m = re.search(r"(\d+) passed", out)
+    bad = re.search(r"(\d+) failed", out)
+    return Row(
         "tests", PASS if rc == 0 else FAIL,
         f"{m.group(1) if m else '?'} passed"
-        + (f", {schlecht.group(1)} failed" if schlecht else ""),
-        befehl)
+        + (f", {bad.group(1)} failed" if bad else ""),
+        command)
 
 
-def zeile_lint() -> Zeile:
-    befehl = "ruff check --select F,E9 src tests tools"
-    rc, aus = _lauf("ruff", "check", "--select", "F,E9", "src", "tests", "tools")
-    return Zeile("lint", PASS if rc == 0 else FAIL,
-                 "clean" if rc == 0 else aus.splitlines()[-1][:80], befehl)
+def row_lint() -> Row:
+    command = "ruff check --select F,E9 src tests tools"
+    rc, out = _run("ruff", "check", "--select", "F,E9", "src", "tests", "tools")
+    return Row("lint", PASS if rc == 0 else FAIL,
+                 "clean" if rc == 0 else out.splitlines()[-1][:80], command)
 
 
-def zeile_claims() -> Zeile:
-    befehl = "python3 tools/check_claims.py check all"
-    rc, aus = _py("tools/check_claims.py", "check", "all")
-    letzte = aus.splitlines()[-1] if aus else ""
-    return Zeile("claims", PASS if rc == 0 else FAIL, letzte[:80], befehl)
+def row_claims() -> Row:
+    command = "python3 tools/check_claims.py check all"
+    rc, out = _py("tools/check_claims.py", "check", "all")
+    last_ = out.splitlines()[-1] if out else ""
+    return Row("claims", PASS if rc == 0 else FAIL, last_[:80], command)
 
 
-def zeile_union() -> Zeile:
-    befehl = "python3 tools/union_gate.py"
-    rc, aus = _py("tools/union_gate.py")
-    rot = [z for z in aus.splitlines() if "FAIL" in z]
-    return Zeile("union_invariants", PASS if rc == 0 and not rot else FAIL,
-                 "U1-U5 pass" if not rot else "; ".join(z[:60] for z in rot),
-                 befehl)
+def row_union() -> Row:
+    command = "python3 tools/union_gate.py"
+    rc, out = _py("tools/union_gate.py")
+    red = [z for z in out.splitlines() if "FAIL" in z]
+    return Row("union_invariants", PASS if rc == 0 and not red else FAIL,
+                 "U1-U5 pass" if not red else "; ".join(z[:60] for z in red),
+                 command)
 
 
-def zeile_meta() -> Zeile:
-    befehl = "python3 tools/meta_evidence.py --falsify"
-    rc, aus = _py("tools/meta_evidence.py", "--falsify")
-    n = len([z for z in aus.splitlines() if z.strip().startswith("OK ")])
-    return Zeile("meta_evidence", PASS if rc == 0 else FAIL,
+def row_meta() -> Row:
+    command = "python3 tools/meta_evidence.py --falsify"
+    rc, out = _py("tools/meta_evidence.py", "--falsify")
+    n = len([z for z in out.splitlines() if z.strip().startswith("OK ")])
+    return Row("meta_evidence", PASS if rc == 0 else FAIL,
                  f"{n} metric(s) VERIFIED, closure "
-                 + ("GREEN" if "=> GREEN" in aus else "NOT GREEN"), befehl)
+                 + ("GREEN" if "=> GREEN" in out else "NOT GREEN"), command)
 
 
-def zeile_attribution() -> Zeile:
-    befehl = "python3 tools/attribution.py"
-    rc, aus = _py("tools/attribution.py")
-    if rc == 3 or "ENVIRONMENT_GAP" in aus:
+def row_attribution() -> Row:
+    command = "python3 tools/attribution.py"
+    rc, out = _py("tools/attribution.py")
+    if rc == 3 or "ENVIRONMENT_GAP" in out:
         # O171: the tool has a third state -- it ran somewhere that does not
         # carry the history the ledger describes, so it checked nothing. That
         # is not a failure of the ledger and must not be reported as one, and
         # it is not a pass either.
-        return Zeile("attribution", NOT_RUN,
+        return Row("attribution", NOT_RUN,
                      "this checkout does not carry the history the ledger "
-                     "describes, so nothing was verified", befehl,
+                     "describes, so nothing was verified", command,
                      "an environment gap is its own state; reporting it as "
                      "FAIL would blame the ledger for the checkout")
-    m = re.search(r"(\d+) of (\d+) post-anchor development nodes", aus)
-    return Zeile("attribution", PASS if rc == 0 else FAIL,
+    m = re.search(r"(\d+) of (\d+) post-anchor development nodes", out)
+    return Row("attribution", PASS if rc == 0 else FAIL,
                  (f"{m.group(1)} of {m.group(2)} nodes through the product"
-                  if m else aus.splitlines()[-1][:70] if aus else "?"),
-                 befehl,
+                  if m else out.splitlines()[-1][:70] if out else "?"),
+                 command,
                  "the ratio is not a gate -- it is reported so that nobody has "
                  "to take the phase's own description of itself on trust")
 
 
-def zeile_succession() -> Zeile:
+def row_succession() -> Row:
     """Does the phase boundary still describe the tree it was written in?
 
     A long programme outlives the session that starts it, and the handover has
     been a document nobody could check. This row is the check: green means a
     successor can pick the capsule up and the ground under it has not moved.
     """
-    befehl = "python3 tools/succession.py verify"
-    rc, aus = _py("tools/succession.py", "verify")
+    command = "python3 tools/succession.py verify"
+    rc, out = _py("tools/succession.py", "verify")
     if rc == 2:
-        return Zeile("succession", NOT_RUN,
-                     "no succession capsule in this tree", befehl,
+        return Row("succession", NOT_RUN,
+                     "no succession capsule in this tree", command,
                      "a phase boundary that was never written is not a "
                      "verified one; the row says so rather than reporting "
                      "the absence as safe")
     if rc == 3:
-        luecken = [z for z in aus.splitlines() if "could not be checked" in z]
-        return Zeile("succession", NOT_RUN,
-                     (luecken[0].strip()[:90] if luecken
-                      else "some fields could not be checked here"), befehl,
+        gaps = [z for z in out.splitlines() if "could not be checked" in z]
+        return Row("succession", NOT_RUN,
+                     (gaps[0].strip()[:90] if gaps
+                      else "some fields could not be checked here"), command,
                      "a field that cannot be checked from this machine is an "
                      "environment gap, which is neither a pass nor drift")
-    gedriftet = [z for z in aus.splitlines() if z.strip().startswith("DRIFTED:")]
-    return Zeile(
+    drifted_ = [z for z in out.splitlines() if z.strip().startswith("DRIFTED:")]
+    return Row(
         "succession", PASS if rc == 0 else FAIL,
-        (gedriftet[0].strip()[:90] if gedriftet
+        (drifted_[0].strip()[:90] if drifted_
          else "every field re-derives from this tree"),
-        befehl,
+        command,
         "the capsule is not wrong about the past when it drifts -- it is "
         "stale about the present, and a successor reading it would be too")
 
 
-def zeile_export_sync() -> Zeile:
+def row_identifiers() -> Row:
+    """Is the published code still readable to the people it is published to?
+
+    O182. The documents were English and the inside of the code was not: a
+    reader of the public tree met `pruefe`, `zeile`, `wurzel`. The sweep is
+    done; this row is what stops it coming back one file at a time, which is
+    how it arrived.
+
+    A gate over a *style* decision is unusual here, and it earns its place
+    for one reason: the defect it prevents is invisible to every other gate.
+    Nothing else in this board would go red if the next function were named
+    `zeile_sonstwas`.
+    """
+    command = "python3 tools/identifiers.py check src tools tests"
+    rc, out = _py("tools/identifiers.py", "check", "src", "tools", "tests")
+    last = [z for z in out.strip().splitlines() if z.strip()]
+    return Row(
+        "identifiers", PASS if rc == 0 else FAIL,
+        (last[-1].strip()[:90] if last else "no output"),
+        command,
+        "a published tool whose names are in another language is readable "
+        "only to the people who wrote it")
+
+
+def row_preflight() -> Row:
+    """Can this machine do the work the next campaign will ask of it?
+
+    V3.3 P0. Not a product gate and not advisory either: it answers a question
+    about the *environment*, and the profile decides which answers block. The
+    demo profile is used here because a source checkout is where somebody
+    rehearses; `--profile unattended` is what a long-horizon run must pass,
+    and it is stricter on purpose.
+
+    Its INCONCLUSIVE rows are real: provider health cannot be measured without
+    spending, and a worktree is not claimed unless one was created.
+    """
+    command = "python3 tools/preflight.py --profile demo"
+    rc, out = _py("tools/preflight.py", "--profile", "demo")
+    verdict_line = [z for z in out.splitlines() if z.startswith("profile ")]
+    state = {0: PASS, 1: FAIL, 3: NOT_RUN}.get(rc, FAIL)
+    return Row(
+        "preflight", state,
+        (verdict_line[-1].strip()[:110] if verdict_line else f"exit {rc}"),
+        command,
+        "an environment that cannot run the work is not a product failure, "
+        "and discovering it after the quota is spent is not a measurement")
+
+
+def row_parallelism() -> Row:
+    """Does the parallelism baseline still describe this code?
+
+    V3.3 P0. The document is generated, so the only way it can be wrong is by
+    being old: the code moved and nobody re-derived it. This row re-derives it
+    and compares, which makes a stale baseline a red row rather than a
+    plausible paragraph.
+    """
+    command = "python3 tools/parallelism_baseline.py --out program/v3_3/VERIHARNESS_PARALLELISM_BASELINE.md"
+    document = HOH / "program/v3_3/VERIHARNESS_PARALLELISM_BASELINE.md"
+    if not document.is_file():
+        return Row("parallelism_baseline", NOT_RUN,
+                   "no baseline document in this tree", command,
+                   "a baseline nobody wrote is not a baseline that holds")
+    import importlib.util as _il
+    spec = _il.spec_from_file_location("parallelism_baseline",
+                                       HERE / "parallelism_baseline.py")
+    pb = _il.module_from_spec(spec)
+    # Registered before execution: a `@dataclass` resolves its annotations
+    # through `sys.modules[cls.__module__]`, and a module loaded from a path
+    # without being registered there raises an AttributeError that says
+    # nothing about the cause.
+    sys.modules["parallelism_baseline"] = pb
+    spec.loader.exec_module(pb)
+    body = pb.measure()
+    fresh = pb.render(body).strip().splitlines()
+    on_disk = document.read_text(encoding="utf-8").strip().splitlines()
+    # The timestamp line is the one thing that is allowed to differ: it is
+    # when the document was written, not what it says.
+    fresh = [line for line in fresh if not line.startswith("Measured at ")]
+    on_disk = [line for line in on_disk if not line.startswith("Measured at ")]
+    native = [c for c in body["classifications"]
+              if c["question"] == "project_native_parallelism"]
+    detail = (native[0]["status"] if native else "?")
+    if fresh != on_disk:
+        moved = [line for line in fresh if line not in on_disk][:1]
+        return Row("parallelism_baseline", FAIL,
+                   "the document no longer matches the code: "
+                   + (moved[0][:70] if moved else "it differs"), command,
+                   "a generated document that was not regenerated is a "
+                   "measurement of a tree that no longer exists")
+    return Row("parallelism_baseline", PASS,
+               f"re-derives identically; project_native_parallelism = {detail}",
+               command,
+               "the baseline is the premise V3.3 was planned against, so it "
+               "is checked rather than remembered")
+
+
+def row_export_sync() -> Row:
     """Would exporting right now overwrite work that did not come from here?
 
     Separate from `export_manifest`, which asks whether the *set* of exported
@@ -192,51 +288,51 @@ def zeile_export_sync() -> Zeile:
     three merged pull requests landed in the public repository and the copier
     compared nothing.
     """
-    befehl = "python3 tools/export_sync.py status"
-    rc, aus = _py("tools/export_sync.py", "status")
+    command = "python3 tools/export_sync.py status"
+    rc, out = _py("tools/export_sync.py", "status")
     if rc == 2:
         # No checkout configured, or no recorded base. Nothing was compared,
         # which is neither safe nor a failure of the export.
-        return Zeile("export_sync", NOT_RUN,
-                     (aus.strip().splitlines() or ["no comparison was made"])[0][:90],
-                     befehl,
+        return Row("export_sync", NOT_RUN,
+                     (out.strip().splitlines() or ["no comparison was made"])[0][:90],
+                     command,
                      "a comparison that did not run is not a green one; the "
                      "row says so rather than reporting the absence as safe")
-    zahlen = dict(re.findall(r"^(\w[\w ()]*?):\s+(\d+)$", aus, re.M))
-    konflikte = len([z for z in aus.splitlines()
+    numbers = dict(re.findall(r"^(\w[\w ()]*?):\s+(\d+)$", out, re.M))
+    conflicts = len([z for z in out.splitlines()
                      if z.strip().startswith(("conflict:", "only in the public"))])
-    return Zeile(
+    return Row(
         "export_sync", PASS if rc == 0 else FAIL,
-        (f"{konflikte} unintegrated public change(s)" if konflikte
-         else f"clean; {zahlen.get('to write (ours)', '?')} ours to write"),
-        befehl,
+        (f"{conflicts} unintegrated public change(s)" if conflicts
+         else f"clean; {numbers.get('to write (ours)', '?')} ours to write"),
+        command,
         "the export is one-directional and the public repository is not "
         "read-only: this row is what stops a copy from reverting work done "
         "there")
 
 
-def zeile_export() -> Zeile:
-    befehl = "python3 tools/export_manifest.py check"
-    rc, aus = _py("tools/export_manifest.py", "check")
+def row_export() -> Row:
+    command = "python3 tools/export_manifest.py check"
+    rc, out = _py("tools/export_manifest.py", "check")
     # O165: this counted every line mentioning "U2b", which includes the
     # check's own OK summary line ("passes U2b + the leak scan"). A green run
     # therefore reported "1 dangling reference(s)" when it had found none, and
     # said nothing about the acknowledged ones -- a number that meant
     # something other than what it was labelled. Count the FAIL lines, which
     # are the unacknowledged references and the only ones that are a finding.
-    u2b = len([z for z in aus.splitlines() if z.startswith("FAIL: U2b:")])
-    anerkannt = len([z for z in aus.splitlines() if z.startswith("ACKNOWLEDGED:")])
-    veraltet = "disagrees with a fresh derivation" in aus
-    rest = len([z for z in aus.splitlines()
+    u2b = len([z for z in out.splitlines() if z.startswith("FAIL: U2b:")])
+    acknowledged = len([z for z in out.splitlines() if z.startswith("ACKNOWLEDGED:")])
+    stale_ = "disagrees with a fresh derivation" in out
+    rest = len([z for z in out.splitlines()
                 if z.startswith("FAIL") and "U2b" not in z])
-    if veraltet:
+    if stale_:
         # The reference checks do not run against a stale manifest, so
         # reporting "0 dangling references" here would be a zero that means
         # "not measured" -- the shape this project refuses everywhere else.
-        return Zeile(
+        return Row(
             "export_manifest", FAIL,
             "the manifest is out of date, so the reference checks did not run",
-            befehl,
+            command,
             "re-derive it with `python3 tools/export_manifest.py derive`; a "
             "count taken against a stale manifest would be a zero that means "
             "'not measured'")
@@ -244,15 +340,15 @@ def zeile_export() -> Zeile:
     # inside "other problems": a home path, a private address or a
     # token-shaped string in an INCLUDE file is the one finding that would
     # make publishing actively harmful.
-    lecks = [z for z in aus.splitlines()
+    lecks = [z for z in out.splitlines()
              if any(k in z for k in ("home-path", "private-address",
                                      "token-shaped"))]
-    zustand = PASS if rc == 0 and not rest and not u2b else FAIL
-    return Zeile(
-        "export_manifest", zustand,
+    state = PASS if rc == 0 and not rest and not u2b else FAIL
+    return Row(
+        "export_manifest", state,
         (f"**{len(lecks)} leak(s)**, " if lecks else "no leaks, ")
         + f"{u2b} unacknowledged dangling reference(s), "
-        + f"{anerkannt} acknowledged, {rest} other problem(s)", befehl,
+        + f"{acknowledged} acknowledged, {rest} other problem(s)", command,
         "the dangling references are limitation 12e: published documents "
         "citing internal ones. Advisory, because none of them is a false "
         "claim -- what a reader loses is the ability to follow a citation",
@@ -260,36 +356,36 @@ def zeile_export() -> Zeile:
         # there to separate "a citation a reader cannot follow" from "a
         # finding", and a home path or a token-shaped string in a published
         # file is the second kind under any reading.
-        beratend=not rest and not lecks)
+        advisory=not rest and not lecks)
 
 
-def zeile_install(quick: bool) -> Zeile:
-    befehl = "python3 tools/clean_install_check.py"
+def row_install(quick: bool) -> Row:
+    command = "python3 tools/clean_install_check.py"
     if quick:
-        return Zeile("clean_install", NOT_RUN, "not run in --quick", befehl)
-    rc, aus = _py("tools/clean_install_check.py")
-    m = re.search(r"=== (\d+) red step", aus)
-    return Zeile("clean_install", PASS if rc == 0 else FAIL,
-                 f"{m.group(1)} red step(s)" if m else aus.splitlines()[-1][:60],
-                 befehl)
+        return Row("clean_install", NOT_RUN, "not run in --quick", command)
+    rc, out = _py("tools/clean_install_check.py")
+    m = re.search(r"=== (\d+) red step", out)
+    return Row("clean_install", PASS if rc == 0 else FAIL,
+                 f"{m.group(1)} red step(s)" if m else out.splitlines()[-1][:60],
+                 command)
 
 
-def zeile_confinement() -> Zeile:
-    befehl = "read dogfood/planner-confinement/SUMMARY.json"
-    pfad = HOH / "dogfood/planner-confinement/SUMMARY.json"
-    if not pfad.is_file():
-        return Zeile("planner_capability_boundary", NOT_RUN,
-                     "no confinement evidence installed", befehl)
-    s = json.loads(pfad.read_text())
-    verdikt = s.get("planner_capability_boundary")
-    return Zeile("planner_capability_boundary",
-                 PASS if verdikt == "VERIFIED" else FAIL,
-                 f"{verdikt} on run {s.get('run_id')}, witness armed for "
+def row_confinement() -> Row:
+    command = "read dogfood/planner-confinement/SUMMARY.json"
+    file_path = HOH / "dogfood/planner-confinement/SUMMARY.json"
+    if not file_path.is_file():
+        return Row("planner_capability_boundary", NOT_RUN,
+                     "no confinement evidence installed", command)
+    s = json.loads(file_path.read_text())
+    verdict = s.get("planner_capability_boundary")
+    return Row("planner_capability_boundary",
+                 PASS if verdict == "VERIFIED" else FAIL,
+                 f"{verdict} on run {s.get('run_id')}, witness armed for "
                  f"{s.get('planner_dispatches_with_an_armed_witness')} of "
-                 f"{s.get('planner_dispatches')} planner dispatch(es)", befehl)
+                 f"{s.get('planner_dispatches')} planner dispatch(es)", command)
 
 
-def zeile_budget() -> Zeile:
+def row_budget() -> Row:
     """Is the dispatch budget enforced, and was that claim falsified?
 
     Release-critical because campaign v3's premise is a matched budget, and
@@ -300,13 +396,13 @@ def zeile_budget() -> Zeile:
     the controls: they build fixture runs, and a readiness pass that silently
     ran a benchmark-shaped workload would be the wrong kind of gate.
     """
-    befehl = ("python3 tools/budget_evidence.py --out "
+    command = ("python3 tools/budget_evidence.py --out "
               "dogfood/budget-enforcement/BUDGET_EVIDENCE.json")
-    pfad = HOH / "dogfood/budget-enforcement/BUDGET_EVIDENCE.json"
-    if not pfad.is_file():
-        return Zeile("budget_enforcement", NOT_RUN,
-                     "no budget evidence installed", befehl)
-    b = json.loads(pfad.read_text())
+    file_path = HOH / "dogfood/budget-enforcement/BUDGET_EVIDENCE.json"
+    if not file_path.is_file():
+        return Row("budget_enforcement", NOT_RUN,
+                     "no budget evidence installed", command)
+    b = json.loads(file_path.read_text())
     v = b.get("budget_enforcement")
     # The control names come from the tool rather than being repeated here. A
     # second copy of the list drifts, and this row spent one regeneration
@@ -315,30 +411,30 @@ def zeile_budget() -> Zeile:
     import importlib.util as _il
 
     spec = _il.spec_from_file_location("budget_evidence",
-                                       HIER / "budget_evidence.py")
+                                       HERE / "budget_evidence.py")
     be = _il.module_from_spec(spec)
     spec.loader.exec_module(be)
-    fehlt = [k for k in be.KONTROLLEN.values() if not b.get(k)]
+    missing = [k for k in be.CONTROLS.values() if not b.get(k)]
 
-    falsifikatoren = b.get("falsifiers") or []
-    gelaufen = [f for f in falsifikatoren if f.get("ran")]
-    erkannt = bool(gelaufen) and all(f.get("detected") for f in gelaufen)
-    return Zeile(
+    falsifiers = b.get("falsifiers") or []
+    ran = [f for f in falsifiers if f.get("ran")]
+    recognised = bool(ran) and all(f.get("detected") for f in ran)
+    return Row(
         "budget_enforcement",
-        PASS if v == "VERIFIED" and not fehlt and erkannt else FAIL,
+        PASS if v == "VERIFIED" and not missing and recognised else FAIL,
         f"{v}; ceilings {b.get('ceilings')}, product refused a dispatch at "
         f"{b.get('runs_whose_refusal_came_from_the_dispatch_path')}; "
-        f"{len(gelaufen)} falsifier(s) "
-        + ("all detected" if erkannt else "NOT all detected")
-        + (f"; failed: {', '.join(fehlt)}" if fehlt else ""),
-        befehl,
+        f"{len(ran)} falsifier(s) "
+        + ("all detected" if recognised else "NOT all detected")
+        + (f"; failed: {', '.join(missing)}" if missing else ""),
+        command,
         "the controls pass on a build with enforcement removed unless the "
         "falsifiers say otherwise, so they are part of the row and not a "
         "footnote under it. One of them deletes only the per-dispatch check, "
         "which is the mutant an earlier version of this instrument survived")
 
 
-def zeile_closure() -> Zeile:
+def row_closure() -> Row:
     """Does the control plane still reach a fixpoint when the budget suffices?
 
     Campaign v3 established the refusal: under nine dispatches per cell, arm C
@@ -352,26 +448,26 @@ def zeile_closure() -> Zeile:
     Not a benchmark, and the artifact says so in its own fields. Nothing it
     produces may be reported next to arm A or arm B.
     """
-    befehl = "python3 tools/closure_e2e.py"
-    pfad = HOH / "dogfood/closure-e2e/CLOSURE_E2E.json"
-    if not pfad.is_file():
-        return Zeile("post_o143_closure", NOT_RUN,
-                     "no closure evidence installed", befehl)
-    c = json.loads(pfad.read_text())
+    command = "python3 tools/closure_e2e.py"
+    file_path = HOH / "dogfood/closure-e2e/CLOSURE_E2E.json"
+    if not file_path.is_file():
+        return Row("post_o143_closure", NOT_RUN,
+                     "no closure evidence installed", command)
+    c = json.loads(file_path.read_text())
     v = c.get("POST_O143_FULL_CONTROL_CLOSURE")
-    offen = c.get("open") or []
+    open_ = c.get("open") or []
     # A run that closed by being given more budget than it declared is not
     # evidence of anything, so the two numbers travel together in the row.
-    return Zeile(
+    return Row(
         "post_o143_closure",
-        PASS if v == "VERIFIED" and not offen else FAIL,
+        PASS if v == "VERIFIED" and not open_ else FAIL,
         f"{v}; halt {c.get('halt')}; {c.get('provider_calls_total')} of "
         f"{c.get('declared_shared_budget')} declared dispatches "
         f"(primary {c.get('primary_spend')}, repair {c.get('repair_spend')}); "
         f"{len(c.get('repair_nodes') or [])} repair node(s); "
         f"{c.get('human_decisions')} human decision(s)"
-        + ("; " + "; ".join(offen) if offen else ""),
-        befehl,
+        + ("; " + "; ".join(open_) if open_ else ""),
+        command,
         "an operational regression test, not a benchmark: it asks only "
         "whether the closure path still works when the ceiling is not the "
         "binding constraint. Its budget is measured from campaign v2 and is "
@@ -379,7 +475,7 @@ def zeile_closure() -> Zeile:
         "beside the artifact so a sequence of them stays visible")
 
 
-def zeile_telemetrie() -> Zeile:
+def row_telemetry() -> Row:
     """Does the product's dispatch record say what it claims, on real runs?
 
     Read across **every** installed audit, not one. The confinement run could
@@ -396,7 +492,7 @@ def zeile_telemetrie() -> Zeile:
       failure record cannot be conjured by a campaign in which nothing
       failed, and demanding one would be demanding a fabricated record.
     """
-    befehl = ("python3 tools/telemetry_audit.py --run-root PATH --run-id ID "
+    command = ("python3 tools/telemetry_audit.py --run-root PATH --run-id ID "
               "--out dogfood/<tree>/TELEMETRY_AUDIT.json")
     # Parked predecessors are history, not evidence. A tree renamed
     # `<name>.v<UTC stamp>` beside a live one is this project's way of
@@ -404,43 +500,43 @@ def zeile_telemetrie() -> Zeile:
     # earlier version of the record -- so it reports gaps in fields that did
     # not exist yet. Judging the product by them would be judging it by what
     # it used to be.
-    geparkt = re.compile(r"\.v\d{8}T\d{6}Z$")
-    pfade = sorted(f for f in (HOH / "dogfood").glob("*/TELEMETRY_AUDIT.json")
-                   if not geparkt.search(f.parent.name))
-    if not pfade:
-        return Zeile("telemetry_on_real_dispatches", NOT_RUN,
-                     "no audit installed", befehl)
-    berichte = {}
-    for pfad in pfade:
+    parked = re.compile(r"\.v\d{8}T\d{6}Z$")
+    paths = sorted(f for f in (HOH / "dogfood").glob("*/TELEMETRY_AUDIT.json")
+                   if not parked.search(f.parent.name))
+    if not paths:
+        return Row("telemetry_on_real_dispatches", NOT_RUN,
+                     "no audit installed", command)
+    reports = {}
+    for file_path in paths:
         try:
-            berichte[pfad.parent.name] = json.loads(pfad.read_text())
+            reports[file_path.parent.name] = json.loads(file_path.read_text())
         except ValueError:                         # pragma: no cover - exotic
             continue
-    luecken = {name: (b.get("fields_with_gaps") or [])
+    gaps = {name: (b.get("fields_with_gaps") or [])
                      + (b.get("coverage_gaps") or [])
-               for name, b in berichte.items()}
-    mit_luecken = {n: v for n, v in luecken.items() if v}
+               for name, b in reports.items()}
+    with_gaps = {n: v for n, v in gaps.items() if v}
     # A shape is observed if any audit saw it. The names come from the audits
     # themselves rather than a second list here, which would drift.
-    alle_formen = set()
-    for b in berichte.values():
-        alle_formen |= set((b.get("coverage") or {}))
-    nie = sorted(f for f in alle_formen
+    all_shapes = set()
+    for b in reports.values():
+        all_shapes |= set((b.get("coverage") or {}))
+    never = sorted(f for f in all_shapes
                  if not any((b.get("coverage") or {}).get(f)
-                            for b in berichte.values()))
-    gruen = not mit_luecken and not nie
-    wo = [n for n, b in berichte.items()
+                            for b in reports.values()))
+    green = not with_gaps and not never
+    where = [n for n, b in reports.items()
           if b.get("telemetry_validated_on_real_dispatches") == "yes"]
-    return Zeile(
+    return Row(
         "telemetry_on_real_dispatches",
-        PASS if gruen else FAIL,
-        f"{len(berichte)} audit(s): "
-        + (f"fully validated on {', '.join(wo)}" if wo else "none fully validated")
+        PASS if green else FAIL,
+        f"{len(reports)} audit(s): "
+        + (f"fully validated on {', '.join(where)}" if where else "none fully validated")
         + ("; gaps: " + "; ".join(f"{n}: {', '.join(v)}"
-                                  for n, v in mit_luecken.items())
-           if mit_luecken else "; no field gaps")
-        + ("; never observed anywhere: " + ", ".join(nie) if nie else ""),
-        befehl,
+                                  for n, v in with_gaps.items())
+           if with_gaps else "; no field gaps")
+        + ("; never observed anywhere: " + ", ".join(never) if never else ""),
+        command,
         "a field gap is a defect on the run that has it and another run "
         "filling it repairs nothing, so any gap blocks; an unobserved shape "
         "blocks only while no run has observed it, because a campaign in "
@@ -450,24 +546,24 @@ def zeile_telemetrie() -> Zeile:
 #: Every check `audit_refs.py` offers. Named here rather than discovered, so
 #: that a check quietly disappearing from that tool shows up as a shorter list
 #: instead of as a green row.
-AUDIT_PRUEFUNGEN = (
+AUDIT_CHECKS = (
     "coverage", "verify-verdicts", "selftest", "a02-count",
     "numbers-recomputed", "summary-consistency", "claims-against-code",
     "no-overclaim-o31",
 )
 
 
-def _plan(kampagne: str) -> dict:
+def _plan(campaign_: str) -> dict:
     import importlib.util as _il
 
     spec = _il.spec_from_file_location(
-        "repetition_plan", HIER / "repetition_plan.py")
+        "repetition_plan", HERE / "repetition_plan.py")
     rp = _il.module_from_spec(spec)
     spec.loader.exec_module(rp)
-    return rp.plan(kampagne)
+    return rp.plan(campaign_)
 
 
-def kampagnen_urteil(p: dict) -> dict:
+def campaign_verdict(p: dict) -> dict:
     """Three questions about a campaign, answered separately.
 
     They were one row and one verdict, and that conflated things a reader has
@@ -484,69 +580,69 @@ def kampagnen_urteil(p: dict) -> dict:
                           violated budget is `NO`, and no count of files
                           changes that.
     """
-    zellen = p["cells"]
-    gelaufen = sum(1 for c in zellen if c["completed_repetitions"])
-    fehlend = [c for c in zellen
+    cells = p["cells"]
+    ran = sum(1 for c in cells if c["completed_repetitions"])
+    missing_ = [c for c in cells
                if isinstance(c["required_repetitions"], int)
                and c["completed_repetitions"] < c["required_repetitions"]]
-    if not gelaufen:
-        vollstaendig = "NOT_RUN"
-    elif p["cells_with_no_repetition"] or fehlend:
-        vollstaendig = "PARTIAL"
+    if not ran:
+        complete_ = "NOT_RUN"
+    elif p["cells_with_no_repetition"] or missing_:
+        complete_ = "PARTIAL"
     elif p["protocol_repetition_requirement"] == "NOT_DETERMINABLE":
         # Every cell ran what it could be asked for, and what it *owed* is not
         # decidable from the frozen text. "Complete" would be a claim the
         # protocol cannot support; this says what is true.
-        vollstaendig = "HISTORICAL_COMPLETE"
+        complete_ = "HISTORICAL_COMPLETE"
     else:
-        vollstaendig = "COMPLETE"
+        complete_ = "COMPLETE"
 
-    kopien = p.get("cells_whose_repetitions_share_a_run") or []
+    copies_ = p.get("cells_whose_repetitions_share_a_run") or []
     budget = {"ENFORCED": "YES", "VIOLATED": "NO"}.get(
         p["budget_rule"], "UNKNOWN")
-    if vollstaendig == "NOT_RUN":
+    if complete_ == "NOT_RUN":
         # A campaign with no runs has no cell over budget, and the rule would
         # read `ENFORCED` off that emptiness -- a green derived from nothing
         # having happened. `NOT_RUN` is not a pass anywhere else in this file
         # and it is not one here either.
         budget = "UNKNOWN"
-        grund = "no cell has run, so nothing about the budget was measured"
+        reason = "no cell has run, so nothing about the budget was measured"
         return {
-            "completeness": vollstaendig, "matched_budget_valid": budget,
-            "reason": grund, "cells_run": gelaufen, "cells": len(zellen),
+            "completeness": complete_, "matched_budget_valid": budget,
+            "reason": reason, "cells_run": ran, "cells": len(cells),
             "usable_for_release": False,
         }
-    grund = ""
-    if kopien:
+    reason = ""
+    if copies_:
         # Counted labels are not counted runs. Three copies of one run,
         # relabelled, read as three repetitions -- and the campaign's own
         # completeness is the thing those labels decide.
-        vollstaendig = "PARTIAL"
+        complete_ = "PARTIAL"
     if budget == "NO":
-        grund = (f"budget_rule violated: "
+        reason = (f"budget_rule violated: "
                  f"{len(p['cells_over_budget_and_not_stopped'])} cell(s) ran "
                  f"past the dispatch budget without being stopped")
     elif budget == "UNKNOWN":
-        grund = (f"budget_rule not determinable: "
+        reason = (f"budget_rule not determinable: "
                  f"{len(p['cells_whose_spend_is_unknown'])} cell(s) asserted "
                  f"a figure nothing counted")
-    if kopien:
-        grund = ((grund + "; ") if grund else "") + (
-            f"{len(kopien)} cell(s) count repetitions that share a run "
-            f"identity: " + ", ".join(kopien[:4]))
+    if copies_:
+        reason = ((reason + "; ") if reason else "") + (
+            f"{len(copies_)} cell(s) count repetitions that share a run "
+            f"identity: " + ", ".join(copies_[:4]))
     return {
-        "completeness": vollstaendig,
+        "completeness": complete_,
         "matched_budget_valid": budget,
-        "reason": grund,
-        "cells_run": gelaufen,
-        "cells": len(zellen),
-        "cells_sharing_a_run": kopien,
+        "reason": reason,
+        "cells_run": ran,
+        "cells": len(cells),
+        "cells_sharing_a_run": copies_,
         "usable_for_release": (
-            budget == "YES" and vollstaendig == "COMPLETE" and not kopien),
+            budget == "YES" and complete_ == "COMPLETE" and not copies_),
     }
 
 
-def zeile_benchmark_v2() -> Zeile:
+def row_benchmark_v2() -> Row:
     """Campaign v2, as history. Advisory, and it says why.
 
     It was release-critical, and that was wrong in a way worth recording: v2
@@ -559,29 +655,29 @@ def zeile_benchmark_v2() -> Zeile:
     So v2 keeps its findings and reports its own validity, and the
     release-critical question moved to `benchmark_v3`.
     """
-    befehl = "python3 tools/repetition_plan.py --campaign v2"
-    u = kampagnen_urteil(_plan("v2"))
+    command = "python3 tools/repetition_plan.py --campaign v2"
+    u = campaign_verdict(_plan("v2"))
     # A green `PASS` whose own text reads `matched_budget_valid = NO` is a row
     # that tells a reader scanning the column the opposite of what it says.
     # The row state follows the campaign's usability, and the advisory flag --
     # not the state -- is what keeps it from blocking.
-    return Zeile(
+    return Row(
         "benchmark_v2_historical",
         PASS if u["usable_for_release"] else FAIL,
         f"{u['completeness']}; matched_budget_valid = "
         f"{u['matched_budget_valid']}"
         + (f"; {u['reason']}" if u["reason"] else ""),
-        befehl,
+        command,
         "historical and advisory: v2 is an immutable dataset, its matched "
         "budget was not matched during the runs, and no step available today "
         "changes that. A blocking row over it could never be satisfied, and a "
         "gate that cannot be satisfied puts pressure on re-interpreting the "
         "dataset -- the one thing freezing a protocol forbids. `benchmark_v3` "
         "carries the release question",
-        beratend=True)
+        advisory=True)
 
 
-def zeile_benchmark_v3() -> Zeile:
+def row_benchmark_v3() -> Row:
     """The release-critical campaign: one that was actually run under the rules.
 
     `current_valid_benchmark_campaign`. NOT_RUN until v3 exists, and NOT_RUN
@@ -590,53 +686,53 @@ def zeile_benchmark_v3() -> Zeile:
     files present and a violated budget is FAIL, not PASS. Completeness is
     not validity.
     """
-    befehl = ("python3 tools/prereg.py check --campaign v3 && "
+    command = ("python3 tools/prereg.py check --campaign v3 && "
               "python3 tools/repetition_plan.py --campaign v3")
     p = _plan("v3")
-    u = kampagnen_urteil(p)
+    u = campaign_verdict(p)
     frost = _prereg("v3")
 
-    offen = []
+    open_ = []
     if frost["verdict"] == "NOT_REGISTERED":
-        offen.append("the instrument freeze is NOT_REGISTERED")
+        open_.append("the instrument freeze is NOT_REGISTERED")
     elif frost["verdict"] != "FROZEN":
-        abgerechnet, warum = drift_abgerechnet("v3", frost)
-        if not abgerechnet:
-            offen.append(f"the instrument freeze is {frost['verdict']} and "
-                         "the drift is not accounted for: " + "; ".join(warum))
+        accounted, why_text = drift_accounted("v3", frost)
+        if not accounted:
+            open_.append(f"the instrument freeze is {frost['verdict']} and "
+                         "the drift is not accounted for: " + "; ".join(why_text))
     if u["completeness"] not in ("COMPLETE",):
-        offen.append(f"completeness {u['completeness']}")
+        open_.append(f"completeness {u['completeness']}")
     if u["matched_budget_valid"] != "YES":
-        offen.append(u["reason"] or
+        open_.append(u["reason"] or
                      f"matched_budget_valid = {u['matched_budget_valid']}")
-    zustand = NOT_RUN if u["completeness"] == "NOT_RUN" else (
-        PASS if not offen else FAIL)
-    abgerechnet, _ = drift_abgerechnet("v3", frost)
-    return Zeile(
-        "benchmark_v3", zustand,
+    state = NOT_RUN if u["completeness"] == "NOT_RUN" else (
+        PASS if not open_ else FAIL)
+    accounted, _ = drift_accounted("v3", frost)
+    return Row(
+        "benchmark_v3", state,
         f"{u['cells_run']} of {u['cells']} cells; {u['completeness']}; "
         f"matched_budget_valid = {u['matched_budget_valid']}; freeze "
         f"{frost['verdict']}"
         + (" (post-campaign repair, accounted for)"
-           if frost["verdict"] == "DRIFTED" and abgerechnet else "")
-        + ("" if not offen else " -- " + "; ".join(offen)),
-        befehl,
+           if frost["verdict"] == "DRIFTED" and accounted else "")
+        + ("" if not open_ else " -- " + "; ".join(open_)),
+        command,
         "the campaign a release may rest on: pre-registered, run under an "
         "enforced budget, complete. A campaign that produced every result "
         "file while violating the protocol is FAIL here, because the files "
         "are not what is being asked about")
 
 
-def _prereg(kampagne: str) -> dict:
+def _prereg(campaign_: str) -> dict:
     import importlib.util as _il
 
-    spec = _il.spec_from_file_location("prereg", HIER / "prereg.py")
+    spec = _il.spec_from_file_location("prereg", HERE / "prereg.py")
     pr = _il.module_from_spec(spec)
     spec.loader.exec_module(pr)
-    return pr.vergleich(kampagne)
+    return pr.comparison(campaign_)
 
 
-def drift_abgerechnet(kampagne: str, v: dict) -> tuple[bool, list[str]]:
+def drift_accounted(campaign_: str, v: dict) -> tuple[bool, list[str]]:
     """Is every file that moved since the freeze accounted for, with evidence?
 
     The freeze describes the instrument **during** a campaign and is not
@@ -658,54 +754,54 @@ def drift_abgerechnet(kampagne: str, v: dict) -> tuple[bool, list[str]]:
     """
     import hashlib
 
-    ziel = HOH / "docs" / "benchmarks" / kampagne / "POST_CAMPAIGN_DRIFT.json"
-    bewegt = sorted(set((v.get("changed") or []) + (v.get("added") or [])
+    target = HOH / "docs" / "benchmarks" / campaign_ / "POST_CAMPAIGN_DRIFT.json"
+    moved_ = sorted(set((v.get("changed") or []) + (v.get("added") or [])
                         + (v.get("removed") or [])))
-    if not bewegt:
+    if not moved_:
         return True, []
-    if not ziel.is_file():
-        return False, [f"{len(bewegt)} file(s) drifted and nothing accounts "
-                       f"for them: " + ", ".join(bewegt)]
-    a = json.loads(ziel.read_text())
-    offen = []
+    if not target.is_file():
+        return False, [f"{len(moved_)} file(s) drifted and nothing accounts "
+                       f"for them: " + ", ".join(moved_)]
+    a = json.loads(target.read_text())
+    open_ = []
     if not a.get("campaign_complete"):
-        offen.append("the drift artifact does not say the campaign is complete")
-    genannt = {c["path"] for c in (a.get("changes") or [])}
-    for pfad in bewegt:
-        if pfad not in genannt:
-            offen.append(f"{pfad} drifted and is not named in the artifact")
-        elif not (a.get("why_each_changed") or {}).get(pfad):
-            offen.append(f"{pfad} is named without a reason")
-    letzte = str(a.get("last_cell_finished_at_utc") or "")
+        open_.append("the drift artifact does not say the campaign is complete")
+    named_ = {c["path"] for c in (a.get("changes") or [])}
+    for file_path in moved_:
+        if file_path not in named_:
+            open_.append(f"{file_path} drifted and is not named in the artifact")
+        elif not (a.get("why_each_changed") or {}).get(file_path):
+            open_.append(f"{file_path} is named without a reason")
+    last_ = str(a.get("last_cell_finished_at_utc") or "")
     for c in (a.get("changes") or []):
-        wann = str(c.get("earliest_change_committed_at") or "")
-        if not wann or not letzte:
-            offen.append(f"{c['path']}: no date to compare against the campaign")
+        when_ = str(c.get("earliest_change_committed_at") or "")
+        if not when_ or not last_:
+            open_.append(f"{c['path']}: no date to compare against the campaign")
             continue
         from datetime import datetime
 
-        if datetime.fromisoformat(wann).timestamp() <= datetime.fromisoformat(
-                letzte.replace("Z", "+00:00")).timestamp():
-            offen.append(f"{c['path']} changed at {wann}, before the campaign "
-                         f"finished at {letzte}")
+        if datetime.fromisoformat(when_).timestamp() <= datetime.fromisoformat(
+                last_.replace("Z", "+00:00")).timestamp():
+            open_.append(f"{c['path']} changed at {when_}, before the campaign "
+                         f"finished at {last_}")
     # Recomputed, never read back: the whole point of the digest table is that
     # it is checked against the files, and an artifact that asserts its own
     # conclusion is the shape this project refuses everywhere else.
-    gebunden = HOH / "docs" / "benchmarks" / kampagne / "RAW_RESULT_DIGESTS.json"
-    ergebnisse = HOH / "dogfood" / "benchmark" / f"results-{kampagne}"
-    if gebunden.is_file() and ergebnisse.is_dir():
-        vorher = json.loads(gebunden.read_text())["digests"]
-        jetzt = {f.name: hashlib.sha256(f.read_bytes()).hexdigest()
-                 for f in sorted(ergebnisse.glob("*.json"))}
-        if vorher != jetzt:
-            offen.append("the raw result files do not hash to what they "
+    bound_ = HOH / "docs" / "benchmarks" / campaign_ / "RAW_RESULT_DIGESTS.json"
+    results = HOH / "dogfood" / "benchmark" / f"results-{campaign_}"
+    if bound_.is_file() and results.is_dir():
+        before = json.loads(bound_.read_text())["digests"]
+        moment = {f.name: hashlib.sha256(f.read_bytes()).hexdigest()
+                 for f in sorted(results.glob("*.json"))}
+        if before != moment:
+            open_.append("the raw result files do not hash to what they "
                          "hashed to before the repair")
     else:
-        offen.append("no bound digest table to check the raw results against")
-    return not offen, offen
+        open_.append("no bound digest table to check the raw results against")
+    return not open_, open_
 
 
-def zeile_prereg() -> Zeile:
+def row_prereg() -> Row:
     """Is the frozen instrument still the instrument?
 
     Separate from `benchmark_v3` because it answers a different question and
@@ -713,12 +809,12 @@ def zeile_prereg() -> Zeile:
     campaign is running, and a reader deciding whether to start one wants to
     know that first.
     """
-    befehl = "python3 tools/prereg.py check --campaign v3"
-    kampagne = "v3"
-    v = _prereg(kampagne)
+    command = "python3 tools/prereg.py check --campaign v3"
+    campaign_ = "v3"
+    v = _prereg(campaign_)
     if v["verdict"] == "NOT_REGISTERED":
-        return Zeile("benchmark_v3_preregistration", NOT_RUN,
-                     "campaign v3 is not pre-registered", befehl)
+        return Row("benchmark_v3_preregistration", NOT_RUN,
+                     "campaign v3 is not pre-registered", command)
     drift = (v.get("changed") or []) + (v.get("added") or []) + \
             (v.get("removed") or [])
     # Three cases, not two. Drift *before* a campaign is a re-freeze; drift
@@ -726,26 +822,26 @@ def zeile_prereg() -> Zeile:
     # that is acceptable is decided by `drift_abgerechnet` -- which recomputes
     # the campaign's completeness, the change dates and the raw digests rather
     # than taking an artifact's word for any of it.
-    abgerechnet, warum = (True, [])
+    accounted, why_text = (True, [])
     if v["verdict"] == "DRIFTED":
-        abgerechnet, warum = drift_abgerechnet(kampagne, v)
-    return Zeile(
+        accounted, why_text = drift_accounted(campaign_, v)
+    return Row(
         "benchmark_v3_preregistration",
-        PASS if v["verdict"] == "FROZEN" or abgerechnet else FAIL,
+        PASS if v["verdict"] == "FROZEN" or accounted else FAIL,
         f"{v['verdict']}, {v['files_frozen']} file(s) frozen at "
         f"{(v.get('protocol_commit') or '')[:12]}"
         + (f" -- moved after the campaign, accounted for: {', '.join(drift[:4])}"
-           if drift and abgerechnet else
-           f" -- moved: {', '.join(drift[:4])}; " + "; ".join(warum)
+           if drift and accounted else
+           f" -- moved: {', '.join(drift[:4])}; " + "; ".join(why_text)
            if drift else ""),
-        befehl,
+        command,
         "drift before the campaign starts is a re-freeze; drift during it "
         "invalidates the campaign; drift after it is a repair, and it counts "
         "only while every moved file is named with a reason, changed after "
         "the last cell, and the raw results still hash to what they did")
 
 
-def zeile_evidenzindex() -> Zeile:
+def row_evidence_index() -> Row:
     """Does the evidence index still describe the trees it names?
 
     The index is the only published account of three evidence trees that are
@@ -753,38 +849,38 @@ def zeile_evidenzindex() -> Zeile:
     trust a description of something that has since changed -- which is worse
     than no description, because it looks like one.
     """
-    befehl = "python3 tools/evidence_index.py"
-    rc, aus = _py("tools/evidence_index.py")
-    return Zeile("evidence_index", PASS if rc == 0 else FAIL,
-                 (aus.splitlines()[-1] if aus else "?")[:70], befehl)
+    command = "python3 tools/evidence_index.py"
+    rc, out = _py("tools/evidence_index.py")
+    return Row("evidence_index", PASS if rc == 0 else FAIL,
+                 (out.splitlines()[-1] if out else "?")[:70], command)
 
 
-def zeile_audit() -> Zeile:
+def row_audit() -> Row:
     """The paper's own citation and numbers audit, every check of it.
 
     It was not a row, and one of its checks had been red since before the
     benchmark it cites had run. A gate nobody looks at is a gate that teaches
     people not to look.
     """
-    befehl = "python3 tools/audit_refs.py <each check>"
-    rot = []
-    for name in AUDIT_PRUEFUNGEN:
+    command = "python3 tools/audit_refs.py <each check>"
+    red = []
+    for name in AUDIT_CHECKS:
         rc, _ = _py("tools/audit_refs.py", name, timeout=600)
         if rc != 0:
-            rot.append(name)
-    return Zeile(
-        "paper_audit", PASS if not rot else FAIL,
-        f"{len(AUDIT_PRUEFUNGEN) - len(rot)} of {len(AUDIT_PRUEFUNGEN)} checks"
-        + (" -- red: " + ", ".join(rot) if rot else ""),
-        befehl,
+            red.append(name)
+    return Row(
+        "paper_audit", PASS if not red else FAIL,
+        f"{len(AUDIT_CHECKS) - len(red)} of {len(AUDIT_CHECKS)} checks"
+        + (" -- red: " + ", ".join(red) if red else ""),
+        command,
         "`coverage` is red on a maintenance item paper/AUDIT.md itself flags "
         "and explains: paper/NUMBERS.md catalogues the 2 of a '2 of 3' ratio "
         "and not the 3. It is a documented, deliberately deferred operator "
         "item, not an unexamined failure",
-        beratend=rot == ["coverage"])
+        advisory=red == ["coverage"])
 
 
-def zeile_ci() -> Zeile:
+def row_ci() -> Row:
     """Has an external CI run against the exact export this tree produces?
 
     It used to ask `git remote` here. The internal tree has none, deliberately:
@@ -805,67 +901,67 @@ def zeile_ci() -> Zeile:
     create the namespace it needs, because the step is skipped, and a green
     job whose relevant step did not run has measured nothing.
     """
-    befehl = ("python3 tools/exact_head_ci.py --run-id ID --export-commit SHA")
-    pfad = HOH / "dogfood/external-ci/EXACT_HEAD_CI.json"
-    if not pfad.is_file():
-        return Zeile("external_ci", NOT_RUN,
-                     "no external CI evidence recorded", befehl,
+    command = ("python3 tools/exact_head_ci.py --run-id ID --export-commit SHA")
+    file_path = HOH / "dogfood/external-ci/EXACT_HEAD_CI.json"
+    if not file_path.is_file():
+        return Row("external_ci", NOT_RUN,
+                     "no external CI evidence recorded", command,
                      "the external run is evidence a release needs, and a "
                      "checkout that cannot produce it is a checkout that "
                      "cannot declare itself ready")
-    c = json.loads(pfad.read_text())
+    c = json.loads(file_path.read_text())
 
     import importlib.util as _il
 
     spec = _il.spec_from_file_location("exact_head_ci",
-                                       HIER / "exact_head_ci.py")
+                                       HERE / "exact_head_ci.py")
     eh = _il.module_from_spec(spec)
     spec.loader.exec_module(eh)
     try:
-        jetzt = eh.export_path_digests(HOH)
+        moment = eh.export_path_digests(HOH)
     except SystemExit as exc:
-        return Zeile("external_ci", FAIL, f"the export cannot be digested: {exc}",
-                     befehl)
+        return Row("external_ci", FAIL, f"the export cannot be digested: {exc}",
+                     command)
 
-    damals = c.get("path_digests") or {}
-    if not damals:
-        return Zeile("external_ci", FAIL,
+    then = c.get("path_digests") or {}
+    if not then:
+        return Row("external_ci", FAIL,
                      "the recorded run carries no per-path digests, so what it "
-                     "tested cannot be compared with this tree", befehl)
-    abweichend = sorted(set(damals) ^ set(jetzt)) + sorted(
-        p for p in set(damals) & set(jetzt) if damals[p] != jetzt[p])
+                     "tested cannot be compared with this tree", command)
+    differing_ = sorted(set(then) ^ set(moment)) + sorted(
+        p for p in set(then) & set(moment) if then[p] != moment[p])
     # The gate writes its own report, and the report is published. So the
     # board and the ledger it renders are INCLUDE files that every run of this
     # gate rewrites -- which means an aggregate comparison is red forever, for
     # a reason that has nothing to do with the software. Those files are named
     # here and only they are tolerated; anything else differing is stale
     # evidence and fails.
-    BERICHTE = {"docs/READINESS.md", "CLAIMS.md", "CLAIMS.json"}
-    echt = [p for p in abweichend if p not in BERICHTE]
-    if echt:
-        return Zeile(
+    REPORTS = {"docs/READINESS.md", "CLAIMS.md", "CLAIMS.json"}
+    real = [p for p in differing_ if p not in REPORTS]
+    if real:
+        return Row(
             "external_ci", FAIL,
             f"the recorded run tested a different export: "
-            f"{len(echt)} path(s) differ beyond this gate's own reports "
-            f"({', '.join(echt[:3])}). Re-export, re-run CI, record it again.",
-            befehl,
+            f"{len(real)} path(s) differ beyond this gate's own reports "
+            f"({', '.join(real[:3])}). Re-export, re-run CI, record it again.",
+            command,
             "a CI result is evidence about a set of bytes, not about a branch "
             "name; reusing it after the export changed would be citing a "
             "measurement of something else")
 
-    rot = [j["name"] for j in (c.get("jobs") or [])
+    red = [j["name"] for j in (c.get("jobs") or [])
            if j.get("conclusion") != "success"]
-    return Zeile(
+    return Row(
         "external_ci",
-        PASS if c.get("run_conclusion") == "success" and not rot else FAIL,
+        PASS if c.get("run_conclusion") == "success" and not red else FAIL,
         f"{c.get('run_conclusion')} on {str(c.get('export_commit'))[:12]} "
         f"({len(c.get('jobs') or [])} job(s)"
-        + (f", red: {', '.join(rot)}" if rot else "")
+        + (f", red: {', '.join(red)}" if red else "")
         + f"); sandbox_external_env = {c.get('sandbox_external_env')}"
         + (f"; differs only by this gate's own reports: "
-           f"{', '.join(sorted(set(abweichend) & BERICHTE))}"
-           if abweichend else ""),
-        befehl,
+           f"{', '.join(sorted(set(differing_) & REPORTS))}"
+           if differing_ else ""),
+        command,
         "the sandbox line is read from its step, not its job: a green job "
         "whose relevant step was skipped has measured nothing, and "
         "UNSUPPORTED_ENVIRONMENT is that state rather than a pass")
@@ -873,10 +969,10 @@ def zeile_ci() -> Zeile:
 
 #: The dispositions `docs/ROUTING.md` may record. Anything else -- including
 #: nothing at all -- is an open question, not a disposition.
-ROUTING_ENTSCHIEDEN = ("DEFERRED_ON_EVIDENCE", "ADOPTED", "REJECTED")
+ROUTING_DECIDED = ("DEFERRED_ON_EVIDENCE", "ADOPTED", "REJECTED")
 
 
-def zeile_routing() -> Zeile:
+def row_routing() -> Row:
     """Is the routing question disposed of, and does the file still say so?
 
     It returned the literal `PASS` regardless of what it read: a file saying
@@ -885,51 +981,54 @@ def zeile_routing() -> Zeile:
     cannot fail is a permanent green sitting inside a conjunction, which is
     the shape of a gate that teaches people not to look.
     """
-    befehl = "read docs/ROUTING.md"
-    pfad = HOH / "docs/ROUTING.md"
-    if not pfad.is_file():
-        return Zeile("routing", NOT_RUN, "docs/ROUTING.md is missing", befehl)
-    m = re.search(r"routing_decision\s*=\s*(\S+)", pfad.read_text())
-    wert = m.group(1) if m else "no routing_decision line"
-    return Zeile("routing", PASS if wert in ROUTING_ENTSCHIEDEN else FAIL,
-                 wert, befehl,
+    command = "read docs/ROUTING.md"
+    file_path = HOH / "docs/ROUTING.md"
+    if not file_path.is_file():
+        return Row("routing", NOT_RUN, "docs/ROUTING.md is missing", command)
+    m = re.search(r"routing_decision\s*=\s*(\S+)", file_path.read_text())
+    value_ = m.group(1) if m else "no routing_decision line"
+    return Row("routing", PASS if value_ in ROUTING_DECIDED else FAIL,
+                 value_, command,
                  "a disposition, not an open question: the condition for "
                  "revisiting it is named and was checked")
 
 
-def zeilen(quick: bool) -> list[Zeile]:
+def row_list(quick: bool) -> list[Row]:
     return [
-        zeile_tests(quick),
-        zeile_lint(),
-        zeile_claims(),
-        zeile_union(),
-        zeile_meta(),
-        zeile_confinement(),
-        zeile_budget(),
-        zeile_closure(),
-        zeile_telemetrie(),
-        zeile_prereg(),
-        zeile_benchmark_v2(),
-        zeile_benchmark_v3(),
-        zeile_export(),
-        zeile_export_sync(),
-        zeile_succession(),
-        zeile_install(quick),
-        zeile_attribution(),
-        zeile_evidenzindex(),
-        zeile_audit(),
-        zeile_ci(),
-        zeile_routing(),
+        row_tests(quick),
+        row_lint(),
+        row_claims(),
+        row_union(),
+        row_meta(),
+        row_confinement(),
+        row_budget(),
+        row_closure(),
+        row_telemetry(),
+        row_prereg(),
+        row_benchmark_v2(),
+        row_benchmark_v3(),
+        row_export(),
+        row_export_sync(),
+        row_succession(),
+        row_identifiers(),
+        row_preflight(),
+        row_parallelism(),
+        row_install(quick),
+        row_attribution(),
+        row_evidence_index(),
+        row_audit(),
+        row_ci(),
+        row_routing(),
     ]
 
 
-def verdikt(rows: list[Zeile]) -> tuple[str, list[str]]:
-    offen = [r.name for r in rows if r.zustand != PASS and not r.beratend]
-    return (PASS if not offen else FAIL), offen
+def verdict(rows: list[Row]) -> tuple[str, list[str]]:
+    open_ = [r.name for r in rows if r.state != PASS and not r.advisory]
+    return (PASS if not open_ else FAIL), open_
 
 
-def markdown(rows: list[Zeile], kopf: str) -> str:
-    stand, offen = verdikt(rows)
+def markdown(rows: list[Row], head: str) -> str:
+    stand, open_ = verdict(rows)
     z = [
         "# Readiness: what holds, what does not, and how each was measured",
         "",
@@ -938,24 +1037,24 @@ def markdown(rows: list[Zeile], kopf: str) -> str:
         "rows rather than a judgement typed above them. A row this tool cannot",
         "evaluate is `NOT_RUN`, which is never a pass.",
         "",
-        f"Measured at `{kopf}` on "
+        f"Measured at `{head}` on "
         + datetime.now(UTC).strftime("%Y-%m-%d") + ".",
         "",
         f"    TECHNICALLY_STABLE_READY = {'yes' if stand == PASS else 'no'}",
         "",
     ]
-    if offen:
-        z += ["Open, and each one blocking: " + ", ".join(offen) + ".", ""]
+    if open_:
+        z += ["Open, and each one blocking: " + ", ".join(open_) + ".", ""]
     z += ["| condition | state | measured | command |", "|---|---|---|---|"]
     for r in rows:
-        marke = r.zustand + (" (advisory)" if r.beratend and r.zustand != PASS
+        marke = r.state + (" (advisory)" if r.advisory and r.state != PASS
                              else "")
-        z.append(f"| `{r.name}` | {marke} | {r.wert} | `{r.befehl}` |")
+        z.append(f"| `{r.name}` | {marke} | {r.value_} | `{r.command}` |")
     z += ["", "## Why some rows are advisory", ""]
     for r in rows:
-        if r.warum:
-            z.append(f"* **`{r.name}`** — {r.warum}.")
-    z += verteilung_abschnitt()
+        if r.why_text:
+            z.append(f"* **`{r.name}`** — {r.why_text}.")
+    z += distribution_section()
     z += [
         "",
         "## What this does not decide",
@@ -968,7 +1067,7 @@ def markdown(rows: list[Zeile], kopf: str) -> str:
     return "\n".join(z)
 
 
-def verteilung_abschnitt() -> list[str]:
+def distribution_section() -> list[str]:
     """What the published distribution establishes -- derived, not asserted.
 
     O176 moved this section out of hand-written prose and into a generator,
@@ -987,13 +1086,13 @@ def verteilung_abschnitt() -> list[str]:
     the positive claim. `_zusicherung` is the whole rule: it never emits the
     affirmative text unless the evidence it was handed says so.
     """
-    quittung = HOH / ".github/releases/v0.1.0.json"
-    if not quittung.is_file():
+    receipt_ = HOH / ".github/releases/v0.1.0.json"
+    if not receipt_.is_file():
         return ["", "## The published distribution", "",
                 "No distribution receipt in this tree, so nothing is claimed "
                 "about a published package here.", ""]
     try:
-        d = json.loads(quittung.read_text())
+        d = json.loads(receipt_.read_text())
     except ValueError as exc:
         return ["", "## The published distribution", "",
                 f"The distribution receipt is unreadable ({exc}), so nothing "
@@ -1007,9 +1106,9 @@ def verteilung_abschnitt() -> list[str]:
          "the historical measurement at its stated commit; these lines are "
          "about the package, not about the campaigns.", ""]
 
-    FEHLT, TYP, NEIN, JA = "fehlt", "typ", "nein", "ja"
+    MISSING, KIND, NO, JA = "fehlt", "typ", "nein", "ja"
 
-    def ist(wert, erwartet, typ) -> str:
+    def is_(value_, expected, kind_) -> str:
         """Does this field say what the affirmative sentence would need?
 
         Four answers, not two. An independent review found the third and
@@ -1019,59 +1118,59 @@ def verteilung_abschnitt() -> list[str]:
         and a value of the wrong type is its own answer -- never a pass, and
         never reported as though the receipt had said no.
         """
-        if wert is None:
-            return FEHLT
-        if not isinstance(wert, typ):
-            return TYP
-        return JA if wert == erwartet else NEIN
+        if value_ is None:
+            return MISSING
+        if not isinstance(value_, kind_):
+            return KIND
+        return JA if value_ == expected else NO
 
-    def alle(*zustaende) -> str:
+    def all_(*states) -> str:
         """The weakest answer among several fields wins, worst first: a claim
         resting on two fields is only as good as the one that does not hold."""
-        for schlecht in (TYP, FEHLT, NEIN):
-            if schlecht in zustaende:
-                return schlecht
+        for bad in (KIND, MISSING, NO):
+            if bad in states:
+                return bad
         return JA
 
-    def zusicherung(zustand: str, ja: str, nein: str, feld: str) -> str:
+    def assurance_(state: str, ja: str, refuse: str, field_: str) -> str:
         """The affirmative sentence only when the evidence says so."""
-        if zustand == FEHLT:
-            return f"Not confirmed -- the receipt carries no `{feld}`: {nein}"
-        if zustand == TYP:
-            return (f"**Not confirmed** -- `{feld}` in the receipt is not of "
-                    f"the type this reads: {nein}")
-        if zustand == NEIN:
-            return f"**Not confirmed** -- `{feld}` in the receipt says otherwise: {nein}"
+        if state == MISSING:
+            return f"Not confirmed -- the receipt carries no `{field_}`: {refuse}"
+        if state == KIND:
+            return (f"**Not confirmed** -- `{field_}` in the receipt is not of "
+                    f"the type this reads: {refuse}")
+        if state == NO:
+            return f"**Not confirmed** -- `{field_}` in the receipt says otherwise: {refuse}"
         return ja
 
     version = d.get("version")
     tag = d.get("source_tag")
-    wann = str(d.get("publication_timestamp") or "")[:10]
+    when_ = str(d.get("publication_timestamp") or "")[:10]
     prod = d.get("production_pypi_result")
     test = d.get("testpypi_result")
     assets = d.get("github_assets_match")
     att = (d.get("attestations") or {}).get("status")
     tp = d.get("trusted_publishing")
     token = d.get("long_lived_pypi_token_used")
-    umgebung = d.get("production_environment") or {}
-    pruefer = umgebung.get("required_reviewer")
+    environment_ = d.get("production_environment") or {}
+    checker = environment_.get("required_reviewer")
     smoke = d.get("python_smoke") or {}
-    bestanden = sorted(v for v, r in smoke.items()
+    passed_ = sorted(v for v, r in smoke.items()
                        if isinstance(r, dict) and r.get("result") == "PASS")
     durchgefallen = sorted(v for v, r in smoke.items()
                            if isinstance(r, dict) and r.get("result") != "PASS")
 
-    z.append(zusicherung(
-        alle(ist(prod, "PASS", str), ist(version, version, str),
-             ist(tag, tag, str)),
+    z.append(assurance_(
+        all_(is_(prod, "PASS", str), is_(version, version, str),
+             is_(tag, tag, str)),
         f"The v{version} distribution was published"
-        + (f" on {wann}" if wann else "")
+        + (f" on {when_}" if when_ else "")
         + f" from the unchanged release tag `{tag}`.",
         "no successful publication to the production index is recorded.",
         "production_pypi_result"))
 
-    z.append(zusicherung(
-        alle(ist(assets, True, bool), ist(test, "PASS", str)),
+    z.append(assurance_(
+        all_(is_(assets, True, bool), is_(test, "PASS", str)),
         "TestPyPI, PyPI, and the GitHub release carry byte-identical wheel "
         "and sdist files.",
         "the three copies are not recorded as byte-identical.",
@@ -1082,26 +1181,26 @@ def verteilung_abschnitt() -> list[str]:
                  "fresh installation is recorded.")
     elif durchgefallen:
         z.append("**Not confirmed** -- fresh installations are recorded as "
-                 "passing on Python " + (", ".join(bestanden) or "none")
+                 "passing on Python " + (", ".join(passed_) or "none")
                  + " and as not passing on " + ", ".join(durchgefallen) + ".")
     else:
         z.append("Fresh installations passed on Python "
-                 + ", ".join(bestanden) + ".")
+                 + ", ".join(passed_) + ".")
 
-    z.append(zusicherung(
-        ist(att, "VERIFIED", str),
+    z.append(assurance_(
+        is_(att, "VERIFIED", str),
         "Both PEP-740 attestations were verified.",
         "the attestations are not recorded as verified.",
         "attestations.status"))
 
-    z.append(zusicherung(
+    z.append(assurance_(
         # Both fields, by identity. `bool(tp)` accepted the string "false",
         # and a missing token field was read as "no token was used" -- an
         # absent record is not a record of absence.
-        alle(ist(tp, True, bool), ist(token, False, bool)),
+        all_(is_(tp, True, bool), is_(token, False, bool)),
         "Publication used OIDC Trusted Publishing"
-        + (f" through the protected `{umgebung.get('name', 'pypi')}` "
-           f"environment, reviewer {pruefer}," if pruefer else ",")
+        + (f" through the protected `{environment_.get('name', 'pypi')}` "
+           f"environment, reviewer {checker}," if checker else ",")
         + " with no long-lived token.",
         "trusted publishing without a long-lived token is not recorded.",
         "trusted_publishing / long_lived_pypi_token_used"))
@@ -1109,9 +1208,9 @@ def verteilung_abschnitt() -> list[str]:
     z.append("The [machine-readable receipt](../.github/releases/v0.1.0.json) "
              "records hashes, job results, provenance and verification scope.")
 
-    umfang = d.get("verification_scope") or {}
-    if umfang.get("historical_campaigns_rerun") or \
-            umfang.get("external_sandbox_reverified"):
+    scope_ = d.get("verification_scope") or {}
+    if scope_.get("historical_campaigns_rerun") or \
+            scope_.get("external_sandbox_reverified"):
         z.append("The receipt's `verification_scope` claims more than "
                  "distribution; this board does not carry that claim.")
     else:
@@ -1122,13 +1221,13 @@ def verteilung_abschnitt() -> list[str]:
     return z
 
 
-def _anker(zeile: str) -> str:
+def _anchor(row: str) -> str:
     import hashlib
 
-    return hashlib.sha256(re.sub(r"\s+", " ", zeile.strip()).encode()).hexdigest()
+    return hashlib.sha256(re.sub(r"\s+", " ", row.strip()).encode()).hexdigest()
 
 
-def _ledger_nachziehen(ziel: Path) -> int:
+def _catch_up_ledger(target: Path) -> int:
     """Re-anchor this document's own ledger entries after regenerating it.
 
     Its rows change whenever a gate's result changes, which is the point of
@@ -1140,20 +1239,20 @@ def _ledger_nachziehen(ziel: Path) -> int:
     in code, so the count only changes when a row is added, and removing an id
     would leave the gap the ledger refuses.
     """
-    pfad = HOH / "CLAIMS.json"
-    if not pfad.is_file():
+    file_path = HOH / "CLAIMS.json"
+    if not file_path.is_file():
         return 0
-    d = json.loads(pfad.read_text())
-    zeilen = ziel.read_text().splitlines()
-    rel = ziel.relative_to(HOH).as_posix()
+    d = json.loads(file_path.read_text())
+    doc_lines = target.read_text().splitlines()
+    rel = target.relative_to(HOH).as_posix()
 
-    zeilen_claim = [(i, z) for i, z in enumerate(zeilen, 1) if z.startswith("| `")]
-    zeilen_nicht = [(i, z) for i, z in enumerate(zeilen, 1)
+    claim_rows = [(i, z) for i, z in enumerate(doc_lines, 1) if z.startswith("| `")]
+    non_claim_rows = [(i, z) for i, z in enumerate(doc_lines, 1)
                     if z.startswith("Open, and each one blocking")
                     or z.startswith("* **`") or z.startswith("| condition |")
                     or z.startswith("|---") or z.startswith("Measured at")]
 
-    def gehoert_uns(text: str) -> bool:
+    def belongs_to_us(text: str) -> bool:
         """Is this entry one this tool writes, or somebody else's?
 
         O176, second half. `vorhanden` used to be *every* entry anchored in
@@ -1174,28 +1273,28 @@ def _ledger_nachziehen(ziel: Path) -> int:
                 or s.startswith("Measured at")
                 or s.startswith("Open, and each one blocking"))
 
-    def nachziehen(schlüssel: str, praefix: str, neue, notiz: dict) -> int:
-        vorhanden = [e for e in d[schlüssel]
+    def catch_up(key_name: str, prefix_: str, new_, note_: dict) -> int:
+        present = [e for e in d[key_name]
                      if e.get("where", "").startswith(rel + ":")
-                     and gehoert_uns(e.get("text", ""))]
+                     and belongs_to_us(e.get("text", ""))]
         n = 0
-        for e, (i, z) in zip(vorhanden, neue, strict=False):
+        for e, (i, z) in zip(present, new_, strict=False):
             e["where"] = f"{rel}:{i}"
             e["text"] = z.strip()
-            e["anchor_digest"] = _anker(z)
+            e["anchor_digest"] = _anchor(z)
             n += 1
-        if len(neue) > len(vorhanden):
-            hoechste = max((int(x["id"].split("-")[1]) for x in d[schlüssel]),
+        if len(new_) > len(present):
+            highest = max((int(x["id"].split("-")[1]) for x in d[key_name]),
                            default=0)
-            for k, (i, z) in enumerate(neue[len(vorhanden):], 1):
-                d[schlüssel].append({
-                    "id": f"{praefix}-{hoechste + k:03d}",
+            for k, (i, z) in enumerate(new_[len(present):], 1):
+                d[key_name].append({
+                    "id": f"{prefix_}-{highest + k:03d}",
                     "text": z.strip(), "where": f"{rel}:{i}",
-                    "anchor_digest": _anker(z), **notiz})
+                    "anchor_digest": _anchor(z), **note_})
                 n += 1
         return n
 
-    n = nachziehen("claims", "C", zeilen_claim, {
+    n = catch_up("claims", "C", claim_rows, {
         "status": "SUPPORTED", "evidence": ["file:tools/readiness.py:1"],
         "note": "Generated by tools/readiness.py; the row's own command column "
                 "is how it is re-derived.",
@@ -1204,11 +1303,11 @@ def _ledger_nachziehen(ziel: Path) -> int:
             "python3 tools/readiness.py --write, which re-runs every command "
             "the row names and rebuilds the table from their output.",
     })
-    n += nachziehen("not_claims", "N", zeilen_nicht, {
+    n += catch_up("not_claims", "N", non_claim_rows, {
         "reason": "a table frame, a provenance line, or the reason a row is "
                   "advisory; the measurement is in the row itself",
     })
-    pfad.write_text(json.dumps(d, indent=2, ensure_ascii=False) + "\n")
+    file_path.write_text(json.dumps(d, indent=2, ensure_ascii=False) + "\n")
     return n
 
 
@@ -1219,29 +1318,29 @@ def main(argv=None) -> int:
     ap.add_argument("--write", action="store_true")
     args = ap.parse_args(argv)
 
-    rc, kopf = _lauf("git", "rev-parse", "--short", "HEAD")
-    kopf = kopf if rc == 0 else "(no git head)"
-    rows = zeilen(args.quick)
-    stand, offen = verdikt(rows)
+    rc, head = _run("git", "rev-parse", "--short", "HEAD")
+    head = head if rc == 0 else "(no git head)"
+    rows = row_list(args.quick)
+    stand, open_ = verdict(rows)
 
     if args.json:
         print(json.dumps({
-            "head": kopf, "verdict": stand, "open": offen,
+            "head": head, "verdict": stand, "open": open_,
             "rows": [r.__dict__ for r in rows],
         }, indent=2))
     else:
         for r in rows:
-            marke = "adv " if r.beratend and r.zustand != PASS else "    "
-            print(f"  {marke}{r.zustand:<8s}{r.name:<32s}{r.wert}")
+            marke = "adv " if r.advisory and r.state != PASS else "    "
+            print(f"  {marke}{r.state:<8s}{r.name:<32s}{r.value_}")
         print(f"\n  TECHNICALLY_STABLE_READY = "
               f"{'yes' if stand == PASS else 'no'}")
-        if offen:
-            print("  open: " + ", ".join(offen))
+        if open_:
+            print("  open: " + ", ".join(open_))
     if args.write:
-        ziel = HOH / "docs/READINESS.md"
-        ziel.write_text(markdown(rows, kopf), encoding="utf-8")
-        print(f"wrote {ziel}")
-        n = _ledger_nachziehen(ziel)
+        target = HOH / "docs/READINESS.md"
+        target.write_text(markdown(rows, head), encoding="utf-8")
+        print(f"wrote {target}")
+        n = _catch_up_ledger(target)
         print(f"re-anchored {n} ledger entr{'y' if n == 1 else 'ies'} "
               "for it")
         if n:
@@ -1253,8 +1352,8 @@ def main(argv=None) -> int:
             # `union_invariants` red, for a reason the previous run had
             # caused. A release gate whose own side effect fails the next
             # release gate is not a gate.
-            rc, aus = _py("tools/check_claims.py", "render")
-            print(aus.splitlines()[-1] if aus else
+            rc, out = _py("tools/check_claims.py", "render")
+            print(out.splitlines()[-1] if out else
                   f"re-render exited {rc}")
     return 0 if stand == PASS else 1
 

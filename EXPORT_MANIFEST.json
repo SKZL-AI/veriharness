@@ -3612,6 +3612,21 @@
       "rule": "operational-integration"
     },
     {
+      "path": "program/v3_3/VERIHARNESS_ENVIRONMENT_CAPABILITIES.json",
+      "decision": "EXCLUDE",
+      "rule": "unclassified"
+    },
+    {
+      "path": "program/v3_3/VERIHARNESS_PARALLELISM_BASELINE.json",
+      "decision": "EXCLUDE",
+      "rule": "unclassified"
+    },
+    {
+      "path": "program/v3_3/VERIHARNESS_PARALLELISM_BASELINE.md",
+      "decision": "EXCLUDE",
+      "rule": "unclassified"
+    },
+    {
       "path": "pyproject.toml",
       "decision": "INCLUDE",
       "rule": "package"
@@ -3857,6 +3872,11 @@
       "rule": "tests"
     },
     {
+      "path": "tests/test_identifiers.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
       "path": "tests/test_isolation_record.py",
       "decision": "INCLUDE",
       "rule": "tests"
@@ -3877,12 +3897,22 @@
       "rule": "tests"
     },
     {
+      "path": "tests/test_parallelism_baseline.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
       "path": "tests/test_phase2.py",
       "decision": "INCLUDE",
       "rule": "tests"
     },
     {
       "path": "tests/test_policy_wiring.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_preflight.py",
       "decision": "INCLUDE",
       "rule": "tests"
     },
@@ -4057,7 +4087,22 @@
       "rule": "tooling"
     },
     {
+      "path": "tools/identifiers.py",
+      "decision": "INCLUDE",
+      "rule": "tooling"
+    },
+    {
       "path": "tools/meta_evidence.py",
+      "decision": "INCLUDE",
+      "rule": "tooling"
+    },
+    {
+      "path": "tools/parallelism_baseline.py",
+      "decision": "INCLUDE",
+      "rule": "tooling"
+    },
+    {
+      "path": "tools/preflight.py",
       "decision": "INCLUDE",
       "rule": "tooling"
     },

@@ -344,13 +344,13 @@ class ProjectState(Strict):
         created reads, to a scheduler, exactly like a dependency that is
         already satisfied.
         """
-        bekannt = {n.id for n in self.nodes}
-        fehlend = {}
+        known = {n.id for n in self.nodes}
+        missing_ = {}
         for n in self.nodes:
-            offen = [d for d in n.dependencies if d not in bekannt]
-            if offen:
-                fehlend[n.id] = offen
-        return fehlend
+            open_ = [d for d in n.dependencies if d not in known]
+            if open_:
+                missing_[n.id] = open_
+        return missing_
 
     def ready(self) -> list[TaskNode]:
         """Nodes that are READY and whose dependencies have all settled.
@@ -359,16 +359,16 @@ class ProjectState(Strict):
         unresolvable dependency as satisfied is how a scheduler runs work
         whose precondition never happened.
         """
-        bekannt = {n.id: n for n in self.nodes}
-        offen = []
+        known = {n.id: n for n in self.nodes}
+        open_ = []
         for n in self.nodes:
             if n.lifecycle is not Lifecycle.READY:
                 continue
-            if any(d not in bekannt for d in n.dependencies):
+            if any(d not in known for d in n.dependencies):
                 continue
-            if all(bekannt[d].settled for d in n.dependencies):
-                offen.append(n)
-        return offen
+            if all(known[d].settled for d in n.dependencies):
+                open_.append(n)
+        return open_
 
     def dag_terminal(self) -> bool:
         """Every node settled. Necessary for closure, nowhere near sufficient."""
@@ -385,12 +385,12 @@ class ProjectState(Strict):
         and those look identical from the record unless something says which
         gates went missing.
         """
-        jetzt = self.latest_generation()
-        if not jetzt:
+        now = self.latest_generation()
+        if not now:
             return []
-        aktuell = {g.name for g in self.gates if g.generation == jetzt}
-        frueher = {g.name for g in self.gates if g.generation and g.generation < jetzt}
-        return sorted(frueher - aktuell)
+        current_ = {g.name for g in self.gates if g.generation == now}
+        earlier_ = {g.name for g in self.gates if g.generation and g.generation < now}
+        return sorted(earlier_ - current_)
 
     def gates_green(self) -> bool:
         """Every gate of the **latest closure pass** is GREEN, and one ran.
@@ -406,16 +406,16 @@ class ProjectState(Strict):
         established anything, and returning True for an empty set is the
         purest form of the failure this whole project is about.
         """
-        jetzt = self.latest_generation()
+        now = self.latest_generation()
         # Results written before `generation` existed all carry 0; falling back
         # to the whole list keeps their behaviour exactly as it was.
-        kandidaten = [g for g in self.gates if g.generation == jetzt] or list(self.gates)
-        letzte: dict[str, GateResult] = {}
-        for g in kandidaten:
-            letzte[g.name] = g
-        if not letzte:
+        candidates = [g for g in self.gates if g.generation == now] or list(self.gates)
+        last_: dict[str, GateResult] = {}
+        for g in candidates:
+            last_[g.name] = g
+        if not last_:
             return False
-        return all(g.counts_as_green for g in letzte.values())
+        return all(g.counts_as_green for g in last_.values())
 
     def rc_closed(self) -> bool:
         """`DAG_TERMINAL != RC_CLOSED`, expressed once, here.
@@ -427,8 +427,8 @@ class ProjectState(Strict):
             return False
         if not self.gates_green():
             return False
-        offen = [n for n in self.nodes if n.repair_of and not n.settled]
-        return not offen
+        open_ = [n for n in self.nodes if n.repair_of and not n.settled]
+        return not open_
 
     def touch(self) -> None:
         self.updated_at = utcnow()

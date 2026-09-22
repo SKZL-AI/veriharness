@@ -33,12 +33,12 @@ import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
 
-HIER = Path(__file__).resolve().parent
-HOH = HIER.parent
+HERE = Path(__file__).resolve().parent
+HOH = HERE.parent
 
 #: Everything a campaign may not change while it runs, and why each is here.
 #: A path that names a directory freezes every file under it.
-GEFROREN: dict[str, str] = {
+FROZEN: dict[str, str] = {
     "docs/BENCHMARK_PROTOCOL.md":
         "the protocol itself -- design, budget, repetitions, stopping rules",
     "dogfood/benchmark/tasks":
@@ -79,7 +79,7 @@ GEFROREN: dict[str, str] = {
 #: record its own findings while it ran.
 
 
-def _env_aufnahme() -> dict:
+def _env_capture() -> dict:
     """What the campaign is running *on*, recorded because it is not frozen.
 
     A digest set says the files did not change. It says nothing about the
@@ -113,13 +113,13 @@ def _env_aufnahme() -> dict:
     # recorded (it can be long and is not this file's business); their
     # presence and digest are, because a prompt that differs between cell 1
     # and cell 45 is a different instrument.
-    umgebung = {}
+    environment_ = {}
     for name in ("HOH_HOUSE_RULES", "HERDR_ENV", "HOH_TRUST_HELPER",
                  "HOH_WORKTREE_ROOT"):
-        wert = os.environ.get(name)
-        umgebung[name] = (
-            "unset" if wert is None
-            else hashlib.sha256(wert.encode()).hexdigest()[:16])
+        value_ = os.environ.get(name)
+        environment_[name] = (
+            "unset" if value_ is None
+            else hashlib.sha256(value_.encode()).hexdigest()[:16])
 
     return {
         "python": platform.python_version(),
@@ -127,7 +127,7 @@ def _env_aufnahme() -> dict:
         "packages": pakete,
         "agent_cli": _version("claude", "--version"),
         "git": _version("git", "--version"),
-        "environment_digests": umgebung,
+        "environment_digests": environment_,
         "model": "not pinned -- tools/benchmark.py dispatches the profile "
                  "'claude' and the CLI chooses. Recorded as a limitation, not "
                  "as a guarantee.",
@@ -140,15 +140,15 @@ def _commit() -> str:
     return p.stdout.strip()
 
 
-def _schmutzig() -> list[str]:
+def _dirty() -> list[str]:
     p = subprocess.run(["git", "-C", str(HOH), "status", "--porcelain", "-uall"],
                        capture_output=True, text=True, check=False)
     return [z for z in p.stdout.splitlines() if z.strip()]
 
 
-def _digest(pfad: Path) -> str:
+def _digest(path: Path) -> str:
     h = hashlib.sha256()
-    h.update(pfad.read_bytes())
+    h.update(path.read_bytes())
     return h.hexdigest()[:16]
 
 
@@ -165,39 +165,39 @@ def digeste() -> tuple[dict[str, str], list[str]]:
     benchmark. Following them would invite a cycle; naming them lets the
     check refuse instead of quietly under-covering.
     """
-    raus: dict[str, str] = {}
-    probleme: list[str] = []
+    out_list: dict[str, str] = {}
+    problems: list[str] = []
 
-    def _datei(f: Path) -> None:
-        raus[str(f.relative_to(HOH))] = (
+    def _file(f: Path) -> None:
+        out_list[str(f.relative_to(HOH))] = (
             f"SYMLINK:{os.readlink(f)}" if f.is_symlink() else _digest(f))
 
-    for eintrag in sorted(GEFROREN):
-        p = HOH / eintrag
+    for entry in sorted(FROZEN):
+        p = HOH / entry
         if p.is_dir():
-            for wurzel, verzeichnisse, dateien in os.walk(p, followlinks=False):
-                w = Path(wurzel)
-                verzeichnisse[:] = [d for d in sorted(verzeichnisse)
+            for root, directories, files in os.walk(p, followlinks=False):
+                w = Path(root)
+                directories[:] = [d for d in sorted(directories)
                                     if d != "__pycache__"]
-                for d in list(verzeichnisse):
+                for d in list(directories):
                     if (w / d).is_symlink():
-                        probleme.append(
+                        problems.append(
                             f"{(w / d).relative_to(HOH)} is a symlinked "
                             f"directory inside a frozen tree: its contents are "
                             f"not covered by any digest")
-                        raus[str((w / d).relative_to(HOH))] = \
+                        out_list[str((w / d).relative_to(HOH))] = \
                             f"SYMLINK:{os.readlink(w / d)}"
-                        verzeichnisse.remove(d)
-                for name in sorted(dateien):
-                    _datei(w / name)
+                        directories.remove(d)
+                for name in sorted(files):
+                    _file(w / name)
         elif p.is_file():
-            _datei(p)
+            _file(p)
         else:
-            raus[eintrag] = "ABSENT"
-    return raus, probleme
+            out_list[entry] = "ABSENT"
+    return out_list, problems
 
 
-def digeste_im_commit(commit: str) -> dict[str, str]:
+def digests_in_commit(commit: str) -> dict[str, str]:
     """The same digests, computed from a **commit** instead of the tree.
 
     This is what makes the registration self-covering. `PREREGISTRATION.json`
@@ -215,74 +215,74 @@ def digeste_im_commit(commit: str) -> dict[str, str]:
                        capture_output=True, text=True, check=False)
     if p.returncode != 0:
         return {}
-    raus: dict[str, str] = {}
-    for zeile in p.stdout.splitlines():
+    out_list: dict[str, str] = {}
+    for line in p.stdout.splitlines():
         try:
-            kopf, pfad = zeile.split("\t", 1)
-            _modus, art, _blob, _groesse = kopf.split()
+            head, path = line.split("\t", 1)
+            _mode, art, _blob, _size = head.split()
         except ValueError:                          # pragma: no cover - exotic
             continue
         if art != "blob":
             continue
-        if not any(pfad == e or pfad.startswith(e + "/") for e in GEFROREN):
+        if not any(path == e or path.startswith(e + "/") for e in FROZEN):
             continue
-        if "__pycache__" in pfad:
+        if "__pycache__" in path:
             continue
-        inhalt = subprocess.run(
-            ["git", "-C", str(HOH), "show", f"{commit}:{pfad}"],
+        content_ = subprocess.run(
+            ["git", "-C", str(HOH), "show", f"{commit}:{path}"],
             capture_output=True, check=False)
-        raus[pfad] = hashlib.sha256(inhalt.stdout).hexdigest()[:16]
-    return raus
+        out_list[path] = hashlib.sha256(content_.stdout).hexdigest()[:16]
+    return out_list
 
 
-def pfad_fuer(kampagne: str) -> Path:
-    return HOH / "docs" / "benchmarks" / kampagne / "PREREGISTRATION.json"
+def path_for(campaign_: str) -> Path:
+    return HOH / "docs" / "benchmarks" / campaign_ / "PREREGISTRATION.json"
 
 
 def cmd_freeze(args) -> int:
-    ziel = pfad_fuer(args.campaign)
-    dreck = _schmutzig()
-    if dreck and not args.allow_dirty:
+    target = path_for(args.campaign)
+    debris = _dirty()
+    if debris and not args.allow_dirty:
         print("the working tree is not clean, so a commit would not describe "
               "what is being frozen:")
-        for z in dreck[:20]:
+        for z in debris[:20]:
             print("  " + z)
         print("commit first, or pass --allow-dirty and accept that the "
               "recorded commit is not the recorded state")
         return 1
-    stempel_digeste, probleme = digeste()
-    daten = {
+    stamp_digests, problems = digeste()
+    data_ = {
         "campaign_id": args.campaign,
         "frozen_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
         f"benchmark_{args.campaign}_protocol_commit": _commit(),
         f"benchmark_{args.campaign}_instrument_commit": _commit(),
-        "working_tree_clean_at_freeze": not dreck,
+        "working_tree_clean_at_freeze": not debris,
         "note": args.note or "",
-        "frozen_paths": GEFROREN,
-        "walk_problems": probleme,
-        "environment": _env_aufnahme(),
-        "digests": stempel_digeste,
+        "frozen_paths": FROZEN,
+        "walk_problems": problems,
+        "environment": _env_capture(),
+        "digests": stamp_digests,
     }
-    if ziel.exists():
+    if target.exists():
         # Never overwritten. A re-freeze of a campaign that already has one is
         # either a mistake or a new campaign, and both deserve to be visible.
-        stempel = datetime.now(UTC).strftime("%Y-%m-%dT%H-%M-%SZ")
-        geparkt = ziel.with_name(f"{ziel.name}.v{stempel}")
-        ziel.rename(geparkt)
-        daten["replaces"] = geparkt.name
-        print(f"parked the previous registration as {geparkt.name}")
-    ziel.parent.mkdir(parents=True, exist_ok=True)
-    ziel.write_text(json.dumps(daten, indent=2) + "\n", encoding="utf-8")
-    print(f"froze {len(daten['digests'])} file(s) for campaign "
+        stamp = datetime.now(UTC).strftime("%Y-%m-%dT%H-%M-%SZ")
+        parked = target.with_name(f"{target.name}.v{stamp}")
+        target.rename(parked)
+        data_["replaces"] = parked.name
+        print(f"parked the previous registration as {parked.name}")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps(data_, indent=2) + "\n", encoding="utf-8")
+    print(f"froze {len(data_['digests'])} file(s) for campaign "
           f"{args.campaign} at "
-          f"{daten[f'benchmark_{args.campaign}_protocol_commit'][:12]}")
-    for x in probleme:
+          f"{data_[f'benchmark_{args.campaign}_protocol_commit'][:12]}")
+    for x in problems:
         print(f"  problem: {x}")
-    print(f"wrote {ziel.relative_to(HOH)}")
+    print(f"wrote {target.relative_to(HOH)}")
     return 0
 
 
-def _verfolgt(rel: str) -> bool:
+def _tracked(rel: str) -> bool:
     """Is this path committed? A registration that exists only in a working
     directory is a draft, not a pre-registration."""
     return subprocess.run(
@@ -290,62 +290,62 @@ def _verfolgt(rel: str) -> bool:
         capture_output=True, text=True, check=False).returncode == 0
 
 
-def _commit_feld(reg: dict, kampagne: str, art: str) -> str:
-    return str(reg.get(f"benchmark_{kampagne}_{art}_commit")
+def _commit_field(reg: dict, campaign_: str, art: str) -> str:
+    return str(reg.get(f"benchmark_{campaign_}_{art}_commit")
                or reg.get(f"{art}_commit") or "").strip()
 
 
-def vergleich(kampagne: str) -> dict:
-    ziel = pfad_fuer(kampagne)
-    if not ziel.is_file():
-        return {"campaign_id": kampagne, "registered": False,
+def comparison(campaign_: str) -> dict:
+    target = path_for(campaign_)
+    if not target.is_file():
+        return {"campaign_id": campaign_, "registered": False,
                 "verdict": "NOT_REGISTERED",
-                "detail": f"no {ziel.relative_to(HOH)}"}
-    reg = json.loads(ziel.read_text())
-    alt = reg.get("digests") or {}
-    neu, probleme = digeste()
-    geaendert = sorted(k for k in alt if k in neu and alt[k] != neu[k])
-    verschwunden = sorted(k for k in alt if k not in neu)
-    dazu = sorted(k for k in neu if k not in alt)
+                "detail": f"no {target.relative_to(HOH)}"}
+    reg = json.loads(target.read_text())
+    old = reg.get("digests") or {}
+    fresh, problems = digeste()
+    changed = sorted(k for k in old if k in fresh and old[k] != fresh[k])
+    vanished = sorted(k for k in old if k not in fresh)
+    alongside = sorted(k for k in fresh if k not in old)
 
-    protokoll = _commit_feld(reg, kampagne, "protocol")
-    instrument = _commit_feld(reg, kampagne, "instrument")
+    log_ = _commit_field(reg, campaign_, "protocol")
+    instrument = _commit_field(reg, campaign_, "instrument")
     # The protocol says this compares the working tree against both commits.
     # It did not: it compared digests and never invoked git, while the
     # repetition count is read out of the commit the registration names. So a
     # rewritten commit field redefined the campaign with no drift signal.
-    im_commit = digeste_im_commit(protokoll) if protokoll else {}
-    commit_abweichung = sorted(
-        k for k in alt
-        if k in im_commit and im_commit[k] != alt[k]
-        and not alt[k].startswith("SYMLINK:"))
-    commit_fehlt = sorted(k for k in alt
-                          if k not in im_commit and alt[k] != "ABSENT")
+    in_commit = digests_in_commit(log_) if log_ else {}
+    commit_deviation = sorted(
+        k for k in old
+        if k in in_commit and in_commit[k] != old[k]
+        and not old[k].startswith("SYMLINK:"))
+    commit_missing = sorted(k for k in old
+                          if k not in in_commit and old[k] != "ABSENT")
     # And the registration itself: tracked, committed, unmodified. An
     # untracked or dirty registration is a pre-registration that exists only
     # in someone's working directory.
-    rel = str(ziel.relative_to(HOH))
-    dreck = [z for z in _schmutzig() if rel in z]
-    verfolgt = _verfolgt(rel)
+    rel = str(target.relative_to(HOH))
+    debris = [z for z in _dirty() if rel in z]
+    tracked_ = _tracked(rel)
 
-    ok = not (geaendert or verschwunden or dazu or probleme
-              or commit_abweichung or commit_fehlt or dreck or not verfolgt
-              or not protokoll or not reg.get("working_tree_clean_at_freeze"))
+    ok = not (changed or vanished or alongside or problems
+              or commit_deviation or commit_missing or debris or not tracked_
+              or not log_ or not reg.get("working_tree_clean_at_freeze"))
     return {
-        "campaign_id": kampagne,
+        "campaign_id": campaign_,
         "registered": True,
         "frozen_at": reg.get("frozen_at"),
-        "protocol_commit": protokoll,
+        "protocol_commit": log_,
         "instrument_commit": instrument,
-        "files_frozen": len(alt),
-        "changed": geaendert,
-        "removed": verschwunden,
-        "added": dazu,
-        "walk_problems": probleme,
-        "differs_from_the_named_commit": commit_abweichung,
-        "not_in_the_named_commit": commit_fehlt,
-        "registration_is_tracked": verfolgt,
-        "registration_is_clean": not dreck,
+        "files_frozen": len(old),
+        "changed": changed,
+        "removed": vanished,
+        "added": alongside,
+        "walk_problems": problems,
+        "differs_from_the_named_commit": commit_deviation,
+        "not_in_the_named_commit": commit_missing,
+        "registration_is_tracked": tracked_,
+        "registration_is_clean": not debris,
         "working_tree_clean_at_freeze": bool(
             reg.get("working_tree_clean_at_freeze")),
         "replaces": reg.get("replaces", ""),
@@ -355,7 +355,7 @@ def vergleich(kampagne: str) -> dict:
 
 
 def cmd_check(args) -> int:
-    v = vergleich(args.campaign)
+    v = comparison(args.campaign)
     if args.json:
         print(json.dumps(v, indent=2))
     else:

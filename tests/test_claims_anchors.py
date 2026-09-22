@@ -1953,23 +1953,23 @@ def test_render_markdown_real_ledger_no_claim_begins_mid_sentence(tmp_path):
     # Beide Richtungen der **-Unterscheidung, damit die Reparatur von 2026-09-10
     # nicht stillschweigend zurueckfaellt: ein oeffnendes ** mit langer
     # Einleitung darf NICHT als Fortsetzung gelten, ein schliessendes ** schon.
-    _oeffnend = (
+    _opening = (
         "**Multi-day orchestrated operation is demonstrated; long-duration "
         "operation without intervention is not.** The campaign behind this "
         "paper ran 65 runs."
     )
-    assert len(_oeffnend.split("**")[1]) > 80, (
+    assert len(_opening.split("**")[1]) > 80, (
         "die Einleitung muss laenger als das alte 80-Zeichen-Fenster sein, "
         "sonst prueft dieser Fall die Reparatur gar nicht"
     )
-    assert not starts_mid_sentence(_oeffnend), (
+    assert not starts_mid_sentence(_opening), (
         "ein oeffnendes ** mit Einleitung ueber 80 Zeichen wurde wieder als "
         "Fortsetzung gewertet -- die Regression von C-142 ist zurueck"
     )
     # Nur Leerraum nach ** heisst Fortsetzung. Jeder Fall hier war unter der
     # verworfenen Positivliste ein Falsch-Positiv; ein adversariales Review
     # fand am 2026-09-10 zehn solche Stellen im Repository selbst, `„` voran.
-    for _anfang in (
+    for _beginning in (
         "**\u201eZitat\u201c am Satzanfang** und der Rest des Satzes.",
         "***fett-kursiv*** beginnt hier einen Satz.",
         "**~~ueberholt~~ ersetzt** durch die neue Fassung.",
@@ -1979,18 +1979,18 @@ def test_render_markdown_real_ledger_no_claim_begins_mid_sentence(tmp_path):
         "**65 Laeufe** trugen 1.988 Belege.",
         "**\\_wortwoertlich\\_ gesetzt** von einem der Pruefer.",
     ):
-        assert not starts_mid_sentence(_anfang), (
-            f"{_anfang[:40]!r} beginnt einen Satz, wurde aber als Fortsetzung "
+        assert not starts_mid_sentence(_beginning), (
+            f"{_beginning[:40]!r} beginnt einen Satz, wurde aber als Fortsetzung "
             "gewertet -- die verworfene Positivliste ist zurueck"
         )
-    for _fortsetzung in (
+    for _continuation in (
         "** and the remainder of a sentence that began on an earlier line.",
         "**\tnach einem Tabulator geht derselbe Satz weiter.",
         "**\nund nach einem Zeilenumbruch ebenso.",
         "**",
     ):
-        assert starts_mid_sentence(_fortsetzung), (
-            f"{_fortsetzung[:30]!r} ist eine Fortsetzung und muss gemeldet werden"
+        assert starts_mid_sentence(_continuation), (
+            f"{_continuation[:30]!r} ist eine Fortsetzung und muss gemeldet werden"
         )
 
     def _render_with_root(ledger: dict, root: Path) -> str:
@@ -2164,17 +2164,17 @@ def test_a_claim_quoting_a_source_line_is_still_checked_against_it():
     import sys as _sys
     from pathlib import Path as _Path
 
-    wurzel = _Path(__file__).resolve().parent.parent
+    base = _Path(__file__).resolve().parent.parent
     spec = importlib.util.spec_from_file_location(
-        "audit_refs_probe", wurzel / "tools" / "audit_refs.py")
+        "audit_refs_probe", base / "tools" / "audit_refs.py")
     mod = importlib.util.module_from_spec(spec)
     _sys.modules.setdefault("audit_refs_probe", mod)
     spec.loader.exec_module(mod)
 
-    quelle = __import__("inspect").getsource(mod.cmd_claims_against_code)
-    assert "hier_verankert" in quelle, "the rule lost its discriminator"
-    assert 'claim.get("where", "").split(":")[0] == path' in quelle, (
+    source_file = __import__("inspect").getsource(mod.cmd_claims_against_code)
+    assert "hier_verankert" in source_file, "the rule lost its discriminator"
+    assert 'claim.get("where", "").split(":")[0] == path' in source_file, (
         "the rule no longer asks whether the claim is anchored in the file it "
         "cites, so it either fires on everything or on nothing")
-    assert "anchor_digest no longer resolves anywhere in" in quelle, (
+    assert "anchor_digest no longer resolves anywhere in" in source_file, (
         "the rule itself is gone, not narrowed")

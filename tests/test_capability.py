@@ -44,7 +44,7 @@ from hoh.capability import (
 
 
 @pytest.fixture
-def welt(tmp_path):
+def world(tmp_path):
     """An arena root shaped like a real run's."""
     arenas = tmp_path / "_arenas" / "r"
     planner_root = arenas / "planner"
@@ -63,10 +63,10 @@ def welt(tmp_path):
     }
 
 
-def planner(welt, protected=None):
+def planner(world, protected=None):
     return planner_policy(
-        read_copy=welt["planner_root"], answer=welt["answer"],
-        protected=protected if protected is not None else (welt["candidate"],),
+        read_copy=world["planner_root"], answer=world["answer"],
+        protected=protected if protected is not None else (world["candidate"],),
     )
 
 
@@ -75,15 +75,15 @@ def planner(welt, protected=None):
 # --------------------------------------------------------------------------- #
 
 
-def test_the_candidate_arena_is_not_a_sibling_of_the_planners_copy(welt):
+def test_the_candidate_arena_is_not_a_sibling_of_the_planners_copy(world):
     """The finding itself. The planner's copy used to sit directly under the
     arena root, next to every candidate arena."""
-    geschwister = {p.name for p in welt["planner_root"].iterdir()}
-    assert welt["candidate"].name not in geschwister
-    assert welt["candidate"].parent != welt["planner_root"]
+    siblings = {p.name for p in world["planner_root"].iterdir()}
+    assert world["candidate"].name not in siblings
+    assert world["candidate"].parent != world["planner_root"]
 
 
-def test_the_planner_may_write_its_own_answer_and_no_other(welt):
+def test_the_planner_may_write_its_own_answer_and_no_other(world):
     """Not the answers directory -- the answer file.
 
     Every role answers into the same directory, so a write scope of
@@ -91,11 +91,11 @@ def test_the_planner_may_write_its_own_answer_and_no_other(welt):
     the file, and a reviewer comparing the policy to the prompt now reads the
     same thing in both.
     """
-    p = planner(welt)
-    assert p.may_write(welt["answer"])
-    assert not p.may_write(welt["answer"].parent / "i1-a1-qa.json")
-    assert not p.may_write(welt["candidate"] / "roman.py")
-    assert not p.may_write(welt["arenas"] / "anything")
+    p = planner(world)
+    assert p.may_write(world["answer"])
+    assert not p.may_write(world["answer"].parent / "i1-a1-qa.json")
+    assert not p.may_write(world["candidate"] / "roman.py")
+    assert not p.may_write(world["arenas"] / "anything")
 
 
 # --------------------------------------------------------------------------- #
@@ -103,109 +103,109 @@ def test_the_planner_may_write_its_own_answer_and_no_other(welt):
 # --------------------------------------------------------------------------- #
 
 
-def _angriff(welt, tun) -> list[str]:
+def _attack(world, do_) -> list[str]:
     """Takes a witness, performs `tun`, returns the violations."""
-    zeuge = CapabilityWitness.take(planner(welt))
-    tun()
-    return zeuge.violations()
+    witness_ = CapabilityWitness.take(planner(world))
+    do_()
+    return witness_.violations()
 
 
-def test_overwriting_a_source_file_is_caught(welt):
-    def tun():
-        (welt["candidate"] / "roman.py").write_text("def to_roman(n):\n    return 'X'\n")
+def test_overwriting_a_source_file_is_caught(world):
+    def do_():
+        (world["candidate"] / "roman.py").write_text("def to_roman(n):\n    return 'X'\n")
 
-    assert _angriff(welt, tun), "an overwritten source file went unnoticed"
-
-
-def test_moving_a_source_file_is_caught(welt):
-    def tun():
-        (welt["candidate"] / "roman.py").rename(welt["candidate"] / "roman.py.bak")
-
-    assert _angriff(welt, tun)
+    assert _attack(world, do_), "an overwritten source file went unnoticed"
 
 
-def test_creating_an_implementation_file_is_caught(welt):
-    def tun():
-        (welt["candidate"] / "impl.py").write_text("x = 1\n")
+def test_moving_a_source_file_is_caught(world):
+    def do_():
+        (world["candidate"] / "roman.py").rename(world["candidate"] / "roman.py.bak")
 
-    assert _angriff(welt, tun)
-
-
-def test_deleting_a_file_is_caught(welt):
-    def tun():
-        (welt["candidate"] / "tests" / "test_roman.py").unlink()
-
-    assert _angriff(welt, tun)
+    assert _attack(world, do_)
 
 
-def test_a_git_commit_in_the_protected_tree_is_caught(welt):
-    subprocess.run(["git", "init", "-q"], cwd=welt["candidate"], check=True)
-    zeuge = CapabilityWitness.take(planner(welt))
-    subprocess.run(["git", "add", "-A"], cwd=welt["candidate"], check=True)
+def test_creating_an_implementation_file_is_caught(world):
+    def do_():
+        (world["candidate"] / "impl.py").write_text("x = 1\n")
+
+    assert _attack(world, do_)
+
+
+def test_deleting_a_file_is_caught(world):
+    def do_():
+        (world["candidate"] / "tests" / "test_roman.py").unlink()
+
+    assert _attack(world, do_)
+
+
+def test_a_git_commit_in_the_protected_tree_is_caught(world):
+    subprocess.run(["git", "init", "-q"], cwd=world["candidate"], check=True)
+    witness_ = CapabilityWitness.take(planner(world))
+    subprocess.run(["git", "add", "-A"], cwd=world["candidate"], check=True)
     subprocess.run(
         ["git", "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", "x"],
-        cwd=welt["candidate"], check=True,
+        cwd=world["candidate"], check=True,
     )
-    assert zeuge.violations(), "a commit inside the protected tree went unnoticed"
+    assert witness_.violations(), "a commit inside the protected tree went unnoticed"
 
 
-def test_shell_redirection_into_the_protected_tree_is_caught(welt):
-    def tun():
+def test_shell_redirection_into_the_protected_tree_is_caught(world):
+    def do_():
         subprocess.run(
-            ["/bin/bash", "-c", f"echo tampered >> {welt['candidate']}/roman.py"],
+            ["/bin/bash", "-c", f"echo tampered >> {world['candidate']}/roman.py"],
             check=True,
         )
 
-    assert _angriff(welt, tun)
+    assert _attack(world, do_)
 
 
-def test_a_python_script_writing_into_the_tree_is_caught(welt):
-    def tun():
+def test_a_python_script_writing_into_the_tree_is_caught(world):
+    def do_():
         subprocess.run(
             ["python3", "-c",
-             f"open({str(welt['candidate'] / 'roman.py')!r}, 'a').write('# x\\n')"],
+             f"open({str(world['candidate'] / 'roman.py')!r}, 'a').write('# x\\n')"],
             check=True,
         )
 
-    assert _angriff(welt, tun)
+    assert _attack(world, do_)
 
 
-def test_a_symlink_planted_in_the_tree_is_caught(welt):
+def test_a_symlink_planted_in_the_tree_is_caught(world):
     """The digest records symlinks by name and target, so planting one is a
     change even though it adds no file content."""
-    def tun():
-        (welt["candidate"] / "shortcut").symlink_to(welt["copy"] / "roman.py")
+    def do_():
+        (world["candidate"] / "shortcut").symlink_to(world["copy"] / "roman.py")
 
-    assert _angriff(welt, tun)
-
-
-def test_a_dotdot_escape_from_the_planners_copy_is_caught(welt):
-    def tun():
-        ziel = welt["copy"] / ".." / ".." / welt["candidate"].name / "roman.py"
-        ziel.write_text("# reached via ..\n")
-
-    assert _angriff(welt, tun)
+    assert _attack(world, do_)
 
 
-def test_an_absolute_path_write_is_caught(welt):
-    def tun():
-        Path(str(welt["candidate"] / "roman.py")).write_text("# absolute\n")
+def test_a_dotdot_escape_from_the_planners_copy_is_caught(world):
+    def do_():
+        target = world["copy"] / ".." / ".." / world["candidate"].name / "roman.py"
+        target.write_text("# reached via ..\n")
 
-    assert _angriff(welt, tun)
+    assert _attack(world, do_)
 
 
-def test_a_temporary_file_moved_in_afterwards_is_caught(welt):
+def test_an_absolute_path_write_is_caught(world):
+    def do_():
+        Path(str(world["candidate"] / "roman.py")).write_text("# absolute\n")
+
+    assert _attack(world, do_)
+
+
+def test_a_temporary_file_moved_in_afterwards_is_caught(world):
     """The one that placement alone would miss: nothing is written *into* the
     tree until the last moment."""
-    def tun():
-        tmp = welt["copy"] / "staged.py"
+    def do_():
+        tmp = world["copy"] / "staged.py"
         tmp.write_text("def to_roman(n):\n    return 'I' * n\n")
-        tmp.rename(welt["candidate"] / "staged.py")
+        tmp.rename(world["candidate"] / "staged.py")
 
-    assert _angriff(welt, tun)
+    assert _attack(world, do_)
 
 
-def test_a_read_permission_change_alone_is_not_reported(welt):
+def test_a_read_permission_change_alone_is_not_reported(world):
     """Honest about exactly what the check sees, which changed.
 
     The digest records the **executable** bit, because that is the one whose
@@ -218,19 +218,19 @@ def test_a_read_permission_change_alone_is_not_reported(welt):
     executable bit. The two are not in tension: one says what is watched, the
     other says what is not.
     """
-    def tun():
-        os.chmod(welt["candidate"] / "roman.py", 0o444)
+    def do_():
+        os.chmod(world["candidate"] / "roman.py", 0o444)
 
-    assert _angriff(welt, tun) == []
+    assert _attack(world, do_) == []
 
 
-def test_making_a_source_file_executable_is_reported(welt):
+def test_making_a_source_file_executable_is_reported(world):
     """The half of the mode that changes what a tree can do."""
-    def tun():
-        os.chmod(welt["candidate"] / "roman.py", 0o755)
+    def do_():
+        os.chmod(world["candidate"] / "roman.py", 0o755)
 
-    (meldung,) = _angriff(welt, tun)
-    assert str(welt["candidate"]) in meldung
+    (message_,) = _attack(world, do_)
+    assert str(world["candidate"]) in message_
 
 
 # --------------------------------------------------------------------------- #
@@ -238,36 +238,36 @@ def test_making_a_source_file_executable_is_reported(welt):
 # --------------------------------------------------------------------------- #
 
 
-def test_reading_the_candidate_is_not_a_violation(welt):
-    def tun():
-        (welt["candidate"] / "roman.py").read_text()
-        (welt["candidate"] / "tests" / "test_roman.py").read_text()
+def test_reading_the_candidate_is_not_a_violation(world):
+    def do_():
+        (world["candidate"] / "roman.py").read_text()
+        (world["candidate"] / "tests" / "test_roman.py").read_text()
 
-    assert _angriff(welt, tun) == []
+    assert _attack(world, do_) == []
 
 
-def test_writing_in_its_own_copy_is_not_a_violation(welt):
+def test_writing_in_its_own_copy_is_not_a_violation(world):
     """The copy is the planner's and is discarded. Making it read-only would
     only invite a chmod; what matters is that it is not the candidate."""
-    def tun():
-        (welt["copy"] / "scratch.py").write_text("notes\n")
-        (welt["copy"] / "roman.py").write_text("# my own copy\n")
+    def do_():
+        (world["copy"] / "scratch.py").write_text("notes\n")
+        (world["copy"] / "roman.py").write_text("# my own copy\n")
 
-    assert _angriff(welt, tun) == []
-
-
-def test_writing_its_answer_is_not_a_violation(welt):
-    def tun():
-        welt["answer"].write_text('{"objective": "x"}')
-
-    assert _angriff(welt, tun) == []
+    assert _attack(world, do_) == []
 
 
-def test_running_a_process_is_not_a_violation_by_itself(welt):
-    def tun():
+def test_writing_its_answer_is_not_a_violation(world):
+    def do_():
+        world["answer"].write_text('{"objective": "x"}')
+
+    assert _attack(world, do_) == []
+
+
+def test_running_a_process_is_not_a_violation_by_itself(world):
+    def do_():
         subprocess.run(["python3", "-c", "print(1)"], capture_output=True, check=True)
 
-    assert _angriff(welt, tun) == []
+    assert _attack(world, do_) == []
 
 
 # --------------------------------------------------------------------------- #
@@ -275,13 +275,13 @@ def test_running_a_process_is_not_a_violation_by_itself(welt):
 # --------------------------------------------------------------------------- #
 
 
-def test_an_unnamed_role_gets_nothing(welt):
+def test_an_unnamed_role_gets_nothing(world):
     """Fail-closed: adding a role without deciding what it may do must stop
     the run rather than inherit the last role's rights."""
-    p = denied_policy("mystery", protected=(welt["candidate"],))
+    p = denied_policy("mystery", protected=(world["candidate"],))
     for cap in Capability:
         assert not p.allows(cap), cap.value
-    assert not p.may_write(welt["answer"])
+    assert not p.may_write(world["answer"])
     assert p.write_scopes == ()
 
 
@@ -292,33 +292,33 @@ def test_a_bare_policy_permits_nothing():
     assert p.isolation == "none"
 
 
-def test_the_developer_is_the_only_role_that_writes_the_artifact(welt):
-    entwickler = developer_policy(arena=welt["arenas"], answer=welt["answer"])
-    prueferin = qa_policy(arena=welt["arenas"], answer=welt["answer"])
-    planerin = planner(welt)
+def test_the_developer_is_the_only_role_that_writes_the_artifact(world):
+    developer_ = developer_policy(arena=world["arenas"], answer=world["answer"])
+    checker = qa_policy(arena=world["arenas"], answer=world["answer"])
+    planner_role = planner(world)
 
-    assert entwickler.may_write(welt["candidate"] / "roman.py")
-    assert not prueferin.may_write(welt["candidate"] / "roman.py")
-    assert not planerin.may_write(welt["candidate"] / "roman.py")
+    assert developer_.may_write(world["candidate"] / "roman.py")
+    assert not checker.may_write(world["candidate"] / "roman.py")
+    assert not planner_role.may_write(world["candidate"] / "roman.py")
 
 
-def test_no_role_may_write_git_or_reach_the_network(welt):
-    for p in (planner(welt),
-              developer_policy(arena=welt["arenas"], answer=welt["answer"]),
-              qa_policy(arena=welt["arenas"], answer=welt["answer"])):
+def test_no_role_may_write_git_or_reach_the_network(world):
+    for p in (planner(world),
+              developer_policy(arena=world["arenas"], answer=world["answer"]),
+              qa_policy(arena=world["arenas"], answer=world["answer"])):
         assert not p.allows(Capability.GIT_WRITE), p.role
         assert not p.allows(Capability.NETWORK), p.role
 
 
-def test_every_role_names_the_one_file_its_answer_comes_from(welt):
-    for p in (planner(welt),
-              developer_policy(arena=welt["arenas"], answer=welt["answer"]),
-              qa_policy(arena=welt["arenas"], answer=welt["answer"])):
-        assert p.output_channel == welt["answer"], p.role
+def test_every_role_names_the_one_file_its_answer_comes_from(world):
+    for p in (planner(world),
+              developer_policy(arena=world["arenas"], answer=world["answer"]),
+              qa_policy(arena=world["arenas"], answer=world["answer"])):
+        assert p.output_channel == world["answer"], p.role
 
 
-def test_the_summary_says_what_the_role_may_do(welt):
-    text = planner(welt).summary()
+def test_the_summary_says_what_the_role_may_do(world):
+    text = planner(world).summary()
     assert "planner" in text and "fs_read" in text and "git_read" in text
     assert "git_write" not in text and "network" not in text
 
@@ -329,20 +329,20 @@ def test_the_summary_says_what_the_role_may_do(welt):
 
 
 def test_an_absent_tree_and_an_empty_tree_are_told_apart(tmp_path):
-    fehlt = tmp_path / "nope"
-    leer = tmp_path / "leer"
-    leer.mkdir()
-    assert tree_digest(fehlt) == ""
-    assert tree_digest(leer) != ""
+    missing = tmp_path / "nope"
+    empty = tmp_path / "leer"
+    empty.mkdir()
+    assert tree_digest(missing) == ""
+    assert tree_digest(empty) != ""
 
 
 def test_a_rename_changes_the_digest(tmp_path):
     d = tmp_path / "t"
     d.mkdir()
     (d / "a.py").write_text("x = 1\n")
-    vorher = tree_digest(d)
+    before = tree_digest(d)
     (d / "a.py").rename(d / "b.py")
-    assert tree_digest(d) != vorher, "a rename left the digest unchanged"
+    assert tree_digest(d) != before, "a rename left the digest unchanged"
 
 
 def test_bytecode_counts_as_a_change(tmp_path):
@@ -361,9 +361,9 @@ def test_bytecode_counts_as_a_change(tmp_path):
     d = tmp_path / "t"
     (d / "__pycache__").mkdir(parents=True)
     (d / "a.py").write_text("x = 1\n")
-    vorher = tree_digest(d)
+    before = tree_digest(d)
     (d / "__pycache__" / "a.cpython-313.pyc").write_bytes(b"\x00\x01")
-    assert tree_digest(d) != vorher
+    assert tree_digest(d) != before
 
 
 def test_an_empty_directory_counts_as_a_change(tmp_path):
@@ -371,9 +371,9 @@ def test_an_empty_directory_counts_as_a_change(tmp_path):
     d = tmp_path / "t"
     d.mkdir()
     (d / "a.py").write_text("x = 1\n")
-    vorher = tree_digest(d)
+    before = tree_digest(d)
     (d / "staging").mkdir()
-    assert tree_digest(d) != vorher
+    assert tree_digest(d) != before
 
 
 def test_a_mode_change_counts_as_a_change(tmp_path):
@@ -381,9 +381,9 @@ def test_a_mode_change_counts_as_a_change(tmp_path):
     d = tmp_path / "t"
     d.mkdir()
     (d / "a.py").write_text("x = 1\n")
-    vorher = tree_digest(d)
+    before = tree_digest(d)
     (d / "a.py").chmod(0o755)
-    assert tree_digest(d) != vorher
+    assert tree_digest(d) != before
 
 
 def test_a_single_file_can_be_protected(tmp_path):
@@ -396,25 +396,25 @@ def test_a_single_file_can_be_protected(tmp_path):
     """
     f = tmp_path / "checks.json"
     f.write_text('{"checks": []}')
-    vorher = tree_digest(f)
-    assert vorher
+    before = tree_digest(f)
+    assert before
     f.write_text('{"checks": ["K1"]}')
-    assert tree_digest(f) != vorher
+    assert tree_digest(f) != before
 
 
-def test_the_violation_names_the_tree_and_both_digests(welt):
-    zeuge = CapabilityWitness.take(planner(welt))
-    (welt["candidate"] / "roman.py").write_text("tampered\n")
-    (meldung,) = zeuge.violations()
-    assert str(welt["candidate"]) in meldung
-    assert "planner" in meldung
-    assert "->" in meldung
+def test_the_violation_names_the_tree_and_both_digests(world):
+    witness_ = CapabilityWitness.take(planner(world))
+    (world["candidate"] / "roman.py").write_text("tampered\n")
+    (message_,) = witness_.violations()
+    assert str(world["candidate"]) in message_
+    assert "planner" in message_
+    assert "->" in message_
 
 
-def test_a_witness_over_nothing_reports_nothing(welt):
-    zeuge = CapabilityWitness.take(planner(welt, protected=()))
-    (welt["candidate"] / "roman.py").write_text("tampered\n")
-    assert zeuge.violations() == [], (
+def test_a_witness_over_nothing_reports_nothing(world):
+    witness_ = CapabilityWitness.take(planner(world, protected=()))
+    (world["candidate"] / "roman.py").write_text("tampered\n")
+    assert witness_.violations() == [], (
         "a policy that protects nothing must not invent a violation -- the "
         "control for every test above"
     )
@@ -445,29 +445,29 @@ def test_a_written_answer_means_the_role_answered(tmp_path):
     left at an input prompt. A role answers through exactly one file, so that
     is where the question is decided -- not in a screen scrape."""
     d, Role = _dispatcher(tmp_path)
-    pfad = d.answers_dir / "i1-a0-planner.json"
-    pfad.write_text('{"objective": "implement fib"}')
-    assert d._answered(pfad, Role.PLANNER)
+    file_path = d.answers_dir / "i1-a0-planner.json"
+    file_path.write_text('{"objective": "implement fib"}')
+    assert d._answered(file_path, Role.PLANNER)
 
 
 def test_a_missing_or_empty_answer_means_it_did_not(tmp_path):
     """The control. A planner stopped at a trust dialog writes nothing, and
     that case must still block."""
     d, Role = _dispatcher(tmp_path)
-    fehlt = d.answers_dir / "nope.json"
-    assert not d._answered(fehlt, Role.PLANNER)
-    leer = d.answers_dir / "empty.json"
-    leer.write_text("   \n")
-    assert not d._answered(leer, Role.PLANNER)
+    missing = d.answers_dir / "nope.json"
+    assert not d._answered(missing, Role.PLANNER)
+    empty = d.answers_dir / "empty.json"
+    empty.write_text("   \n")
+    assert not d._answered(empty, Role.PLANNER)
 
 
 def test_an_unstructured_role_does_not_answer_through_a_file(tmp_path):
     """Only the structured roles have a declared output channel. Treating a
     developer's file as its answer would accept a half-written one."""
     d, Role = _dispatcher(tmp_path)
-    pfad = d.answers_dir / "dev.json"
-    pfad.write_text("something")
-    assert not d._answered(pfad, Role.DEVELOPER)
+    file_path = d.answers_dir / "dev.json"
+    file_path.write_text("something")
+    assert not d._answered(file_path, Role.DEVELOPER)
 
 
 def test_an_unstructured_role_delivers_by_changing_the_arena(tmp_path):
@@ -484,11 +484,11 @@ def test_an_unstructured_role_delivers_by_changing_the_arena(tmp_path):
     arena.mkdir()
     (arena / "fib.py").write_text("def fib(n):\n    raise NotImplementedError\n")
     d.role_cwd = {Role.DEVELOPER: str(arena)}
-    vorher = tree_digest(arena)
+    before = tree_digest(arena)
 
-    assert not d._delivered(Role.DEVELOPER, vorher), "nothing changed yet"
+    assert not d._delivered(Role.DEVELOPER, before), "nothing changed yet"
     (arena / "fib.py").write_text("def fib(n):\n    return n\n")
-    assert d._delivered(Role.DEVELOPER, vorher)
+    assert d._delivered(Role.DEVELOPER, before)
 
 
 def test_a_structured_role_is_not_judged_by_the_arena(tmp_path):
@@ -520,36 +520,36 @@ def test_a_commit_in_a_linked_worktree_moves_the_git_digest(tmp_path):
 
     from hoh.capability import git_state_digest
 
-    umgebung = {
+    environment_ = {
         "PATH": "/usr/bin:/bin", "HOME": str(tmp_path),
         "GIT_CONFIG_GLOBAL": "/dev/null",
         "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@local",
         "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@local",
     }
 
-    def git(wo, *args):
-        subprocess.run(["git", "-C", str(wo), *args], check=True,
-                       capture_output=True, env=umgebung)
+    def git(where, *args):
+        subprocess.run(["git", "-C", str(where), *args], check=True,
+                       capture_output=True, env=environment_)
 
-    haupt = tmp_path / "main"
-    haupt.mkdir()
-    (haupt / "a.py").write_text("x = 1\n")
-    git(haupt, "init", "-q", "-b", "main")
-    git(haupt, "add", "-A")
-    git(haupt, "commit", "-qm", "init")
+    main_ = tmp_path / "main"
+    main_.mkdir()
+    (main_ / "a.py").write_text("x = 1\n")
+    git(main_, "init", "-q", "-b", "main")
+    git(main_, "add", "-A")
+    git(main_, "commit", "-qm", "init")
 
-    arbeit = tmp_path / "wt"
-    git(haupt, "worktree", "add", "-q", "-b", "arbeit", str(arbeit))
-    assert (arbeit / ".git").is_file(), "not a linked worktree"
+    work_ = tmp_path / "wt"
+    git(main_, "worktree", "add", "-q", "-b", "arbeit", str(work_))
+    assert (work_ / ".git").is_file(), "not a linked worktree"
 
-    vorher = git_state_digest(arbeit)
-    assert vorher
+    before = git_state_digest(work_)
+    assert before
 
-    (arbeit / "a.py").write_text("x = 2\n")
-    git(arbeit, "add", "-A")
-    git(arbeit, "commit", "-qm", "a commit in the worktree")
+    (work_ / "a.py").write_text("x = 2\n")
+    git(work_, "add", "-A")
+    git(work_, "commit", "-qm", "a commit in the worktree")
 
-    assert git_state_digest(arbeit) != vorher, (
+    assert git_state_digest(work_) != before, (
         "a commit in a linked worktree left the git digest unchanged")
 
 
@@ -564,7 +564,7 @@ def test_reading_a_repository_does_not_move_the_git_digest(tmp_path):
 
     from hoh.capability import git_state_digest
 
-    umgebung = {
+    environment_ = {
         "PATH": "/usr/bin:/bin", "HOME": str(tmp_path),
         "GIT_CONFIG_GLOBAL": "/dev/null",
         "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@local",
@@ -576,12 +576,12 @@ def test_reading_a_repository_does_not_move_the_git_digest(tmp_path):
     for args in (("init", "-q", "-b", "main"), ("add", "-A"),
                  ("commit", "-qm", "init")):
         subprocess.run(["git", "-C", str(repo), *args], check=True,
-                       capture_output=True, env=umgebung)
+                       capture_output=True, env=environment_)
 
-    vorher = git_state_digest(repo)
+    before = git_state_digest(repo)
     subprocess.run(["git", "-C", str(repo), "status", "--porcelain"],
-                   check=True, capture_output=True, env=umgebung)
-    assert git_state_digest(repo) == vorher
+                   check=True, capture_output=True, env=environment_)
+    assert git_state_digest(repo) == before
 
 
 def test_an_export_ignore_line_moves_the_git_digest(tmp_path):
@@ -596,7 +596,7 @@ def test_an_export_ignore_line_moves_the_git_digest(tmp_path):
 
     from hoh.capability import git_state_digest
 
-    umgebung = {
+    environment_ = {
         "PATH": "/usr/bin:/bin", "HOME": str(tmp_path),
         "GIT_CONFIG_GLOBAL": "/dev/null",
         "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@local",
@@ -609,12 +609,12 @@ def test_an_export_ignore_line_moves_the_git_digest(tmp_path):
     for args in (("init", "-q", "-b", "main"), ("add", "-A"),
                  ("commit", "-qm", "init")):
         subprocess.run(["git", "-C", str(repo), *args], check=True,
-                       capture_output=True, env=umgebung)
+                       capture_output=True, env=environment_)
 
-    vorher = git_state_digest(repo)
+    before = git_state_digest(repo)
     (repo / ".git" / "info").mkdir(exist_ok=True)
     (repo / ".git" / "info" / "attributes").write_text("guard.py export-ignore\n")
-    assert git_state_digest(repo) != vorher
+    assert git_state_digest(repo) != before
 
 
 def test_a_hook_or_a_config_change_moves_the_git_digest(tmp_path):
@@ -624,7 +624,7 @@ def test_a_hook_or_a_config_change_moves_the_git_digest(tmp_path):
 
     from hoh.capability import git_state_digest
 
-    umgebung = {
+    environment_ = {
         "PATH": "/usr/bin:/bin", "HOME": str(tmp_path),
         "GIT_CONFIG_GLOBAL": "/dev/null",
         "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@local",
@@ -636,16 +636,16 @@ def test_a_hook_or_a_config_change_moves_the_git_digest(tmp_path):
     for args in (("init", "-q", "-b", "main"), ("add", "-A"),
                  ("commit", "-qm", "init")):
         subprocess.run(["git", "-C", str(repo), *args], check=True,
-                       capture_output=True, env=umgebung)
+                       capture_output=True, env=environment_)
 
-    vorher = git_state_digest(repo)
+    before = git_state_digest(repo)
     (repo / ".git" / "hooks" / "post-checkout").write_text("#!/bin/sh\nexit 0\n")
-    nach_hook = git_state_digest(repo)
-    assert nach_hook != vorher
+    after_hook = git_state_digest(repo)
+    assert after_hook != before
 
     subprocess.run(["git", "-C", str(repo), "config", "core.hooksPath", ".hooks"],
-                   check=True, capture_output=True, env=umgebung)
-    assert git_state_digest(repo) != nach_hook
+                   check=True, capture_output=True, env=environment_)
+    assert git_state_digest(repo) != after_hook
 
 
 def test_the_shallow_watch_actually_reports_a_new_child(tmp_path):
@@ -653,18 +653,18 @@ def test_the_shallow_watch_actually_reports_a_new_child(tmp_path):
     shallow entry, never that a change in it is reported."""
     from hoh.capability import CapabilityWitness, RoleExecutionPolicy
 
-    wurzel = tmp_path / "arenas"
-    (wurzel / "aaaa1111").mkdir(parents=True)
-    politik = RoleExecutionPolicy(role="planner", protected_shallow=(wurzel,))
-    zeuge = CapabilityWitness.take(politik)
+    root = tmp_path / "arenas"
+    (root / "aaaa1111").mkdir(parents=True)
+    policy_ = RoleExecutionPolicy(role="planner", protected_shallow=(root,))
+    witness_ = CapabilityWitness.take(policy_)
 
-    assert zeuge.violations() == []
-    (wurzel / "staging").mkdir()
+    assert witness_.violations() == []
+    (root / "staging").mkdir()
 
-    (meldung,) = zeuge.violations()
-    assert "gained or lost a child" in meldung
-    assert str(wurzel) in meldung
-    assert "planner" in meldung
+    (message_,) = witness_.violations()
+    assert "gained or lost a child" in message_
+    assert str(root) in message_
+    assert "planner" in message_
 
 
 def test_a_repository_is_measured_the_way_the_freeze_check_measures_it(tmp_path):
@@ -679,7 +679,7 @@ def test_a_repository_is_measured_the_way_the_freeze_check_measures_it(tmp_path)
 
     from hoh.capability import repo_digest
 
-    umgebung = {
+    environment_ = {
         "PATH": "/usr/bin:/bin", "HOME": str(tmp_path),
         "GIT_CONFIG_GLOBAL": "/dev/null",
         "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@local",
@@ -692,15 +692,15 @@ def test_a_repository_is_measured_the_way_the_freeze_check_measures_it(tmp_path)
     for args in (("init", "-q", "-b", "main"), ("add", "-A"),
                  ("commit", "-qm", "init")):
         subprocess.run(["git", "-C", str(repo), *args], check=True,
-                       capture_output=True, env=umgebung)
+                       capture_output=True, env=environment_)
 
-    vorher = repo_digest(repo)
+    before = repo_digest(repo)
     (repo / "__pycache__").mkdir()
     (repo / "__pycache__" / "app.cpython-313.pyc").write_bytes(b"\x00")
-    assert repo_digest(repo) == vorher, "a gitignored file is not a difference"
+    assert repo_digest(repo) == before, "a gitignored file is not a difference"
 
     (repo / "app.py").write_text("x = 2\n")
-    assert repo_digest(repo) != vorher, "a tracked change is"
+    assert repo_digest(repo) != before, "a tracked change is"
 
 
 def test_a_directory_that_is_not_a_repository_is_still_digested_whole(tmp_path):
@@ -710,6 +710,6 @@ def test_a_directory_that_is_not_a_repository_is_still_digested_whole(tmp_path):
     d = tmp_path / "arena"
     (d / "__pycache__").mkdir(parents=True)
     (d / "a.py").write_text("x = 1\n")
-    vorher = repo_digest(d)
+    before = repo_digest(d)
     (d / "__pycache__" / "a.cpython-313.pyc").write_bytes(b"\x00")
-    assert repo_digest(d) != vorher
+    assert repo_digest(d) != before

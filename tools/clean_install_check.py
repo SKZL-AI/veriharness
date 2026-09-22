@@ -36,19 +36,19 @@ from pathlib import Path
 # A command the guard must allow, and one it must refuse. The refusal is the
 # load-bearing half: it can only work if the pattern files were packaged.
 HARMLOS = "python3 -m pytest -q"
-VERBOTEN = "nvidia-smi"
+FORBIDDEN = "nvidia-smi"
 
 
-class Schritt:
+class Step_:
     def __init__(self) -> None:
-        self.rot = 0
+        self.red = 0
 
     def __call__(self, name: str, argv: list[str], cwd: Path | None = None) -> subprocess.CompletedProcess:
         p = subprocess.run(argv, cwd=cwd, capture_output=True, text=True)
         status = "OK  " if p.returncode == 0 else "ROT "
         print(f"  {status} {name} (rc={p.returncode})")
         if p.returncode != 0:
-            self.rot += 1
+            self.red += 1
             for line in (p.stdout + p.stderr).strip().splitlines()[-8:]:
                 print(f"        {line}")
         return p
@@ -61,52 +61,52 @@ def main() -> int:
     ap.add_argument("--dist", help="test existing wheel/sdist without rebuilding them")
     args = ap.parse_args()
 
-    quelle = Path(args.source).resolve()
-    if not (quelle / "pyproject.toml").exists():
-        print(f"ROT  {quelle} carries no pyproject.toml")
+    source_file = Path(args.source).resolve()
+    if not (source_file / "pyproject.toml").exists():
+        print(f"ROT  {source_file} carries no pyproject.toml")
         return 2
 
-    arbeit = Path(tempfile.mkdtemp(prefix="hoh-clean-install-"))
-    schritt = Schritt()
+    work_ = Path(tempfile.mkdtemp(prefix="hoh-clean-install-"))
+    step_ = Step_()
     try:
-        print(f"=== clean install check, source {quelle} ===")
+        print(f"=== clean install check, source {source_file} ===")
 
         # 1. Build from a copy: building in place leaves build/ and *.egg-info
         # behind in the tree under test, which is exactly the sort of residue a
         # "clean checkout" claim must not depend on.
-        baum = arbeit / "source"
+        tree_ = work_ / "source"
         if args.dist:
             dist = Path(args.dist).resolve()
         else:
             shutil.copytree(
-                quelle, baum,
+                source_file, tree_,
                 ignore=shutil.ignore_patterns(
                     ".git", ".pytest_cache", ".ruff_cache", "__pycache__",
                     "build", "dist", "*.egg-info", "runs", "demo",
                 ),
             )
-            schritt("build wheel and sdist", [sys.executable, "-m", "build", str(baum)], cwd=baum)
-            dist = baum / "dist"
-        raeder = sorted(dist.glob("*.whl"))
-        quellen = sorted(dist.glob("*.tar.gz"))
-        print(f"  {'OK  ' if raeder else 'ROT '} wheel produced: {[w.name for w in raeder] or 'none'}")
-        print(f"  {'OK  ' if quellen else 'ROT '} sdist produced: {[s.name for s in quellen] or 'none'}")
-        if not raeder:
-            schritt.rot += 1
-            return 1 if schritt.rot else 0
+            step_("build wheel and sdist", [sys.executable, "-m", "build", str(tree_)], cwd=tree_)
+            dist = tree_ / "dist"
+        wheels = sorted(dist.glob("*.whl"))
+        sources = sorted(dist.glob("*.tar.gz"))
+        print(f"  {'OK  ' if wheels else 'ROT '} wheel produced: {[w.name for w in wheels] or 'none'}")
+        print(f"  {'OK  ' if sources else 'ROT '} sdist produced: {[s.name for s in sources] or 'none'}")
+        if not wheels:
+            step_.red += 1
+            return 1 if step_.red else 0
 
         # 2. Fresh environment. Not the ambient interpreter: the whole point is
         # to see what a stranger gets.
-        venv = arbeit / "venv"
-        schritt("create fresh venv", [sys.executable, "-m", "venv", str(venv)])
+        venv = work_ / "venv"
+        step_("create fresh venv", [sys.executable, "-m", "venv", str(venv)])
         pip = venv / "bin" / "pip"
         py = venv / "bin" / "python"
         if not pip.exists():                       # Windows layout
             pip, py = venv / "Scripts" / "pip.exe", venv / "Scripts" / "python.exe"
-        schritt("install the wheel", [str(pip), "install", "--quiet", str(raeder[0])])
+        step_("install the wheel", [str(pip), "install", "--quiet", str(wheels[0])])
 
         # 3. The console script, as an installed user would invoke it.
-        schritt("console script --help", [str(py), "-m", "hoh.cli", "--help"])
+        step_("console script --help", [str(py), "-m", "hoh.cli", "--help"])
 
         # 4/5. Read the packaged policy back out of the INSTALLED copy, then
         # exercise the guard. Written as one probe so a partial pass cannot be
@@ -122,23 +122,23 @@ def main() -> int:
             f"assert_command_allowed({HARMLOS!r})\n"
             "print('harmless command: allowed')\n"
             "try:\n"
-            f"    assert_command_allowed({VERBOTEN!r})\n"
+            f"    assert_command_allowed({FORBIDDEN!r})\n"
             "except Exception as e:\n"
             "    print('forbidden command: refused ->', type(e).__name__)\n"
             "else:\n"
             "    print('forbidden command was ALLOWED -- the guard is inert'); sys.exit(1)\n"
         )
-        p = schritt("guard works from the install", [str(py), "-c", probe])
+        p = step_("guard works from the install", [str(py), "-c", probe])
         for line in p.stdout.strip().splitlines():
             print(f"        {line}")
 
-        print(f"=== {schritt.rot} red step(s) ===")
-        return 1 if schritt.rot else 0
+        print(f"=== {step_.red} red step(s) ===")
+        return 1 if step_.red else 0
     finally:
         if args.keep:
-            print(f"    scratch kept at {arbeit}")
+            print(f"    scratch kept at {work_}")
         else:
-            shutil.rmtree(arbeit, ignore_errors=True)
+            shutil.rmtree(work_, ignore_errors=True)
 
 
 if __name__ == "__main__":

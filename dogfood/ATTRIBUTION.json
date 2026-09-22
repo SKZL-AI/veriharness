@@ -428,6 +428,39 @@
         "46da7dff2052ec72ffe7cc5b5a221bf58e837828"
       ],
       "why_not_the_product": "O186, the rule that decides which commits this ledger has to account for, and the board beside it. Outside any run by construction: a run cannot widen the rule that decides whether its own commits need attributing, and the board is the measurement a run cannot make about itself."
+    },
+    {
+      "id": "v010-final-board",
+      "category": "MAIN_ORCHESTRATOR_DIRECT",
+      "is_development_node": false,
+      "commits": [
+        "515a36c74eef861bb22033224c443653666adb93"
+      ],
+      "why_not_the_product": "The board that closes the phase, bound to CI run 35660398365 over export f2bc352. The measurement a run cannot make about itself."
+    },
+    {
+      "id": "v010-evidence-records",
+      "category": "MAIN_ORCHESTRATOR_DIRECT",
+      "is_development_node": false,
+      "commits": [
+        "6bc1f6781d61f33c898d50b9ad1720231138c8b9"
+      ],
+      "why_not_the_product": "The CI and sync records the closing board was measured against, written by exact_head_ci.py and export_sync.py and committed after the board that reads them. Outside any run: binding a CI result to a set of bytes is an act about two repositories, which no run inside one of them performs."
+    },
+    {
+      "id": "v3-3-p0-english-and-preflight",
+      "category": "MAIN_ORCHESTRATOR_DIRECT",
+      "is_development_node": false,
+      "commits": [
+        "83f1a2f90e003b75cf6da511f734a1fcd05b01bf",
+        "d01c66e4d9b44bcd0212c9f264e79fdf7b38c13a",
+        "f123f7823ca6f9c3346687b4c4acbc5d9bca1f18",
+        "7d6ed206441d3be1cb48ba3f9f1e4d2b2e7c4c1f",
+        "2196b3c2464a3e115ed76c5d85dbbf70f2910f51",
+        "9d63888c31abca150a1188c767f72c605e9338e5",
+        "514cb74685ec9f9af9b8029eb2f7a30a1778f37c"
+      ],
+      "why_not_the_product": "The English sweep (O182/O188-O191) and the V3.3 P0 preflight. Outside any run: the language of the published surface is a decision nobody dispatched, and the preflight is the instrument that decides whether a run may be started at all -- a run cannot be the thing that certifies its own environment."
     }
   ]
 }

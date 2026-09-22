@@ -144,10 +144,10 @@ def _amendment_block(reopened: list[str] | None) -> str:
     """
     if not reopened:
         return ""
-    namen = ", ".join(sorted(reopened))
+    names_ = ", ".join(sorted(reopened))
     return f"""
 /reopened-by-an-amendment
-The specification was amended, and {namen} must be planned and measured again
+The specification was amended, and {names_} must be planned and measured again
 against the **new** text. Their earlier evidence no longer supports an
 acceptance, and their earlier definitions no longer apply: write each of them
 afresh, as a criterion that would be red on the current state and green once
@@ -452,7 +452,7 @@ def extract_json(text: str) -> dict:
         raise RoleOutputError("empty answer")
 
     try:
-        return _als_objekt(json.loads(text))
+        return _as_object(json.loads(text))
     except json.JSONDecodeError:
         pass
 
@@ -464,7 +464,7 @@ def extract_json(text: str) -> dict:
     # valid JSON that comes after it.
     for fenced in _FENCE.finditer(text):
         try:
-            return _als_objekt(json.loads(fenced.group(1).strip()))
+            return _as_object(json.loads(fenced.group(1).strip()))
         except json.JSONDecodeError:
             continue
 
@@ -477,10 +477,10 @@ def extract_json(text: str) -> dict:
     except json.JSONDecodeError as exc:
         raise RoleOutputError(f"invalid JSON: {exc}") from exc
 
-    return _als_objekt(data)
+    return _as_object(data)
 
 
-def _als_objekt(data: object) -> dict:
+def _as_object(data: object) -> dict:
     if not isinstance(data, dict):
         raise RoleOutputError(f"expected a JSON object, got {type(data).__name__}")
     return data

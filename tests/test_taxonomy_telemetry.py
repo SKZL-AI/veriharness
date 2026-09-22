@@ -55,11 +55,11 @@ def test_the_table_covers_the_enum_exactly():
 def test_the_classes_do_not_all_have_the_same_policy():
     """The control for the parametrised test above: a table where every row is
     identical would pass it and would be worth nothing."""
-    verschieden = {
+    different_ = {
         (d.max_retries, d.budget, d.auto_resume, d.human_gate)
         for d in POLICY.values()
     }
-    assert len(verschieden) >= 5
+    assert len(different_) >= 5
 
 
 # --------------------------------------------------------------------------- #
@@ -120,9 +120,9 @@ def test_needs_approval_is_not_a_failure_and_is_not_retried():
 
 
 def test_backoff_doubles_and_is_capped():
-    werte = [backoff_for(FailureClass.PROVIDER_RATE_LIMIT, i) for i in range(1, 8)]
-    assert werte[:4] == [30, 60, 120, 240]
-    assert max(werte) == disposition(FailureClass.PROVIDER_RATE_LIMIT).backoff_ceiling
+    values_ = [backoff_for(FailureClass.PROVIDER_RATE_LIMIT, i) for i in range(1, 8)]
+    assert values_[:4] == [30, 60, 120, 240]
+    assert max(values_) == disposition(FailureClass.PROVIDER_RATE_LIMIT).backoff_ceiling
 
 
 def test_a_class_that_never_retries_never_waits():
@@ -145,11 +145,11 @@ def test_only_infrastructure_exit_codes_classify_as_infrastructure():
 
 
 def _rec(**kw) -> DispatchRecord:
-    basis = dict(role="developer", run_id="r", iteration=1, attempt=1,
+    baseline = dict(role="developer", run_id="r", iteration=1, attempt=1,
                  started_at="2026-09-11T10:00:00Z", ended_at="2026-09-11T10:00:10Z",
                  wallclock_seconds=10.0)
-    basis.update(kw)
-    return DispatchRecord(**basis)
+    baseline.update(kw)
+    return DispatchRecord(**baseline)
 
 
 def test_a_partial_token_total_is_not_reported_as_a_total():
@@ -219,40 +219,40 @@ def test_records_round_trip_through_the_log(tmp_path):
     log = TelemetryLog(tmp_path / "t.jsonl")
     log.append(_rec(role="planner"))
     log.append(_rec(role="qa", tokens_in=5, tokens_out=6))
-    gelesen = log.read()
-    assert [r.role for r in gelesen] == ["planner", "qa"]
-    assert gelesen[1].tokens_in == 5
+    read_ = log.read()
+    assert [r.role for r in read_] == ["planner", "qa"]
+    assert read_[1].tokens_in == 5
 
 
 def test_a_truncated_last_line_does_not_lose_the_history(tmp_path):
     """A killed writer loses the line it was writing. Raising on it would lose
     everything before it, which is the worse failure."""
-    pfad = tmp_path / "t.jsonl"
-    log = TelemetryLog(pfad)
+    path = tmp_path / "t.jsonl"
+    log = TelemetryLog(path)
     log.append(_rec(role="planner"))
-    with open(pfad, "a") as fh:
+    with open(path, "a") as fh:
         fh.write('{"role": "dev", "run_i')
     assert [r.role for r in log.read()] == ["planner"]
 
 
 def test_the_log_is_append_only(tmp_path):
-    pfad = tmp_path / "t.jsonl"
-    log = TelemetryLog(pfad)
+    path = tmp_path / "t.jsonl"
+    log = TelemetryLog(path)
     log.append(_rec(role="planner"))
-    erste = pfad.read_text()
+    first = path.read_text()
     log.append(_rec(role="qa"))
-    assert pfad.read_text().startswith(erste), "an earlier record was rewritten"
+    assert path.read_text().startswith(first), "an earlier record was rewritten"
 
 
 def test_rewriting_sorted_keeps_every_record(tmp_path):
-    pfad = tmp_path / "t.jsonl"
-    log = TelemetryLog(pfad)
+    path = tmp_path / "t.jsonl"
+    log = TelemetryLog(path)
     log.append(_rec(role="qa", started_at="2026-09-11T10:00:02Z"))
     log.append(_rec(role="planner", started_at="2026-09-11T10:00:01Z"))
     log.rewrite_sorted()
-    gelesen = log.read()
-    assert [r.role for r in gelesen] == ["planner", "qa"]
-    assert len(gelesen) == 2
+    read_ = log.read()
+    assert [r.role for r in read_] == ["planner", "qa"]
+    assert len(read_) == 2
 
 
 def test_a_missing_log_reads_as_empty_rather_than_raising(tmp_path):

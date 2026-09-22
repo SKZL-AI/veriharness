@@ -123,14 +123,14 @@ class ProjectStore:
         """
         if not path.exists():
             return None
-        hoechste = 0
+        highest = 0
         for f in path.parent.glob(f"{path.name}.v*"):
             m = re.match(rf"^{re.escape(path.name)}\.v(\d+)\.", f.name)
             if m:
-                hoechste = max(hoechste, int(m.group(1)))
-        ziel = path.with_name(f"{path.name}.v{hoechste + 1}.{_stamp()}")
-        os.replace(path, ziel)
-        return ziel
+                highest = max(highest, int(m.group(1)))
+        target = path.with_name(f"{path.name}.v{highest + 1}.{_stamp()}")
+        os.replace(path, target)
+        return target
 
     def parked_states(self) -> list[Path]:
         return sorted(self.dir.glob("project.json.v*"))
@@ -161,18 +161,18 @@ class ProjectStore:
         self.ensure()
         if self.state_path.exists():
             try:
-                aktuell = self.read_state()
+                current_ = self.read_state()
             except StoreError:
                 raise
-            if aktuell.project_id != state.project_id:
+            if current_.project_id != state.project_id:
                 raise StaleWrite(
-                    f"State on disk belongs to project {aktuell.project_id}, "
+                    f"State on disk belongs to project {current_.project_id}, "
                     f"but the write is for {state.project_id}"
                 )
-            if state.write_seq < aktuell.write_seq:
+            if state.write_seq < current_.write_seq:
                 raise StaleWrite(
                     f"Stale writer for project {self.project_id}: own sequence "
-                    f"{state.write_seq}, on disk {aktuell.write_seq}. Another "
+                    f"{state.write_seq}, on disk {current_.write_seq}. Another "
                     "orchestrator has advanced the state -- reload instead of "
                     "overwriting."
                 )
@@ -219,11 +219,11 @@ def resume_decision(state: ProjectState) -> tuple[str, str]:
     already finished is not restarted by a session that merely found
     something runnable.
     """
-    unbekannt = state.unknown_dependencies()
-    if unbekannt:
+    unknown_ = state.unknown_dependencies()
+    if unknown_:
         return BLOCK, (
             "dependencies naming nodes that do not exist: "
-            + "; ".join(f"{k} -> {v}" for k, v in sorted(unbekannt.items()))
+            + "; ".join(f"{k} -> {v}" for k, v in sorted(unknown_.items()))
             + ". An unresolvable dependency reads to a scheduler exactly like a "
             "satisfied one, so this blocks rather than proceeding."
         )
@@ -248,11 +248,11 @@ def resume_decision(state: ProjectState) -> tuple[str, str]:
             f"no outstanding repair node; closure generation {state.closure_generation}."
         )
 
-    blockiert = [n for n in state.nodes if n.lifecycle is Lifecycle.BLOCKED]
-    bereit = state.ready()
+    blocked_ = [n for n in state.nodes if n.lifecycle is Lifecycle.BLOCKED]
+    ready_ = state.ready()
 
-    if bereit:
-        n = bereit[0]
+    if ready_:
+        n = ready_[0]
         if n.rejections:
             return RETRY, (
                 f"node {n.id} is READY after {n.rejections} rejection(s); a rejection is "
@@ -263,25 +263,25 @@ def resume_decision(state: ProjectState) -> tuple[str, str]:
     if state.dag_terminal():
         # Terminal but not closed: either a gate is red or never ran. Both mean
         # repair, and NOT_RUN is not green.
-        letzte: dict[str, object] = {}
+        last_: dict[str, object] = {}
         for g in state.gates:
-            letzte[g.name] = g
-        rot = [name for name, g in letzte.items() if not g.counts_as_green]  # type: ignore[union-attr]
-        if not letzte:
+            last_[g.name] = g
+        red = [name for name, g in last_.items() if not g.counts_as_green]  # type: ignore[union-attr]
+        if not last_:
             return REPAIR, (
                 "every node has settled but no global gate has run. A closure that "
                 "checked nothing has established nothing."
             )
         return REPAIR, (
             "every node has settled, but the global gates are not all green: "
-            + ", ".join(sorted(rot))
+            + ", ".join(sorted(red))
             + ". DAG_TERMINAL is not RC_CLOSED."
         )
 
-    if blockiert:
+    if blocked_:
         return BLOCK, (
             "no node is runnable and these are blocked: "
-            + ", ".join(n.id for n in blockiert)
+            + ", ".join(n.id for n in blocked_)
             + ". A blocked node needs an authority outside the orchestrator."
         )
 
@@ -319,16 +319,16 @@ def unblock(store: "ProjectStore", node_id: str, reason: str,
             f"node {node_id} is {node.lifecycle.value}, not BLOCKED -- unblocking "
             "something that is not blocked would hide whatever it is actually doing"
         )
-    vorher = node.note
+    before = node.note
     node.lifecycle = Lifecycle.READY
-    node.note = (f"{vorher} | unblocked {utc()}: {reason}" if vorher else reason)
+    node.note = (f"{before} | unblocked {utc()}: {reason}" if before else reason)
     state.decisions.append(
         DecisionRecord(
             id=f"D{len(state.decisions) + 1:04d}",
             kind=DecisionKind.POLICY_DISPOSITION,
             actor=actor,
             reason=reason,
-            payload={"node": node_id, "was_blocked_for": vorher or ""},
+            payload={"node": node_id, "was_blocked_for": before or ""},
         )
     )
     store.write_state(state)
@@ -369,17 +369,17 @@ def abandon(store: "ProjectStore", node_id: str, reason: str,
             f"node {node_id} is already {node.lifecycle.value}; abandoning a "
             "settled node would rewrite a decision that has already had effects"
         )
-    vorher = node.note
-    vorheriger_zustand = node.lifecycle.value
+    before = node.note
+    previous_state = node.lifecycle.value
     node.lifecycle = Lifecycle.ABANDONED
-    node.note = (f"{vorher} | abandoned {utc()}: {reason}" if vorher else reason)
+    node.note = (f"{before} | abandoned {utc()}: {reason}" if before else reason)
     state.decisions.append(
         DecisionRecord(
             id=f"D{len(state.decisions) + 1:04d}",
             kind=DecisionKind.ABANDON_NODE,
             actor=actor,
             reason=reason,
-            payload={"node": node_id, "was": vorheriger_zustand},
+            payload={"node": node_id, "was": previous_state},
         )
     )
     store.write_state(state)
@@ -436,7 +436,7 @@ def _head(repo: Path) -> str:
 
 
 def list_projects(root: Path | str) -> list[str]:
-    basis = Path(root).expanduser().resolve() / PROJECTS_DIRNAME
-    if not basis.is_dir():
+    baseline = Path(root).expanduser().resolve() / PROJECTS_DIRNAME
+    if not baseline.is_dir():
         return []
-    return sorted(p.name for p in basis.iterdir() if (p / "project.json").exists())
+    return sorted(p.name for p in baseline.iterdir() if (p / "project.json").exists())

@@ -959,14 +959,14 @@ def test_rule_set_has_sixteen_names_with_published_evidence_added():
     }
     current = set(em.RULES)
 
-    spaeter = {"paper", "published-evidence"}
+    later = {"paper", "published-evidence"}
 
     assert len(em.RULES) == 16
-    assert spaeter <= current
+    assert later <= current
 
     assert prior_fourteen <= current, f"missing prior rule(s): {prior_fourteen - current}"
-    assert current <= prior_fourteen | spaeter, (
-        f"unexpected extra rule(s): {current - (prior_fourteen | spaeter)}"
+    assert current <= prior_fourteen | later, (
+        f"unexpected extra rule(s): {current - (prior_fourteen | later)}"
     )
 
 
@@ -1153,8 +1153,8 @@ def test_loopback_is_not_a_private_address_finding():
     """This machine's house rules require local-only logging on loopback, and
     a test that opens a listener there to prove a sandbox cannot reach it is
     doing what the rules ask. Loopback reveals no topology: everyone has one."""
-    punkt = chr(46)
-    loopback = punkt.join(("127", "0", "0", "1"))
+    point_ = chr(46)
+    loopback = point_.join(("127", "0", "0", "1"))
     assert not em._PRIVATE_IPV4_RE.search(loopback)
     assert not em._PRIVATE_IPV4_RE.search(f"connect to {loopback}:8080")
 
@@ -1163,10 +1163,10 @@ def test_the_other_private_ranges_are_still_findings():
     """Built from parts on purpose: this file is itself scanned, and writing
     the addresses out would make the scan find them here. The same reason the
     home-path needles are assembled rather than spelled."""
-    punkt = chr(46)
-    for teile in (("192", "168", "1", "5"), ("10", "0", "0", "1"),
+    point_ = chr(46)
+    for segments in (("192", "168", "1", "5"), ("10", "0", "0", "1"),
                   ("172", "16", "3", "9")):
-        addr = punkt.join(teile)
+        addr = point_.join(segments)
         assert em._PRIVATE_IPV4_RE.search(addr), addr
 
 
@@ -1190,9 +1190,9 @@ def test_the_unsupported_forms_are_still_refused():
     """The control for the widening above: everything else stays refused, and
     an unsupported pattern stops the derivation rather than quietly letting
     ignored content into the manifest."""
-    for muster in ("a**b", "a?b", "a[0-9]b", "/anchored", "a*b*c"):
+    for pattern_ in ("a**b", "a?b", "a[0-9]b", "/anchored", "a*b*c"):
         with pytest.raises(em.UnsupportedGitignorePattern):
-            em._compile_gitignore_rule(muster)
+            em._compile_gitignore_rule(pattern_)
 
 
 def test_the_acknowledged_reference_list_is_short_and_every_entry_says_why():
@@ -1223,7 +1223,7 @@ def test_the_acknowledged_reference_list_is_short_and_every_entry_says_why():
     """
     import tools.export_manifest as em  # noqa: PLC0415
 
-    assert set(em.U2B_ANERKANNT) == {
+    assert set(em.U2B_ACKNOWLEDGED) == {
         "paper/REVIEW_A.md",
         "paper/REVIEW_B.md",
         # Single references, not the document: the audit's source column has
@@ -1234,21 +1234,21 @@ def test_the_acknowledged_reference_list_is_short_and_every_entry_says_why():
         "paper/AUDIT.md -> dogfood/closure-e2e/CLOSURE_E2E.json",
     }
 
-    wurzel = Path(__file__).resolve().parent.parent
-    manifest = json.loads((wurzel / "EXPORT_MANIFEST.json").read_text())
-    eintraege = manifest["entries"] if isinstance(manifest, dict) and "entries" in manifest else manifest
-    veroeffentlicht = {
-        e["path"] for e in eintraege
+    root = Path(__file__).resolve().parent.parent
+    manifest = json.loads((root / "EXPORT_MANIFEST.json").read_text())
+    entries = manifest["entries"] if isinstance(manifest, dict) and "entries" in manifest else manifest
+    published_ = {
+        e["path"] for e in entries
         if (e.get("classification") or e.get("decision")) == "INCLUDE"
     }
 
-    for pfad, grund in em.U2B_ANERKANNT.items():
-        assert len(grund) > 80, f"{pfad} is acknowledged without a reason"
-        genannt = {k for k in re.findall(r"[\w.-]+(?:/[\w.-]+)*\.(?:md|json|py|cff|toml)", grund)}
-        assert genannt & veroeffentlicht, (
-            f"{pfad} does not name a document the export actually carries, so "
+    for file_path, reason in em.U2B_ACKNOWLEDGED.items():
+        assert len(reason) > 80, f"{file_path} is acknowledged without a reason"
+        named_ = {k for k in re.findall(r"[\w.-]+(?:/[\w.-]+)*\.(?:md|json|py|cff|toml)", reason)}
+        assert named_ & published_, (
+            f"{file_path} does not name a document the export actually carries, so "
             f"it does not say where a reader can look instead (named: "
-            f"{sorted(genannt)})")
+            f"{sorted(named_)})")
 
 
 def test_an_acknowledged_reference_is_not_a_finding_and_is_still_printed():
@@ -1262,12 +1262,12 @@ def test_an_acknowledged_reference_is_not_a_finding_and_is_still_printed():
         {"type": "u2b_dangling_reference", "from": "README.md",
          "to": "dogfood/ABSCHLUSSBERICHT.md", "reason": "target is EXCLUDE"},
     ]
-    offen, anerkannt = em.teile_u2b(findings)
+    open_, acknowledged = em.parts_u2b(findings)
 
-    assert [f["from"] for f in offen] == ["README.md"], (
+    assert [f["from"] for f in open_] == ["README.md"], (
         "a document nobody exempted must still fail")
-    assert [f["from"] for f in anerkannt] == ["paper/REVIEW_B.md"]
-    assert anerkannt[0]["acknowledged"], "the reason travels with the finding"
+    assert [f["from"] for f in acknowledged] == ["paper/REVIEW_B.md"]
+    assert acknowledged[0]["acknowledged"], "the reason travels with the finding"
 
 
 def test_a_single_reference_can_be_acknowledged_without_excusing_a_document():
@@ -1285,10 +1285,10 @@ def test_a_single_reference_can_be_acknowledged_without_excusing_a_document():
         {"from": "paper/AUDIT.md", "to": "runs/a03/receipts", "reason": "x"},
         {"from": "paper/AUDIT.md", "to": "dogfood/whatever.md", "reason": "x"},
     ]
-    offen, anerkannt = em.teile_u2b(findings)
+    open_, acknowledged = em.parts_u2b(findings)
 
-    assert [f["to"] for f in anerkannt] == ["runs/a03/receipts"]
-    assert [f["to"] for f in offen] == ["dogfood/whatever.md"], (
+    assert [f["to"] for f in acknowledged] == ["runs/a03/receipts"]
+    assert [f["to"] for f in open_] == ["dogfood/whatever.md"], (
         "acknowledging one pair must not excuse the document's other "
         "references")
 
@@ -1308,19 +1308,19 @@ def test_the_campaigns_own_declaration_and_evidence_are_published():
     manifest = json.loads(
         (Path(em.__file__).resolve().parent.parent / "EXPORT_MANIFEST.json")
         .read_text())
-    eintraege = {e["path"]: e for e in manifest["entries"]}
-    for pfad in ("docs/benchmarks/v3/PREREGISTRATION.json",
+    entries = {e["path"]: e for e in manifest["entries"]}
+    for file_path in ("docs/benchmarks/v3/PREREGISTRATION.json",
                  "docs/benchmarks/v3/PREREGISTRATION_PROVENANCE.json",
                  "docs/benchmarks/v3/RAW_RESULT_DIGESTS.json",
                  "docs/benchmarks/v3/O154_ANALYSIS_ONLY.json"):
-        assert pfad in eintraege, f"{pfad} is not in the manifest at all"
-        assert eintraege[pfad]["decision"] == "INCLUDE", pfad
-        assert eintraege[pfad]["rule"] == "published-evidence", pfad
+        assert file_path in entries, f"{file_path} is not in the manifest at all"
+        assert entries[file_path]["decision"] == "INCLUDE", file_path
+        assert entries[file_path]["rule"] == "published-evidence", file_path
 
-    geparkt = [p for p in eintraege
+    parked = [p for p in entries
                if p.startswith("docs/benchmarks/v3/PREREGISTRATION.json.v")]
-    for p in geparkt:
-        assert eintraege[p]["decision"] == "EXCLUDE", (
+    for p in parked:
+        assert entries[p]["decision"] == "EXCLUDE", (
             "the superseded registration is not published: it is superseded, "
             "nothing points at it as a path, and the claim it supports is "
             "checkable from git without it")
@@ -1500,32 +1500,32 @@ def test_an_internal_working_note_is_classified_by_its_marker_not_its_language()
     """
     import tools.export_manifest as em  # noqa: PLC0415
 
-    englisch = ("# A note\n\nThis document is written in English and says "
+    english = ("# A note\n\nThis document is written in English and says "
                 "nothing German at all, so the density heuristic will not "
                 "classify it.\n")
-    assert em.german_density(englisch) < em.GERMAN_DENSITY_THRESHOLD
+    assert em.german_density(english) < em.GERMAN_DENSITY_THRESHOLD
 
     with tempfile.TemporaryDirectory() as tmp:
-        wurzel = Path(tmp)
-        (wurzel / "docs").mkdir()
+        root = Path(tmp)
+        (root / "docs").mkdir()
 
-        def regel_fuer(pfad: str) -> tuple[str, str]:
-            ziel = wurzel / pfad
-            ziel.parent.mkdir(parents=True, exist_ok=True)
-            ziel.write_text(englisch, encoding="utf-8")
-            return em._classify(pfad, wurzel)
+        def rule_for(file_path: str) -> tuple[str, str]:
+            destination = root / file_path
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_text(english, encoding="utf-8")
+            return em._classify(file_path, root)
 
-        assert regel_fuer("DOGFOOD_SOMETHING.md") == (
+        assert rule_for("DOGFOOD_SOMETHING.md") == (
             "EXCLUDE", "internal-working-document")
 
         # Negative controls: the marker, and only the marker. An English
         # document without it stays public, or the rule has quietly made
         # every root-level note internal.
-        for pfad in ("README.md", "NOTES.md", "docs/GUIDE.md",
+        for file_path in ("README.md", "NOTES.md", "docs/GUIDE.md",
                      "DOGFOODISH.md"):
-            _, regel = regel_fuer(pfad)
-            assert regel != "internal-working-document", (
-                f"{pfad} was swallowed by a rule that should only match the "
+            _, rule_ = rule_for(file_path)
+            assert rule_ != "internal-working-document", (
+                f"{file_path} was swallowed by a rule that should only match the "
                 "marker"
             )
 

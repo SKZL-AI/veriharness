@@ -623,7 +623,7 @@ def test_running_the_gate_leaves_the_fixture_byte_identical(tmp_path):
 # A skipped invariant verifies nothing -- and said so misleadingly
 # --------------------------------------------------------------------------- #
 
-def test_failure_line_nimmt_stderr_zuerst():
+def test_failure_line_takes_stderr_first():
     """A failed command's informative half is stderr, not stdout.
 
     The previous order preferred stdout, and on a failed `pip wheel` that
@@ -646,7 +646,7 @@ def test_failure_line_nimmt_stderr_zuerst():
     assert ug._failure_line("", "") == "no output"
 
 
-def test_require_macht_ein_uebersprungenes_invariant_rot(tmp_path):
+def test_require_turns_a_skipped_invariant_red(tmp_path):
     """`--require N` turns a SKIPPED invariant into a failure.
 
     Without it a gate can exit 0 while an invariant checked nothing, which is
@@ -660,32 +660,32 @@ def test_require_macht_ein_uebersprungenes_invariant_rot(tmp_path):
     """
     (tmp_path / "README.md").write_text("no pyproject here\n", encoding="utf-8")
 
-    ergebnisse, rc = ug.run_gate(tmp_path)
-    assert ergebnisse[2].status == ug.STATUS_SKIPPED, ergebnisse[2]
+    results, rc = ug.run_gate(tmp_path)
+    assert results[2].status == ug.STATUS_SKIPPED, results[2]
     assert rc == 0, "a skipped invariant alone does not fail the gate -- that is the point"
 
-    ergebnisse, rc = ug.run_gate(tmp_path, frozenset({3}))
-    assert ergebnisse[2].status == ug.STATUS_SKIPPED
+    results, rc = ug.run_gate(tmp_path, frozenset({3}))
+    assert results[2].status == ug.STATUS_SKIPPED
     assert rc == 1, "U3 was required to run and did not"
 
     # In this deliberately empty fixture every invariant skips, which is
     # itself the sharpest statement of the problem: without --require the gate
     # reports exit 0 having checked precisely nothing.
-    assert all(r.status == ug.STATUS_SKIPPED for r in ergebnisse), [
-        (r.status, r.detail) for r in ergebnisse
+    assert all(r.status == ug.STATUS_SKIPPED for r in results), [
+        (r.status, r.detail) for r in results
     ]
-    _, rc_alle = ug.run_gate(tmp_path, frozenset({1, 2, 3, 4, 5}))
-    assert rc_alle == 1
+    _, rc_all = ug.run_gate(tmp_path, frozenset({1, 2, 3, 4, 5}))
+    assert rc_all == 1
 
     # And requiring an invariant that genuinely ran changes nothing. Checked
     # on the result objects rather than by running the gate against this
     # repository a second time: that would re-invoke the whole suite through
     # U5, from inside the suite.
-    lief = [ug.Result(ug.STATUS_PASS, "")] * 5
-    assert ug._exit_for(lief, frozenset({1, 2, 3, 4, 5})) == 0
+    ran_ = [ug.Result(ug.STATUS_PASS, "")] * 5
+    assert ug._exit_for(ran_, frozenset({1, 2, 3, 4, 5})) == 0
 
 
-def test_require_wird_streng_gelesen():
+def test_require_is_read_strictly():
     """A malformed --require is refused rather than quietly ignored.
 
     An option that silently accepts nonsense is an option that silently stops
@@ -694,17 +694,17 @@ def test_require_wird_streng_gelesen():
     assert ug._parse_required("") == frozenset()
     assert ug._parse_required("3") == frozenset({3})
     assert ug._parse_required("U1,u3, 5") == frozenset({1, 3, 5})
-    for schrott in ("x", "0", "6", "3,x"):
+    for junk in ("x", "0", "6", "3,x"):
         with pytest.raises(SystemExit):
-            ug._parse_required(schrott)
+            ug._parse_required(junk)
 
 
-def test_require_erscheint_in_der_ausgabe(tmp_path, capsys):
+def test_require_appears_in_the_output(tmp_path, capsys):
     """The reader is told which invariant was required and did not run."""
     (tmp_path / "README.md").write_text("no pyproject here\n", encoding="utf-8")
     capsys.readouterr()
     rc = ug.main([str(tmp_path), "--require", "3"])
-    aus = capsys.readouterr().out
+    output = capsys.readouterr().out
     assert rc == 1
-    assert "U3: SKIPPED" in aus
-    assert "required to run and did not" in aus
+    assert "U3: SKIPPED" in output
+    assert "required to run and did not" in output

@@ -180,7 +180,7 @@ class HohRunLauncher(RunLauncher):
         # that was refused.
         self.budget_argumente()
         run_id = node.run_id or node.id
-        zweig = node.branch or f"hoh-{run_id}"
+        branch_ = node.branch or f"hoh-{run_id}"
         store = RunStore(self.root, run_id)
 
         if store.state_exists():
@@ -189,7 +189,7 @@ class HohRunLauncher(RunLauncher):
             # trust. Measured the first time a repair node was dispatched for
             # real -- the node was unblocked, the run was still BLOCKED from
             # its previous attempt, and `hoh run` refused to start at all.
-            return self._ensure_runnable(run_id, zweig, store)
+            return self._ensure_runnable(run_id, branch_, store)
         # A repair node's specification belongs to the **run**, not to the
         # repository under test. It used to be written to
         # `<repo>/.hoh-repair-<id>.md`, where it is untracked, unprotected and
@@ -201,25 +201,25 @@ class HohRunLauncher(RunLauncher):
         #
         # Under `--root` it travels with the run's receipts and state, is
         # readable afterwards, and no repository ever has to ignore it.
-        spec_pfad = Path(node.spec_path) if node.spec_path else (
+        spec_file = Path(node.spec_path) if node.spec_path else (
             self.root / run_id / f"repair-{run_id}.md"
         )
-        spec_pfad.parent.mkdir(parents=True, exist_ok=True)
-        if not spec_pfad.exists():
+        spec_file.parent.mkdir(parents=True, exist_ok=True)
+        if not spec_file.exists():
             if not node.repair_of:
                 return (
                     f"node {run_id} has no run and no specification at "
-                    f"{spec_pfad}; there is nothing to dispatch"
+                    f"{spec_file}; there is nothing to dispatch"
                 )
-            spec_pfad.write_text(self._repair_spec(node), encoding="utf-8")
+            spec_file.write_text(self._repair_spec(node), encoding="utf-8")
 
         wt = self._run_cli([
             "python3", "-m", "hoh.cli", "--root", str(self.root),
-            "worktree", "--repo", str(self.repo_path), "--branch", zweig,
+            "worktree", "--repo", str(self.repo_path), "--branch", branch_,
         ])
         if wt.exit_code != 0 and "already exists" not in (wt.stdout + wt.stderr):
             return f"could not create the worktree for {run_id}: {(wt.stderr or wt.stdout)[-200:]}"
-        worktree = self._worktree_path(wt.stdout) or self._worktree_for(zweig)
+        worktree = self._worktree_path(wt.stdout) or self._worktree_for(branch_)
         if not worktree.is_dir():
             return f"no worktree at {worktree} for {run_id}"
 
@@ -227,24 +227,24 @@ class HohRunLauncher(RunLauncher):
         # which HoH will not answer. Measured the first time a repair node was
         # dispatched for real: the run reached DEVELOPING and blocked on
         # "Yes, I trust this folder".
-        freigabe = self._approve(worktree)
-        if not freigabe.granted:
-            return freigabe.as_reason()
+        release_ = self._approve(worktree)
+        if not release_.granted:
+            return release_.as_reason()
 
         argumente = [
             "python3", "-m", "hoh.cli", "--root", str(self.root), "start",
-            "--repo", str(worktree), "--spec", str(spec_pfad), "--run-id", run_id,
+            "--repo", str(worktree), "--spec", str(spec_file), "--run-id", run_id,
         ]
         argumente += self.budget_argumente()
         st = self._run_cli(argumente)
         if st.exit_code != 0:
             return f"could not start run {run_id}: {(st.stderr or st.stdout)[-200:]}"
-        node.branch = zweig
+        node.branch = branch_
         node.run_id = run_id
-        node.spec_path = str(spec_pfad)
+        node.spec_path = str(spec_file)
         return None
 
-    def verbrauchtes_budget(self) -> int:
+    def spent_budget(self) -> int:
         """Dispatches every run under this root has already spent.
 
         Read from the **persisted run states**, not from a counter in this
@@ -254,16 +254,16 @@ class HohRunLauncher(RunLauncher):
         dispatches and write them down, so the number survives the process
         that produced it and cannot be lowered by starting a new one.
         """
-        gesamt = 0
+        total = 0
         if not self.root.is_dir():
             return 0
         # `rglob`, not `glob`. A one-level glob sees only runs sitting
         # directly under the root, and a run one directory deeper -- which
         # nothing in this file forbids -- would have spent dispatches that
         # the next run was then handed again.
-        for zustand in sorted(self.root.rglob("state.json")):
+        for verdict_state in sorted(self.root.rglob("state.json")):
             try:
-                daten = json.loads(zustand.read_text(encoding="utf-8"))
+                data_ = json.loads(verdict_state.read_text(encoding="utf-8"))
             except (OSError, ValueError) as exc:
                 # Fails **closed**. Skipping an unreadable state counted it as
                 # zero, which is the most dangerous possible reading: the one
@@ -272,24 +272,24 @@ class HohRunLauncher(RunLauncher):
                 # not a budget, so nothing more is handed out.
                 raise BudgetExhausted(
                     f"the shared dispatch budget cannot be computed: "
-                    f"{zustand} is unreadable ({exc}). Nothing further is "
+                    f"{verdict_state} is unreadable ({exc}). Nothing further is "
                     f"started, because a spend that cannot be read is not a "
                     f"spend of zero") from exc
-            gesamt += int((daten.get("usage") or {}).get("dispatches", 0) or 0)
-        return gesamt
+            total += int((data_.get("usage") or {}).get("dispatches", 0) or 0)
+        return total
 
-    def verbleibendes_budget(self) -> int:
+    def remaining_budget(self) -> int:
         """What a run started now may still spend. Never negative."""
         if self.dispatch_budget is None:           # pragma: no cover - guarded
             return 0
-        return max(self.dispatch_budget - self.verbrauchtes_budget(), 0)
+        return max(self.dispatch_budget - self.spent_budget(), 0)
 
     def budget_argumente(self) -> list[str]:
         """The ceiling the next run is started with, as CLI arguments.
 
         A named method rather than two lines inside `prepare` so that the
         instrument control can measure the *wiring* and not only the
-        arithmetic: `verbleibendes_budget` returning the right number proves
+        arithmetic: `remaining_budget` returning the right number proves
         nothing if `prepare` passes a constant.
 
         Raises `BudgetExhausted` when nothing is left. It used to return
@@ -301,15 +301,15 @@ class HohRunLauncher(RunLauncher):
         """
         if self.dispatch_budget is None:
             return []
-        uebrig = self.verbleibendes_budget()
-        if uebrig <= 0:
+        remaining_ = self.remaining_budget()
+        if remaining_ <= 0:
             raise BudgetExhausted(
                 f"the shared dispatch budget is spent: "
-                f"{self.verbrauchtes_budget()}/{self.dispatch_budget} used by "
+                f"{self.spent_budget()}/{self.dispatch_budget} used by "
                 f"the runs under {self.root}")
-        return ["--max-dispatches", str(uebrig)]
+        return ["--max-dispatches", str(remaining_)]
 
-    def _ensure_runnable(self, run_id: str, zweig: str, store: "RunStore") -> str | None:
+    def _ensure_runnable(self, run_id: str, branch_: str, store: "RunStore") -> str | None:
         """Clears what an earlier attempt left in the way, or says what remains.
 
         Only two things are cleared, and both are operator actions rather than
@@ -325,17 +325,17 @@ class HohRunLauncher(RunLauncher):
         if state.condition is not Condition.BLOCKED:
             return None
 
-        grund = (state.blocked_reason or state.stop_reason or "")
-        if not any(k in grund.lower() for k in APPROVAL_WAITING):
+        reason = (state.blocked_reason or state.stop_reason or "")
+        if not any(k in reason.lower() for k in APPROVAL_WAITING):
             return (
                 f"run {run_id} is blocked for a reason this launcher does not "
-                f"clear: {grund.splitlines()[0][:160] if grund else 'no reason recorded'}"
+                f"clear: {reason.splitlines()[0][:160] if reason else 'no reason recorded'}"
             )
 
-        worktree = self._worktree_for(zweig)
-        freigabe = self._approve(worktree)
-        if not freigabe.granted:
-            return f"run {run_id} waits on a trust approval -- {freigabe.as_reason()}"
+        worktree = self._worktree_for(branch_)
+        release_ = self._approve(worktree)
+        if not release_.granted:
+            return f"run {run_id} waits on a trust approval -- {release_.as_reason()}"
 
         ub = self._run_cli([
             "python3", "-m", "hoh.cli", "--root", str(self.root), "unblock", run_id,
@@ -346,33 +346,33 @@ class HohRunLauncher(RunLauncher):
 
     def _approve(self, worktree: Path) -> Approval:
         """Asks the configured authority, and records what it answered."""
-        freigabe = self.approvals.approve(worktree, self.repo_path)
-        self.approvals_given.append(freigabe)
-        return freigabe
+        release_ = self.approvals.approve(worktree, self.repo_path)
+        self.approvals_given.append(release_)
+        return release_
 
-    def _worktree_for(self, zweig: str) -> Path:
+    def _worktree_for(self, branch_: str) -> Path:
         """Where Herdr puts a worktree for this repository and branch."""
-        return Path.home() / ".herdr" / "worktrees" / self.repo_path.name / zweig
+        return Path.home() / ".herdr" / "worktrees" / self.repo_path.name / branch_
 
     @staticmethod
     def _worktree_path(stdout: str) -> Path | None:
         try:
-            daten = json.loads(stdout)
+            data_ = json.loads(stdout)
         except Exception:
             return None
 
-        def suche(obj):
+        def search_(obj):
             if isinstance(obj, dict):
                 p = obj.get("path")
                 if isinstance(p, str) and "worktree" in p:
                     return p
                 for v in obj.values():
-                    gefunden = suche(v)
-                    if gefunden:
-                        return gefunden
+                    found = search_(v)
+                    if found:
+                        return found
             return None
 
-        p = suche(daten)
+        p = search_(data_)
         return Path(p) if p else None
 
     @staticmethod
@@ -450,7 +450,7 @@ class HohRunLauncher(RunLauncher):
 
         # The baseline the controller recorded before this dispatch. Falling
         # back to reading it here covers a launcher used without a controller.
-        vorher = node.accepted_before or self.accepted_baseline(node)
+        before = node.accepted_before or self.accepted_baseline(node)
 
         d = self._run_cli([
             "python3", "-m", "hoh.cli", "--root", str(self.root), "run", run_id,
@@ -467,29 +467,29 @@ class HohRunLauncher(RunLauncher):
                 f"run {run_id} left no readable state (cli exit {d.exit_code}): {exc}",
             )
 
-        return self._verdict(state, vorher, d)
+        return self._verdict(state, before, d)
 
-    def _verdict_from_baseline(self, state, vorher_id: str | None) -> RunOutcome:
-        return self._verdict(state, vorher_id, Dispatch(0, "", ""))
+    def _verdict_from_baseline(self, state, previous_id: str | None) -> RunOutcome:
+        return self._verdict(state, previous_id, Dispatch(0, "", ""))
 
-    def _verdict(self, state, vorher, d: Dispatch) -> RunOutcome:
+    def _verdict(self, state, before, d: Dispatch) -> RunOutcome:
         # `vorher` is a candidate id (from project state) or a Candidate (from a
         # direct read). Normalised here so both callers share one comparison.
-        vorher_id = getattr(vorher, "candidate_id", vorher)
-        nachher = state.last_accepted_candidate
+        previous_id = getattr(before, "candidate_id", before)
+        after = state.last_accepted_candidate
 
         # Handled first, and deliberately: an acceptance that a run recorded is
         # a fact about that run, and nothing that happens afterwards -- a
         # block, a spent budget, another iteration -- un-records it.
-        if state.condition is Condition.BLOCKED and nachher is None:
+        if state.condition is Condition.BLOCKED and after is None:
             art = (state.blocked_kind or "").lower()
-            grund_text = (state.blocked_reason or state.stop_reason or "").lower()
+            reason_text = (state.blocked_reason or state.stop_reason or "").lower()
             # A trust dialog is not an unclassifiable state. HoH deliberately
             # never answers one itself -- granting trust to a directory it was
             # merely pointed at is exactly the capability it refuses to take --
             # so the run stops and waits. Naming that separately is the
             # difference between "answer the prompt" and "go find the defect".
-            if any(k in grund_text for k in APPROVAL_WAITING):
+            if any(k in reason_text for k in APPROVAL_WAITING):
                 return RunOutcome(
                     RunVerdict.NEEDS_APPROVAL,
                     (state.blocked_reason or state.stop_reason or "awaiting approval")
@@ -513,14 +513,14 @@ class HohRunLauncher(RunLauncher):
             return RunOutcome(RunVerdict.UNDETERMINED,
                               f"run ended {state.condition.value}: {state.stop_reason}")
 
-        if nachher is not None:
-            if vorher_id is not None and nachher.candidate_id == vorher_id:
+        if after is not None:
+            if previous_id is not None and after.candidate_id == previous_id:
                 # The run ended where it started. Merging on this would apply
                 # the same candidate a second time.
                 return RunOutcome(
                     RunVerdict.REJECTED,
-                    f"no new candidate: still {nachher.candidate_id}",
-                    candidate=nachher.commit,
+                    f"no new candidate: still {after.candidate_id}",
+                    candidate=after.commit,
                 )
             # **An acceptance is durable.** It does not depend on the stage the
             # run happened to stop in afterwards. This check used to live
@@ -533,17 +533,17 @@ class HohRunLauncher(RunLauncher):
             # Measured twice in the benchmark, on two different branches of
             # this function (O122). A verdict that discards a recorded
             # acceptance costs the work, not just the report.
-            nachsatz = ""
+            postscript = ""
             if state.stage not in (Stage.CHECKPOINTED, Stage.READY_FOR_DELIVERY):
-                nachsatz = (
+                postscript = (
                     f", and the run then continued to "
                     f"{state.stage.value}/{state.condition.value}"
                 )
                 if state.condition is Condition.BLOCKED:
-                    nachsatz += f": {state.blocked_reason}"
+                    postscript += f": {state.blocked_reason}"
             return RunOutcome(RunVerdict.ACCEPTED,
-                              f"accepted {nachher.candidate_id}{nachsatz}",
-                              candidate=nachher.commit)
+                              f"accepted {after.candidate_id}{postscript}",
+                              candidate=after.commit)
 
         if state.stage in (Stage.CHECKPOINTED, Stage.READY_FOR_DELIVERY):
             return RunOutcome(RunVerdict.UNDETERMINED,
@@ -553,7 +553,7 @@ class HohRunLauncher(RunLauncher):
         # is, and reporting it as unclassifiable deadlocked an unattended run:
         # a process died between marking the node RUNNING and dispatching it,
         # and every later round re-read the same NEW state and halted on it.
-        if state.stage is Stage.NEW and not state.iteration and nachher is None:
+        if state.stage is Stage.NEW and not state.iteration and after is None:
             return RunOutcome(
                 RunVerdict.NOT_STARTED,
                 "the run exists and has not begun: no iteration, no candidate",
@@ -594,51 +594,51 @@ class HohRunLauncher(RunLauncher):
         unclassified one, because it sends the reader somewhere specific and
         wrong.
         """
-        zweig = node.branch or f"hoh-{node.run_id or node.id}"
-        ergebnis = MergeResult(landed=False, branch=zweig, candidate=outcome.candidate or "")
+        branch_ = node.branch or f"hoh-{node.run_id or node.id}"
+        result = MergeResult(landed=False, branch=branch_, candidate=outcome.candidate or "")
         if self.dry_run:
-            ergebnis.failure = MergeFailure.UNKNOWN
-            ergebnis.detail = "dry run: no merge attempted"
-            return ergebnis
+            result.failure = MergeFailure.UNKNOWN
+            result.detail = "dry run: no merge attempted"
+            return result
 
-        if self._git("rev-parse", "--verify", "--quiet", zweig).returncode != 0:
-            ergebnis.failure = MergeFailure.NO_BRANCH
-            ergebnis.detail = f"branch {zweig} does not exist in {self.repo_path}"
-            return ergebnis
+        if self._git("rev-parse", "--verify", "--quiet", branch_).returncode != 0:
+            result.failure = MergeFailure.NO_BRANCH
+            result.detail = f"branch {branch_} does not exist in {self.repo_path}"
+            return result
 
-        ergebnis.target_head_before = self._git(
+        result.target_head_before = self._git(
             "rev-parse", "--short", self.mainline).stdout.strip()
-        ergebnis.merge_base = self._git(
-            "merge-base", zweig, self.mainline).stdout.strip()[:12]
+        result.merge_base = self._git(
+            "merge-base", branch_, self.mainline).stdout.strip()[:12]
 
         # Already contained: a resumed session must not merge twice, and the
         # cheapest way to know is to ask whether the branch is an ancestor.
-        if self._git("merge-base", "--is-ancestor", zweig, self.mainline).returncode == 0:
-            ergebnis.landed = True
-            ergebnis.detail = "already contained in the mainline"
-            return ergebnis
+        if self._git("merge-base", "--is-ancestor", branch_, self.mainline).returncode == 0:
+            result.landed = True
+            result.detail = "already contained in the mainline"
+            return result
 
         if self._git("rev-parse", "--abbrev-ref", "HEAD").stdout.strip() != self.mainline:
-            aus = self._git("checkout", self.mainline)
-            if aus.returncode != 0:
-                ergebnis.failure = MergeFailure.OBSTRUCTED
-                ergebnis.detail = (aus.stderr or aus.stdout).strip().splitlines()[:1][0][:200] \
-                    if (aus.stderr or aus.stdout).strip() else "checkout failed"
-                return ergebnis
+            out = self._git("checkout", self.mainline)
+            if out.returncode != 0:
+                result.failure = MergeFailure.OBSTRUCTED
+                result.detail = (out.stderr or out.stdout).strip().splitlines()[:1][0][:200] \
+                    if (out.stderr or out.stdout).strip() else "checkout failed"
+                return result
 
-        p = self._git("merge", "--no-ff", zweig, "-m",
+        p = self._git("merge", "--no-ff", branch_, "-m",
                       f"Take accepted candidate {node.id} ({outcome.detail})")
         if p.returncode == 0:
-            ergebnis.landed = True
-            return ergebnis
+            result.landed = True
+            return result
 
         text = (p.stdout or "") + (p.stderr or "")
-        ergebnis.conflicting_paths = self._conflicting_paths(text)
-        ergebnis.detail = self._first_meaningful(text)
-        ergebnis.failure = self._classify(text)
+        result.conflicting_paths = self._conflicting_paths(text)
+        result.detail = self._first_meaningful(text)
+        result.failure = self._classify(text)
         # Leave no half-merge behind for the next session to puzzle over.
         self._git("merge", "--abort")
-        return ergebnis
+        return result
 
     @staticmethod
     def _classify(text: str) -> MergeFailure:
@@ -648,35 +648,35 @@ class HohRunLauncher(RunLauncher):
         merge" for a dirty or occupied working tree *before* it attempts any
         content merge, so that message never accompanies a real conflict.
         """
-        unten = text.lower()
-        if ("would be overwritten by merge" in unten
-                or "your local changes to the following files" in unten
-                or "please commit your changes or stash them" in unten):
+        further_down = text.lower()
+        if ("would be overwritten by merge" in further_down
+                or "your local changes to the following files" in further_down
+                or "please commit your changes or stash them" in further_down):
             return MergeFailure.OBSTRUCTED
-        if "conflict (" in unten or "automatic merge failed" in unten:
+        if "conflict (" in further_down or "automatic merge failed" in further_down:
             return MergeFailure.CONFLICT
         return MergeFailure.UNKNOWN
 
     @staticmethod
     def _conflicting_paths(text: str) -> tuple[str, ...]:
-        pfade: list[str] = []
-        for zeile in text.splitlines():
-            s = zeile.strip()
+        paths: list[str] = []
+        for line in text.splitlines():
+            s = line.strip()
             m = re.match(r"CONFLICT \([^)]*\): (.+?) (deleted in|added in|merge conflict)", s)
             if m:
-                pfade.append(m.group(1))
+                paths.append(m.group(1))
                 continue
             if s and not s.startswith(("error:", "CONFLICT", "Auto", "Please", "Aborting",
                                        "Merge", "warning:", "hint:")) and "/" in s or (
                     s.endswith((".py", ".txt", ".md", ".json", ".pyc"))):
-                if s not in pfade and len(s) < 200 and " " not in s:
-                    pfade.append(s)
-        return tuple(dict.fromkeys(pfade))
+                if s not in paths and len(s) < 200 and " " not in s:
+                    paths.append(s)
+        return tuple(dict.fromkeys(paths))
 
     @staticmethod
     def _first_meaningful(text: str) -> str:
-        for zeile in text.splitlines():
-            s = zeile.strip()
+        for line in text.splitlines():
+            s = line.strip()
             if s and not s.startswith(("hint:", "warning:")):
                 return s[:200]
         return "git produced no output"

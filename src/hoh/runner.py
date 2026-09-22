@@ -398,22 +398,22 @@ def _unsandboxed_limits() -> list[tuple[int, int]]:
     was left behind -- the same defect in the twin, which is how a fix stops
     being a fix.
     """
-    raus = []
+    out_list = []
     for res, limit in (
         (resource.RLIMIT_CPU, RLIMIT_CPU_SECONDS),
         (resource.RLIMIT_AS, RLIMIT_ADDRESS_SPACE),
         (resource.RLIMIT_FSIZE, RLIMIT_FILE_SIZE),
     ):
         try:
-            weich, hart = resource.getrlimit(res)
+            soft, hard_kill = resource.getrlimit(res)
         except (ValueError, OSError):            # pragma: no cover - exotic
             continue
-        wert = limit
-        for grenze in (weich, hart):
-            if grenze != resource.RLIM_INFINITY:
-                wert = min(wert, grenze)
-        raus.append((res, wert))
-    return raus
+        value_ = limit
+        for limit_ in (soft, hard_kill):
+            if limit_ != resource.RLIM_INFINITY:
+                value_ = min(value_, limit_)
+        out_list.append((res, value_))
+    return out_list
 
 
 def _limits() -> None:
@@ -421,17 +421,17 @@ def _limits() -> None:
 
     No `RLIMIT_NPROC` -- see the module docstring.
     """
-    for res, wert in _unsandboxed_limits():
+    for res, value_ in _unsandboxed_limits():
         try:
             _, hard = resource.getrlimit(res)
-            resource.setrlimit(res, (wert, hard))
+            resource.setrlimit(res, (value_, hard))
         except (ValueError, OSError):
             continue
     os.setsid()  # own process group, so that a timeout reaches the whole family
 
 
 #: What the policy fields say when nothing was applied because nothing ran.
-NICHT_ANGEWANDT = "not applied: isolation refused"
+NOT_APPLIED = "not applied: isolation refused"
 
 
 def _sandbox_preexec(spec):
@@ -453,21 +453,21 @@ def _sandbox_preexec(spec):
     """
     from .sandbox import _limits_for
 
-    grenzen = _limits_for(spec)
+    limits_ = _limits_for(spec)
 
-    def anwenden() -> None:                      # pragma: no cover - runs post-fork
-        if grenzen is not None:
-            grenzen()
+    def apply_now() -> None:                      # pragma: no cover - runs post-fork
+        if limits_ is not None:
+            limits_()
         os.setsid()
 
-    return anwenden
+    return apply_now
 
 
 #: Signatures of a baseline run that executed **nothing**. Each is a way a
 #: test runner says "there was no test here", which is what happens when the
 #: criterion's own file is part of the candidate and therefore absent from the
 #: state it is measured against.
-ARTEFACTUAL_SIGNATUREN = (
+ARTEFACTUAL_SIGNATURES = (
     "NO TESTS RAN",
     "no tests ran",
     "FileNotFoundError",
@@ -501,9 +501,9 @@ def artefactual_reason(exit_code: int, transcript: str) -> str:
     if exit_code == 5:
         # pytest's and unittest's convention for "no tests were collected".
         return "the baseline collected no tests at all (exit 5)"
-    ausgabe = transcript.split("--- output ---", 1)[-1]
-    for sig in ARTEFACTUAL_SIGNATUREN:
-        if sig in ausgabe:
+    output_ = transcript.split("--- output ---", 1)[-1]
+    for sig in ARTEFACTUAL_SIGNATURES:
+        if sig in output_:
             return (
                 f"the baseline did not execute the criterion ({sig!r} in its "
                 "output): it is red because the candidate's own file is not "
@@ -518,7 +518,7 @@ def _own_ns() -> dict[str, str]:
     return own_namespaces()
 
 
-def _drain_proof(fd: int, hoechstens: int = 4096) -> list[str]:
+def _drain_proof(fd: int, at_most: int = 4096) -> list[str]:
     """Collects what came out of the sandbox, in a thread, until the pipe closes.
 
     Drained rather than read-once for a specific reason: the write end is open
@@ -533,22 +533,22 @@ def _drain_proof(fd: int, hoechstens: int = 4096) -> list[str]:
     `OSError`, so the guard missed it -- and a run ended with no receipt at
     all, which is the one outcome this module exists to prevent.
     """
-    stuecke: list[bytes] = []
-    behalten = 0
+    pieces: list[bytes] = []
+    kept = 0
     with os.fdopen(fd, "rb", closefd=True) as fh:
         while True:
             block = fh.read(65536)
             if not block:
                 break
-            if behalten < hoechstens:
-                stuecke.append(block[: hoechstens - behalten])
-                behalten += len(stuecke[-1])
+            if kept < at_most:
+                pieces.append(block[: at_most - kept])
+                kept += len(pieces[-1])
     return "".join(
-        b.decode("utf-8", "replace") for b in stuecke
+        b.decode("utf-8", "replace") for b in pieces
     ).splitlines()
 
 
-def _isolation_measured(requested, beweis: dict[str, str], spec):
+def _isolation_measured(requested, proof_: dict[str, str], spec):
     """What isolation the run *demonstrably* had.
 
     Returns `(effective, mount_mode, network_policy, complaint)`. The
@@ -571,41 +571,41 @@ def _isolation_measured(requested, beweis: dict[str, str], spec):
     """
     from .sandbox import Isolation as _I, own_namespaces
 
-    eigen = own_namespaces()
-    if not eigen:
+    own = own_namespaces()
+    if not own:
         # Without the runner's own namespaces there is nothing to compare
         # against. The previous form skipped the comparison silently, which
         # made the check fail *open*: a run in the runner's own namespaces
         # would have passed unnoticed.
-        return ISOLATION_UNVERIFIED, NICHT_ANGEWANDT, NICHT_ANGEWANDT, (
+        return ISOLATION_UNVERIFIED, NOT_APPLIED, NOT_APPLIED, (
             "the runner could not read its own namespaces, so the isolation "
             "it asked for cannot be compared against anything"
         )
-    if not beweis:
-        return ISOLATION_UNVERIFIED, NICHT_ANGEWANDT, NICHT_ANGEWANDT, (
+    if not proof_:
+        return ISOLATION_UNVERIFIED, NOT_APPLIED, NOT_APPLIED, (
             f"isolation {requested.value} was requested and the command left no "
             "proof it ever started inside a sandbox; bubblewrap reports its own "
             "setup failures with the same exit code a failing check uses, so "
             "this is treated as a refusal and not as a verdict"
         )
-    gleich = [
+    equal_ = [
         name for name in ("mnt_ns", "net_ns")
-        if name in eigen and beweis.get(name) == eigen[name]
+        if name in own and proof_.get(name) == own[name]
     ]
-    if gleich:
+    if equal_:
         return _I.NONE, "read-write", "allowed", (
             f"isolation {requested.value} was requested but the command ran in "
-            f"the runner's own {', '.join(gleich)}: it was not isolated"
+            f"the runner's own {', '.join(equal_)}: it was not isolated"
         )
     mount = {
         "ro": "read-only", "rw": "read-write", "absent": "not present",
-    }.get(beweis.get("candidate_writable", ""), "unknown")
+    }.get(proof_.get("candidate_writable", ""), "unknown")
     # Derived from the measurement, not from the spec the runner itself wrote.
     # `"denied" if not spec.network` was an echo of the request dressed as an
     # observation -- the same defect in the same field, one layer down.
-    netz = (
+    network_ = (
         "denied"
-        if beweis.get("net_ns") and beweis["net_ns"] != eigen.get("net_ns")
+        if proof_.get("net_ns") and proof_["net_ns"] != own.get("net_ns")
         else "allowed"
     )
     if mount == "not present":
@@ -613,23 +613,23 @@ def _isolation_measured(requested, beweis: dict[str, str], spec):
         # logic reported a candidate that had never been mounted as read-only:
         # the precise failure this proof exists to catch produced a clean
         # receipt, with no adversarial check involved.
-        return requested, mount, netz, (
+        return requested, mount, network_, (
             f"isolation {requested.value} was requested and the candidate is "
             "not present inside the sandbox at all; the check measured "
             "something other than the object under test"
         )
     if mount != "read-only":
-        return requested, mount, netz, (
+        return requested, mount, network_, (
             f"isolation {requested.value} was requested but the candidate was "
             f"{mount} inside the sandbox; a check that can rewrite what it "
             "checks has invalidated its own result"
         )
-    if netz != "denied":
-        return requested, mount, netz, (
+    if network_ != "denied":
+        return requested, mount, network_, (
             f"isolation {requested.value} was requested and the command shared "
             "the runner's network namespace"
         )
-    return requested, mount, netz, ""
+    return requested, mount, network_, ""
 
 
 def _limit_policy() -> str:
@@ -641,12 +641,12 @@ def _limit_policy() -> str:
     `applied_limits`' own docstring calls worse than no receipt, on the same
     contract field.
     """
-    namen = {
+    names_ = {
         resource.RLIMIT_CPU: "cpu",
         resource.RLIMIT_AS: "as",
         resource.RLIMIT_FSIZE: "fsize",
     }
-    return ",".join(f"{namen[res]}={wert}" for res, wert in _unsandboxed_limits())
+    return ",".join(f"{names_[res]}={value_}" for res, value_ in _unsandboxed_limits())
 
 
 def _scratch_dir(workdir: Path) -> Path:
@@ -688,7 +688,7 @@ def _scratch_dir(workdir: Path) -> Path:
         # would leave one directory per check -- measured at up to 118 MB each
         # on this project's own runs -- and would throw away the pip and pytest
         # caches between two checks of the same candidate.
-        _frisches_scratch(scratch)
+        _fresh_scratch(scratch)
     except OSError:
         # Falling back to the old behaviour is worse than a sibling and better
         # than failing the run: a check that cannot start produces no verdict
@@ -698,7 +698,7 @@ def _scratch_dir(workdir: Path) -> Path:
     return scratch
 
 
-def _frisches_scratch(scratch: Path) -> Path:
+def _fresh_scratch(scratch: Path) -> Path:
     """Create a scratch directory this process owns, parking any it finds.
 
     Shared by both regimes. The sandboxed path had this hole open after the
@@ -710,15 +710,15 @@ def _frisches_scratch(scratch: Path) -> Path:
     # meantime was adopted as ours -- a reviewer planted a `usercustomize.py`
     # between two checks of the same candidate and it survived, which is
     # exactly the pre-plant the parking exists to stop.
-    unser = _EIGENE_SCRATCHES.get(str(scratch))
-    jetzt = scratch.stat().st_ino if scratch.exists() else None
-    if unser is None or jetzt != unser:
+    ours = _OWN_SCRATCHES.get(str(scratch))
+    moment = scratch.stat().st_ino if scratch.exists() else None
+    if ours is None or moment != ours:
         if scratch.exists():
-            stempel = datetime.datetime.now(
+            stamp = datetime.datetime.now(
                 datetime.UTC).strftime("%Y%m%dT%H%M%S%fZ")
-            scratch.rename(scratch.with_name(f"{scratch.name}.v{stempel}"))
+            scratch.rename(scratch.with_name(f"{scratch.name}.v{stamp}"))
         scratch.mkdir(parents=True)
-        _EIGENE_SCRATCHES[str(scratch)] = scratch.stat().st_ino
+        _OWN_SCRATCHES[str(scratch)] = scratch.stat().st_ino
     return scratch
 
 
@@ -726,7 +726,7 @@ def _frisches_scratch(scratch: Path) -> Path:
 #: here was made by this runner and is safe to reuse; one that is not, or one
 #: whose inode no longer matches, was put there by something else -- which is
 #: the situation the parking exists for.
-_EIGENE_SCRATCHES: dict[str, int] = {}
+_OWN_SCRATCHES: dict[str, int] = {}
 
 
 def _env(workdir: Path, extra: dict[str, str] | None) -> dict[str, str]:
@@ -903,7 +903,7 @@ def run_check(
     # before a sink or a directory exists, keeps a refused sandbox from leaving
     # half a run's worth of artifacts behind.
     backend_probe = ""
-    abgelehnt = ""
+    rejected_ = ""
     if isolation is not _Isolation.NONE and sandbox is None:
         try:
             sandbox = _select(isolation)
@@ -934,7 +934,7 @@ def run_check(
                 f"the supplied backend {sandbox.name!r} reports itself "
                 f"unusable: {backend_probe}"
             )
-            abgelehnt = sandbox.name
+            rejected_ = sandbox.name
             sandbox = None
 
     # What actually happened, filled in as it happens. Every field below is
@@ -943,20 +943,20 @@ def run_check(
     # from the spec the runner had just written -- an echo of the request
     # dressed as a measurement, which is the exact inference this record was
     # added to remove.
-    angewandt = _Isolation.NONE
-    eigen_ns: dict[str, str] = {}
-    isolation_grund = ""
-    backend_name = sandbox.name if sandbox is not None else abgelehnt
-    netz = "allowed"
+    applied_ = _Isolation.NONE
+    own_ns: dict[str, str] = {}
+    isolation_reason = ""
+    backend_name = sandbox.name if sandbox is not None else rejected_
+    network_ = "allowed"
     mount = "read-write"
-    grenzen = _limit_policy()
-    beweis: dict[str, str] = {}
+    limits_ = _limit_policy()
+    proof_: dict[str, str] = {}
     if isolation_error:
         # Nothing ran, so nothing was applied. Reporting the unsandboxed
         # regime's values here would describe a process that never existed --
         # a receipt has to be readable without knowing which branch produced
         # it.
-        netz = mount = grenzen = NICHT_ANGEWANDT
+        network_ = mount = limits_ = NOT_APPLIED
 
     buffer: object | None = None
     try:
@@ -972,13 +972,13 @@ def run_check(
         # nothing, and saying so is the whole point of failing closed.
         exit_code, runner_ok = 126, False
         note = f"Isolation {isolation.value} was requested and is unavailable: {isolation_error}"
-        isolation_grund = note
+        isolation_reason = note
     elif buffer is not None and sandbox is not None and isolation is not _Isolation.NONE:
         with buffer as fh:
             spec = None
-            lese_ende = schreib_ende = None
-            beweis_zeilen: list[str] = []
-            gestartet = False
+            read_end = write_end = None
+            proof_lines: list[str] = []
+            started_ = False
             try:
                 # Parked exactly as the unsandboxed path's scratch is, and
                 # for a reason a reviewer demonstrated rather than argued: the
@@ -988,7 +988,7 @@ def run_check(
                 # command's first line, under a receipt that says "verified
                 # from inside". The strongest-looking receipt was the
                 # vulnerable one.
-                scratch = _frisches_scratch(sink.parent / f".hoh-scratch-{receipt_id}")
+                scratch = _fresh_scratch(sink.parent / f".hoh-scratch-{receipt_id}")
                 # The proof travels out over a pipe this process holds. It used
                 # to be a file in the scratch directory -- which is
                 # bind-mounted read-write and is also the check's $HOME and
@@ -996,8 +996,8 @@ def run_check(
                 # untrusted command owned the evidence about itself. A
                 # three-line echo was enough to make a bare unsandboxed bash
                 # report honoured isolation.
-                lese_ende, schreib_ende = os.pipe()
-                os.set_inheritable(schreib_ende, True)
+                read_end, write_end = os.pipe()
+                os.set_inheritable(write_end, True)
                 spec = SandboxSpec(
                     candidate=workdir, scratch=scratch, isolation=isolation,
                     timeout=timeout,
@@ -1014,7 +1014,7 @@ def run_check(
                     # isolation. No in-tree caller passed it, which is how it
                     # stayed unnoticed.
                     extra_env=dict(env or {}),
-                    proof_fd=schreib_ende,
+                    proof_fd=write_end,
                 )
                 plan = sandbox.plan(["/bin/bash", "-c", resolved_command], spec)
                 proc = subprocess.Popen(
@@ -1025,25 +1025,25 @@ def run_check(
                     stderr=subprocess.STDOUT,
                     stdin=subprocess.DEVNULL,
                     preexec_fn=_sandbox_preexec(spec),
-                    pass_fds=(schreib_ende,),
+                    pass_fds=(write_end,),
                 )
                 # Closed here so the pipe reaches EOF when the sandbox exits.
                 # Held open in the parent, the drain would never finish.
-                os.close(schreib_ende)
-                schreib_ende = None
-                sammler = threading.Thread(
-                    target=lambda: beweis_zeilen.extend(_drain_proof(lese_ende)),
+                os.close(write_end)
+                write_end = None
+                collector_ = threading.Thread(
+                    target=lambda: proof_lines.extend(_drain_proof(read_end)),
                     daemon=True,
                 )
-                sammler.start()
-                lese_ende = None      # the thread owns it now
-                gestartet = True
+                collector_.start()
+                read_end = None      # the thread owns it now
+                started_ = True
             except SandboxUnavailable as exc:
                 exit_code, runner_ok = 126, False
                 note = f"Isolation {isolation.value} became unavailable: {exc}"
-                isolation_grund = note
-                netz = mount = grenzen = NICHT_ANGEWANDT
-                angewandt = None
+                isolation_reason = note
+                network_ = mount = limits_ = NOT_APPLIED
+                applied_ = None
             except OSError as exc:
                 # `scratch.mkdir` used to sit outside every try. An ENOSPC or
                 # an EEXIST there left `run_check` through the exception
@@ -1051,17 +1051,17 @@ def run_check(
                 # in the branch that was supposed to be the stricter one.
                 exit_code, runner_ok = 127, False
                 note = f"Sandboxed process could not be started: {exc}"
-                isolation_grund = note
-                netz = mount = grenzen = NICHT_ANGEWANDT
-                angewandt = None
+                isolation_reason = note
+                network_ = mount = limits_ = NOT_APPLIED
+                applied_ = None
             finally:
-                for fd in (lese_ende, schreib_ende):
+                for fd in (read_end, write_end):
                     if fd is not None:
                         try:
                             os.close(fd)
                         except OSError:          # pragma: no cover
                             pass
-            if gestartet:
+            if started_:
                 # The same supervisor as the unsandboxed path. The sandboxed
                 # branch used to call `subprocess.run(capture_output=True)`,
                 # which silently dropped the output ceiling and the streaming
@@ -1070,20 +1070,20 @@ def run_check(
                 exit_code, runner_ok, truncated, note = _supervise(
                     proc, sink, timeout=timeout, max_output_bytes=max_output_bytes
                 )
-                grenzen = applied_limits(spec)
-                sammler.join(timeout=10)
+                limits_ = applied_limits(spec)
+                collector_.join(timeout=10)
                 from .sandbox import marker_reading
 
-                beweis = (
-                    marker_reading("\n".join(beweis_zeilen))
+                proof_ = (
+                    marker_reading("\n".join(proof_lines))
                     if plan.proves_isolation else {}
                 )
-                eigen_ns = _own_ns()
-                angewandt, mount, netz, grund = _isolation_measured(
-                    isolation, beweis, spec
+                own_ns = _own_ns()
+                applied_, mount, network_, reason = _isolation_measured(
+                    isolation, proof_, spec
                 )
-                isolation_grund = grund
-                if grund:
+                isolation_reason = reason
+                if reason:
                     # Requested isolation, and the measurement does not show
                     # it. Not a product verdict under any circumstances: a
                     # check that did not run in the regime it was supposed to
@@ -1091,10 +1091,10 @@ def run_check(
                     runner_ok = False
                     if exit_code not in INFRA_EXIT_CODES:
                         exit_code = 126
-                    note = f"{grund} (backend {sandbox.name})"
+                    note = f"{reason} (backend {sandbox.name})"
                 elif not note:
                     note = (
-                        f"executed under {angewandt.value} isolation "
+                        f"executed under {applied_.value} isolation "
                         f"({sandbox.name}), verified from inside: "
                         f"mnt/net namespaces differ from the runner's, "
                         f"candidate {mount}"
@@ -1165,25 +1165,25 @@ def run_check(
             # the launch itself failed.
             effective=(
                 ISOLATION_REFUSED
-                if (isolation_error or angewandt is None)
-                else getattr(angewandt, "value", angewandt)
+                if (isolation_error or applied_ is None)
+                else getattr(applied_, "value", applied_)
             ),
             backend=backend_name,
             backend_probe=backend_probe,
             fallback_to_none=(
                 isolation is not _Isolation.NONE
                 and not isolation_error
-                and angewandt is _Isolation.NONE
+                and applied_ is _Isolation.NONE
             ),
-            verified_from_inside=bool(beweis),
-            complaint=isolation_grund,
+            verified_from_inside=bool(proof_),
+            complaint=isolation_reason,
             observed_namespaces={
-                k: v for k, v in beweis.items() if k.endswith("_ns")
+                k: v for k, v in proof_.items() if k.endswith("_ns")
             },
-            runner_namespaces=eigen_ns,
-            network_policy=netz,
+            runner_namespaces=own_ns,
+            network_policy=network_,
             candidate_mount_mode=mount,
-            resource_limit_policy=grenzen,
+            resource_limit_policy=limits_,
         ),
     )
     return receipt, combined

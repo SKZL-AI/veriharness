@@ -212,36 +212,36 @@ class AuthorityPolicy:
     rationale: str = ""
 
     def objections(self, record: AssuranceRecord) -> list[str]:
-        raus: list[str] = []
+        out_list: list[str] = []
         if record.source.kind not in self.allowed:
-            erlaubt = ", ".join(sorted(k.value for k in self.allowed))
-            raus.append(
+            allowed_ = ", ".join(sorted(k.value for k in self.allowed))
+            out_list.append(
                 f"{record.source.kind.value} cannot answer {self.metric_id}; "
-                f"only {erlaubt} can. {self.rationale}"
+                f"only {allowed_} can. {self.rationale}"
             )
         elif self.preferred and record.source.kind is not self.preferred:
-            raus.append(
+            out_list.append(
                 f"answered from {record.source.kind.value} where "
                 f"{self.preferred.value} is the authority for {self.metric_id}"
             )
         if self.requires_binding and not record.source.subject_head:
-            raus.append(
+            out_list.append(
                 f"{self.metric_id} requires the commit it was measured at, and "
                 "the record names none"
             )
         if self.requires_falsifier and record.falsifier is not FalsifierState.KILLED:
-            raus.append(
+            out_list.append(
                 f"{self.metric_id} requires a negative control that caught "
                 f"something; this one is {record.falsifier.value}"
             )
         if self.requires_cross_check is not None:
             cc = record.cross_check
             if cc is None or cc.kind is not self.requires_cross_check:
-                raus.append(
+                out_list.append(
                     f"{self.metric_id} requires an independent "
                     f"{self.requires_cross_check.value} cross-check"
                 )
-        return raus
+        return out_list
 
 
 #: The policies this project decides releases on. Absent from here means: no
@@ -326,8 +326,8 @@ def authority_for(metric_id: str) -> AuthorityPolicy | None:
     """
     if metric_id in AUTHORITIES:
         return AUTHORITIES[metric_id]
-    klasse = metric_id.split(":", 1)[0]
-    return AUTHORITIES.get(klasse)
+    class_name = metric_id.split(":", 1)[0]
+    return AUTHORITIES.get(class_name)
 
 
 class Provenance(StrEnum):
@@ -530,18 +530,18 @@ class AssuranceRecord(Strict):
         more than one way at once, and fixing one of three is not progress
         anybody should be able to report as green.
         """
-        offen: list[str] = []
+        open_: list[str] = []
 
         # Any state that is not VERIFIED. Derived from the enum, so a state
         # added later is caught by default rather than by remembering.
         if self.state is ResultState.FAILED:
-            offen.append("the metric measured a failure")
+            open_.append("the metric measured a failure")
         elif self.state in NOT_A_PASS:
-            offen.append(f"state is {self.state.value}, which is not a pass")
+            open_.append(f"state is {self.state.value}, which is not a pass")
 
         # absence != zero, and empty source != measured zero.
         if self.source.kind is SourceKind.ABSENT:
-            offen.append(
+            open_.append(
                 "no source was read; the result can only be NOT_DETERMINABLE"
             )
 
@@ -549,7 +549,7 @@ class AssuranceRecord(Strict):
         # first version applied this only to logs, so a record honestly
         # declaring "I read run state where git was the answer" passed clean.
         if self.stronger_source_available is not None:
-            offen.append(
+            open_.append(
                 f"read from {self.source.kind.value} while "
                 f"{self.stronger_source_available.value} was available for "
                 "the same question"
@@ -557,7 +557,7 @@ class AssuranceRecord(Strict):
 
         # logs are not authoritative for anything release-critical.
         if self.source.kind is SourceKind.TRANSIENT_LOG and self.critical:
-            offen.append(
+            open_.append(
                 "a release-critical metric read from a transient log; a log "
                 "does not outlive the process, and a process that was "
                 "killed logged nothing while still having acted"
@@ -566,17 +566,17 @@ class AssuranceRecord(Strict):
         # a critical metric without a working falsifier cannot be authoritative.
         if self.critical:
             if self.falsifier is FalsifierState.ESCAPED:
-                offen.append(
+                open_.append(
                     "the negative control was not caught: this metric has been "
                     f"shown unable to fail ({self.falsifier_detail or 'no detail'})"
                 )
             elif self.falsifier is FalsifierState.NOT_RUN:
-                offen.append(
+                open_.append(
                     "no negative control was run, so it is unknown whether this "
                     "metric can fail at all"
                 )
             if self.provenance is Provenance.DECLARED:
-                offen.append(
+                open_.append(
                     "hand-assembled: this module did not read the source it "
                     "names. Use one of the from_* builders, or accept that "
                     "every field here is the caller's word"
@@ -585,12 +585,12 @@ class AssuranceRecord(Strict):
         # stale evidence from another head is not current evidence.
         if subject_head:
             if self.source.subject_head and self.source.subject_head != subject_head:
-                offen.append(
+                open_.append(
                     f"measured at {self.source.subject_head[:12]}, but the "
                     f"subject is {subject_head[:12]}"
                 )
             elif not self.source.subject_head and self.source.kind in HEAD_BOUND:
-                offen.append(
+                open_.append(
                     f"a {self.source.kind.value} value that does not say which "
                     "commit it was measured at cannot be checked for staleness"
                 )
@@ -598,19 +598,19 @@ class AssuranceRecord(Strict):
         # The metric's own authority, where it has one. Checked before the
         # general rules, because "git is durable" is no answer to "git cannot
         # tell you what stage a run is in".
-        politik = authority_for(self.metric_id)
-        if politik is not None:
-            offen.extend(politik.objections(self))
+        policy_ = authority_for(self.metric_id)
+        if policy_ is not None:
+            open_.extend(policy_.objections(self))
 
         # A source outside the trusted base needs a cross-check to stand.
         if self.critical and self.source.kind not in TRUSTED_BASE:
             if self.cross_check is None:
-                offen.append(
+                open_.append(
                     f"{self.source.kind.value} is outside the trusted base and "
                     "no independent cross-check was recorded"
                 )
             elif self.cross_check.kind not in TRUSTED_BASE:
-                offen.append(
+                open_.append(
                     "the cross-check is itself outside the trusted base, which "
                     "moves the question rather than answering it"
                 )
@@ -620,12 +620,12 @@ class AssuranceRecord(Strict):
         cc = self.cross_check
         if cc is not None and cc.identity == self.source.identity:
             if cc.digest and self.source.digest and cc.digest != self.source.digest:
-                offen.append(
+                open_.append(
                     f"the cross-check quotes {cc.identity} with digest "
                     f"{cc.digest[:12]} while the source says "
                     f"{self.source.digest[:12]}: two different things with one name"
                 )
-        return offen
+        return open_
 
     def authoritative(self, *, subject_head: str | None = None) -> bool:
         """May this record be used to call a release green?
@@ -641,8 +641,8 @@ class AssuranceRecord(Strict):
 # --------------------------------------------------------------------------- #
 
 
-def _digest_bytes(roh: bytes) -> str:
-    return hashlib.sha256(roh).hexdigest()[:16]
+def _digest_bytes(raw_: bytes) -> str:
+    return hashlib.sha256(raw_).hexdigest()[:16]
 
 
 def git_head(repo: Path | str) -> str:
@@ -676,7 +676,7 @@ def from_git(
     p = subprocess.run(
         ["git", "-C", str(repo), *argv], capture_output=True, text=True
     )
-    gemessen, zustand = interpret(p)
+    measured_, condition = interpret(p)
     return AssuranceRecord(
         metric_id=metric_id,
         source=EvidenceSource(
@@ -693,8 +693,8 @@ def from_git(
         ),
         note=f"read at {git_head(repo)[:12] or 'unknown'} in {repo}",
         derivation=derivation,
-        measured=gemessen,
-        state=zustand,
+        measured=measured_,
+        state=condition,
         falsifier=falsifier,
         falsifier_detail=falsifier_detail,
         critical=critical,
@@ -732,17 +732,17 @@ def from_json_state(
             critical=critical,
             provenance=Provenance.MEASURED,
         )
-    roh = p.read_bytes()
-    gemessen, zustand = interpret(json.loads(roh.decode("utf-8")))
+    raw_ = p.read_bytes()
+    measured_, condition = interpret(json.loads(raw_.decode("utf-8")))
     return AssuranceRecord(
         metric_id=metric_id,
         source=EvidenceSource(
-            kind=kind, identity=str(p), digest=_digest_bytes(roh),
+            kind=kind, identity=str(p), digest=_digest_bytes(raw_),
             subject_head=subject_head,
         ),
         derivation=derivation,
-        measured=gemessen,
-        state=zustand,
+        measured=measured_,
+        state=condition,
         falsifier=falsifier,
         falsifier_detail=falsifier_detail,
         critical=critical,
@@ -768,7 +768,7 @@ def from_ci_step(
     either. That is false green number five: the job was green, and the step
     that was supposed to measure the sandbox never ran.
     """
-    zustand = {
+    condition = {
         "success": ResultState.VERIFIED,
         "failure": ResultState.FAILED,
         "skipped": ResultState.UNSUPPORTED_ENVIRONMENT,
@@ -783,7 +783,7 @@ def from_ci_step(
         ),
         derivation=derivation,
         measured=conclusion,
-        state=zustand,
+        state=condition,
         falsifier=falsifier,
         falsifier_detail=falsifier_detail,
         critical=critical,
@@ -806,11 +806,11 @@ class AssuranceClosure(Strict):
     @model_validator(mode="after")
     def _ids_are_unique(self) -> AssuranceClosure:
         ids = [r.metric_id for r in self.records]
-        doppelt = sorted({i for i in ids if ids.count(i) > 1})
-        if doppelt:
+        twice_ = sorted({i for i in ids if ids.count(i) > 1})
+        if twice_:
             raise ValueError(
                 "duplicate metric_id(s) in one closure: "
-                + ", ".join(doppelt)
+                + ", ".join(twice_)
                 + " -- two records under one name means the report shows one "
                 "record's reasons against the other's row"
             )
@@ -823,16 +823,16 @@ class AssuranceClosure(Strict):
         requirement nobody measured is the most complete way to be wrong about
         it.
         """
-        raus: dict[str, list[str]] = {}
+        out_list: dict[str, list[str]] = {}
         for r in self.records:
-            gruende = r.weaknesses(subject_head=self.subject_head)
-            if gruende:
-                raus[r.metric_id] = gruende
-        vorhanden = {r.metric_id for r in self.records}
-        for verlangt in self.required:
-            if verlangt not in vorhanden:
-                raus[verlangt] = ["required, and no record was produced for it"]
-        return raus
+            reasons = r.weaknesses(subject_head=self.subject_head)
+            if reasons:
+                out_list[r.metric_id] = reasons
+        present = {r.metric_id for r in self.records}
+        for demands in self.required:
+            if demands not in present:
+                out_list[demands] = ["required, and no record was produced for it"]
+        return out_list
 
     def green(self) -> bool:
         """True only when every record is authoritative and nothing required
@@ -848,28 +848,28 @@ class AssuranceClosure(Strict):
         return not self.problems()
 
     def by_state(self) -> dict[str, int]:
-        zaehler: dict[str, int] = {s.value: 0 for s in ResultState}
+        counter: dict[str, int] = {s.value: 0 for s in ResultState}
         for r in self.records:
-            zaehler[r.state.value] += 1
-        return {k: v for k, v in zaehler.items() if v}
+            counter[r.state.value] += 1
+        return {k: v for k, v in counter.items() if v}
 
     def report(self) -> str:
-        zeilen = [
+        lines = [
             f"meta-evidence closure over {len(self.records)} metric(s)"
             + (f" at {self.subject_head[:12]}" if self.subject_head else "")
         ]
-        probleme = self.problems()
+        issues = self.problems()
         for r in sorted(self.records, key=lambda x: x.metric_id):
-            marke = "OK " if r.metric_id not in probleme else "NOT"
-            zeilen.append(
+            marke = "OK " if r.metric_id not in issues else "NOT"
+            lines.append(
                 f"  {marke}  {r.metric_id:<38s} {r.state.value:<24s} "
                 f"{r.source.kind.value}"
             )
-            for g in probleme.get(r.metric_id, []):
-                zeilen.append(f"          - {g}")
-        for fehlt in sorted(set(probleme) - {r.metric_id for r in self.records}):
-            zeilen.append(f"  NOT  {fehlt:<38s} {'MISSING':<24s} -")
-            for g in probleme[fehlt]:
-                zeilen.append(f"          - {g}")
-        zeilen.append(f"  => {'GREEN' if self.green() else 'NOT GREEN'}")
-        return "\n".join(zeilen)
+            for g in issues.get(r.metric_id, []):
+                lines.append(f"          - {g}")
+        for missing in sorted(set(issues) - {r.metric_id for r in self.records}):
+            lines.append(f"  NOT  {missing:<38s} {'MISSING':<24s} -")
+            for g in issues[missing]:
+                lines.append(f"          - {g}")
+        lines.append(f"  => {'GREEN' if self.green() else 'NOT GREEN'}")
+        return "\n".join(lines)

@@ -168,15 +168,22 @@ def test_a_capsule_from_another_history_is_a_gap_not_a_pass(tmp_path):
 
 def test_a_moved_head_is_drift_and_says_how_far(tmp_path):
     """The capsule is not wrong about the past; it is stale about the present,
-    and a successor deserves to know by how much."""
+    and a successor deserves to know by how much.
+
+    O187. This read `HEAD~1` and expected drift, which stopped being true the
+    day O184 made a one-commit distance correct when that commit is the
+    capsule's own -- and the last commit of a phase close is exactly that. Two
+    commits back is drift under the narrow rule for any history, so the case
+    no longer depends on what the tip happens to contain.
+    """
     capsule = _capsule(tmp_path)
-    parent = su._git("rev-parse", "HEAD~1")
-    if not parent:
+    grandparent = su._git("rev-parse", "HEAD~2")
+    if not grandparent:
         import pytest
-        pytest.skip("no parent commit in this checkout")
-    capsule["internal_commit"] = parent
+        pytest.skip("fewer than two parent commits in this checkout")
+    capsule["internal_commit"] = grandparent
     verdict, detail = _verdict(capsule, "internal_commit")
-    assert verdict == su.DRIFT and "moved 1 commit(s)" in detail
+    assert verdict == su.DRIFT and "moved 2 commit(s)" in detail
 
 
 def test_the_commit_that_records_the_capsule_is_not_drift(tmp_path):
@@ -197,26 +204,26 @@ def test_the_commit_that_records_the_capsule_is_not_drift(tmp_path):
     git("add", "-A"); git("commit", "-qm", "first")
     base = git("rev-parse", "HEAD").stdout.strip()
 
-    kapsel_rel = "dogfood/succession/SUCCESSION.json"
-    (repo / kapsel_rel).write_text("{}\n")
+    capsule_rel = "dogfood/succession/SUCCESSION.json"
+    (repo / capsule_rel).write_text("{}\n")
     git("add", "-A"); git("commit", "-qm", "capsule")
     head = git("rev-parse", "HEAD").stdout.strip()
 
-    alt_hoh, alt_capsule = su.HOH, su.CAPSULE
+    old_hoh, old_capsule = su.HOH, su.CAPSULE
     try:
-        su.HOH, su.CAPSULE = repo, repo / kapsel_rel
+        su.HOH, su.CAPSULE = repo, repo / capsule_rel
         assert su._only_the_capsule_moved(base, head) is True
 
         # The negative control, and it is the whole point: the same shape of
         # commit carrying one more file is drift.
         (repo / "other.md").write_text("two\n")
-        (repo / kapsel_rel).write_text("{ }\n")
+        (repo / capsule_rel).write_text("{ }\n")
         git("add", "-A"); git("commit", "-qm", "capsule and more")
         assert su._only_the_capsule_moved(head, git("rev-parse", "HEAD").stdout.strip()) is False
         # And two commits of distance is drift even if both are the capsule.
         assert su._only_the_capsule_moved(base, git("rev-parse", "HEAD").stdout.strip()) is False
     finally:
-        su.HOH, su.CAPSULE = alt_hoh, alt_capsule
+        su.HOH, su.CAPSULE = old_hoh, old_capsule
 
 
 def test_an_unreachable_plan_is_a_gap_and_claims_nothing(tmp_path):

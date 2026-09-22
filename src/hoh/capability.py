@@ -134,19 +134,19 @@ class RoleExecutionPolicy:
         not get a different answer than the place it actually lands.
         """
         try:
-            ziel = Path(path).expanduser().resolve()
+            target = Path(path).expanduser().resolve()
         except OSError:                            # pragma: no cover - exotic
             return False
         for scope in self.write_scopes:
             s = scope.expanduser().resolve()
-            if ziel == s or s in ziel.parents:
+            if target == s or s in target.parents:
                 return True
         return False
 
     def summary(self) -> str:
-        erlaubt = [c.value for c in Capability if self.allows(c)]
+        allowed_ = [c.value for c in Capability if self.allows(c)]
         return (
-            f"{self.role}: {', '.join(erlaubt) or 'nothing'}"
+            f"{self.role}: {', '.join(allowed_) or 'nothing'}"
             f" · writes {len(self.write_scopes)} scope(s)"
             f" · protects {len(self.protected)} tree(s)"
             f" + {len(self.protected_shallow)} listing(s)"
@@ -160,7 +160,7 @@ class RoleExecutionPolicy:
 #: witness nobody leaves switched on. Git-level mutation is covered instead by
 #: the post-hoc measurement in `tools/confinement_evidence.py`, which reads
 #: refs, unreachable objects, the index and the working tree.
-VCS_METADATEN = ".git"
+VCS_METADATA = ".git"
 
 #: What *is* read out of `.git`, because these change only when somebody moves
 #: the repository's history: the current head, the ref files, and the packed
@@ -173,9 +173,9 @@ VCS_METADATEN = ".git"
 #: changing. A reviewer demonstrated it. `config` and the hooks are in for the
 #: same reason -- `core.hooksPath`, a clean/smudge filter and a hook all change
 #: what comes out of a checkout without touching the history.
-GIT_ZUSTAND = ("HEAD", "packed-refs", "config",
+GIT_STATE = ("HEAD", "packed-refs", "config",
                "info/attributes", "info/exclude")
-GIT_VERZEICHNISSE = ("refs", "hooks")
+GIT_DIRECTORIES = ("refs", "hooks")
 
 
 def git_state_digest(root: Path | str) -> str:
@@ -195,43 +195,43 @@ def git_state_digest(root: Path | str) -> str:
     `ref: refs/heads/<branch>` before and after a commit, and seen nothing.
     Both directories are read.
     """
-    p = Path(root) / VCS_METADATEN
+    p = Path(root) / VCS_METADATA
     if p.is_file():                       # a worktree: .git is a pointer file
         try:
-            ziel = p.read_text().split("gitdir:", 1)[-1].strip()
+            target = p.read_text().split("gitdir:", 1)[-1].strip()
         except OSError:                   # pragma: no cover
             return ""
-        p = Path(ziel)
+        p = Path(target)
     if not p.is_dir():
         return ""
-    orte = [p]
-    gemeinsam = p / "commondir"
-    if gemeinsam.is_file():
+    places = [p]
+    shared = p / "commondir"
+    if shared.is_file():
         try:
-            ziel = (p / gemeinsam.read_text().strip()).resolve()
+            target = (p / shared.read_text().strip()).resolve()
         except OSError:                   # pragma: no cover
-            ziel = None
-        if ziel is not None and ziel.is_dir() and ziel != p:
-            orte.append(ziel)
+            target = None
+        if target is not None and target.is_dir() and target != p:
+            places.append(target)
     h = hashlib.sha256()
-    for ort in orte:
-        for name in GIT_ZUSTAND:
-            f = ort / name
+    for place in places:
+        for name in GIT_STATE:
+            f = place / name
             if f.is_file():
                 h.update(str(f).encode())
                 h.update(f.read_bytes())
-        for unter in GIT_VERZEICHNISSE:
-            baum = ort / unter
-            if not baum.is_dir():
+        for below in GIT_DIRECTORIES:
+            tree_ = place / below
+            if not tree_.is_dir():
                 continue
-            for f in sorted(baum.rglob("*")):
+            for f in sorted(tree_.rglob("*")):
                 if f.is_file():
-                    h.update(str(f.relative_to(ort)).encode())
+                    h.update(str(f.relative_to(place)).encode())
                     h.update(f.read_bytes())
     return h.hexdigest()[:16]
 
 
-def _eintrag(pfad: Path, rel: str, h) -> None:
+def _entry(file_path: Path, rel: str, h) -> None:
     """Fold one filesystem entry into a digest, whatever kind it is.
 
     Every kind is folded in, including the ones an earlier version skipped:
@@ -239,21 +239,21 @@ def _eintrag(pfad: Path, rel: str, h) -> None:
     contains no files to notice), and a file's executable bit (which is not a
     content change). Each of those was a way past the check.
     """
-    if pfad.is_symlink():
+    if file_path.is_symlink():
         h.update(b"L")
         h.update(rel.encode())
         h.update(b"\x00")
-        h.update(os.readlink(pfad).encode())
-    elif pfad.is_dir():
+        h.update(os.readlink(file_path).encode())
+    elif file_path.is_dir():
         h.update(b"D")
         h.update(rel.encode())
         h.update(b"\x00")
-    elif pfad.is_file():
-        h.update(b"Fx" if os.access(pfad, os.X_OK) else b"F-")
+    elif file_path.is_file():
+        h.update(b"Fx" if os.access(file_path, os.X_OK) else b"F-")
         h.update(rel.encode())
         h.update(b"\x00")
         try:
-            h.update(hashlib.sha256(pfad.read_bytes()).digest())
+            h.update(hashlib.sha256(file_path.read_bytes()).digest())
         except OSError:                            # pragma: no cover
             h.update(b"?")
 
@@ -277,14 +277,14 @@ def tree_digest(root: Path | str) -> str:
     p = Path(root)
     h = hashlib.sha256()
     if p.is_symlink() or p.is_file():
-        _eintrag(p, p.name, h)
+        _entry(p, p.name, h)
         return h.hexdigest()[:16]
     if not p.is_dir():
         return ""
-    for eintrag in sorted(p.rglob("*")):
-        if VCS_METADATEN in eintrag.parts:
+    for entry in sorted(p.rglob("*")):
+        if VCS_METADATA in entry.parts:
             continue
-        _eintrag(eintrag, str(eintrag.relative_to(p)), h)
+        _entry(entry, str(entry.relative_to(p)), h)
     return h.hexdigest()[:16]
 
 
@@ -305,17 +305,17 @@ def repo_digest(root: Path | str) -> str:
     witness has no business failing a run over them.
     """
     p = Path(root)
-    if not (p / VCS_METADATEN).exists():
+    if not (p / VCS_METADATA).exists():
         return tree_digest(p)
     import subprocess
 
-    aus = subprocess.run(
+    out = subprocess.run(
         ["git", "-C", str(p), "status", "--porcelain", "-uall"],
         capture_output=True, text=True, check=False)
-    if aus.returncode != 0:                        # pragma: no cover - exotic
+    if out.returncode != 0:                        # pragma: no cover - exotic
         return tree_digest(p)
     h = hashlib.sha256()
-    h.update(aus.stdout.encode())
+    h.update(out.stdout.encode())
     h.update(git_state_digest(p).encode())
     return h.hexdigest()[:16]
 
@@ -365,7 +365,7 @@ class CapabilityWitness:
             git={str(p): git_state_digest(p) for p in policy.protected},
         )
 
-    def neu_bezeugen(self, pfade: Iterable[Path | str]) -> list[str]:
+    def witness_again(self, paths: Iterable[Path | str]) -> list[str]:
         """Re-takes the baseline for exactly these paths, and says which.
 
         For the one writer this witness cannot otherwise account for: the
@@ -387,18 +387,18 @@ class CapabilityWitness:
         rewriting anyway, so no digest could attribute it either. Recorded in
         `docs/LIMITATIONS.md` rather than left to be found.
         """
-        erneuert = []
-        for pfad in pfade:
-            schluessel = str(pfad)
-            p = Path(schluessel)
-            if schluessel in self.digests:
-                self.digests[schluessel] = repo_digest(p)
-                erneuert.append(schluessel)
-            if schluessel in self.git:
-                self.git[schluessel] = git_state_digest(p)
-            if schluessel in self.shallow:
-                self.shallow[schluessel] = shallow_digest(p)
-        return erneuert
+        renewed = []
+        for file_path in paths:
+            key = str(file_path)
+            p = Path(key)
+            if key in self.digests:
+                self.digests[key] = repo_digest(p)
+                renewed.append(key)
+            if key in self.git:
+                self.git[key] = git_state_digest(p)
+            if key in self.shallow:
+                self.shallow[key] = shallow_digest(p)
+        return renewed
 
     def violations(self) -> list[str]:
         """Protected trees that differ from when this witness was taken.
@@ -409,30 +409,30 @@ class CapabilityWitness:
         terminal would all produce this, and a ledger entry saying the planner
         did it would be the wrong kind of sentence in an evidence system.
         """
-        raus = []
-        for pfad, vorher in self.digests.items():
-            nachher = repo_digest(Path(pfad))
-            if nachher != vorher:
-                raus.append(
+        out_list = []
+        for file_path, before in self.digests.items():
+            after = repo_digest(Path(file_path))
+            if after != before:
+                out_list.append(
                     f"a protected tree changed during {self.policy.role}'s "
-                    f"dispatch: {pfad} "
-                    f"({vorher or 'absent'} -> {nachher or 'absent'})"
+                    f"dispatch: {file_path} "
+                    f"({before or 'absent'} -> {after or 'absent'})"
                 )
-        for pfad, vorher in self.git.items():
-            nachher = git_state_digest(Path(pfad))
-            if nachher != vorher:
-                raus.append(
+        for file_path, before in self.git.items():
+            after = git_state_digest(Path(file_path))
+            if after != before:
+                out_list.append(
                     f"a protected repository's history moved during "
-                    f"{self.policy.role}'s dispatch: {pfad}"
+                    f"{self.policy.role}'s dispatch: {file_path}"
                 )
-        for pfad, vorher in self.shallow.items():
-            nachher = shallow_digest(Path(pfad))
-            if nachher != vorher:
-                raus.append(
+        for file_path, before in self.shallow.items():
+            after = shallow_digest(Path(file_path))
+            if after != before:
+                out_list.append(
                     f"a protected directory gained or lost a child during "
-                    f"{self.policy.role}'s dispatch: {pfad}"
+                    f"{self.policy.role}'s dispatch: {file_path}"
                 )
-        return raus
+        return out_list
 
 
 class CapabilityViolation(RuntimeError):

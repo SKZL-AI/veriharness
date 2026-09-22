@@ -110,10 +110,10 @@ def _register_trust(store, root) -> str | None:
         # What actually stops a write there is the witness in `capability.py`,
         # which fails the run closed. This narrows what HoH asks for to what
         # its roles need: a place to put their answer.
-        antworten = store.dir / "answers"
-        antworten.mkdir(parents=True, exist_ok=True)
+        answers = store.dir / "answers"
+        answers.mkdir(parents=True, exist_ok=True)
         registered = [
-            path for path in (store.arenas_dir, planner_root, antworten)
+            path for path in (store.arenas_dir, planner_root, answers)
             if trust.register(path, owned_root=root)
         ]
         if registered:
@@ -578,42 +578,42 @@ def cmd_amend(args) -> int:
     from .amendment import AmendmentKind, AmendmentLedger, park_and_amend, text_digest
 
     store = _store(args)
-    neuer_text = Path(args.spec_file).expanduser().read_text(encoding="utf-8")
+    new_text = Path(args.spec_file).expanduser().read_text(encoding="utf-8")
     try:
         with store.lock():
             state = store.read_state()
-            kette = store.read_amendments(origin_digest=state.spec_digest)
-            if not kette.amendments and kette.origin_digest != state.spec_digest:
-                kette = AmendmentLedger(run_id=state.run_id,
+            chain = store.read_amendments(origin_digest=state.spec_digest)
+            if not chain.amendments and chain.origin_digest != state.spec_digest:
+                chain = AmendmentLedger(run_id=state.run_id,
                                         origin_digest=state.spec_digest)
-            betroffen = [c.strip() for c in (args.affects or "").split(",") if c.strip()]
-            nach_annahme = state.last_accepted_candidate is not None
+            affected = [c.strip() for c in (args.affects or "").split(",") if c.strip()]
+            after_acceptance = state.last_accepted_candidate is not None
             amendment = park_and_amend(
-                state.spec_path, neuer_text,
+                state.spec_path, new_text,
                 run_id=state.run_id, amendment_id=args.amendment_id,
                 kind=AmendmentKind(args.kind), actor=args.actor,
-                reason=args.reason, affected_criteria=betroffen,
+                reason=args.reason, affected_criteria=affected,
                 evidence=[e for e in (args.evidence or "").split(",") if e],
-                after_acceptance=nach_annahme, write_seq=state.write_seq,
+                after_acceptance=after_acceptance, write_seq=state.write_seq,
             )
             # Built before the chain is written, so a duplicate id or a
             # broken chain is refused with nothing changed. The amendment
             # itself already validated before the specification moved.
-            kette = AmendmentLedger(
-                run_id=kette.run_id, origin_digest=kette.origin_digest,
-                amendments=[*kette.amendments, amendment],
+            chain = AmendmentLedger(
+                run_id=chain.run_id, origin_digest=chain.origin_digest,
+                amendments=[*chain.amendments, amendment],
             )
-            store.write_amendments(kette)
+            store.write_amendments(chain)
             state.note(f"specification amended: {amendment.summary()}")
-            state.spec_digest = text_digest(neuer_text)
+            state.spec_digest = text_digest(new_text)
             store.write_state(state)
     except (StoreError, LockBusy, ValueError, OSError) as exc:
         print(f"refused: {exc}", file=sys.stderr)
         return 2
-    print(kette.report())
-    noetig = kette.revalidation_needed()
-    if noetig:
-        print(f"\nAcceptance is withheld until {', '.join(sorted(noetig))} "
+    print(chain.report())
+    needed = chain.revalidation_needed()
+    if needed:
+        print(f"\nAcceptance is withheld until {', '.join(sorted(needed))} "
               "has been planned and measured against the new text.")
     return 0
 
@@ -625,11 +625,11 @@ def _inconclusive_checks(store, state, iteration: int) -> list[tuple[str, str]]:
     "not accepted", and only the receipt knows whether that was a product
     defect or an infrastructure refusal.
     """
-    raus: list[tuple[str, str]] = []
-    verzeichnis = store.dir / "receipts"
-    if not verzeichnis.is_dir():
-        return raus
-    for f in sorted(verzeichnis.glob(f"{state.run_id}-i{iteration}-*.json")):
+    out_list: list[tuple[str, str]] = []
+    directory = store.dir / "receipts"
+    if not directory.is_dir():
+        return out_list
+    for f in sorted(directory.glob(f"{state.run_id}-i{iteration}-*.json")):
         if f.stem.endswith("-basis"):
             continue
         try:
@@ -638,14 +638,14 @@ def _inconclusive_checks(store, state, iteration: int) -> list[tuple[str, str]]:
             continue
         if d.get("runner_ok", True) and d.get("exit_code") not in (124, 126, 127):
             continue
-        grund = {
+        why = {
             124: "timeout", 126: "refused or not executable", 127: "not found",
         }.get(d.get("exit_code"), "infrastructure error")
-        raus.append((d.get("check_id", f.stem), grund))
-    return raus
+        out_list.append((d.get("check_id", f.stem), why))
+    return out_list
 
 
-def _isolation_for_run(state, angefordert: str | None):
+def _isolation_for_run(state, requested_: str | None):
     """The isolation for this invocation, reconciled with the run's own.
 
     Three cases, and only one of them is a judgement call:
@@ -657,20 +657,20 @@ def _isolation_for_run(state, angefordert: str | None):
       sandbox and partly not, and the run record would carry a single word for
       two different regimes.
     """
-    gespeichert = getattr(state, "isolation", "none") or "none"
-    if angefordert is None or angefordert == gespeichert:
-        return _isolation(gespeichert)
-    neu = _isolation(angefordert)
-    rang = {"none": 0, "strict": 1}
-    if rang.get(angefordert, 0) < rang.get(gespeichert, 0):
+    stored = getattr(state, "isolation", "none") or "none"
+    if requested_ is None or requested_ == stored:
+        return _isolation(stored)
+    created = _isolation(requested_)
+    rank = {"none": 0, "strict": 1}
+    if rank.get(requested_, 0) < rank.get(stored, 0):
         raise ValueError(
-            f"this run was started under --isolation {gespeichert} and asking "
-            f"for {angefordert} now would verify part of it under a sandbox "
+            f"this run was started under --isolation {stored} and asking "
+            f"for {requested_} now would verify part of it under a sandbox "
             "and part of it without one. Start a new run if that is what you "
             "want; a run's isolation is a property of the run."
         )
-    state.isolation = angefordert
-    return neu
+    state.isolation = requested_
+    return created
 
 
 def _isolation(name: str):
@@ -688,8 +688,8 @@ def _isolation(name: str):
     try:
         return Isolation(name)
     except ValueError:
-        erlaubt = ", ".join(i.value for i in Isolation)
-        raise ValueError(f"unknown isolation {name!r}; expected one of: {erlaubt}") from None
+        allowed_ = ", ".join(i.value for i in Isolation)
+        raise ValueError(f"unknown isolation {name!r}; expected one of: {allowed_}") from None
 
 
 def _per_role(pairs: list[str]) -> dict[Role, str]:
@@ -830,9 +830,9 @@ def cmd_run(args) -> int:
     # before that -- an unreadable spec, a stop request, `--iterations 0` --
     # left the run recorded as unsandboxed, and the next `hoh run` continued it
     # that way without a word.
-    gewuenscht = isolation.value if isolation is not None else "none"
-    if state.isolation != gewuenscht:
-        state.isolation = gewuenscht
+    wanted = isolation.value if isolation is not None else "none"
+    if state.isolation != wanted:
+        state.isolation = wanted
         with store.lock():
             store.write_state(state)
 
@@ -882,8 +882,8 @@ def cmd_run(args) -> int:
         waiting_for_approval = waiting_for_approval or out.waiting_for_approval
         label = "accepted" if out.accepted else "not accepted"
         print(f"Iteration {out.iteration}: {label} -- {out.reason}")
-        unklar = _inconclusive_checks(store, state, out.iteration)
-        if unklar and not out.accepted:
+        undecided = _inconclusive_checks(store, state, out.iteration)
+        if undecided and not out.accepted:
             # "Not accepted" is true and useless when the reason is that
             # nothing ran. An iteration whose criteria were refused by the
             # guard, timed out, or could not be isolated has measured nothing
@@ -891,9 +891,9 @@ def cmd_run(args) -> int:
             # product rejection is the laundering this project exists to stop.
             # A reviewer read exactly that off a real run's log.
             print(
-                f"  {len(unklar)} of these did not run at all "
+                f"  {len(undecided)} of these did not run at all "
                 f"(INCONCLUSIVE, not a verdict): "
-                + ", ".join(f"{cid} [{grund}]" for cid, grund in unklar)
+                + ", ".join(f"{cid} [{why}]" for cid, why in undecided)
             )
 
         if state.condition is not Condition.ACTIVE:
@@ -1139,9 +1139,9 @@ def cmd_project(args) -> int:
         for pid in projekte:
             try:
                 st = ProjectStore(args.root, pid).read_state()
-                verdikt, _ = resume_decision(st)
-                offen = sum(1 for n in st.nodes if not n.settled)
-                print(f"{pid}  {verdikt:9s}  nodes={len(st.nodes)} open={offen} "
+                verdict_text, _ = resume_decision(st)
+                open_ = sum(1 for n in st.nodes if not n.settled)
+                print(f"{pid}  {verdict_text:9s}  nodes={len(st.nodes)} open={open_} "
                       f"closure_gen={st.closure_generation}")
             except StoreError as exc:
                 print(f"{pid}  UNREADABLE: {exc}")
@@ -1184,19 +1184,19 @@ def cmd_project(args) -> int:
         print(f"{args.node} is now {n.lifecycle.value}; recorded as {st.decisions[-1].id}")
         return 0
 
-    verdikt, grund = resume_decision(st)
+    verdict_text, why = resume_decision(st)
 
     if args.project_cmd == "resume":
-        print(json.dumps({"project_id": st.project_id, "verdict": verdikt,
-                          "reason": grund, "measurement_head": st.measurement_head,
+        print(json.dumps({"project_id": st.project_id, "verdict": verdict_text,
+                          "reason": why, "measurement_head": st.measurement_head,
                           "closure_generation": st.closure_generation,
                           "rc_closed": st.rc_closed()}, indent=2))
         return 0
 
     # status
     print(f"project {st.project_id}  ({st.repo_path})")
-    print(f"  verdict          {verdikt}")
-    print(f"  reason           {grund}")
+    print(f"  verdict          {verdict_text}")
+    print(f"  reason           {why}")
     print(f"  dag terminal     {st.dag_terminal()}")
     print(f"  gates green      {st.gates_green()}")
     print(f"  RC_CLOSED        {st.rc_closed()}")
@@ -1209,11 +1209,11 @@ def cmd_project(args) -> int:
         print(f"    {n.id:24s} {n.lifecycle.value:10s} {n.action_class.value:8s} "
               f"rej={n.rejections} {marke}")
     if st.gates:
-        letzte = {}
+        last_ = {}
         for g in st.gates:
-            letzte[g.name] = g
+            last_[g.name] = g
         print("  gates (most recent per name):")
-        for name, g in sorted(letzte.items()):
+        for name, g in sorted(last_.items()):
             print(f"    {name:24s} {g.outcome.value:8s} @{g.subject}")
     if st.decisions:
         print(f"  decisions: {len(st.decisions)} recorded, latest:")
@@ -1225,9 +1225,9 @@ def cmd_project(args) -> int:
         # able to say where it came from.
         print(f"  external actions: {len(st.external_actions)} recorded")
         for r in st.external_actions[-3:]:
-            bewegt = "" if r.changed_the_tree else "  (tree unchanged)"
+            moved_ = "" if r.changed_the_tree else "  (tree unchanged)"
             print(f"    {r.action_id} {r.actor}: {r.head_before or '?'} -> "
-                  f"{r.head_after or '?'}{bewegt}  {r.reason[:60]}")
+                  f"{r.head_after or '?'}{moved_}  {r.reason[:60]}")
     return 0
 
 

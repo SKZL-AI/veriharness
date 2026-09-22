@@ -64,13 +64,13 @@ STATE = HOH / "dogfood/export-sync/EXPORT_SYNC_STATE.json"
 
 def staging() -> Path:
     if STAGING is None:
-        raise Abbruch(
+        raise Abort(
             f"no export checkout. Set {STAGING_ENV} to the checkout that "
             "carries the public repository, or pass --staging. This is not "
             "defaulted because a default would be one machine's path in a "
             "file that ships to every reader")
     if not (STAGING / ".git").exists():
-        raise Abbruch(f"{STAGING} is not a git checkout")
+        raise Abort(f"{STAGING} is not a git checkout")
     return STAGING
 
 #: No path is exempt from the comparison. The set is kept, empty, because
@@ -101,10 +101,10 @@ def staging() -> Path:
 #: So a generated file that legitimately replaces public content does it the
 #: same way every other file does: integrate, then record the new base. That
 #: record is the explicit, checkable regeneration evidence.
-BERICHTE: frozenset[str] = frozenset()
+REPORTS: frozenset[str] = frozenset()
 
 
-class Abbruch(RuntimeError):
+class Abort(RuntimeError):
     """Raised before any write when the comparison is not conclusive."""
 
 
@@ -112,7 +112,7 @@ def _git(repo: Path, *args: str, check: bool = True) -> str:
     r = subprocess.run(["git", "-C", str(repo), *args],
                        capture_output=True, text=True)
     if check and r.returncode != 0:
-        raise Abbruch(f"git {' '.join(args)} failed: {r.stderr.strip()}")
+        raise Abort(f"git {' '.join(args)} failed: {r.stderr.strip()}")
     return r.stdout
 
 
@@ -120,7 +120,7 @@ def digest(b: bytes) -> str:
     return hashlib.sha256(b).hexdigest()
 
 
-def include_pfade(root: Path) -> list[str]:
+def include_paths(root: Path) -> list[str]:
     man = json.loads((root / "EXPORT_MANIFEST.json").read_text())
     ent = man["entries"] if isinstance(man, dict) and "entries" in man else man
     return sorted(e["path"] for e in ent
@@ -134,20 +134,20 @@ def blob_digests(repo: Path, commit: str) -> dict[str, str]:
     carry an uncommitted edit, and what the public repository *has* is what its
     commit says, not what happens to be checked out beside it.
     """
-    aus = _git(repo, "ls-tree", "-r", "-z", "--format=%(objectname) %(path)",
+    out = _git(repo, "ls-tree", "-r", "-z", "--format=%(objectname) %(path)",
                commit)
-    ergebnis = {}
-    for eintrag in aus.split("\0"):
-        if not eintrag.strip():
+    result = {}
+    for entry in out.split("\0"):
+        if not entry.strip():
             continue
-        sha, _, pfad = eintrag.partition(" ")
-        inhalt = subprocess.run(["git", "-C", str(repo), "cat-file", "blob", sha],
+        sha, _, path = entry.partition(" ")
+        content_ = subprocess.run(["git", "-C", str(repo), "cat-file", "blob", sha],
                                 capture_output=True).stdout
-        ergebnis[pfad] = digest(inhalt)
-    return ergebnis
+        result[path] = digest(content_)
+    return result
 
 
-def staging_schmutz(repo: Path) -> dict[str, str]:
+def staging_dirt(repo: Path) -> dict[str, str]:
     """Every path the staging checkout has touched and not committed.
 
     Staged, unstaged and untracked alike, because all three are somebody's
@@ -156,26 +156,26 @@ def staging_schmutz(repo: Path) -> dict[str, str]:
     not guessed at; `--untracked-files=all` so that a new file inside an
     untracked directory is seen individually rather than as its parent.
     """
-    aus = _git(repo, "status", "--porcelain=v1", "-z", "--untracked-files=all")
-    felder = aus.split("\0")
-    schmutz: dict[str, str] = {}
+    out = _git(repo, "status", "--porcelain=v1", "-z", "--untracked-files=all")
+    fields_ = out.split("\0")
+    dirt: dict[str, str] = {}
     i = 0
-    while i < len(felder):
-        eintrag = felder[i]
+    while i < len(fields_):
+        entry = fields_[i]
         i += 1
-        if len(eintrag) < 4:
+        if len(entry) < 4:
             continue
-        xy, pfad = eintrag[:2], eintrag[3:]
+        xy, path = entry[:2], entry[3:]
         if xy[0] == "R":
             # A rename carries its source in the next field.
-            if i < len(felder):
-                schmutz[felder[i]] = xy
+            if i < len(fields_):
+                dirt[fields_[i]] = xy
                 i += 1
-        schmutz[pfad] = xy
-    return schmutz
+        dirt[path] = xy
+    return dirt
 
 
-def staging_pruefen(repo: Path, kopf: str, schreiben: list[str]) -> list[str]:
+def staging_check(repo: Path, head: str, write_ops: list[str]) -> list[str]:
     """Reasons the staging checkout is not safe to write into right now.
 
     The comparison above is about `origin/main`. This is about the tree the
@@ -193,41 +193,41 @@ def staging_pruefen(repo: Path, kopf: str, schreiben: list[str]) -> list[str]:
     Never resolved automatically. No reset, no stash, no removal: the whole
     point is that this tool does not decide whose work survives.
     """
-    gruende = []
-    kopf_hier = _git(repo, "rev-parse", "HEAD").strip()
-    if kopf_hier != kopf:
-        gruende.append(
-            f"the staging checkout is at {kopf_hier[:12]}, not at the head "
-            f"this comparison was made against ({kopf[:12]}). Writing here "
+    reasons = []
+    head_here = _git(repo, "rev-parse", "HEAD").strip()
+    if head_here != head:
+        reasons.append(
+            f"the staging checkout is at {head_here[:12]}, not at the head "
+            f"this comparison was made against ({head[:12]}). Writing here "
             "would mix two states; check it out first")
-    schmutz = staging_schmutz(repo)
-    kollision = sorted(set(schmutz) & set(schreiben))
-    if kollision:
-        gruende.append(
-            f"{len(kollision)} path(s) we would write are modified and not "
+    dirt = staging_dirt(repo)
+    clash = sorted(set(dirt) & set(write_ops))
+    if clash:
+        reasons.append(
+            f"{len(clash)} path(s) we would write are modified and not "
             "committed in the staging checkout: "
-            + ", ".join(f"{p} [{schmutz[p].strip() or '??'}]"
-                        for p in kollision[:10]))
-    sonst = sorted(set(schmutz) - set(schreiben))
-    if sonst:
-        gruende.append(
+            + ", ".join(f"{p} [{dirt[p].strip() or '??'}]"
+                        for p in clash[:10]))
+    otherwise = sorted(set(dirt) - set(write_ops))
+    if otherwise:
+        reasons.append(
             f"(not a collision, reported so it is not lost from view: "
-            f"{len(sonst)} other uncommitted path(s) here, e.g. "
-            + ", ".join(sonst[:5]) + ")")
-    return gruende
+            f"{len(otherwise)} other uncommitted path(s) here, e.g. "
+            + ", ".join(otherwise[:5]) + ")")
+    return reasons
 
 
-def lade_zustand() -> dict:
+def load_state() -> dict:
     if not STATE.is_file():
         # Not `relative_to(HOH)`: that raises ValueError for a path outside
         # the tree, so the message meant to explain the problem would replace
         # it with a different one -- the O171 shape, in an error path.
         try:
-            wo = STATE.relative_to(HOH)
+            where = STATE.relative_to(HOH)
         except ValueError:
-            wo = STATE
-        raise Abbruch(
-            f"no sync state at {wo}. Without a recorded "
+            where = STATE
+        raise Abort(
+            f"no sync state at {where}. Without a recorded "
             "base there is no way to tell our change from theirs, and a copy "
             "made on that ignorance is exactly what this tool exists to "
             "prevent. Record one with `record --export-commit <sha>` naming "
@@ -235,7 +235,7 @@ def lade_zustand() -> dict:
     return json.loads(STATE.read_text())
 
 
-def plane(basis: dict[str, str], meine: dict[str, str],
+def plane(baseline: dict[str, str], meine: dict[str, str],
           ihre: dict[str, str]) -> dict:
     """The three-way comparison, over digests alone.
 
@@ -247,45 +247,45 @@ def plane(basis: dict[str, str], meine: dict[str, str],
     plan: dict[str, list] = {"schreiben": [], "unveraendert": [], "neu": [],
                              "konflikt": [], "nur_dort": [], "verschwunden": [],
                              "berichte": []}
-    for pfad in sorted(set(meine) | set(ihre) | set(basis)):
-        b, m, i = basis.get(pfad), meine.get(pfad), ihre.get(pfad)
-        if pfad in BERICHTE:
+    for path in sorted(set(meine) | set(ihre) | set(baseline)):
+        b, m, i = baseline.get(path), meine.get(path), ihre.get(path)
+        if path in REPORTS:
             if m is not None and m != i:
-                plan["berichte"].append(pfad)
+                plan["berichte"].append(path)
             continue
         if m is not None and m == i:
-            plan["unveraendert"].append(pfad)
+            plan["unveraendert"].append(path)
         elif m is not None and i is None:
             (plan["neu"] if b is None else plan["konflikt"]).append(
-                pfad if b is None else (pfad, "we have it, the base knew it, "
+                path if b is None else (path, "we have it, the base knew it, "
                                         "the public head no longer carries it"))
         elif m is None and i is not None:
             if b is None or i != b:
-                plan["nur_dort"].append(pfad)
+                plan["nur_dort"].append(path)
             else:
-                plan["verschwunden"].append(pfad)
+                plan["verschwunden"].append(path)
         elif m != b and i == b:
-            plan["schreiben"].append(pfad)
+            plan["schreiben"].append(path)
         elif m == b and i != b:
-            plan["konflikt"].append((pfad, "changed in the public repository "
+            plan["konflikt"].append((path, "changed in the public repository "
                                            "since the last sync, not here"))
         else:
-            plan["konflikt"].append((pfad, "changed on both sides since the "
+            plan["konflikt"].append((path, "changed on both sides since the "
                                            "last sync, and they disagree"))
     return plan
 
 
-def vergleiche(zustand: dict, remote_head: str) -> dict:
+def comparisons(state: dict, remote_head: str) -> dict:
     """`plane`, over the three states as they are right now."""
     return plane(
-        zustand["path_digests"],
+        state["path_digests"],
         {p: digest((HOH / p).read_bytes())
-         for p in include_pfade(HOH) if (HOH / p).is_file()},
+         for p in include_paths(HOH) if (HOH / p).is_file()},
         blob_digests(staging(), remote_head),
     )
 
 
-def nenne_hindernisse(plan: dict, *, geschrieben_haette: bool) -> bool:
+def name_obstacles(plan: dict, *, would_have_written: bool) -> bool:
     """Print what stands in the way, and say so. Returns True if any does.
 
     `status` used to exit 1 here and print nothing about why -- a refusal
@@ -296,12 +296,12 @@ def nenne_hindernisse(plan: dict, *, geschrieben_haette: bool) -> bool:
         return False
     print()
     print("STOP -- nothing was written."
-          if geschrieben_haette else "STOP -- an export would not be safe now.")
-    for eintrag in plan["konflikt"]:
-        pfad, grund = eintrag if isinstance(eintrag, tuple) else (eintrag, "")
-        print(f"  conflict: {pfad} -- {grund}")
-    for pfad in plan["nur_dort"]:
-        print(f"  only in the public repository: {pfad}")
+          if would_have_written else "STOP -- an export would not be safe now.")
+    for entry in plan["konflikt"]:
+        path, reason = entry if isinstance(entry, tuple) else (entry, "")
+        print(f"  conflict: {path} -- {reason}")
+    for path in plan["nur_dort"]:
+        print(f"  only in the public repository: {path}")
     print()
     print("Integrate those changes here, then record the new sync state with "
           "`record --export-commit <sha>`. This tool will not decide whose "
@@ -309,37 +309,37 @@ def nenne_hindernisse(plan: dict, *, geschrieben_haette: bool) -> bool:
     return True
 
 
-def melde(plan: dict, remote_head: str) -> None:
+def report_(plan: dict, remote_head: str) -> None:
     print(f"public head:        {remote_head[:12]}")
     print(f"unchanged:          {len(plan['unveraendert'])}")
     print(f"to write (ours):    {len(plan['schreiben'])}")
     print(f"new (ours):         {len(plan['neu'])}")
     print(f"reports (expected): {len(plan['berichte'])}")
-    for schluessel, wort in (("nur_dort", "only in the public repository"),
+    for key, word_ in (("nur_dort", "only in the public repository"),
                              ("verschwunden", "in the base, no longer here")):
-        if plan[schluessel]:
-            print(f"{wort}: {len(plan[schluessel])}")
-            for p in plan[schluessel][:10]:
+        if plan[key]:
+            print(f"{word_}: {len(plan[key])}")
+            for p in plan[key][:10]:
                 print(f"    {p}")
 
 
 def export(push: bool) -> int:
-    zustand = lade_zustand()
+    state = load_state()
     _git(staging(), "fetch", "--quiet", "origin")
-    kopf_vorher = _git(staging(), "rev-parse", "origin/main").strip()
+    head_before = _git(staging(), "rev-parse", "origin/main").strip()
 
-    plan = vergleiche(zustand, kopf_vorher)
-    melde(plan, kopf_vorher)
+    plan = comparisons(state, head_before)
+    report_(plan, head_before)
 
-    if nenne_hindernisse(plan, geschrieben_haette=True):
+    if name_obstacles(plan, would_have_written=True):
         return 1
 
-    zu_schreiben = plan["schreiben"] + plan["neu"] + plan["berichte"]
-    hindernisse = staging_pruefen(staging(), kopf_vorher, zu_schreiben)
-    ernst = [g for g in hindernisse if not g.startswith("(")]
-    for g in hindernisse:
+    to_write = plan["schreiben"] + plan["neu"] + plan["berichte"]
+    obstacles = staging_check(staging(), head_before, to_write)
+    serious = [g for g in obstacles if not g.startswith("(")]
+    for g in obstacles:
         print(f"  staging: {g}")
-    if ernst:
+    if serious:
         print()
         print("STOP -- nothing was written. The comparison was about the "
               "public head; this is about the tree the files land in, and it "
@@ -348,13 +348,13 @@ def export(push: bool) -> int:
               "will be reset, stashed or removed from here.")
         return 1
 
-    geschrieben = 0
-    for pfad in zu_schreiben:
-        ziel = staging() / pfad
-        ziel.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(HOH / pfad, ziel)
-        geschrieben += 1
-    print(f"\nwrote {geschrieben} file(s) into the staging checkout")
+    written = 0
+    for path in to_write:
+        target = staging() / path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(HOH / path, target)
+        written += 1
+    print(f"\nwrote {written} file(s) into the staging checkout")
     if plan["verschwunden"]:
         print(f"{len(plan['verschwunden'])} path(s) the base knew are gone "
               "here and were left in place, never removed:")
@@ -366,10 +366,10 @@ def export(push: bool) -> int:
         return 0
 
     _git(staging(), "fetch", "--quiet", "origin")
-    kopf_nachher = _git(staging(), "rev-parse", "origin/main").strip()
-    if kopf_nachher != kopf_vorher:
-        print(f"\nSTOP -- the public head moved from {kopf_vorher[:12]} to "
-              f"{kopf_nachher[:12]} while this ran. The comparison above "
+    head_after = _git(staging(), "rev-parse", "origin/main").strip()
+    if head_after != head_before:
+        print(f"\nSTOP -- the public head moved from {head_before[:12]} to "
+              f"{head_after[:12]} while this ran. The comparison above "
               "describes a tree nobody is pushing to. Re-run.")
         return 1
     print("push it from the staging checkout with an ordinary `git push`; "
@@ -404,23 +404,23 @@ def record(export_commit: str) -> int:
     guard exists to break.
     """
     _git(staging(), "fetch", "--quiet", "origin")
-    voll = _git(staging(), "rev-parse", export_commit).strip()
-    ihre = blob_digests(staging(), voll)
+    full_ = _git(staging(), "rev-parse", export_commit).strip()
+    ihre = blob_digests(staging(), full_)
     meine = {p: digest((HOH / p).read_bytes())
-             for p in include_pfade(HOH) if (HOH / p).is_file()}
+             for p in include_paths(HOH) if (HOH / p).is_file()}
 
-    fehlen = sorted(p for p in ihre
-                    if p not in meine and p not in BERICHTE)
-    if fehlen:
-        print(f"refusing to record: {voll[:12]} carries {len(fehlen)} path(s) "
+    missing_ones = sorted(p for p in ihre
+                    if p not in meine and p not in REPORTS)
+    if missing_ones:
+        print(f"refusing to record: {full_[:12]} carries {len(missing_ones)} path(s) "
               "this tree does not have. Recording it as integrated would tell "
               "the next export they are accounted for:")
-        for p in fehlen[:10]:
+        for p in missing_ones[:10]:
             print(f"    {p}")
         return 1
 
-    unsere = sorted(p for p in meine
-                    if meine[p] != ihre.get(p) and p not in BERICHTE)
+    ours_ = sorted(p for p in meine
+                    if meine[p] != ihre.get(p) and p not in REPORTS)
     STATE.parent.mkdir(parents=True, exist_ok=True)
     STATE.write_text(json.dumps({
         "what": "the public export commit whose content has been integrated "
@@ -428,19 +428,19 @@ def record(export_commit: str) -> int:
                 "tools/export_sync.py: digests are the public side at that "
                 "commit, so anything differing here afterwards is ours.",
         "public_repo": "SKZL-AI/veriharness",
-        "synced_export_commit": voll,
+        "synced_export_commit": full_,
         # Not `subprocess.run(["date", ...])`: there is no `date -u` on
         # Windows, and shelling out for a timestamp the standard library
         # produces is a portability cost with nothing bought for it.
         "recorded_at_utc": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "ours_at_record_time": unsere,
+        "ours_at_record_time": ours_,
         "path_digests": dict(sorted(ihre.items())),
     }, indent=2) + "\n")
-    print(f"recorded {len(ihre)} path digest(s) from {voll[:12]}")
-    if unsere:
-        print(f"{len(unsere)} path(s) already differ here and will be treated "
+    print(f"recorded {len(ihre)} path digest(s) from {full_[:12]}")
+    if ours_:
+        print(f"{len(ours_)} path(s) already differ here and will be treated "
               "as ours from now on:")
-        for p in unsere[:10]:
+        for p in ours_[:10]:
             print(f"    {p}")
     return 0
 
@@ -464,14 +464,14 @@ def main(argv=None) -> int:
         if args.cmd == "record":
             return record(args.export_commit)
         if args.cmd == "status":
-            zustand = lade_zustand()
+            state = load_state()
             _git(staging(), "fetch", "--quiet", "origin")
-            kopf = _git(staging(), "rev-parse", "origin/main").strip()
-            plan = vergleiche(zustand, kopf)
-            melde(plan, kopf)
-            return 1 if nenne_hindernisse(plan, geschrieben_haette=False) else 0
+            head = _git(staging(), "rev-parse", "origin/main").strip()
+            plan = comparisons(state, head)
+            report_(plan, head)
+            return 1 if name_obstacles(plan, would_have_written=False) else 0
         return export(args.push)
-    except Abbruch as exc:
+    except Abort as exc:
         print(f"STOP -- {exc}", file=sys.stderr)
         return 2
 

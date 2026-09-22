@@ -34,8 +34,8 @@ import subprocess
 import sys
 from pathlib import Path
 
-HIER = Path(__file__).resolve().parent
-sys.path.insert(0, str(HIER.parent / "src"))
+HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE.parent / "src"))
 
 from hoh.contracts import AcceptanceCheck, Candidate  # noqa: E402
 from hoh.runner import run_check  # noqa: E402
@@ -76,26 +76,26 @@ class UnsandboxedButClaiming:
         raise NotImplementedError
 
 
-def instrument_control(ziel: Path) -> dict:
+def instrument_control(target: Path) -> dict:
     """Measures the same way against a deliberately unisolated run."""
-    arena = ziel / "arena"
+    arena = target / "arena"
     arena.mkdir(parents=True, exist_ok=True)
     (arena / "hello.txt").write_text("hi\n")
-    kandidat = Candidate(
+    candidate_tree = Candidate(
         candidate_id="control", repo_path=str(arena), commit="0" * 40,
         tree_clean=True, tree_digest="0" * 16,
     )
-    pruefung = AcceptanceCheck(
+    check = AcceptanceCheck(
         check_id="CONTROL", command="cat hello.txt", expect_exit=0,
         description="the same shape of check, run without isolation",
     )
     receipt, log = run_check(
-        pruefung, kandidat, run_id="control", iteration=1, attempt=1,
+        check, candidate_tree, run_id="control", iteration=1, attempt=1,
         cwd=arena, isolation=Isolation.STRICT, sandbox=UnsandboxedButClaiming(),
         timeout=60,
     )
-    (ziel / "control-receipt.json").write_text(receipt.model_dump_json(indent=2))
-    (ziel / "control-transcript.txt").write_text(log)
+    (target / "control-receipt.json").write_text(receipt.model_dump_json(indent=2))
+    (target / "control-transcript.txt").write_text(log)
     iso = receipt.isolation
     return {
         "what": (
@@ -127,48 +127,48 @@ def main(argv=None) -> int:
     ap.add_argument("--repo", default=".", type=Path)
     args = ap.parse_args(argv)
 
-    quelle = args.run_root.expanduser().resolve() / args.run_id
-    if not quelle.is_dir():
-        print(f"no run tree at {quelle}", file=sys.stderr)
+    source = args.run_root.expanduser().resolve() / args.run_id
+    if not source.is_dir():
+        print(f"no run tree at {source}", file=sys.stderr)
         return 2
-    ziel = (args.repo.expanduser().resolve() / args.into)
-    if ziel.exists():
-        stempel = datetime.datetime.now(datetime.UTC).strftime("%Y%m%dT%H%M%SZ")
-        ziel.rename(ziel.with_name(f"{ziel.name}.v{stempel}"))
-    ziel.mkdir(parents=True)
+    target = (args.repo.expanduser().resolve() / args.into)
+    if target.exists():
+        stamp = datetime.datetime.now(datetime.UTC).strftime("%Y%m%dT%H%M%SZ")
+        target.rename(target.with_name(f"{target.name}.v{stamp}"))
+    target.mkdir(parents=True)
 
     # 1. state and receipts
     for name in ("state.json", "checks.json", "plan.json"):
-        if (quelle / name).exists():
-            shutil.copy2(quelle / name, ziel / name)
-    for unter in ("receipts", "logs"):
-        if (quelle / unter).is_dir():
-            shutil.copytree(quelle / unter, ziel / unter)
+        if (source / name).exists():
+            shutil.copy2(source / name, target / name)
+    for below in ("receipts", "logs"):
+        if (source / below).is_dir():
+            shutil.copytree(source / below, target / below)
 
 
     # 3. the control, run now against this machine
-    kontrolle = instrument_control(ziel / "control")
+    control = instrument_control(target / "control")
 
     # 4. a README a third party can act on
-    kopf = subprocess.run(
+    head = subprocess.run(
         ["git", "-C", str(args.repo.resolve()), "rev-parse", "HEAD"],
         capture_output=True, text=True,
     ).stdout.strip()
-    quittungen = sorted((ziel / "receipts").glob("*.json"))
-    geehrt = []
-    for f in quittungen:
+    receipts_ = sorted((target / "receipts").glob("*.json"))
+    was_honoured = []
+    for f in receipts_:
         d = json.loads(f.read_text())
         iso = d.get("isolation") or {}
-        beobachtet = iso.get("observed_namespaces") or {}
-        laeufer = iso.get("runner_namespaces") or {}
+        observed_ = iso.get("observed_namespaces") or {}
+        runner_path = iso.get("runner_namespaces") or {}
         # Recomputed here rather than read off `verified_from_inside`. The
         # runner's verdict and the numbers it rests on are separate things,
         # and a summary that only carried the verdict would ask a reader to
         # trust the code that has already been wrong about exactly this.
-        unabhaengig = bool(beobachtet) and bool(laeufer) and all(
-            beobachtet.get(k) and beobachtet.get(k) != v for k, v in laeufer.items()
+        independent_ = bool(observed_) and bool(runner_path) and all(
+            observed_.get(k) and observed_.get(k) != v for k, v in runner_path.items()
         )
-        geehrt.append({
+        was_honoured.append({
             "receipt_id": d.get("receipt_id"),
             "exit_code": d.get("exit_code"),
             "runner_ok": d.get("runner_ok"),
@@ -178,28 +178,28 @@ def main(argv=None) -> int:
             "network_policy": iso.get("network_policy"),
             "complaint": iso.get("complaint"),
             "verified_from_inside": iso.get("verified_from_inside"),
-            "observed": beobachtet,
-            "runner": laeufer,
-            "namespaces_differ_recomputed": unabhaengig,
+            "observed": observed_,
+            "runner": runner_path,
+            "namespaces_differ_recomputed": independent_,
         })
-    (ziel / "SUMMARY.json").write_text(json.dumps({
+    (target / "SUMMARY.json").write_text(json.dumps({
         "run_id": args.run_id,
         "collected_at": datetime.datetime.now(datetime.UTC).isoformat(),
-        "subject_head": kopf,
+        "subject_head": head,
         "runner_namespaces_at_collection": own_namespaces(),
         "namespace_comparison_recomputed": sum(
-            1 for g in geehrt if g["namespaces_differ_recomputed"]
+            1 for g in was_honoured if g["namespaces_differ_recomputed"]
         ),
-        "receipts": geehrt,
-        "instrument_control": kontrolle,
+        "receipts": was_honoured,
+        "instrument_control": control,
     }, indent=2) + "\n")
-    print(f"{len(quittungen)} receipts -> {ziel}")
+    print(f"{len(receipts_)} receipts -> {target}")
     print(
         f"namespaces recomputed as differing on "
-        f"{sum(1 for g in geehrt if g['namespaces_differ_recomputed'])}"
-        f" of {len(geehrt)}"
+        f"{sum(1 for g in was_honoured if g['namespaces_differ_recomputed'])}"
+        f" of {len(was_honoured)}"
     )
-    print("instrument control:", kontrolle["verdict"])
+    print("instrument control:", control["verdict"])
     return 0
 
 

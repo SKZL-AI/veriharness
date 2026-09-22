@@ -365,15 +365,15 @@ def classify_failure(exc: BaseException | None, *, detail: str = "") -> FailureC
     """
     # --- by type, which is this project's own and is reliable ------------- #
     for k in type(exc).__mro__ if exc is not None else ():
-        nach_typ = {
+        by_type = {
             "CapabilityViolation": FailureClass.CAPABILITY_VIOLATION,
             "WaitingForApproval": FailureClass.NEEDS_APPROVAL,
             "RoleOutputError": FailureClass.CONTRACT_INVALID,
             "StoreError": FailureClass.CORRUPT_STATE,
             "FreezeError": FailureClass.CORRUPT_STATE,
         }.get(k.__name__)
-        if nach_typ is not None:
-            return nach_typ
+        if by_type is not None:
+            return by_type
     if getattr(exc, "transient", False):
         # `DispatchError.transient` is set where the failure happened, by the
         # code that saw it. Nothing in a message beats that.
@@ -386,9 +386,9 @@ def classify_failure(exc: BaseException | None, *, detail: str = "") -> FailureC
     # screen, and this project dogfoods on a tree full of files called
     # `approval.py`, `contracts.py` and `trust.py`. Only the first line is the
     # failure's own sentence.
-    erste = (detail or str(exc or "")).strip().splitlines()
-    text = erste[0].lower() if erste else ""
-    for muster, klasse in (
+    first = (detail or str(exc or "")).strip().splitlines()
+    text = first[0].lower() if first else ""
+    for pattern_, kind in (
         ("capability violation", FailureClass.CAPABILITY_VIOLATION),
         ("dispatch refused", FailureClass.BUDGET_EXHAUSTED),
         ("budget exhausted", FailureClass.BUDGET_EXHAUSTED),
@@ -409,8 +409,8 @@ def classify_failure(exc: BaseException | None, *, detail: str = "") -> FailureC
         ("timeout", FailureClass.PROVIDER_TRANSIENT),
         ("connection", FailureClass.PROVIDER_TRANSIENT),
     ):
-        if muster in text:
-            return klasse
+        if pattern_ in text:
+            return kind
     return FailureClass.UNKNOWN
 
 

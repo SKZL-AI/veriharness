@@ -47,9 +47,9 @@ def test_a_dispatch_appends_exactly_one_record(tmp_path):
         started_at="2026-09-11T10:00:00Z", ended_at="2026-09-11T10:00:04Z",
         backend="herdr", outcome="ok", usage={},
     )
-    saetze = c.telemetry().read()
-    assert len(saetze) == 1
-    r = saetze[0]
+    sentences = c.telemetry().read()
+    assert len(sentences) == 1
+    r = sentences[0]
     assert r.role == "planner"
     assert r.run_id == "r"
     assert r.iteration == 1
@@ -124,10 +124,10 @@ def test_a_telemetry_failure_never_fails_the_run(tmp_path, monkeypatch):
     c = Controller.__new__(Controller)
     c.store = store
 
-    def kaputt(self, record):
+    def broken_(self, record):
         raise OSError("no space left on device")
 
-    monkeypatch.setattr(TelemetryLog, "append", kaputt)
+    monkeypatch.setattr(TelemetryLog, "append", broken_)
     # Must not raise.
     c.note_dispatch(
         role="planner", run_id="r", iteration=1, attempt=1,
@@ -144,15 +144,15 @@ def test_records_are_one_json_object_per_line(tmp_path):
     store.dir.mkdir(parents=True, exist_ok=True)
     c = Controller.__new__(Controller)
     c.store = store
-    for rolle in ("planner", "developer", "qa"):
+    for role_ in ("planner", "developer", "qa"):
         c.note_dispatch(
-            role=rolle, run_id="r", iteration=1, attempt=1,
+            role=role_, run_id="r", iteration=1, attempt=1,
             started_at="2026-09-11T10:00:00Z", ended_at="2026-09-11T10:00:01Z",
             backend="herdr", outcome="ok", usage={},
         )
-    zeilen = _log_path(store).read_text().strip().splitlines()
-    assert len(zeilen) == 3
-    for z in zeilen:
+    lines = _log_path(store).read_text().strip().splitlines()
+    assert len(lines) == 3
+    for z in lines:
         assert DispatchRecord.model_validate(json.loads(z))
 
 
@@ -167,20 +167,20 @@ def test_a_record_names_the_provider_it_actually_ran_under(tmp_path):
     from hoh.controller import Controller
     from hoh.store import RunStore
 
-    class Versender:
+    class Sender:
         profiles = {Role.PLANNER: "claude"}
 
     store = RunStore(tmp_path / "root", "r")
     store.dir.mkdir(parents=True, exist_ok=True)
     c = Controller.__new__(Controller)
     c.store = store
-    c.dispatcher = Versender()
+    c.dispatcher = Sender()
 
     c.note_dispatch(role="planner", run_id="r", iteration=1, attempt=0,
                     started_at="2026-09-11T10:00:00Z",
                     ended_at="2026-09-11T10:00:04Z", backend="herdr", usage={})
-    (satz,) = c.telemetry().read()
-    assert satz.provider == "claude"
+    (sentence,) = c.telemetry().read()
+    assert sentence.provider == "claude"
 
 
 def test_an_unreportable_model_says_so_instead_of_staying_empty(tmp_path):
@@ -203,8 +203,8 @@ def test_an_unreportable_model_says_so_instead_of_staying_empty(tmp_path):
     c.note_dispatch(role="planner", run_id="r", iteration=1, attempt=0,
                     started_at="2026-09-11T10:00:00Z",
                     ended_at="2026-09-11T10:00:04Z", usage={})
-    (satz,) = c.telemetry().read()
-    assert satz.model == NOT_AVAILABLE
+    (sentence,) = c.telemetry().read()
+    assert sentence.model == NOT_AVAILABLE
 
 
 def test_a_failed_dispatch_always_carries_a_class(tmp_path):
@@ -223,8 +223,8 @@ def test_a_failed_dispatch_always_carries_a_class(tmp_path):
                     started_at="2026-09-11T10:00:00Z",
                     ended_at="2026-09-11T10:00:04Z", outcome="failed",
                     detail="planner waits for an approval in pane w1:p2", usage={})
-    (satz,) = c.telemetry().read()
-    assert satz.failure_class is FailureClass.NEEDS_APPROVAL
+    (sentence,) = c.telemetry().read()
+    assert sentence.failure_class is FailureClass.NEEDS_APPROVAL
 
 
 def test_a_failure_nothing_identifies_is_unknown_and_not_absent(tmp_path):
@@ -242,8 +242,8 @@ def test_a_failure_nothing_identifies_is_unknown_and_not_absent(tmp_path):
                     started_at="2026-09-11T10:00:00Z",
                     ended_at="2026-09-11T10:00:04Z", outcome="failed",
                     detail="something happened", usage={})
-    (satz,) = c.telemetry().read()
-    assert satz.failure_class is FailureClass.UNKNOWN
+    (sentence,) = c.telemetry().read()
+    assert sentence.failure_class is FailureClass.UNKNOWN
 
 
 def test_a_successful_dispatch_carries_no_class(tmp_path):
@@ -259,8 +259,8 @@ def test_a_successful_dispatch_carries_no_class(tmp_path):
     c.note_dispatch(role="planner", run_id="r", iteration=1, attempt=0,
                     started_at="2026-09-11T10:00:00Z",
                     ended_at="2026-09-11T10:00:04Z", usage={})
-    (satz,) = c.telemetry().read()
-    assert satz.failure_class is None
+    (sentence,) = c.telemetry().read()
+    assert sentence.failure_class is None
 
 
 def test_the_verification_record_carries_the_receipts_it_produced(tmp_path, repo_fixture=None):
@@ -279,6 +279,6 @@ def test_the_verification_record_carries_the_receipts_it_produced(tmp_path, repo
                     started_at="2026-09-11T10:00:00Z",
                     ended_at="2026-09-11T10:00:04Z", usage={},
                     receipts=2, discriminating=1, artefactual=0)
-    (satz,) = c.telemetry().read()
-    assert satz.receipts == 2
-    assert satz.discriminating == 1
+    (sentence,) = c.telemetry().read()
+    assert sentence.receipts == 2
+    assert sentence.discriminating == 1

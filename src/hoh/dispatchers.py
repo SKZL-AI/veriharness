@@ -142,8 +142,8 @@ class _Base:
             return False
         from .capability import tree_digest
 
-        ziel = self.role_cwd.get(role) or getattr(self, "cwd", None)
-        return bool(ziel) and tree_digest(Path(ziel)) != before
+        destination = self.role_cwd.get(role) or getattr(self, "cwd", None)
+        return bool(destination) and tree_digest(Path(destination)) != before
 
     def _read_answer(self, path: Path, role: Role) -> str:
         if not path.exists():
@@ -613,13 +613,13 @@ class HerdrDispatcher(_Base):
         # Witnessed before the dispatch, so an unstructured role's delivery can
         # be measured rather than read off its pane. Cheap: a digest over the
         # arena, which is the tree the role is expected to change.
-        vorher = None
+        earlier = None
         if role not in STRUCTURED_ROLES:
             from .capability import tree_digest
 
-            ziel = self.role_cwd.get(role) or getattr(self, "cwd", None)
-            if ziel:
-                vorher = tree_digest(Path(ziel))
+            destination = self.role_cwd.get(role) or getattr(self, "cwd", None)
+            if destination:
+                earlier = tree_digest(Path(destination))
         try:
             data = self._cli(
                 ["herdr", "agent", "prompt", target, full, "--wait",
@@ -647,10 +647,10 @@ class HerdrDispatcher(_Base):
         ).evidence()
 
         status = str(agent.get("agent_status", ""))
-        geliefert = (
-            self._answered(answer_path, role) or self._delivered(role, vorher)
+        delivered_ = (
+            self._answered(answer_path, role) or self._delivered(role, earlier)
         )
-        if status == "blocked" and not geliefert:
+        if status == "blocked" and not delivered_:
             # **Read** the dialog before anything is cleaned up. Twice a run
             # came to a halt at an approval, and both times it was afterwards
             # not determinable which one -- the pane was gone. A blocker

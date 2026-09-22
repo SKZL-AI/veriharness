@@ -22,22 +22,22 @@ import pytest
 
 from conftest import (
     HIDDEN_FIXTURES,
-    braucht_evidenz,
+    needs_evidence,
 )
 
-WURZEL = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parent.parent
 
 
-def _laden():
+def _load():
     spec = importlib.util.spec_from_file_location(
-        "repetition_plan", WURZEL / "tools" / "repetition_plan.py")
+        "repetition_plan", ROOT / "tools" / "repetition_plan.py")
     mod = importlib.util.module_from_spec(spec)
     sys.modules.setdefault("repetition_plan", mod)
     spec.loader.exec_module(mod)
     return mod
 
 
-rp = _laden()
+rp = _load()
 
 
 # --------------------------------------------------------------------------- #
@@ -74,7 +74,7 @@ def test_a_protocol_that_names_a_campaign_budget_is_determinable():
 
 def test_the_real_protocol_does_not_decide_the_requirement():
     """Measured against the frozen commit, not against the working tree."""
-    if not rp.historie_vollstaendig():
+    if not rp.history_complete():
         pytest.skip(
             "this clone is shallow, so the commit that introduced the "
             "protocol cannot be identified -- `git log --diff-filter=A` "
@@ -95,49 +95,49 @@ def test_the_real_protocol_does_not_decide_the_requirement():
 # --------------------------------------------------------------------------- #
 
 
-def _zelle(tmp: Path, name: str, **felder):
+def _cell(tmp: Path, name: str, **fields_):
     d = {"task": "t", "arm": "C", "repetition": 1,
          "arm_detail": {"dispatches": 9, "dispatch_budget": 9}}
-    d.update(felder)
+    d.update(fields_)
     (tmp / name).write_text(json.dumps(d))
 
 
 def test_a_parked_earlier_version_is_not_a_second_repetition(tmp_path,
                                                              monkeypatch):
-    quelle = tmp_path / "results-v2"
-    quelle.mkdir()
-    _zelle(quelle, "t.C.1.json")
-    _zelle(quelle, "t.C.1.v20260913T164629Z.json")
-    monkeypatch.setitem(rp.KAMPAGNEN_DIR, "v2", quelle)
+    source = tmp_path / "results-v2"
+    source.mkdir()
+    _cell(source, "t.C.1.json")
+    _cell(source, "t.C.1.v20260913T164629Z.json")
+    monkeypatch.setitem(rp.CAMPAIGNS_DIR, "v2", source)
 
-    gezaehlt, verworfen = rp.zellen("v2")
-    assert len(gezaehlt) == 1
-    assert any("parked" in z for z in verworfen)
+    counted, discarded = rp.cells("v2")
+    assert len(counted) == 1
+    assert any("parked" in z for z in discarded)
 
 
 def test_an_attempt_that_did_not_deliver_is_not_a_repetition(tmp_path,
                                                              monkeypatch):
-    quelle = tmp_path / "results-v2"
-    quelle.mkdir()
-    _zelle(quelle, "t.C.1.json")
-    _zelle(quelle, "t.C.1.attempt2.v20260913T164629Z.json")
-    monkeypatch.setitem(rp.KAMPAGNEN_DIR, "v2", quelle)
+    source = tmp_path / "results-v2"
+    source.mkdir()
+    _cell(source, "t.C.1.json")
+    _cell(source, "t.C.1.attempt2.v20260913T164629Z.json")
+    monkeypatch.setitem(rp.CAMPAIGNS_DIR, "v2", source)
 
-    gezaehlt, _ = rp.zellen("v2")
-    assert len(gezaehlt) == 1
+    counted, _ = rp.cells("v2")
+    assert len(counted) == 1
 
 
 def test_a_result_file_whose_arm_never_ran_does_not_count(tmp_path,
                                                           monkeypatch):
     """A file exists and the arm recorded nothing: that is not a repetition."""
-    quelle = tmp_path / "results-v2"
-    quelle.mkdir()
-    _zelle(quelle, "t.C.1.json", arm_detail={})
-    monkeypatch.setitem(rp.KAMPAGNEN_DIR, "v2", quelle)
+    source = tmp_path / "results-v2"
+    source.mkdir()
+    _cell(source, "t.C.1.json", arm_detail={})
+    monkeypatch.setitem(rp.CAMPAIGNS_DIR, "v2", source)
 
-    gezaehlt, verworfen = rp.zellen("v2")
-    assert gezaehlt == []
-    assert any("recorded nothing" in z for z in verworfen)
+    counted, discarded = rp.cells("v2")
+    assert counted == []
+    assert any("recorded nothing" in z for z in discarded)
 
 
 def test_a_cell_from_another_campaign_is_not_counted(tmp_path, monkeypatch):
@@ -146,12 +146,12 @@ def test_a_cell_from_another_campaign_is_not_counted(tmp_path, monkeypatch):
     v2 = tmp_path / "results-v2"
     v1.mkdir()
     v2.mkdir()
-    _zelle(v1, "t.C.2.json", repetition=2)
-    monkeypatch.setitem(rp.KAMPAGNEN_DIR, "v1", v1)
-    monkeypatch.setitem(rp.KAMPAGNEN_DIR, "v2", v2)
+    _cell(v1, "t.C.2.json", repetition=2)
+    monkeypatch.setitem(rp.CAMPAIGNS_DIR, "v1", v1)
+    monkeypatch.setitem(rp.CAMPAIGNS_DIR, "v2", v2)
 
-    gezaehlt, _ = rp.zellen("v2")
-    assert gezaehlt == []
+    counted, _ = rp.cells("v2")
+    assert counted == []
 
 
 # --------------------------------------------------------------------------- #
@@ -165,28 +165,28 @@ def test_an_asserted_dispatch_figure_cannot_certify_conformance(tmp_path,
     `min(iterations * 3, DISPATCH_BUDGET)`, which cannot exceed 9 by
     construction. Reading that as "within budget" cleared campaign v1 falsely.
     """
-    braucht_evidenz(HIDDEN_FIXTURES)
-    quelle = tmp_path / "results"
-    quelle.mkdir()
-    (quelle / "t.C.1.json").write_text(json.dumps({
+    needs_evidence(HIDDEN_FIXTURES)
+    source = tmp_path / "results"
+    source.mkdir()
+    (source / "t.C.1.json").write_text(json.dumps({
         "task": "t", "arm": "C", "repetition": 1,
         "arm_detail": {"dispatches": 9},          # no dispatch_budget: asserted
     }))
-    monkeypatch.setitem(rp.KAMPAGNEN_DIR, "v1", quelle)
+    monkeypatch.setitem(rp.CAMPAIGNS_DIR, "v1", source)
 
     p = rp.plan("v1")
-    zelle = next(r for r in p["cells"] if r["task"] == "t" and r["arm"] == "C")
-    assert zelle["budget_conformance"] == ["UNKNOWN_FIGURE_WAS_ASSERTED"]
+    cell = next(r for r in p["cells"] if r["task"] == "t" and r["arm"] == "C")
+    assert cell["budget_conformance"] == ["UNKNOWN_FIGURE_WAS_ASSERTED"]
     assert p["budget_rule"] == "NOT_DETERMINABLE"
 
 
-def _gezaehlte_zelle(quelle, **detail):
+def _counted_cell(source, **detail):
     """A result file whose figure was actually counted."""
     d = {"dispatches": 18, "dispatch_budget": 9,
          "dispatch_count": {"provider_calls": 18, "lines": 18,
                             "lines_without_the_figure": 0}}
     d.update(detail)
-    (quelle / "t.C.1.json").write_text(json.dumps({
+    (source / "t.C.1.json").write_text(json.dumps({
         "task": "t", "arm": "C", "repetition": 1,
         "measured_tree": "/tmp/bm-t-C1-abc", "started_at": 1.0,
         "arm_detail": d,
@@ -197,11 +197,11 @@ def test_a_run_over_budget_that_was_not_stopped_is_a_violation(tmp_path,
                                                                monkeypatch):
     """The frozen protocol: a run that exceeds the budget is stopped and
     recorded as BUDGET_EXHAUSTED."""
-    braucht_evidenz(HIDDEN_FIXTURES)
-    quelle = tmp_path / "results-v2"
-    quelle.mkdir()
-    _gezaehlte_zelle(quelle, halt="CLOSED")
-    monkeypatch.setitem(rp.KAMPAGNEN_DIR, "v2", quelle)
+    needs_evidence(HIDDEN_FIXTURES)
+    source = tmp_path / "results-v2"
+    source.mkdir()
+    _counted_cell(source, halt="CLOSED")
+    monkeypatch.setitem(rp.CAMPAIGNS_DIR, "v2", source)
 
     p = rp.plan("v2")
     assert p["budget_rule"] == "VIOLATED"
@@ -226,31 +226,31 @@ def test_a_run_over_budget_is_a_violation_even_when_it_was_stopped(
     the enforcement failed, and a campaign cannot certify its matched budget
     on the strength of a word in its own result file.
     """
-    braucht_evidenz(HIDDEN_FIXTURES)
-    quelle = tmp_path / "results-v2"
-    quelle.mkdir()
-    _gezaehlte_zelle(quelle, halt="BUDGET_EXHAUSTED")
-    monkeypatch.setitem(rp.KAMPAGNEN_DIR, "v2", quelle)
+    needs_evidence(HIDDEN_FIXTURES)
+    source = tmp_path / "results-v2"
+    source.mkdir()
+    _counted_cell(source, halt="BUDGET_EXHAUSTED")
+    monkeypatch.setitem(rp.CAMPAIGNS_DIR, "v2", source)
 
     p = rp.plan("v2")
     assert p["budget_rule"] == "VIOLATED"
     assert "t/C" in p["cells_over_budget_and_not_stopped"]
-    zelle = next(r for r in p["cells"]
+    cell = next(r for r in p["cells"]
                  if r["task"] == "t" and r["arm"] == "C")
-    assert zelle["budget_conformance"] == ["EXCEEDED_AND_STOPPED"]
+    assert cell["budget_conformance"] == ["EXCEEDED_AND_STOPPED"]
 
 
 def test_a_run_inside_the_budget_whose_figure_was_counted_is_conformant(
         tmp_path, monkeypatch):
     """The positive control. Without it every test above passes on a rule that
     calls everything a violation."""
-    braucht_evidenz(HIDDEN_FIXTURES)
-    quelle = tmp_path / "results-v2"
-    quelle.mkdir()
-    _gezaehlte_zelle(quelle, halt="CLOSED", dispatches=7,
+    needs_evidence(HIDDEN_FIXTURES)
+    source = tmp_path / "results-v2"
+    source.mkdir()
+    _counted_cell(source, halt="CLOSED", dispatches=7,
            dispatch_count={"provider_calls": 7, "lines": 8,
                            "lines_without_the_figure": 0})
-    monkeypatch.setitem(rp.KAMPAGNEN_DIR, "v2", quelle)
+    monkeypatch.setitem(rp.CAMPAIGNS_DIR, "v2", source)
 
     p = rp.plan("v2")
     assert p["budget_rule"] == "ENFORCED"
@@ -266,11 +266,11 @@ def test_a_figure_nothing_counted_is_unknown_however_the_record_is_shaped(
     future campaign by construction -- and arm A's constant 1 would have
     certified as measured.
     """
-    braucht_evidenz(HIDDEN_FIXTURES)
-    quelle = tmp_path / "results-v2"
-    quelle.mkdir()
-    _gezaehlte_zelle(quelle, halt="CLOSED", dispatches=7, dispatch_count=None)
-    monkeypatch.setitem(rp.KAMPAGNEN_DIR, "v2", quelle)
+    needs_evidence(HIDDEN_FIXTURES)
+    source = tmp_path / "results-v2"
+    source.mkdir()
+    _counted_cell(source, halt="CLOSED", dispatches=7, dispatch_count=None)
+    monkeypatch.setitem(rp.CAMPAIGNS_DIR, "v2", source)
 
     p = rp.plan("v2")
     assert p["budget_rule"] == "NOT_DETERMINABLE"
@@ -282,13 +282,13 @@ def test_a_log_line_that_could_not_answer_makes_the_figure_unknown(
     """A telemetry line written before `provider_calls` existed cannot say
     what it cost, and reading it as one call is how the asserted figure got
     in."""
-    braucht_evidenz(HIDDEN_FIXTURES)
-    quelle = tmp_path / "results-v2"
-    quelle.mkdir()
-    _gezaehlte_zelle(quelle, halt="CLOSED", dispatches=7,
+    needs_evidence(HIDDEN_FIXTURES)
+    source = tmp_path / "results-v2"
+    source.mkdir()
+    _counted_cell(source, halt="CLOSED", dispatches=7,
            dispatch_count={"provider_calls": 7, "lines": 9,
                            "lines_without_the_figure": 2})
-    monkeypatch.setitem(rp.KAMPAGNEN_DIR, "v2", quelle)
+    monkeypatch.setitem(rp.CAMPAIGNS_DIR, "v2", source)
 
     assert rp.plan("v2")["budget_rule"] == "NOT_DETERMINABLE"
 
@@ -300,21 +300,21 @@ def test_a_crashed_repetition_is_not_counted_as_one(tmp_path, monkeypatch):
     being non-empty, and an arm whose single provider call raised still
     writes `{dispatches: 1, error: ...}`.
     """
-    braucht_evidenz(HIDDEN_FIXTURES)
-    quelle = tmp_path / "results-v2"
-    quelle.mkdir()
+    needs_evidence(HIDDEN_FIXTURES)
+    source = tmp_path / "results-v2"
+    source.mkdir()
     # A declared task, so the cell has a row whether or not it was counted.
-    (quelle / "to_roman.A.1.json").write_text(json.dumps({
+    (source / "to_roman.A.1.json").write_text(json.dumps({
         "task": "to_roman", "arm": "A", "repetition": 1,
         "harness_error": "TimeoutExpired: the arm never answered",
         "arm_detail": {"dispatches": 1, "dispatch_budget": 9},
     }))
-    (quelle / "to_roman.B.1.json").write_text(json.dumps({
+    (source / "to_roman.B.1.json").write_text(json.dumps({
         "task": "to_roman", "arm": "B", "repetition": 1,
         "arm_detail": {"dispatches": 1, "dispatch_budget": 9,
                        "error": "provider unavailable"},
     }))
-    monkeypatch.setitem(rp.KAMPAGNEN_DIR, "v2", quelle)
+    monkeypatch.setitem(rp.CAMPAIGNS_DIR, "v2", source)
 
     p = rp.plan("v2")
     assert "to_roman/A" in p["cells_with_no_repetition"]
@@ -326,24 +326,24 @@ def test_a_crashed_repetition_is_not_counted_as_one(tmp_path, monkeypatch):
 def test_copies_of_one_run_are_not_three_repetitions(tmp_path, monkeypatch):
     """`len(reps)` counted distinct labels, and a label is written into the
     file by whoever wrote the file."""
-    braucht_evidenz(HIDDEN_FIXTURES)
-    quelle = tmp_path / "results-v2"
-    quelle.mkdir()
+    needs_evidence(HIDDEN_FIXTURES)
+    source = tmp_path / "results-v2"
+    source.mkdir()
     for rep in (1, 2, 3):
-        (quelle / f"t.C.{rep}.json").write_text(json.dumps({
+        (source / f"t.C.{rep}.json").write_text(json.dumps({
             "task": "t", "arm": "C", "repetition": rep,
             "measured_tree": "/tmp/bm-t-C1-abc", "started_at": 1.0,
             "arm_detail": {"dispatches": 7, "dispatch_budget": 9,
                            "dispatch_count": {"provider_calls": 7, "lines": 7,
                                               "lines_without_the_figure": 0}},
         }))
-    monkeypatch.setitem(rp.KAMPAGNEN_DIR, "v2", quelle)
+    monkeypatch.setitem(rp.CAMPAIGNS_DIR, "v2", source)
 
     p = rp.plan("v2")
-    zelle = next(r for r in p["cells"]
+    cell = next(r for r in p["cells"]
                  if r["task"] == "t" and r["arm"] == "C")
-    assert zelle["completed_repetitions"] == 3, "the labels are still counted"
-    assert zelle["repetitions_sharing_a_run_identity"], (
+    assert cell["completed_repetitions"] == 3, "the labels are still counted"
+    assert cell["repetitions_sharing_a_run_identity"], (
         "three files, one run, and nothing said so")
     assert "t/C" in p["cells_whose_repetitions_share_a_run"]
 
@@ -393,9 +393,9 @@ def test_a_qualified_repetition_count_is_still_not_determinable():
 def test_the_frozen_commit_for_a_campaign_comes_from_its_registration(tmp_path,
                                                                       monkeypatch):
     monkeypatch.setattr(rp, "HOH", tmp_path)
-    ziel = tmp_path / "docs" / "benchmarks" / "v3"
-    ziel.mkdir(parents=True)
-    (ziel / "PREREGISTRATION.json").write_text(
+    target = tmp_path / "docs" / "benchmarks" / "v3"
+    target.mkdir(parents=True)
+    (target / "PREREGISTRATION.json").write_text(
         json.dumps({"benchmark_v3_protocol_commit": "f" * 40}), encoding="utf-8")
     assert rp.frozen_protocol_commit("v3") == "f" * 40
 
@@ -411,26 +411,26 @@ def test_a_campaign_without_a_registration_falls_back_to_the_adding_commit():
     tautology that could not fail -- and it was the only test covering the
     fallback path. Caught by an adversarial review.
     """
-    if not rp.historie_vollstaendig():
+    if not rp.history_complete():
         pytest.skip(
             "this clone is shallow, so the commit that introduced the "
             "protocol cannot be identified -- `git log --diff-filter=A` "
             "would name the newest commit it can see, which is not the "
             "frozen one. The question is about the repository that "
             "produced the campaigns.")
-    hinzugefuegt = rp.frozen_protocol_commit("v2")
-    assert len(hinzugefuegt) == 40, "not a commit id"
+    added_ = rp.frozen_protocol_commit("v2")
+    assert len(added_) == 40, "not a commit id"
     # The fallback really is the commit that *added* the protocol, and that
     # commit's text is the undecidable one.
     assert rp.repetition_requirement(
-        rp.frozen_text(hinzugefuegt))["verdict"] == "NOT_DETERMINABLE"
+        rp.frozen_text(added_))["verdict"] == "NOT_DETERMINABLE"
     # And it is not simply HEAD: the working tree's text is decidable, so a
     # fallback that returned HEAD would have judged v2 by today's rule.
     import subprocess
 
     head = subprocess.run(["git", "-C", str(rp.HOH), "rev-parse", "HEAD"],
                           capture_output=True, text=True).stdout.strip()
-    assert hinzugefuegt != head
+    assert added_ != head
 
 
 def test_the_required_count_is_not_a_constant_in_this_file():
