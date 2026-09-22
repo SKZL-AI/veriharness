@@ -2107,6 +2107,431 @@
       "rule": "internal-working-document"
     },
     {
+      "path": "dogfood/p1-16/20260922T1806Z/README.as-cloned.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/clone-reflog.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/driver.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/run-evidence/20260922t1806z-minimal-demo/.lock",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/run-evidence/20260922t1806z-minimal-demo/answers/i1-a0-planner.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/run-evidence/20260922t1806z-minimal-demo/answers/i1-a0-planner.json.dispatch.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/run-evidence/20260922t1806z-minimal-demo/answers/i1-a1-qa.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/run-evidence/20260922t1806z-minimal-demo/answers/i1-a1-qa.json.dispatch.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/run-evidence/20260922t1806z-minimal-demo/approval/developer.settings.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/run-evidence/20260922t1806z-minimal-demo/approval/house_rules.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/run-evidence/20260922t1806z-minimal-demo/approval/integrity-before.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/run-evidence/20260922t1806z-minimal-demo/approval/integrity.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/run-evidence/20260922t1806z-minimal-demo/approval/planner.settings.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/run-evidence/20260922t1806z-minimal-demo/approval/policy.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/run-evidence/20260922t1806z-minimal-demo/approval/qa.settings.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/run-evidence/20260922t1806z-minimal-demo/approval/worktree_trust.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/run-evidence/20260922t1806z-minimal-demo/attic/arenas/.hoh-out-20260922t1806z-minimal-demo-i1-a1-K1-basis.log",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/run-evidence/20260922t1806z-minimal-demo/attic/arenas/.hoh-out-20260922t1806z-minimal-demo-i1-a1-K2-basis.log",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/run-evidence/20260922t1806z-minimal-demo/attic/arenas/.hoh-out-20260922t1806z-minimal-demo-i1-a1-K3-basis.log",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/run-evidence/20260922t1806z-minimal-demo/checks.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/run-evidence/20260922t1806z-minimal-demo/evidence.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/run-evidence/20260922t1806z-minimal-demo/logs/20260922t1806z-minimal-demo-i1-a1-K1-basis.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/run-evidence/20260922t1806z-minimal-demo/logs/20260922t1806z-minimal-demo-i1-a1-K1.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/run-evidence/20260922t1806z-minimal-demo/logs/20260922t1806z-minimal-demo-i1-a1-K2-basis.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/run-evidence/20260922t1806z-minimal-demo/logs/20260922t1806z-minimal-demo-i1-a1-K2.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/run-evidence/20260922t1806z-minimal-demo/logs/20260922t1806z-minimal-demo-i1-a1-K3-basis.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/run-evidence/20260922t1806z-minimal-demo/logs/20260922t1806z-minimal-demo-i1-a1-K3.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/run-evidence/20260922t1806z-minimal-demo/receipts/20260922t1806z-minimal-demo-i1-a1-K1-basis.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/run-evidence/20260922t1806z-minimal-demo/receipts/20260922t1806z-minimal-demo-i1-a1-K1.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/run-evidence/20260922t1806z-minimal-demo/receipts/20260922t1806z-minimal-demo-i1-a1-K2-basis.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/run-evidence/20260922t1806z-minimal-demo/receipts/20260922t1806z-minimal-demo-i1-a1-K2.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/run-evidence/20260922t1806z-minimal-demo/receipts/20260922t1806z-minimal-demo-i1-a1-K3-basis.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/run-evidence/20260922t1806z-minimal-demo/receipts/20260922t1806z-minimal-demo-i1-a1-K3.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/run-evidence/20260922t1806z-minimal-demo/results/plan-i1-a1.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/run-evidence/20260922t1806z-minimal-demo/results/qa-i1-a1.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/run-evidence/20260922t1806z-minimal-demo/state.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/run-evidence/20260922t1806z-minimal-demo/state.json.v2026-09-22T18-06-39Z",
+      "decision": "EXCLUDE",
+      "rule": "parked-predecessor"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/run-evidence/20260922t1806z-minimal-demo/state.json.v2026-09-22T18-06-39Z-001",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/run-evidence/20260922t1806z-minimal-demo/state.json.v2026-09-22T18-06-39Z-002",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/run-evidence/20260922t1806z-minimal-demo/state.json.v2026-09-22T18-06-39Z-003",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/run-evidence/20260922t1806z-minimal-demo/state.json.v2026-09-22T18-07-07Z",
+      "decision": "EXCLUDE",
+      "rule": "parked-predecessor"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/run-evidence/20260922t1806z-minimal-demo/state.json.v2026-09-22T18-07-07Z-001",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/run-evidence/20260922t1806z-minimal-demo/state.json.v2026-09-22T18-07-07Z-002",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/run-evidence/20260922t1806z-minimal-demo/state.json.v2026-09-22T18-07-07Z-003",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/run-evidence/20260922t1806z-minimal-demo/state.json.v2026-09-22T18-07-28Z",
+      "decision": "EXCLUDE",
+      "rule": "parked-predecessor"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/run-evidence/20260922t1806z-minimal-demo/state.json.v2026-09-22T18-07-28Z-001",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/run-evidence/20260922t1806z-minimal-demo/state.json.v2026-09-22T18-07-28Z-002",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/run-evidence/20260922t1806z-minimal-demo/state.json.v2026-09-22T18-07-28Z-003",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/run-evidence/20260922t1806z-minimal-demo/state.json.v2026-09-22T18-07-28Z-004",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/run-evidence/20260922t1806z-minimal-demo/state.json.v2026-09-22T18-08-10Z",
+      "decision": "EXCLUDE",
+      "rule": "parked-predecessor"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/run-evidence/20260922t1806z-minimal-demo/state.json.v2026-09-22T18-08-10Z-001",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/run-evidence/20260922t1806z-minimal-demo/state.json.v2026-09-22T18-08-10Z-002",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/run-evidence/20260922t1806z-minimal-demo/telemetry.jsonl",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/spec.as-cloned.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/steps.jsonl",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/steps/01-driver_blob.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/steps/02-tool_blob.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/steps/03-driver_status.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/steps/04-clone.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/steps/05-head.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/steps/06-published_head.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/steps/07-status_after_clone.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/steps/08-readme_blob.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/steps/09-spec_blob.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/steps/10-venv.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/steps/11-install.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/steps/12-which_hoh.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/steps/13-interpreter.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/steps/14-doctor.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/steps/15-target_init.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/steps/16-target_add.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/steps/17-target_commit.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/steps/18-target_head.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/steps/19-worktree.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/steps/20-start.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/steps/21-run.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/steps/22-report.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/steps/23-status_after_run.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/steps/24-accepted_head.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/steps/25-recheck_clone.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/steps/26-recheck_checkout.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/steps/27-recheck_tree.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/steps/28-recheck_K1.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/steps/29-recheck_K2.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1806Z/steps/30-recheck_K3.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
       "path": "dogfood/p1-16/P1_16_ACCEPTANCE.json",
       "decision": "EXCLUDE",
       "rule": "internal-working-document"

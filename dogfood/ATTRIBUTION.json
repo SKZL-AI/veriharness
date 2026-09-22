@@ -575,6 +575,17 @@
         "a6d00630f6db2d028bb04786eeec969d65047a9b"
       ],
       "why_not_the_product": "Recording the export's CI evidence and the sync base, and the pre-flight corrections both reviewers required before the fourth drive (--until-accepted in the documented command, stdout-only parsing). Orchestrator work on the instrument and its evidence, outside the product."
+    },
+    {
+      "id": "p1-16-proven-fourth-run",
+      "category": "MAIN_ORCHESTRATOR_DIRECT",
+      "is_development_node": true,
+      "commits": [
+        "b5bbb39ff24aec2a922a32e957baf989668c53d1",
+        "74671a9eda6c475bb3ba663b7d2009d6e673790c",
+        "b7a2768e85ae1f83c652744e40ec9bba14fad26e"
+      ],
+      "why_not_the_product": "The fourth P1-16 drive and its record. The run itself was the product's -- HoH planned, developed and accepted the minimal programme with no human intervention -- but the drive around it, the record and the re-execution are the instrument that judges that run, and a run does not author what judges it."
     }
   ]
 }

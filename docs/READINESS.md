@@ -5,11 +5,11 @@ command that produced it, and the verdict is the conjunction of the
 rows rather than a judgement typed above them. A row this tool cannot
 evaluate is `NOT_RUN`, which is never a pass.
 
-Measured at `b7a2768` on 2026-09-22.
+Measured at `d048013` on 2026-09-22.
 
     TECHNICALLY_STABLE_READY = no
 
-Open, and each one blocking: succession, external_ci.
+Open, and each one blocking: export_sync, succession, external_ci.
 
 | condition | state | measured | command |
 |---|---|---|---|
@@ -26,21 +26,21 @@ Open, and each one blocking: succession, external_ci.
 | `benchmark_v2_historical` | FAIL (advisory) | HISTORICAL_COMPLETE; matched_budget_valid = NO; budget_rule violated: 2 cell(s) ran past the dispatch budget without being stopped | `python3 tools/repetition_plan.py --campaign v2` |
 | `benchmark_v3` | PASS | 15 of 15 cells; COMPLETE; matched_budget_valid = YES; freeze DRIFTED (post-campaign repair, accounted for) | `python3 tools/prereg.py check --campaign v3 && python3 tools/repetition_plan.py --campaign v3` |
 | `export_manifest` | PASS | no leaks, 0 unacknowledged dangling reference(s), 12 acknowledged, 0 other problem(s) | `python3 tools/export_manifest.py check` |
-| `export_sync` | PASS | clean; 7 ours to write | `python3 tools/export_sync.py status` |
+| `export_sync` | FAIL | 4 unintegrated public change(s) | `python3 tools/export_sync.py status` |
 | `succession` | FAIL | DRIFTED: 4 field(s) no longer describe this tree: internal_commit, board, sync, open_findi | `python3 tools/succession.py verify` |
 | `identifiers` | PASS | 0 file(s) still carry German identifiers | `python3 tools/identifiers.py check src tools tests` |
 | `preflight` | PASS | profile demo: READY | `python3 tools/preflight.py --profile demo` |
 | `parallelism_baseline` | PASS | re-derives identically; project_native_parallelism = MISSING | `python3 tools/parallelism_baseline.py --out program/v3_3/VERIHARNESS_PARALLELISM_BASELINE.md` |
 | `program_scope` | PASS | COMPLETE: 0 problem(s) | `python3 tools/program_scope.py --check` |
-| `capability_matrix` | PASS | 27 proven, 148 missing, 8 partial -- re-derives identically | `python3 tools/capability_matrix.py --out program/v3_3/VERIHARNESS_CAPABILITY_MATRIX.json` |
-| `build_plan` | PASS | 157 open requirement(s) in 4 wave(s); 135 held behind a phase gate | `python3 tools/build_plan.py` |
-| `acceptance` | FAIL (advisory) | not yet proven: P1-16 IMPLEMENTED_NOT_PROVEN | `python3 tools/acceptance_record.py --evidence <dir> --out <record> --check, for each evidence probe in the register, via tools/capability_matrix.py` |
+| `capability_matrix` | PASS | 28 proven, 148 missing, 8 partial -- re-derives identically | `python3 tools/capability_matrix.py --out program/v3_3/VERIHARNESS_CAPABILITY_MATRIX.json` |
+| `build_plan` | PASS | 156 open requirement(s) in 3 wave(s); 135 held behind a phase gate | `python3 tools/build_plan.py` |
+| `acceptance` | PASS | all proven: P1-16 | `python3 tools/acceptance_record.py --evidence <dir> --out <record> --check, for each evidence probe in the register, via tools/capability_matrix.py` |
 | `baseline_docs` | PASS | 3 document(s) re-render identically | `python3 tools/baseline_docs.py --out-dir program/v3_3` |
 | `clean_install` | PASS | 0 red step(s) | `python3 tools/clean_install_check.py` |
-| `attribution` | PASS | 1 of 17 nodes through the product | `python3 tools/attribution.py` |
+| `attribution` | PASS | 1 of 18 nodes through the product | `python3 tools/attribution.py` |
 | `evidence_index` | PASS | EVIDENCE_INDEX.md matches the trees it describes | `python3 tools/evidence_index.py` |
 | `paper_audit` | PASS | 8 of 8 checks | `python3 tools/audit_refs.py <each check>` |
-| `external_ci` | FAIL | the recorded run tested a different export: 4 path(s) differ beyond this gate's own reports (dogfood/ATTRIBUTION.json, examples/minimal/README.md, tests/test_acceptance_record.py). Re-export, re-run CI, record it again. | `python3 tools/exact_head_ci.py --run-id ID --export-commit SHA` |
+| `external_ci` | FAIL | the recorded run tested a different export: 5 path(s) differ beyond this gate's own reports (EXPORT_MANIFEST.json, dogfood/ATTRIBUTION.json, examples/minimal/README.md). Re-export, re-run CI, record it again. | `python3 tools/exact_head_ci.py --run-id ID --export-commit SHA` |
 | `routing` | PASS | DEFERRED_ON_EVIDENCE | `read docs/ROUTING.md` |
 
 ## Why some rows are advisory
