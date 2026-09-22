@@ -461,6 +461,17 @@
         "514cb74685ec9f9af9b8029eb2f7a30a1778f37c"
       ],
       "why_not_the_product": "The English sweep (O182/O188-O191) and the V3.3 P0 preflight. Outside any run: the language of the published surface is a decision nobody dispatched, and the preflight is the instrument that decides whether a run may be started at all -- a run cannot be the thing that certifies its own environment."
+    },
+    {
+      "id": "v3-3-p0-baselines",
+      "category": "MAIN_ORCHESTRATOR_DIRECT",
+      "is_development_node": false,
+      "commits": [
+        "85f4668a87231a6e86e5561b25b86456d7f1c818",
+        "c8de984db21e2070555fe797fdc26327fbd9aa26",
+        "fd1dbc23ab09b4ce06ce3b6d7d30cbeaa629455c"
+      ],
+      "why_not_the_product": "The V3.3 P0 baselines: the parallelism measurement and the campaign-drift accounting the rename made necessary. Outside any run by construction -- a baseline is the description of what the product currently is, and the product cannot be the author of its own description without the ratio this ledger reports becoming circular. One of these commits carries the ledger together with the board and the evidence records, which is why it needed an entry at all: a commit that changes anything besides one bookkeeping file is work, whatever its message says (O186)."
     }
   ]
 }

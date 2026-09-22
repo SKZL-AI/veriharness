@@ -5,11 +5,11 @@ command that produced it, and the verdict is the conjunction of the
 rows rather than a judgement typed above them. A row this tool cannot
 evaluate is `NOT_RUN`, which is never a pass.
 
-Measured at `fd1dbc2` on 2026-09-22.
+Measured at `c1ab8e3` on 2026-09-22.
 
     TECHNICALLY_STABLE_READY = no
 
-Open, and each one blocking: export_sync, succession, external_ci.
+Open, and each one blocking: succession, external_ci.
 
 | condition | state | measured | command |
 |---|---|---|---|
@@ -26,8 +26,8 @@ Open, and each one blocking: export_sync, succession, external_ci.
 | `benchmark_v2_historical` | FAIL (advisory) | HISTORICAL_COMPLETE; matched_budget_valid = NO; budget_rule violated: 2 cell(s) ran past the dispatch budget without being stopped | `python3 tools/repetition_plan.py --campaign v2` |
 | `benchmark_v3` | PASS | 15 of 15 cells; COMPLETE; matched_budget_valid = YES; freeze DRIFTED (post-campaign repair, accounted for) | `python3 tools/prereg.py check --campaign v3 && python3 tools/repetition_plan.py --campaign v3` |
 | `export_manifest` | PASS | no leaks, 0 unacknowledged dangling reference(s), 12 acknowledged, 0 other problem(s) | `python3 tools/export_manifest.py check` |
-| `export_sync` | NOT_RUN | STOP -- no export checkout. Set VERIHARNESS_EXPORT_CHECKOUT to the checkout that carries t | `python3 tools/export_sync.py status` |
-| `succession` | FAIL | DRIFTED: 3 field(s) no longer describe this tree: internal_commit, board, open_findings | `python3 tools/succession.py verify` |
+| `export_sync` | PASS | clean; 4 ours to write | `python3 tools/export_sync.py status` |
+| `succession` | FAIL | DRIFTED: 2 field(s) no longer describe this tree: internal_commit, board | `python3 tools/succession.py verify` |
 | `identifiers` | PASS | 0 file(s) still carry German identifiers | `python3 tools/identifiers.py check src tools tests` |
 | `preflight` | PASS | profile demo: READY | `python3 tools/preflight.py --profile demo` |
 | `parallelism_baseline` | PASS | re-derives identically; project_native_parallelism = MISSING | `python3 tools/parallelism_baseline.py --out program/v3_3/VERIHARNESS_PARALLELISM_BASELINE.md` |
@@ -35,7 +35,7 @@ Open, and each one blocking: export_sync, succession, external_ci.
 | `attribution` | PASS | 1 of 12 nodes through the product | `python3 tools/attribution.py` |
 | `evidence_index` | PASS | EVIDENCE_INDEX.md matches the trees it describes | `python3 tools/evidence_index.py` |
 | `paper_audit` | PASS | 8 of 8 checks | `python3 tools/audit_refs.py <each check>` |
-| `external_ci` | FAIL | the recorded run tested a different export: 79 path(s) differ beyond this gate's own reports (tests/test_identifiers.py, tests/test_parallelism_baseline.py, tests/test_preflight.py). Re-export, re-run CI, record it again. | `python3 tools/exact_head_ci.py --run-id ID --export-commit SHA` |
+| `external_ci` | FAIL | the recorded run tested a different export: 1 path(s) differ beyond this gate's own reports (dogfood/ATTRIBUTION.json). Re-export, re-run CI, record it again. | `python3 tools/exact_head_ci.py --run-id ID --export-commit SHA` |
 | `routing` | PASS | DEFERRED_ON_EVIDENCE | `read docs/ROUTING.md` |
 
 ## Why some rows are advisory
@@ -47,7 +47,7 @@ Open, and each one blocking: export_sync, succession, external_ci.
 * **`benchmark_v2_historical`** — historical and advisory: v2 is an immutable dataset, its matched budget was not matched during the runs, and no step available today changes that. A blocking row over it could never be satisfied, and a gate that cannot be satisfied puts pressure on re-interpreting the dataset -- the one thing freezing a protocol forbids. `benchmark_v3` carries the release question.
 * **`benchmark_v3`** — the campaign a release may rest on: pre-registered, run under an enforced budget, complete. A campaign that produced every result file while violating the protocol is FAIL here, because the files are not what is being asked about.
 * **`export_manifest`** — the dangling references are limitation 12e: published documents citing internal ones. Advisory, because none of them is a false claim -- what a reader loses is the ability to follow a citation.
-* **`export_sync`** — a comparison that did not run is not a green one; the row says so rather than reporting the absence as safe.
+* **`export_sync`** — the export is one-directional and the public repository is not read-only: this row is what stops a copy from reverting work done there.
 * **`succession`** — the capsule is not wrong about the past when it drifts -- it is stale about the present, and a successor reading it would be too.
 * **`identifiers`** — a published tool whose names are in another language is readable only to the people who wrote it.
 * **`preflight`** — an environment that cannot run the work is not a product failure, and discovering it after the quota is spent is not a measurement.
