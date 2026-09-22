@@ -130,35 +130,47 @@ def test_a_worktree_is_not_claimed_unless_it_was_created():
     assert c.state == pf.INCONCLUSIVE and c.evidence["attempted"] is False
 
 
-def test_trust_readiness_fails_when_nothing_is_configured(monkeypatch):
-    """Today this is the answer on every machine, and the reason is a product
-    gap rather than a missing file: there is no configuration path at all."""
-    monkeypatch.delenv("HOH_APPROVAL_SCRIPT", raising=False)
-    monkeypatch.delenv("HOH_APPROVAL_SCOPE", raising=False)
+def test_trust_readiness_measures_the_mechanism_the_product_has():
+    """Superseded 2026-09-22 (P1-09). The earlier version of this test pinned a
+    FAIL on two environment variables no part of the product read. The check
+    now measures `hoh run --trust-worktree` and names its scope root."""
     c = pf.check_trust_readiness()
-    assert c.state == pf.FAIL
-    assert "NoApprovalProvider" in c.detail
-    assert c.evidence["gap"]
+    assert c.state == pf.PASS, c.detail
+    assert c.evidence["mechanism"] == "hoh run --trust-worktree"
+    assert c.evidence["scope_root"].endswith(".herdr/worktrees")
 
 
-def test_trust_readiness_passes_only_with_an_executable_helper_and_a_real_scope(
-        monkeypatch, tmp_path):
-    scope = tmp_path / "worktrees" / "project"
-    scope.mkdir(parents=True)
-    helper = tmp_path / "approve.sh"
-    helper.write_text("#!/bin/sh\nexit 0\n")
-    monkeypatch.setenv("HOH_APPROVAL_SCOPE", str(scope))
-    monkeypatch.setenv("HOH_APPROVAL_SCRIPT", str(helper))
-
-    # Not executable yet: a helper that cannot run cannot approve.
-    assert pf.check_trust_readiness().state == pf.FAIL
-    helper.chmod(0o755)
-    assert pf.check_trust_readiness().state == pf.PASS
-
-    # And a scope wide enough to be decorative is refused, not accepted.
-    monkeypatch.setenv("HOH_APPROVAL_SCOPE", str(Path.home()))
+def test_trust_readiness_fails_when_the_build_has_no_scoped_authority(monkeypatch):
+    """The negative control: a build without the scoped pre-trust says so."""
+    import hoh.trust as trust
+    monkeypatch.delattr(trust, "trust_run_worktree")
     c = pf.check_trust_readiness()
-    assert c.state == pf.FAIL and "scope" in c.detail
+    assert c.state == pf.FAIL and "trust dialog" in c.detail
+
+
+def test_role_permissions_loads_the_shipped_policy_through_the_product_loader():
+    """O198: the doctor said READY and the first dispatch stopped for a human.
+    This check is what would have said so."""
+    c = pf.check_role_permissions()
+    assert c.state == pf.PASS, c.detail
+    assert c.evidence["mode"] == "auto"
+    assert "without it they inherit" in c.detail
+
+
+def test_role_permissions_fails_on_a_policy_the_loader_refuses(monkeypatch, tmp_path):
+    import json as _json
+    bad = tmp_path / "policy"
+    bad.mkdir()
+    doc = _json.loads((ROOT / "policy" / "role_approval.default.json").read_text())
+    doc["mode"] = "manual"
+    (bad / "role_approval.default.json").write_text(_json.dumps(doc))
+    monkeypatch.setattr(pf, "HOH", tmp_path)
+    c = pf.check_role_permissions()
+    assert c.state == pf.FAIL and "manual" in c.detail
+
+
+def test_unattended_requires_role_permissions():
+    assert "role_permissions" in pf.PROFILES["unattended"]["requires"]
 
 
 def test_the_digest_ignores_the_clock_and_not_the_content():

@@ -89,7 +89,8 @@ PROFILES: dict[str, dict] = {
     "unattended": {
         "requires": ("python_version", "cli_entrypoint", "dependencies",
                      "git_repo", "infrastructure_exits", "disk_headroom",
-                     "trust_readiness", "repo_clean", "worktree_creation"),
+                     "trust_readiness", "role_permissions", "repo_clean",
+                     "worktree_creation"),
         "min_isolation": STRICT_OS_SANDBOX,
         "why": ("nobody is there to answer a prompt or to notice that a "
                 "check never ran"),
@@ -348,49 +349,75 @@ def check_resource_controls() -> Check:
 
 
 def check_trust_readiness() -> Check:
-    """Can an unattended run get a fresh worktree trusted without a person?
+    """Can a run's developer worktree be trusted with nobody present?
 
-    The product has the mechanism -- a scoped `ApprovalProvider` -- and the
-    launcher defaults to `NoApprovalProvider`, which refuses everything and
-    says so. What it has no way to do is read one out of a deployment: there
-    is no environment variable, no config key, nothing a machine could set.
-    So for an unattended profile this is FAIL, and the reason is a product
-    gap rather than a missing file on this host.
+    Superseded 2026-09-22 (P1-09). This used to look for two environment
+    variables that no part of the product ever read, and said FAIL because
+    they were absent -- a check against a mechanism that did not exist. The
+    mechanism now is `hoh run --trust-worktree`: a per-run, recorded grant for
+    the run's own linked worktree under Herdr's worktree root, and nothing
+    else. This measures that it is present and that the root it is scoped to
+    is where `hoh worktree` puts worktrees.
     """
     sys.path.insert(0, str(HOH / "src"))
     try:
-        from hoh import approval as ap
+        from hoh import trust
     except Exception as exc:                      # pragma: no cover
         return Check("trust_readiness", "can a worktree be trusted with nobody present?",
                      INCONCLUSIVE, f"not importable: {exc}", {})
-    configured = os.environ.get("HOH_APPROVAL_SCRIPT")
-    scope = os.environ.get("HOH_APPROVAL_SCOPE")
-    providers = [n for n in dir(ap) if n.endswith("Provider")]
-    if not configured or not scope:
+    if not hasattr(trust, "trust_run_worktree"):
         return Check(
             "trust_readiness", "can a worktree be trusted with nobody present?",
-            FAIL,
-            "no approval authority is discoverable from the environment; the "
-            "launcher would use NoApprovalProvider and the run would stop at "
-            "the trust dialog",
-            {"providers_available": providers,
-             "HOH_APPROVAL_SCRIPT": configured, "HOH_APPROVAL_SCOPE": scope,
-             "gap": "no deployment-level configuration path exists (V3.3 P0)"})
-    helper = Path(configured)
-    try:
-        provider = ap.PrefixScopedProvider(script=helper, prefix=Path(scope))
-    except ValueError as exc:
-        return Check("trust_readiness", "can a worktree be trusted with nobody present?",
-                     FAIL, f"the configured scope is not usable: {exc}",
-                     {"HOH_APPROVAL_SCOPE": scope})
-    ok = helper.exists() and os.access(helper, os.X_OK)
+            FAIL, "no scoped worktree-trust authority in this build; the developer "
+                  "would stop at the trust dialog",
+            {"gap": "no scoped worktree pre-trust (P1-09)"})
+    root = trust.herdr_worktree_root()
     return Check(
         "trust_readiness", "can a worktree be trusted with nobody present?",
-        PASS if ok else FAIL,
-        f"{provider.name} scoped to {provider.prefix}"
-        + ("" if ok else f"; helper {helper} is missing or not executable"),
-        {"provider": provider.name, "prefix": str(provider.prefix),
-         "helper": str(helper), "executable": ok})
+        PASS,
+        f"`hoh run --trust-worktree` pre-grants trust for the run's own linked "
+        f"worktree below {root}, and records the grant in the run directory",
+        {"mechanism": "hoh run --trust-worktree", "scope_root": str(root),
+         "root_exists": root.is_dir()})
+
+
+def check_role_permissions() -> Check:
+    """Will a role stop for a human the first time it runs a command?
+
+    O198: the doctor said READY and the first dispatch waited for a keypress
+    ten seconds later, because it checked folder trust and not what a role may
+    do. This loads the shipped role approval policy through the product's own
+    loader -- the same refusals apply here as at run time -- and reports the
+    operator's own Claude default beside it, because a run started *without*
+    `--approval-policy` inherits that default.
+    """
+    sys.path.insert(0, str(HOH / "src"))
+    policy_file = HOH / "policy" / "role_approval.default.json"
+    operator_mode = None
+    settings = Path.home() / ".claude" / "settings.json"
+    if settings.is_file():
+        try:
+            operator_mode = (json.loads(settings.read_text()).get("permissions") or {}
+                             ).get("defaultMode")
+        except (OSError, ValueError):
+            operator_mode = "unreadable"
+    try:
+        from hoh.approval_policy import PolicyRefused, load
+        policy = load(policy_file)
+    except (ImportError, PolicyRefused) as exc:
+        return Check(
+            "role_permissions", "will a role stop for a human on its first command?",
+            FAIL, f"no usable role approval policy: {str(exc)[:110]}",
+            {"policy": str(policy_file), "operator_default_mode": operator_mode})
+    return Check(
+        "role_permissions", "will a role stop for a human on its first command?",
+        PASS,
+        f"with --approval-policy roles run in {policy.mode!r} mode, "
+        f"{len(policy.deny)} actions denied in every mode; without it they inherit "
+        f"the operator's default ({operator_mode or 'interactive'}) and stop at "
+        "every unapproved action",
+        {"policy": str(policy_file.relative_to(HOH)), "mode": policy.mode,
+         "digest": policy.digest, "operator_default_mode": operator_mode})
 
 
 def check_worktree_creation(deep: bool) -> Check:
@@ -486,6 +513,7 @@ def measure(deep: bool = False) -> list[Check]:
         check_isolation(),
         check_resource_controls(),
         check_trust_readiness(),
+        check_role_permissions(),
         check_worktree_creation(deep),
         check_disk_headroom(),
         check_provider_health(),

@@ -1067,6 +1067,46 @@
       "rule": "internal-working-document"
     },
     {
+      "path": "dogfood/p1-16/20260922T1340Z/approvals.log",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1340Z/clone.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1340Z/doctor-demo.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1340Z/install.log",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1340Z/run-2.log",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1340Z/run.log",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1340Z/start.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p1-16/20260922T1340Z/worktree.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
       "path": "dogfood/planner-confinement.v20260913T135001Z/SUMMARY.json",
       "decision": "EXCLUDE",
       "rule": "internal-working-document"
@@ -3617,6 +3657,11 @@
       "rule": "operational-integration"
     },
     {
+      "path": "policy/role_approval.default.json",
+      "decision": "INCLUDE",
+      "rule": "operational-integration"
+    },
+    {
       "path": "program/v3_3/AUTHORITATIVE_PROGRAM_SCOPE.json",
       "decision": "EXCLUDE",
       "rule": "unclassified"
@@ -3713,6 +3758,11 @@
     },
     {
       "path": "src/hoh/approval.py",
+      "decision": "INCLUDE",
+      "rule": "package"
+    },
+    {
+      "path": "src/hoh/approval_policy.py",
       "decision": "INCLUDE",
       "rule": "package"
     },
@@ -3868,6 +3918,11 @@
     },
     {
       "path": "tests/test_approval.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_approval_policy.py",
       "decision": "INCLUDE",
       "rule": "tests"
     },
@@ -4043,6 +4098,11 @@
     },
     {
       "path": "tests/test_repetition_plan.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_resume_collects_answer.py",
       "decision": "INCLUDE",
       "rule": "tests"
     },

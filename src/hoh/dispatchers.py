@@ -80,6 +80,11 @@ class _Base:
         #: defaults to" -- which is what HoH did exclusively until 2026-09-08.
         self.models = models or {}
         self.efforts = efforts or {}
+        #: P1-09. What each role may do without asking, decided before the run
+        #: and written into the run directory. None keeps the historical
+        #: behaviour: the role inherits the operator's interactive defaults and
+        #: a prompt stops the run for a human (O198).
+        self.approval_policy = None
         self.answers_dir = Path(answers_dir)
         self.answers_dir.mkdir(parents=True, exist_ok=True)
         #: The run directory. Boundary for reusing an agent that Herdr
@@ -146,6 +151,57 @@ class _Base:
         destination = self.role_cwd.get(role) or getattr(self, "cwd", None)
         return bool(destination) and tree_digest(Path(destination)) != before
 
+    # -- O199: collecting the answer an approved dialog enabled -------------- #
+
+    @staticmethod
+    def _prompt_digest(full: str) -> str:
+        import hashlib
+        return hashlib.sha256(full.encode("utf-8")).hexdigest()
+
+    @staticmethod
+    def _marker_for(answer_path: Path) -> Path:
+        return answer_path.with_name(answer_path.name + ".dispatch.json")
+
+    def _write_dispatch_marker(self, answer_path: Path, full: str) -> None:
+        """Remember what was asked, so a later dispatch can tell whether the
+        answer on disk answers *this* question. A previous marker is kept with
+        a version suffix, never overwritten."""
+        marker = self._marker_for(answer_path)
+        if marker.exists():
+            marker.rename(marker.with_name(f"{marker.name}.v{utcnow()}"))
+        marker.write_text(json.dumps({
+            "prompt_sha256": self._prompt_digest(full),
+            "dispatched_at": time.time(),
+        }) + "\n", encoding="utf-8")
+
+    def _resumable_answer(self, role: Role, answer_path: Path, full: str) -> bool:
+        """Is the answer on disk the completed answer to this very prompt?
+
+        O199. A dialog aborted the iteration; the operator answered it; the
+        role finished and wrote its answer; the resumed run then parked that
+        answer as "an earlier round" and asked again -- so every approval
+        enabled work the next resume threw away, and the supervised path
+        could not converge.
+
+        All four must hold, and any doubt means the answer is parked as
+        before rather than trusted: the role answers through a file; a marker
+        from the dispatch exists; that dispatch asked exactly this prompt
+        (same digest -- a changed iteration, attempt, amendment or spec
+        changes the prompt); and the answer was written after it was asked.
+        """
+        if role not in STRUCTURED_ROLES:
+            return False
+        marker = self._marker_for(answer_path)
+        try:
+            meta = json.loads(marker.read_text(encoding="utf-8"))
+            written_at = answer_path.stat().st_mtime
+            nonempty = bool(answer_path.read_text(encoding="utf-8").strip())
+        except (OSError, ValueError):
+            return False
+        return (nonempty
+                and meta.get("prompt_sha256") == self._prompt_digest(full)
+                and written_at > float(meta.get("dispatched_at") or 0))
+
     def _read_answer(self, path: Path, role: Role) -> str:
         if not path.exists():
             raise DispatchError(
@@ -183,6 +239,18 @@ class _Base:
             extra += ["--model", model]
         if effort:
             extra += ["--effort", effort]
+        policy = getattr(self, "approval_policy", None)
+        if policy is not None:
+            kind = (self.profiles or {}).get(role)
+            if kind != "claude":
+                # Fail closed: a policy HoH cannot express to this harness is
+                # not quietly dropped, it stops the run before the role starts.
+                raise DispatchError(
+                    f"the approval policy can be applied to Claude roles only; "
+                    f"{role.value} is configured as {kind!r}. Run it without a "
+                    "policy, or give the role the claude harness.")
+            settings, prompt = policy.write_role_files(self.store_dir, role.value)
+            extra += policy.args(role.value, settings, prompt)
         return extra
 
     def endpoint_evidence(self, role: Role) -> str:
@@ -620,13 +688,24 @@ class HerdrDispatcher(_Base):
     def dispatch(self, role: Role, prompt: str, *, state: RunState) -> str:
         target = self._ensure_agent(role, state)
         answer_path = self._answer_path(role, state)
-        if answer_path.exists():
-            # Do not reuse an answer from an earlier round.
-            answer_path.rename(answer_path.with_name(f"{answer_path.name}.v{utcnow()}"))
-
         full = prompt + (
             _answer_instruction(answer_path) if role in STRUCTURED_ROLES else ""
         )
+        if answer_path.exists():
+            if self._resumable_answer(role, answer_path, full):
+                # O199: the answer to this exact prompt, finished after an
+                # operator answered the dialog that interrupted it. Collected,
+                # not asked again -- and recorded as collected.
+                self.endpoints[role] = (
+                    f"collected after an approved dialog: {answer_path.name} "
+                    f"written by {target} in answer to the same prompt")
+                self.collected_after_dialog = getattr(
+                    self, "collected_after_dialog", []) + [role.value]
+                return self._read_answer(answer_path, role)
+            # Do not reuse an answer from an earlier round.
+            answer_path.rename(answer_path.with_name(f"{answer_path.name}.v{utcnow()}"))
+        if role in STRUCTURED_ROLES:
+            self._write_dispatch_marker(answer_path, full)
 
         # Witnessed before the dispatch, so an unstructured role's delivery can
         # be measured rather than read off its pane. Cheap: a digest over the
@@ -711,6 +790,7 @@ def build_dispatcher(
     timeout_ms: int = DEFAULT_TIMEOUT_MS,
     models: dict[Role, str] | None = None,
     efforts: dict[Role, str] | None = None,
+    approval_policy=None,
 ) -> _Base:
     """Picks the adapter -- and says honestly when it is not the evidencing one."""
     if prefer_herdr:
@@ -721,9 +801,13 @@ def build_dispatcher(
                 "subprocess does not fulfill the assignment. With --no-herdr one "
                 "can deliberately work without any acceptance value."
             )
-        return HerdrDispatcher(answers_dir=answers_dir, profiles=profiles, cwd=cwd,
-                              timeout_ms=timeout_ms, models=models, efforts=efforts)
+        d = HerdrDispatcher(answers_dir=answers_dir, profiles=profiles, cwd=cwd,
+                            timeout_ms=timeout_ms, models=models, efforts=efforts)
+        d.approval_policy = approval_policy
+        return d
     # The subprocess adapter counts in seconds, not in milliseconds.
-    return HarnessDispatcher(answers_dir=answers_dir, profiles=profiles, cwd=cwd,
-                             timeout=max(1, timeout_ms // 1000),
-                             models=models, efforts=efforts)
+    d = HarnessDispatcher(answers_dir=answers_dir, profiles=profiles, cwd=cwd,
+                          timeout=max(1, timeout_ms // 1000),
+                          models=models, efforts=efforts)
+    d.approval_policy = approval_policy
+    return d

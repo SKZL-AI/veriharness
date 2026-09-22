@@ -77,3 +77,64 @@ def register(path: Path | str, *, owned_root: Path | str) -> bool:
     tmp.write_text(json.dumps(data, indent=2), encoding="utf-8")
     os.replace(tmp, conf)
     return True
+
+
+def herdr_worktree_root() -> Path:
+    """Where `hoh worktree` has Herdr put the worktrees it creates."""
+    return Path.home() / ".herdr" / "worktrees"
+
+
+def trust_run_worktree(path: Path | str, *, herdr_root: Path | str | None = None) -> dict:
+    """Pre-grant trust for a run's own development worktree (P1-09).
+
+    The developer's worktree is the one directory a run needs that HoH did not
+    create below its own root, so `register` refuses it and the developer
+    stops at the trust dialog. `hoh run --trust-worktree` asks for it to be
+    granted up front instead -- explicitly, per run, and only for a directory
+    that is all three of:
+
+    * inside Herdr's managed worktree root, one project level down, so the
+      grant cannot reach the root itself or anything beside it;
+    * a *linked* git worktree (its git dir differs from the common dir), so an
+      ordinary checkout or an arbitrary folder is refused;
+    * the path the caller passes, which `hoh run` takes from the run's own
+      recorded repository and nowhere else.
+
+    Returns what was granted, for the run's evidence. Refuses with the reason
+    otherwise; nothing is written on a refusal.
+    """
+    import subprocess
+
+    target = Path(path).resolve()
+    root = Path(herdr_root or herdr_worktree_root()).resolve()
+    if not target.is_dir():
+        raise TrustRefused(f"{target} is not a directory")
+    if target == root or not target.is_relative_to(root):
+        raise TrustRefused(
+            f"{target} is not below Herdr's worktree root {root}; only a "
+            "worktree Herdr created for this project can be pre-trusted")
+    rel = target.relative_to(root)
+    if len(rel.parts) < 2:
+        raise TrustRefused(
+            f"{target} is a project directory, not a worktree inside one")
+
+    def git(*a: str) -> str:
+        p = subprocess.run(["git", "-C", str(target), *a],
+                           capture_output=True, text=True)
+        if p.returncode != 0:
+            raise TrustRefused(f"{target} is not a git worktree: "
+                               f"{(p.stderr or p.stdout).strip()[:120]}")
+        return p.stdout.strip()
+
+    git_dir = Path(git("rev-parse", "--absolute-git-dir")).resolve()
+    common = Path(git("rev-parse", "--git-common-dir"))
+    common = (common if common.is_absolute() else target / common).resolve()
+    if git_dir == common:
+        raise TrustRefused(
+            f"{target} is a main checkout, not a linked worktree; a checkout "
+            "somebody works in is the captain's to trust, in the tab")
+    project_root = root / rel.parts[0]
+    written = register(target, owned_root=project_root)
+    return {"worktree": str(target), "herdr_root": str(root),
+            "project_root": str(project_root), "git_common_dir": str(common),
+            "registered": written, "at": utcnow()}

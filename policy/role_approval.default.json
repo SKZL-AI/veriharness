@@ -1,0 +1,45 @@
+{
+  "schema": "hoh-role-approval/1",
+  "what": "The default role approval policy for VeriHarness runs (P1-09). Roles run in the harness's `auto` mode: routine actions are approved by the harness, risky ones are stopped, and nothing waits for a human. The deny-list below applies in every mode and cannot be shortened: a policy missing any mandatory entry is refused on load.",
+  "mode": "auto",
+  "deny": [
+    "Bash(rm:*)",
+    "Bash(rmdir:*)",
+    "Bash(shred:*)",
+    "Bash(dd:*)",
+    "Bash(mkfs:*)",
+    "Bash(find * -delete:*)",
+    "Bash(truncate:*)",
+    "Bash(git clean:*)",
+    "Bash(git reset --hard:*)",
+    "Bash(git push:*)",
+    "Bash(git branch -D:*)",
+    "Bash(git tag -d:*)",
+    "Bash(git rebase:*)",
+    "Bash(sudo:*)",
+    "Bash(su:*)",
+    "Bash(chown:*)",
+    "Bash(curl:*)",
+    "Bash(wget:*)",
+    "Bash(ssh:*)",
+    "Bash(scp:*)",
+    "Bash(twine:*)",
+    "Bash(gh release:*)",
+    "Bash(npm publish:*)",
+    "Bash(nvidia-smi:*)",
+    "WebFetch",
+    "WebSearch"
+  ],
+  "house_rules": "# House rules for this session (binding)\n\nYou were started by VeriHarness as one role of a verified run. These rules are\nnot suggestions and they hold whatever permission mode this session runs in.\n\n- **Never delete anything.** No rm, rmdir, shred, dd, truncate, `find -delete`,\n  `git clean`, `git reset --hard`, `git branch -D`, `git tag -d`, and no code\n  that removes files or directories. Those commands are denied; do not work\n  around the denial.\n- **Version instead of overwriting.** Before you replace a file you did not\n  create in this session, keep the previous content: copy it to\n  `<name>.v<N>.<UTC-timestamp>` beside it, or into `.archiv/` of the project.\n  Redundant saving, versioning and archiving is the strategy; removal is not.\n- **Stay in your own directories.** Write only where your role writes: the\n  answers directory you were given, your arena, or the development worktree if\n  you are the developer. Other worktrees and reference projects are read-only.\n- **No network, no publishing.** No curl, wget, ssh, pip/npm installs, pushes,\n  releases or package uploads.\n- **No nvidia-smi**, in any form, including from code you write.\n- If something you need is denied, say so in your answer and stop; do not look\n  for another command that does the same thing.\n",
+  "roles": {
+    "planner": {
+      "allow": []
+    },
+    "developer": {
+      "allow": []
+    },
+    "qa": {
+      "allow": []
+    }
+  }
+}

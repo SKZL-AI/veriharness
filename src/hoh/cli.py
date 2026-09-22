@@ -771,6 +771,35 @@ def cmd_run(args) -> int:
             "note": "recorded here because a verdict is only comparable when "
                     "it is known which model produced it",
         })
+    # P1-09. Both decided before any role starts, both written into the run
+    # directory, so the record says what the agents could do and which
+    # directory was trusted on whose instruction.
+    policy = None
+    approval_dir = store.dir / "approval"
+    if getattr(args, "approval_policy", None):
+        from .approval_policy import PolicyRefused, load
+        try:
+            policy = load(args.approval_policy)
+        except PolicyRefused as exc:
+            print(f"approval policy refused: {exc}", file=sys.stderr)
+            return 2
+        approval_dir.mkdir(parents=True, exist_ok=True)
+        (approval_dir / "policy.json").write_text(
+            json.dumps(policy.evidence(), indent=2) + "\n", encoding="utf-8")
+        _print({"approval_policy": {"mode": policy.mode, "digest": policy.digest,
+                                    "denied": len(policy.deny),
+                                    "source": policy.source}})
+    if getattr(args, "trust_worktree", False):
+        from .trust import TrustRefused, trust_run_worktree
+        try:
+            granted = trust_run_worktree(state.repo_path)
+        except TrustRefused as exc:
+            print(f"worktree trust refused: {exc}", file=sys.stderr)
+            return 2
+        approval_dir.mkdir(parents=True, exist_ok=True)
+        (approval_dir / "worktree_trust.json").write_text(
+            json.dumps(granted, indent=2) + "\n", encoding="utf-8")
+        _print({"worktree_trust": granted})
     try:
         dispatcher = build_dispatcher(
             answers_dir=store.dir / "answers",
@@ -780,6 +809,7 @@ def cmd_run(args) -> int:
             timeout_ms=args.role_timeout * 1000,
             models=models,
             efforts=efforts,
+            approval_policy=policy,
         )
     except Exception as exc:   # DispatchError and HerdrUnavailable
         print(str(exc), file=sys.stderr)
@@ -1308,6 +1338,16 @@ def build_parser() -> argparse.ArgumentParser:
                    help="deadline per role run in seconds (default 2700 = 45 min). "
                         "A thorough differential review takes time; too tight a "
                         "deadline trains superficial work.")
+    r.add_argument("--approval-policy", metavar="PATH", default=None,
+                   help="what each role may do without asking, decided up front "
+                        "(P1-09); e.g. policy/role_approval.default.json. Without "
+                        "it a role inherits the operator's interactive defaults "
+                        "and every unapproved action stops the run for a human.")
+    r.add_argument("--trust-worktree", action="store_true",
+                   help="pre-grant folder trust for this run's own development "
+                        "worktree -- only a linked worktree Herdr created, below "
+                        "its worktree root -- so the developer does not stop at "
+                        "the trust dialog. Recorded in the run directory.")
     r.set_defaults(func=cmd_run)
 
     for name, fn, help_ in (

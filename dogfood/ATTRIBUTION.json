@@ -523,9 +523,19 @@
         "58587b4b006ec88c75959190f85cc6bf37b60f03",
         "aa90302e0edec0fe519407616c8c4ed6e40287fa",
         "bdc976422a427f1589f971da1fc9d7ce563c52d8",
-        "ca3ed6916cc5be9d0b6c2e53c12faf51e05eca15"
+        "ca3ed6916cc5be9d0b6c2e53c12faf51e05eca15",
+        "cf459012f9177cbf07db1d77c7bdffef78e1273e"
       ],
       "why_not_the_product": "The programme-scope gate (O196) and the board/matrix cycle (O197). Outside any run by construction: deciding what the programme *is* -- which work exists, in which phase, gated by what -- is the question every run is an answer inside of, and a run cannot author the inventory its own work is measured against."
+    },
+    {
+      "id": "p1-09-role-approval-policy",
+      "category": "MAIN_ORCHESTRATOR_DIRECT",
+      "is_development_node": true,
+      "commits": [
+        "af0dc0e60b5c340977621fe375b28c64a704c83a"
+      ],
+      "why_not_the_product": "P1-09 was built by the orchestrator because it is the capability a product run needs in order to run at all: without it the first dispatch of any run stops for a human (O198), and a run cannot build the policy that decides whether it may start. Counted as a development node, and not through the product, which is what it was."
     }
   ]
 }
