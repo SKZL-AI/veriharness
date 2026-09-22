@@ -586,6 +586,18 @@
         "b7a2768e85ae1f83c652744e40ec9bba14fad26e"
       ],
       "why_not_the_product": "The fourth P1-16 drive and its record. The run itself was the product's -- HoH planned, developed and accepted the minimal programme with no human intervention -- but the drive around it, the record and the re-execution are the instrument that judges that run, and a run does not author what judges it."
+    },
+    {
+      "id": "p1-boundary-closure",
+      "category": "MAIN_ORCHESTRATOR_DIRECT",
+      "is_development_node": true,
+      "commits": [
+        "9f2058ebf071b2f6f4558f3f485f073ab2abf68d",
+        "eec82190f2101180e2b9f94260666d3aa801fcc3",
+        "139528189b1dcdde43312339719fc16d0f25f90e",
+        "d048013a095746751547a49b307971a4195d0b16"
+      ],
+      "why_not_the_product": "Closing the P1 boundary: the export's CI and sync records and the regenerated documents. Mechanical closure work on the instrument, outside the product."
     }
   ]
 }
