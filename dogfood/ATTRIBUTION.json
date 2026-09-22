@@ -598,6 +598,18 @@
         "d048013a095746751547a49b307971a4195d0b16"
       ],
       "why_not_the_product": "Closing the P1 boundary: the export's CI and sync records and the regenerated documents. Mechanical closure work on the instrument, outside the product."
+    },
+    {
+      "id": "p1-boundary-export-and-board",
+      "category": "MAIN_ORCHESTRATOR_DIRECT",
+      "is_development_node": true,
+      "commits": [
+        "8578c37b8b45e3c4cbd38f77939568a46ebb4b02",
+        "be5b937e6f6b0111c3fd424ecc8ddfe8823e1a6a",
+        "d962f192852f0c61cf70590e1473d21f44f96a12",
+        "2c8bff00b8a794f66004993f75d1458c26f1f627"
+      ],
+      "why_not_the_product": "The P1 boundary's export records and regenerated board. Mechanical closure work on the instrument."
     }
   ]
 }
