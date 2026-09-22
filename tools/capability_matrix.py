@@ -133,16 +133,16 @@ def classify(req: dict, symbols, collection, board) -> dict:
         else:
             status = PROVEN if test_seen else MISSING
     elif kind == "row":
-        if row_state is None:
-            status = NOT_DETERMINABLE
-        elif row_state == "ABSENT":
-            status = PARTIAL if equivalent else MISSING
-        elif row_state.startswith("PASS"):
-            status = PROVEN
-        elif row_state.startswith("NOT_RUN"):
-            status = IMPLEMENTED_NOT_PROVEN
-        else:
-            status = IMPLEMENTED_NOT_PROVEN
+        # O197. A board row answers "is this green right now", which is
+        # operational state; this matrix answers "does the capability exist
+        # and is it tested". Reading the one to decide the other made the
+        # board and the matrix a cycle: `succession` flipped, P2-07 flipped
+        # with it, the matrix went stale, its own row flipped, and the board
+        # never reached a fixpoint in four passes. Refused rather than
+        # supported, so the cycle cannot come back through a register edit.
+        status = NOT_DETERMINABLE
+        evidence.append("row probes are refused: the matrix does not read the "
+                        "board (O197)")
     else:
         status = NOT_DETERMINABLE
         evidence.append(f"unknown probe kind {kind!r}")
@@ -177,7 +177,7 @@ def measure() -> dict:
     register = json.loads(REGISTER.read_text(encoding="utf-8"))
     symbols = _symbols()
     collection = _collected()
-    board = _board()
+    board: dict = {}   # O197: never read; see the `row` branch in classify
     rows = [classify(r, symbols, collection, board)
             for r in register["requirements"]]
     counts: dict[str, int] = {s: 0 for s in ORDER + [NOT_DETERMINABLE]}

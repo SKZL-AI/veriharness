@@ -75,18 +75,35 @@ def test_a_symbol_without_its_test_is_not_proven():
     assert any("NOT collected" in e for e in unproven["evidence"])
 
 
-def test_a_board_row_carries_its_own_verdict():
-    board = {"green_row": ("PASS", "measured"), "red_row": ("FAIL", "measured"),
-             "unrun_row": ("NOT_RUN", "nothing ran")}
-    assert cm.classify(_req({"kind": "row", "row": "green_row"}), {}, ("", True),
-                       board)["status"] == cm.PROVEN
-    assert cm.classify(_req({"kind": "row", "row": "red_row"}), {}, ("", True),
-                       board)["status"] == cm.IMPLEMENTED_NOT_PROVEN
-    assert cm.classify(_req({"kind": "row", "row": "unrun_row"}), {}, ("", True),
-                       board)["status"] == cm.IMPLEMENTED_NOT_PROVEN
-    assert cm.classify(_req({"kind": "row", "row": "no_such_row"}), {}, ("", True),
-                       board)["status"] == cm.MISSING
+def test_a_board_row_is_refused_as_a_probe():
+    """O197. A board row answers "is this green right now"; the matrix answers
+    "does the capability exist and is it tested". Reading one to decide the
+    other made the board and the matrix a cycle that did not converge in four
+    passes -- and it over-credited three capabilities whose rows passed for
+    reasons that were not the capability (a recorded routing *deferral*, a
+    doctor that exists without the end-to-end path, a preflight nothing
+    obeys). A `row` probe now comes back NOT_DETERMINABLE, whatever the
+    board says."""
+    board = {"green_row": ("PASS", "measured")}
+    r = cm.classify(_req({"kind": "row", "row": "green_row"}), {}, ("", True), board)
+    assert r["status"] == cm.NOT_DETERMINABLE
+    assert any("O197" in e for e in r["evidence"])
 
+
+def test_the_matrix_never_reads_the_board():
+    """The structural half: not just refused in `classify`, but not read at
+    all, so no future probe kind can quietly reintroduce the cycle."""
+    source = (ROOT / "tools" / "capability_matrix.py").read_text()
+    measure = source[source.index("def measure()"):]
+    measure = measure[:measure.index("\ndef ")]
+    assert "_board()" not in measure, "measure() reads the board again"
+
+
+def test_the_register_uses_no_board_rows():
+    needs_evidence(PROGRAM_REGISTER)
+    rows = [r["id"] for r in _register()["requirements"]
+            if (r.get("probe") or {}).get("kind") == "row"]
+    assert not rows, rows
 
 def test_a_probe_that_could_not_run_is_not_a_finding_about_the_software():
     """NOT_DETERMINABLE, never MISSING. The two sentences are different and
@@ -110,12 +127,17 @@ def test_every_requirement_in_the_register_has_a_probe_the_tool_understands():
 
 
 def test_the_register_covers_the_phases_the_plan_names():
+    """Superseded 2026-09-22 (O196). This used to assert
+    `{"P1", "P2", "P3"} <= phases` where `phases` came from the register under
+    test -- so a register that dropped P4 through P12 passed it, and so did
+    every artefact derived from that register. Completeness is now decided by
+    `tools/program_scope.py` against an inventory parsed from the pinned plan
+    (`tests/test_program_scope.py`); what stays here is only what the matrix
+    itself needs: every requirement names the plan item it implements."""
     register = _register()
-    phases = {r["target_phase"] for r in register["requirements"]}
-    assert {"P1", "P2", "P3"} <= phases
-    assert register["plan_snapshot_commit"]
-
-
+    assert register.get("scope_plan_sha256"), "not reconciled against the plan"
+    for r in register["requirements"]:
+        assert r.get("authoritative_item"), r["id"]
 def test_the_counts_add_up_to_the_register():
     """A summary that loses a row is how a gap disappears."""
     needs_evidence(PROGRAM_REGISTER)
@@ -144,5 +166,11 @@ def test_this_tree_is_the_baseline_the_plan_was_written_against():
     body = cm.measure()
     by_id = {r["id"]: r["status"] for r in body["capabilities"]}
     assert by_id["P3-02"] == cm.MISSING, "ParallelWaveExecutor"
-    assert by_id["P3-11"] == cm.PROVEN, "ExecutionPreflight, built in P0"
+    # ExecutionPreflight measures and reports; nothing refuses to start a run
+    # on its verdict yet, so it is PARTIAL -- the board row that said PASS
+    # was answering a different question (O197).
+    assert by_id["P3-11"] == cm.PARTIAL, "ExecutionPreflight is not wired in"
+    # The capability report was filed as P3-10 until the register was
+    # reconciled with the plan (O196); the plan files it under P5.
+    assert by_id["P5-17"] == cm.PROVEN, "the truthful isolation report is"
     assert by_id["P1-07"] == cm.PROVEN, "the sandbox"

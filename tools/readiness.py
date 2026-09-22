@@ -407,6 +407,30 @@ def row_baseline_docs() -> Row:
                "so the only thing that can go wrong is being old")
 
 
+def row_program_scope() -> Row:
+    """Does the register describe the whole programme the plan names?
+
+    O196. The register used to certify its own completeness: the test asked
+    whether it contained P1-P3, and the register supplied the answer. This row
+    asks the pinned plan instead, parsed from its bytes, and fails on a missing
+    capability, a missing phase, an invented requirement, a duplicate, or an
+    inventory parsed from a different plan than the one pinned.
+    """
+    command = "python3 tools/program_scope.py --check"
+    rc, out = _py("tools/program_scope.py", "--check")
+    last = [z for z in out.strip().splitlines() if z.strip()]
+    if rc == 3:
+        return Row("program_scope", NOT_RUN,
+                   (last[-1][:100] if last else "the pinned plan is not reachable"),
+                   command,
+                   "the inventory is derived from the plan; without the plan "
+                   "nothing about completeness is claimed")
+    return Row("program_scope", PASS if rc == 0 else FAIL,
+               (last[-1].strip()[:100] if last else f"exit {rc}"), command,
+               "a register that is internally consistent can still be a "
+               "quarter of the programme; only the plan can say it is not")
+
+
 def row_export_sync() -> Row:
     """Would exporting right now overwrite work that did not come from here?
 
@@ -1141,6 +1165,7 @@ def row_list(quick: bool) -> list[Row]:
         row_identifiers(),
         row_preflight(),
         row_parallelism(),
+        row_program_scope(),
         row_capability_matrix(),
         row_build_plan(),
         row_baseline_docs(),

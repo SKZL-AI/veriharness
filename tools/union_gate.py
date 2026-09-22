@@ -477,7 +477,15 @@ def check_u2(repo_path: Path) -> Result:
         return Result.skipped(f"{repo_path} is not a git repository")
 
     shipped = {line for line in proc.stdout.splitlines() if line}
-    md_files = sorted(f for f in shipped if f.endswith(".md"))
+    # `.archiv/` holds parked copies (house rules, 2026-09-21): a document
+    # moved there keeps the relative links it had where it lived, so they
+    # dangle by construction. It is not a live document and its links are not
+    # a claim anybody follows -- the first parked board copies turned U2 red
+    # for exactly that reason (O197). Links *into* the archive are still
+    # checked, because a live document pointing at a parked one is a real
+    # dangling reference if the parked file is gone.
+    md_files = sorted(f for f in shipped
+                      if f.endswith(".md") and not f.startswith(".archiv/"))
 
     findings: list[str] = []
     for rel in md_files:

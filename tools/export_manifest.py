@@ -267,6 +267,11 @@ _DIRECTORY_RULES = (
     ("runs", "EXCLUDE", "evidence-not-artifact"),
     ("build", "EXCLUDE", "stale-build-output"),
     ("history", "EXCLUDE", "parked-predecessor"),
+    # The house-rule archive (2026-09-21): obsolete files are parked here as
+    # `name.v<N>.<UTC>` rather than deleted. Local by definition, never
+    # published, and pruned whole -- a file parked here must not make the
+    # manifest stale, which is exactly what the first fixpoint probe did.
+    (".archiv", "EXCLUDE", "parked-predecessor"),
     ("ops", "INCLUDE", "operational-integration"),
     ("plugin", "INCLUDE", "operational-integration"),
     ("policy", "INCLUDE", "operational-integration"),
@@ -283,7 +288,7 @@ _DIRECTORY_RULES = (
 #: ones (`tests`, `tools`, `examples`, `ops`, `plugin`, `policy`) are needed
 #: individually for export, and `history` is EXCLUDE but small and not
 #: named by this run's spec.
-_PRUNE_AT_ROOT_DIRNAMES = frozenset({"runs", "build"})
+_PRUNE_AT_ROOT_DIRNAMES = frozenset({"runs", "build", ".archiv"})
 
 #: Paths under an EXCLUDE-by-default directory that are nevertheless published,
 #: because a public claim names them as its evidence. Matched as a prefix and

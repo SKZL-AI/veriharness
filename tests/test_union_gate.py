@@ -154,6 +154,45 @@ def test_u2_fails_naming_referencing_file_and_missing_target(tmp_path):
     assert "README.md" in detail and "docs/INTERNAL.md" in detail
 
 
+def test_u2_ignores_a_parked_copy_whose_links_were_valid_where_it_lived(tmp_path):
+    """O197. A document parked in `.archiv/` keeps its relative links, which
+    dangle from the new location by construction. It is not a live document."""
+    (tmp_path / "README.md").write_text("Fine.\n", encoding="utf-8")
+    (tmp_path / ".archiv").mkdir()
+    (tmp_path / ".archiv" / "BOARD.v1.md").write_text(
+        "See [the receipt](../.github/releases/v0.1.0.json).\n", encoding="utf-8")
+    git_init(tmp_path)
+
+    _, lines = run_gate(tmp_path)
+    assert lines["2"].group(2) == "PASS"
+
+
+def test_u2_still_catches_a_live_link_into_a_missing_archive_file(tmp_path):
+    """The negative control: the exemption is for what the archive contains,
+    not for links that point into it."""
+    (tmp_path / "README.md").write_text(
+        "See [old board](.archiv/BOARD.v1.md).\n", encoding="utf-8")
+    git_init(tmp_path)
+
+    _, lines = run_gate(tmp_path)
+    match = lines["2"]
+    assert match.group(2) == "FAIL"
+    assert ".archiv/BOARD.v1.md" in (match.group(3) or "")
+
+
+def test_u2_still_walks_a_nested_directory_that_happens_to_be_called_archiv(tmp_path):
+    """Root only. `docs/.archiv/` is ordinary content and its links count."""
+    (tmp_path / "README.md").write_text("Fine.\n", encoding="utf-8")
+    (tmp_path / "docs" / ".archiv").mkdir(parents=True)
+    (tmp_path / "docs" / ".archiv" / "NOTE.md").write_text(
+        "See [gone](MISSING.md).\n", encoding="utf-8")
+    git_init(tmp_path)
+
+    _, lines = run_gate(tmp_path)
+    assert lines["2"].group(2) == "FAIL"
+    assert "docs/.archiv/NOTE.md" in (lines["2"].group(3) or "")
+
+
 def test_u2_skipped_when_not_a_git_repository(tmp_path):
     (tmp_path / "README.md").write_text("No git repo here.\n", encoding="utf-8")
     # deliberately no git init

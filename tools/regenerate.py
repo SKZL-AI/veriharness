@@ -37,6 +37,9 @@ BOARD = HOH / "docs/READINESS.md"
 #: In order. The board is last in every pass because it reads what the others
 #: write; the others are in dependency order among themselves.
 STEPS: tuple[tuple[str, list[str]], ...] = (
+    ("programme scope", [
+        "tools/program_scope.py",
+        "--out", str(PROGRAM / "AUTHORITATIVE_PROGRAM_SCOPE.json")]),
     ("parallelism baseline", [
         "tools/parallelism_baseline.py",
         "--out", str(PROGRAM / "VERIHARNESS_PARALLELISM_BASELINE.md")]),
@@ -48,7 +51,8 @@ STEPS: tuple[tuple[str, list[str]], ...] = (
         "tools/build_plan.py",
         "--dag", str(PROGRAM / "VERIHARNESS_IMPLEMENTATION_DAG.json"),
         "--checklist", str(PROGRAM / "VERIHARNESS_BUILD_CHECKLIST.json"),
-        "--markdown", str(PROGRAM / "VERIHARNESS_BUILD_CHECKLIST.md")]),
+        "--markdown", str(PROGRAM / "VERIHARNESS_BUILD_CHECKLIST.md"),
+        "--dispositions", str(PROGRAM / "PROGRAMME_DISPOSITIONS.md")]),
     ("baseline documents", [
         "tools/baseline_docs.py", "--out-dir", str(PROGRAM)]),
     ("readiness board", ["tools/readiness.py", "--write"]),

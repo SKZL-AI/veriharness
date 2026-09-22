@@ -514,6 +514,18 @@
         "e22e9458db865cd361ae3607cba88fc545d64dea"
       ],
       "why_not_the_product": "The agent-name collision fix (O195) and the regeneration loop (O194). Outside any run: O195 changes how a run's own agents are named, which no run can change about itself without its restart reuse breaking mid-flight; O194 orders the instruments that measure the repository, which is the measurement a run is inside of."
+    },
+    {
+      "id": "v3-3-programme-scope",
+      "category": "MAIN_ORCHESTRATOR_DIRECT",
+      "is_development_node": false,
+      "commits": [
+        "58587b4b006ec88c75959190f85cc6bf37b60f03",
+        "aa90302e0edec0fe519407616c8c4ed6e40287fa",
+        "bdc976422a427f1589f971da1fc9d7ce563c52d8",
+        "ca3ed6916cc5be9d0b6c2e53c12faf51e05eca15"
+      ],
+      "why_not_the_product": "The programme-scope gate (O196) and the board/matrix cycle (O197). Outside any run by construction: deciding what the programme *is* -- which work exists, in which phase, gated by what -- is the question every run is an answer inside of, and a run cannot author the inventory its own work is measured against."
     }
   ]
 }

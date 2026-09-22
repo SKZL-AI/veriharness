@@ -1529,3 +1529,72 @@ def test_an_internal_working_note_is_classified_by_its_marker_not_its_language()
                 "marker"
             )
 
+
+
+def test_a_file_parked_in_the_archive_does_not_move_the_manifest(tmp_path):
+    """House rules 2026-09-21: obsolete files are parked in `.archiv/` rather
+    than deleted. The first probe of the board fixpoint parked two files there
+    and the next board run reported `export_manifest: FAIL -- the manifest is
+    out of date`: the act of keeping evidence changed the thing being
+    measured. `.archiv/` is now one pruned entry, so what is parked inside it
+    is invisible to the derivation."""
+    (tmp_path / "README.md").write_text("# x\n")
+    (tmp_path / ".archiv").mkdir()
+    (tmp_path / ".archiv" / "old.v1.20260922T000000Z").write_text("parked\n")
+    before = em.derive(tmp_path)
+
+    (tmp_path / ".archiv" / "another.v2.20260922T010000Z").write_text("more\n")
+    (tmp_path / ".archiv" / "sub").mkdir()
+    (tmp_path / ".archiv" / "sub" / "deep.txt").write_text("deeper\n")
+    after = em.derive(tmp_path)
+
+    assert before["entries"] == after["entries"]
+    archive = [e for e in after["entries"] if e["path"].startswith(".archiv")]
+    # A pruned subtree is one entry, spelled with its trailing slash like
+    # `runs/` and `build/`.
+    assert archive == [{"path": ".archiv/", "decision": "EXCLUDE",
+                        "rule": "parked-predecessor"}], archive
+
+
+def test_the_negative_control_a_new_file_outside_the_archive_does_move_it(tmp_path):
+    """Without this, the case above would also pass against a derivation that
+    ignored every new file."""
+    (tmp_path / "README.md").write_text("# x\n")
+    before = em.derive(tmp_path)
+    (tmp_path / "NOTES.md").write_text("new\n")
+    assert em.derive(tmp_path)["entries"] != before["entries"]
+
+
+def test_only_the_root_archive_is_pruned_and_look_alikes_are_not_hidden(tmp_path):
+    """The exemption is one directory at the root, spelled exactly. A nested
+    `.archiv/`, a root `archiv/` or `.archive/` is ordinary content and must be
+    walked -- otherwise the archive convention becomes a generic way to hide a
+    path from the export survey."""
+    (tmp_path / "README.md").write_text("# x\n")
+    for rel in ("docs/.archiv/nested.md", "archiv/plain.md", ".archive/other.md",
+                "tools/.archiv_notes.md"):
+        target = tmp_path / rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text("content\n")
+    paths = {e["path"] for e in em.derive(tmp_path)["entries"]}
+    for rel in ("docs/.archiv/nested.md", "archiv/plain.md", ".archive/other.md",
+                "tools/.archiv_notes.md"):
+        assert rel in paths, f"{rel} was hidden by the archive rule"
+
+
+def test_moving_a_published_file_into_the_archive_is_visible(tmp_path):
+    """Parking is a real change to what ships. The derivation must say the
+    file left, rather than the archive rule making the move look like
+    nothing happened."""
+    (tmp_path / "README.md").write_text("# x\n")
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "GUIDE.md").write_text("# guide\n")
+    before = {e["path"]: e["decision"] for e in em.derive(tmp_path)["entries"]}
+    assert "docs/GUIDE.md" in before
+
+    (tmp_path / ".archiv").mkdir()
+    (tmp_path / "docs" / "GUIDE.md").rename(tmp_path / ".archiv" / "GUIDE.md.v1.20260922T000000Z")
+    after = {e["path"]: e["decision"] for e in em.derive(tmp_path)["entries"]}
+    assert "docs/GUIDE.md" not in after, "the move did not register"
+    assert after[".archiv/"] == "EXCLUDE"
+    assert before != after

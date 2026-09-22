@@ -2,6 +2,11 @@
   "schema": "hoh-export-manifest/1",
   "entries": [
     {
+      "path": ".archiv/",
+      "decision": "EXCLUDE",
+      "rule": "parked-predecessor"
+    },
+    {
       "path": ".github/releases/v0.1.0.json",
       "decision": "INCLUDE",
       "rule": "repo-meta"
@@ -3612,6 +3617,16 @@
       "rule": "operational-integration"
     },
     {
+      "path": "program/v3_3/AUTHORITATIVE_PROGRAM_SCOPE.json",
+      "decision": "EXCLUDE",
+      "rule": "unclassified"
+    },
+    {
+      "path": "program/v3_3/PROGRAMME_DISPOSITIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "unclassified"
+    },
+    {
       "path": "program/v3_3/REQUIREMENTS.json",
       "decision": "EXCLUDE",
       "rule": "unclassified"
@@ -3897,6 +3912,11 @@
       "rule": "tests"
     },
     {
+      "path": "tests/test_capability_vs_operational.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
       "path": "tests/test_claims_anchors.py",
       "decision": "INCLUDE",
       "rule": "tests"
@@ -3993,6 +4013,11 @@
     },
     {
       "path": "tests/test_prereg_provenance.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_program_scope.py",
       "decision": "INCLUDE",
       "rule": "tests"
     },
@@ -4198,6 +4223,11 @@
     },
     {
       "path": "tools/prereg.py",
+      "decision": "INCLUDE",
+      "rule": "tooling"
+    },
+    {
+      "path": "tools/program_scope.py",
       "decision": "INCLUDE",
       "rule": "tooling"
     },
