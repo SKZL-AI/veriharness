@@ -621,6 +621,17 @@
         "c62740e5f8d06ae2fb311a6ab00a34ab139235df"
       ],
       "why_not_the_product": "The final P1-boundary export: the board it carried, and the CI and sync records bound to it."
+    },
+    {
+      "id": "p1-boundary-closure-cycle",
+      "category": "MAIN_ORCHESTRATOR_DIRECT",
+      "is_development_node": true,
+      "commits": [
+        "965309a069e84a311e0ea80356211838ba318f2d",
+        "3f2b0ce950ce801336efeb00bfa8fb0cbd2f4722",
+        "011a0c98ec690abd2e3a262e41055fb776916cf4"
+      ],
+      "why_not_the_product": "The closure cycle of the P1 boundary: regenerated documents, the rewritten succession capsule, and the export's CI and sync records. Mechanical; it adds no capability and decides nothing."
     }
   ]
 }

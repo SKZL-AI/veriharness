@@ -242,10 +242,18 @@ def test_stale_ci_evidence_is_refused_unless_only_the_gates_reports_moved(
     spec.loader.exec_module(rd)
 
     source = __import__("inspect").getsource(rd.row_ci)
-    assert '"docs/READINESS.md", "CLAIMS.md", "CLAIMS.json"' in source, (
-        "the tolerated set is not the gate's own reports any more")
     assert "path_digests" in source, (
         "the row must compare per-path digests, or it cannot name what moved")
     assert "beyond this gate's own reports" in source
+    # Guarded as data since 2026-09-23: the set moved to module level and one
+    # entry was added (see EXPORT_REPORTS). Reading it out of the row's source
+    # made the last assertion below vacuous the moment the set moved, which a
+    # reviewer demonstrated -- so the tolerance is now asserted against the
+    # values and against the comparison's behaviour.
+    assert rd.EXPORT_REPORTS == frozenset({
+        "docs/READINESS.md", "CLAIMS.md", "CLAIMS.json", "dogfood/ATTRIBUTION.json"}), (
+        "the tolerated set is not the gate's own bookkeeping any more")
     # A source file differing must read as stale evidence, not as a report.
-    assert "src/hoh" not in source.split("REPORTS")[1].split("}")[0]
+    for path in ("src/hoh/runner.py", "src/hoh/cli.py", "tests/test_readiness.py"):
+        _, real = rd.stale_export_paths({path: "before"}, {path: "after"})
+        assert real == [path], (path, real)

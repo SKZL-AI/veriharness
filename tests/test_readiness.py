@@ -906,3 +906,88 @@ def test_a_truthy_string_is_not_a_yes_and_a_missing_field_is_not_a_no(tmp_path):
     assert "with no long-lived token." in real
     assert "carry byte-identical wheel and sdist files." in real
 
+
+
+def test_the_external_ci_row_tolerates_only_bookkeeping_it_causes_itself():
+    """The exclusion set is what makes a boundary closable, and it must not
+    grow into "anything inconvenient".
+
+    Tolerated: the board, the two claims files it renders and the attribution
+    ledger -- each written after the thing it records, each rewritten by every
+    closure, none of them product code. A source file, a
+    test, a tool, a document or an example still makes the recorded CI stale,
+    because that is what the evidence is about.
+    """
+    assert rd.EXPORT_REPORTS == frozenset({
+        "docs/READINESS.md", "CLAIMS.md", "CLAIMS.json", "dogfood/ATTRIBUTION.json"})
+
+    bookkeeping = {p: "old" for p in rd.EXPORT_REPORTS}
+    then = {"src/hoh/runner.py": "same", "tests/test_x.py": "same", **bookkeeping}
+    moment = {"src/hoh/runner.py": "same", "tests/test_x.py": "same",
+              **{p: "new" for p in rd.EXPORT_REPORTS}}
+    differing, real = rd.stale_export_paths(then, moment)
+    assert set(differing) == set(rd.EXPORT_REPORTS) and real == []
+
+    for path in ("src/hoh/runner.py", "tests/test_x.py", "tools/readiness.py",
+                 "docs/EVIDENCE_MODEL.md", "examples/minimal/spec.md", "pyproject.toml"):
+        moved = dict(moment)
+        moved[path] = "changed"
+        _, real = rd.stale_export_paths({**then, path: "before"}, moved)
+        assert real == [path], (path, real)
+
+    # A path that only one side has is a difference too: a file added to the
+    # export after the run, or removed from it, is not the run's subject.
+    _, real = rd.stale_export_paths(then, {**moment, "src/hoh/new.py": "x"})
+    assert real == ["src/hoh/new.py"]
+    gone = dict(moment)
+    del gone["src/hoh/runner.py"]
+    _, real = rd.stale_export_paths(then, gone)
+    assert real == ["src/hoh/runner.py"]
+
+    # And the tolerance is for a changed byte, not for a path that leaves the
+    # export: a tolerated file reclassified EXCLUDE is drift, not a report.
+    for tolerated in sorted(rd.EXPORT_REPORTS):
+        left = {k: v for k, v in moment.items() if k != tolerated}
+        _, real = rd.stale_export_paths(then, left)
+        assert real == [tolerated], (tolerated, real)
+        arrived = {**{k: v for k, v in then.items() if k != tolerated}, }
+        _, real = rd.stale_export_paths(arrived, moment)
+        assert real == [tolerated], (tolerated, real)
+
+
+def test_the_export_classification_of_each_bookkeeping_file_is_pinned():
+    """Reviewer A, gap C: nothing tied the tolerated set to the manifest, which
+    is how an entry for an EXCLUDE file survived review once. If the capsule is
+    ever published, or the ledger unpublished, the argument has to be made
+    again rather than inherited."""
+    import json
+    from pathlib import Path as _Path
+
+    manifest = json.loads((_Path(rd.HOH) / "EXPORT_MANIFEST.json").read_text())
+    rows = manifest.get("entries") or manifest.get("paths") or []
+    by_path = {r.get("path"): r for r in rows if isinstance(r, dict)}
+    assert by_path.get("dogfood/ATTRIBUTION.json", {}).get("decision") == "INCLUDE"
+    assert by_path.get("dogfood/succession/SUCCESSION.json", {}).get("decision") == "EXCLUDE"
+
+
+def test_every_tolerated_report_is_actually_in_the_export():
+    """An exclusion for a path the comparison never sees is inert, and an
+    inert entry invites the belief that it fixed something.
+
+    A reviewer measured exactly that: the succession capsule was listed here
+    while `EXPORT_MANIFEST.json` classifies it EXCLUDE, so it could never
+    appear in the digests being compared. This asserts against the real export
+    classification rather than against the list's own wording.
+    """
+    import importlib.util as _il
+    from pathlib import Path as _Path
+
+    spec = _il.spec_from_file_location("exact_head_ci_probe",
+                                       _Path(rd.HERE) / "exact_head_ci.py")
+    eh = _il.module_from_spec(spec)
+    spec.loader.exec_module(eh)
+    exported = set(eh.export_path_digests(_Path(rd.HOH)))
+    assert exported, "no export digests to check against"
+    missing = sorted(p for p in rd.EXPORT_REPORTS if p not in exported)
+    assert missing == [], (
+        f"tolerated but never compared, so the entry does nothing: {missing}")

@@ -5,18 +5,18 @@ command that produced it, and the verdict is the conjunction of the
 rows rather than a judgement typed above them. A row this tool cannot
 evaluate is `NOT_RUN`, which is never a pass.
 
-Measured at `011a0c9` on 2026-09-23.
+Measured at `fbb2e43` on 2026-09-23.
 
     TECHNICALLY_STABLE_READY = no
 
-Open, and each one blocking: succession, external_ci.
+Open, and each one blocking: tests, union_invariants, succession, external_ci.
 
 | condition | state | measured | command |
 |---|---|---|---|
-| `tests` | PASS | 1608 passed | `python3 -m pytest -q` |
+| `tests` | FAIL | 1603 passed, 6 failed | `python3 -m pytest -q` |
 | `lint` | PASS | clean | `ruff check --select F,E9 src tests tools` |
 | `claims` | PASS | OK: all checks passed | `python3 tools/check_claims.py check all` |
-| `union_invariants` | PASS | U1-U5 pass | `python3 tools/union_gate.py` |
+| `union_invariants` | FAIL | U5: FAIL: pytest: [31m[31m[1m1 failed[0m, [32m1608 pass | `python3 tools/union_gate.py` |
 | `meta_evidence` | PASS | 5 metric(s) VERIFIED, closure GREEN | `python3 tools/meta_evidence.py --falsify` |
 | `planner_capability_boundary` | PASS | VERIFIED on run cfnfib8a, witness armed for 2 of 2 planner dispatch(es) | `read dogfood/planner-confinement/SUMMARY.json` |
 | `budget_enforcement` | PASS | VERIFIED; ceilings [9, 8, 4], product refused a dispatch at [8, 4]; 2 falsifier(s) all detected | `python3 tools/budget_evidence.py --out dogfood/budget-enforcement/BUDGET_EVIDENCE.json` |
@@ -26,7 +26,7 @@ Open, and each one blocking: succession, external_ci.
 | `benchmark_v2_historical` | FAIL (advisory) | HISTORICAL_COMPLETE; matched_budget_valid = NO; budget_rule violated: 2 cell(s) ran past the dispatch budget without being stopped | `python3 tools/repetition_plan.py --campaign v2` |
 | `benchmark_v3` | PASS | 15 of 15 cells; COMPLETE; matched_budget_valid = YES; freeze DRIFTED (post-campaign repair, accounted for) | `python3 tools/prereg.py check --campaign v3 && python3 tools/repetition_plan.py --campaign v3` |
 | `export_manifest` | PASS | no leaks, 0 unacknowledged dangling reference(s), 12 acknowledged, 0 other problem(s) | `python3 tools/export_manifest.py check` |
-| `export_sync` | PASS | clean; 4 ours to write | `python3 tools/export_sync.py status` |
+| `export_sync` | PASS | clean; 6 ours to write | `python3 tools/export_sync.py status` |
 | `succession` | FAIL | DRIFTED: 1 field(s) no longer describe this tree: board | `python3 tools/succession.py verify` |
 | `identifiers` | PASS | 0 file(s) still carry German identifiers | `python3 tools/identifiers.py check src tools tests` |
 | `preflight` | PASS | profile demo: READY | `python3 tools/preflight.py --profile demo` |
@@ -37,10 +37,10 @@ Open, and each one blocking: succession, external_ci.
 | `acceptance` | PASS | all proven: P1-16 | `python3 tools/acceptance_record.py --evidence <dir> --out <record> --check, for each evidence probe in the register, via tools/capability_matrix.py` |
 | `baseline_docs` | PASS | 3 document(s) re-render identically | `python3 tools/baseline_docs.py --out-dir program/v3_3` |
 | `clean_install` | PASS | 0 red step(s) | `python3 tools/clean_install_check.py` |
-| `attribution` | PASS | 1 of 21 nodes through the product | `python3 tools/attribution.py` |
+| `attribution` | PASS | 1 of 22 nodes through the product | `python3 tools/attribution.py` |
 | `evidence_index` | PASS | EVIDENCE_INDEX.md matches the trees it describes | `python3 tools/evidence_index.py` |
 | `paper_audit` | PASS | 8 of 8 checks | `python3 tools/audit_refs.py <each check>` |
-| `external_ci` | FAIL | the recorded run tested a different export: 1 path(s) differ beyond this gate's own reports (dogfood/ATTRIBUTION.json). Re-export, re-run CI, record it again. | `python3 tools/exact_head_ci.py --run-id ID --export-commit SHA` |
+| `external_ci` | FAIL | the recorded run tested a different export: 2 path(s) differ beyond this gate's own reports (tests/test_readiness.py, tools/readiness.py). Re-export, re-run CI, record it again. | `python3 tools/exact_head_ci.py --run-id ID --export-commit SHA` |
 | `routing` | PASS | DEFERRED_ON_EVIDENCE | `read docs/ROUTING.md` |
 
 ## Why some rows are advisory
