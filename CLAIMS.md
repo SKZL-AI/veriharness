@@ -289,7 +289,7 @@ d4e: `CLAIMS.json` now declares, for every `INCLUDE` path in `EXPORT_MANIFEST.js
 | C-259 | SUPPORTED | `benchmark_v3` — PASS — 15 of 15 cells; COMPLETE; matched_budget_valid = YES; freeze DRIFTED (post-campaign repair, accounted for) — `python3 tools/prereg.py check --campaign v3 && python3 tools/repetition_plan.py --campaign v3` | docs/READINESS.md:27 |
 | C-260 | SUPPORTED | `export_manifest` — PASS — no leaks, 0 unacknowledged dangling reference(s), 12 acknowledged, 0 other problem(s) — `python3 tools/export_manifest.py check` | docs/READINESS.md:28 |
 | C-261 | SUPPORTED | `export_sync` — PASS — clean; 4 ours to write — `python3 tools/export_sync.py status` | docs/READINESS.md:29 |
-| C-262 | SUPPORTED | `succession` — FAIL — DRIFTED: 2 field(s) no longer describe this tree: internal_commit, board — `python3 tools/succession.py verify` | docs/READINESS.md:30 |
+| C-262 | SUPPORTED | `succession` — FAIL — DRIFTED: 1 field(s) no longer describe this tree: board — `python3 tools/succession.py verify` | docs/READINESS.md:30 |
 | C-263 | SUPPORTED | `ledger_apply` — A — yes — yes — PASS — PASS | docs/BENCHMARK_RESULTS_v2.md:40 |
 | C-264 | SUPPORTED | `ledger_apply` — B — yes — yes — PASS — PASS | docs/BENCHMARK_RESULTS_v2.md:41 |
 | C-265 | SUPPORTED | `ledger_apply` — C — yes — yes — PASS — PASS | docs/BENCHMARK_RESULTS_v2.md:42 |
@@ -501,7 +501,7 @@ d4e: `CLAIMS.json` now declares, for every `INCLUDE` path in `EXPORT_MANIFEST.js
 | C-471 | SUPPORTED | `acceptance` — PASS — all proven: P1-16 — `python3 tools/acceptance_record.py --evidence <dir> --out <record> --check, for each evidence probe in the register, via tools/capability_matrix.py` | docs/READINESS.md:37 |
 | C-472 | SUPPORTED | `baseline_docs` — PASS — 3 document(s) re-render identically — `python3 tools/baseline_docs.py --out-dir program/v3_3` | docs/READINESS.md:38 |
 | C-473 | SUPPORTED | `clean_install` — PASS — 0 red step(s) — `python3 tools/clean_install_check.py` | docs/READINESS.md:39 |
-| C-474 | SUPPORTED | `attribution` — PASS — 1 of 20 nodes through the product — `python3 tools/attribution.py` | docs/READINESS.md:40 |
+| C-474 | SUPPORTED | `attribution` — PASS — 1 of 21 nodes through the product — `python3 tools/attribution.py` | docs/READINESS.md:40 |
 | C-475 | SUPPORTED | `evidence_index` — PASS — EVIDENCE_INDEX.md matches the trees it describes — `python3 tools/evidence_index.py` | docs/READINESS.md:41 |
 | C-476 | SUPPORTED | `paper_audit` — PASS — 8 of 8 checks — `python3 tools/audit_refs.py <each check>` | docs/READINESS.md:42 |
 | C-477 | SUPPORTED | `external_ci` — FAIL — the recorded run tested a different export: 1 path(s) differ beyond this gate's own reports (dogfood/ATTRIBUTION.json). Re-export, re-run CI, record it again. — `python3 tools/exact_head_ci.py --run-id ID --export-commit SHA` | docs/READINESS.md:43 |
@@ -4457,7 +4457,7 @@ Number-bearing sentences from README.md and docs/** that were judged not to be p
 | docs/BENCHMARK_RESULTS_v2.md:49 | `(excluded)` is the protocol's own rule, not a missing number: an arm that produced no final state says nothing about the method, so its suite result is not reported as a correctness outcome. The suite did run -- arm C's tree exists whatever the orchestrator did -- and what it measured was a state the arm never finished. ⟦suite result is not reported as a correctness outcome. The suite did⟧ | explains the table's own exclusion rule; a rule, not a measurement |
 | docs/BENCHMARK_RESULTS_v2.md:50 | The suite did run -- arm C's tree exists whatever the orchestrator did -- and what it measured was a state the arm never finished. ⟦run -- arm C's tree exists whatever the orchestrator did -- and what⟧ | explains the table's own exclusion rule; a rule, not a measurement |
 | docs/BENCHMARK_RESULTS_v2.md:51 | The suite did run -- arm C's tree exists whatever the orchestrator did -- and what it measured was a state the arm never finished. ⟦it measured was a state the arm never finished.⟧ | explains the table's own exclusion rule; a rule, not a measurement |
-| docs/READINESS.md:8 | Measured at `c62740e` on 2026-09-22. ⟦Measured at `c62740e` on 2026-09-22.⟧ | a table frame, a provenance line, or the reason a row is advisory; the measurement is in the row itself |
+| docs/READINESS.md:8 | Measured at `011a0c9` on 2026-09-23. ⟦Measured at `011a0c9` on 2026-09-23.⟧ | a table frame, a provenance line, or the reason a row is advisory; the measurement is in the row itself |
 | docs/READINESS.md:12 | Open, and each one blocking: succession, external_ci. ⟦Open, and each one blocking: succession, external_ci.⟧ | a table frame, a provenance line, or the reason a row is advisory; the measurement is in the row itself |
 | docs/READINESS.md:14 | condition — state — measured — command | a table frame, a provenance line, or the reason a row is advisory; the measurement is in the row itself |
 | docs/READINESS.md:15 | --- — --- — --- — --- | a table frame, a provenance line, or the reason a row is advisory; the measurement is in the row itself |

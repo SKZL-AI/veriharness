@@ -2915,9 +2915,9 @@
     },
     {
       "id": "C-262",
-      "text": "| `succession` | FAIL | DRIFTED: 2 field(s) no longer describe this tree: internal_commit, board | `python3 tools/succession.py verify` |",
+      "text": "| `succession` | FAIL | DRIFTED: 1 field(s) no longer describe this tree: board | `python3 tools/succession.py verify` |",
       "where": "docs/READINESS.md:30",
-      "anchor_digest": "d3ccdbb5897af5f46426a438d688a7ed2aed1dd5f022e4d7331e04315e69775f",
+      "anchor_digest": "09a4cfe3bcc8d8cc825dbb78be5714d8c5a7112e1440ba55569295a207af668f",
       "status": "SUPPORTED",
       "evidence": [
         "file:tools/readiness.py:1"
@@ -5506,9 +5506,9 @@
     },
     {
       "id": "C-474",
-      "text": "| `attribution` | PASS | 1 of 20 nodes through the product | `python3 tools/attribution.py` |",
+      "text": "| `attribution` | PASS | 1 of 21 nodes through the product | `python3 tools/attribution.py` |",
       "where": "docs/READINESS.md:40",
-      "anchor_digest": "8e8417e36f71f813e1ade2f4037f3fe35dc501755ad39391d2b123ceab5b65a6",
+      "anchor_digest": "5a71b4db629c8d1602bfbfdaef784fba89d0231f50ec05f7aead3a4ad940840e",
       "status": "SUPPORTED",
       "evidence": [
         "file:tools/readiness.py:1"
@@ -10724,10 +10724,10 @@
     },
     {
       "id": "N-713",
-      "text": "Measured at `c62740e` on 2026-09-22.",
+      "text": "Measured at `011a0c9` on 2026-09-23.",
       "where": "docs/READINESS.md:8",
       "reason": "a table frame, a provenance line, or the reason a row is advisory; the measurement is in the row itself",
-      "anchor_digest": "c49f4854d1fc731d0900b0027138c63abd1991d3131edee13548f0525c22baf7"
+      "anchor_digest": "ec578b63664419c6ec6e926c4cd850533a98c37d4651992f10e3294ff5f01330"
     },
     {
       "id": "N-714",

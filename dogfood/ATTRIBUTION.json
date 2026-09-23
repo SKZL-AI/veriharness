@@ -610,6 +610,17 @@
         "2c8bff00b8a794f66004993f75d1458c26f1f627"
       ],
       "why_not_the_product": "The P1 boundary's export records and regenerated board. Mechanical closure work on the instrument."
+    },
+    {
+      "id": "p1-boundary-final-export",
+      "category": "MAIN_ORCHESTRATOR_DIRECT",
+      "is_development_node": true,
+      "commits": [
+        "fb814da5f6902aa44c2bd50335ca708ee8371db2",
+        "d25326182fe4e9ae46b1c0d074e25f76a73eebec",
+        "c62740e5f8d06ae2fb311a6ab00a34ab139235df"
+      ],
+      "why_not_the_product": "The final P1-boundary export: the board it carried, and the CI and sync records bound to it."
     }
   ]
 }
