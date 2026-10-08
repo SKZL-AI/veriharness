@@ -291,6 +291,14 @@ class TaskNode(Strict):
     repair_of: str | None = None
     closure_generation: int = 0
     note: str = ""
+    #: Why a BLOCKED node waits, machine-readably -- the same vocabulary as
+    #: `RunState.blocked_kind`. `usage_limit` is a provider wait that a due
+    #: timer may resume; anything else waits for a decision, and no timer
+    #: resumes it (`hoh.resumption`).
+    blocked_kind: str | None = None
+    #: The earliest moment a provider wait may be retried, in the timer form
+    #: (`2026-09-25T12:00:00Z`).
+    retry_after: str | None = None
 
     @property
     def settled(self) -> bool:
@@ -330,6 +338,19 @@ class ProjectState(Strict):
 
     #: Monotonic; a writer holding an older value is stale and is refused.
     write_seq: int = Field(default=0, ge=0)
+    #: The master epoch (`hoh.succession`) of the session that wrote this
+    #: state; 0 for a state written without master authority. The store
+    #: refuses a write whose epoch is behind the one on disk, so a replaced
+    #: master cannot write even after re-reading a fresh `write_seq` -- the
+    #: fence `write_seq` alone cannot give, since a stale master that re-reads
+    #: holds a current sequence number.
+    master_epoch: int = Field(default=0, ge=0)
+    #: The programme generation: which version of the plan this state belongs
+    #: to. Durable timers are armed under it and a timer from another
+    #: generation never resumes anything (`hoh.resumption`). Distinct from
+    #: `master_epoch` on purpose -- a successor master continues the same
+    #: programme, and must resume the timers its predecessor armed.
+    program_generation: int = Field(default=1, ge=1)
 
     def node(self, node_id: str) -> TaskNode | None:
         for n in self.nodes:

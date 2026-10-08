@@ -1420,10 +1420,15 @@ astimezone timezone hexdigest digest digests argue argues issue issues venue
 continue continued unique queued dequeue due request requested requests question
 questions sequence socket tempfile zipfile badzipfile valueerror getvalue packet
 prologue backend backends backtick daemon different does goes guessed guessing
-offender untracked coerced checker arenaescape blockedqa sandboxbackend
+offender untracked coerced checker arenaescape blockedqa sandboxbackend guestobserver
+sequences cloexec rogue overdue continues blockingioerror enoent
 sequential subsequent consequence consequences frequency quest guest
 language languages dialogue catalogue cheque conquer conquest
 subsequently adequate adequately
+rawdescriptionhelpformatter deque queries query querying queried
+scheduled reschedule rescheduled unscheduled
+squeeze squeezed squeezes ambiguouschain
+discharge discharged discharges discharging dischargeable undischarged
 """.split())
 
 

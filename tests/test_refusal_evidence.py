@@ -84,7 +84,7 @@ def test_the_refusal_receipt_records_why(tmp_path):
     c.store = store
     c._refusal_receipt(
         _state(tmp_path),
-        AcceptanceCheck(check_id="K2", command="rm -rf /", expect_exit=0,
+        AcceptanceCheck(check_id="K2", command="hoh-never-execute-sentinel --all", expect_exit=0,
                         description="d"),
         _candidate(tmp_path),
         HouseRuleViolation("recursive deletion at a fundamental path"),

@@ -1,0 +1,38 @@
+[Unit]
+Description=HoH: resume runs that are parked on storage pressure
+Documentation=file://%h/hoh/docs/OPERATIONS.md
+
+[Service]
+Type=oneshot
+# The storage state root comes from one place, the operator's environment file:
+#   HOH_STATE_ROOT=/home/<user>/hoh-state     (initialised: hoh storage init --root ...)
+# and is passed explicitly, so the unit never resolves a different default.
+EnvironmentFile=%h/.config/hoh/storage.env
+# `hoh resume-storage` resumes blocked_kind=storage_pressure only, and only when
+# a due STORAGE_RECHECK timer speaks for the run AND a role run would be
+# admitted now. Otherwise it arms the next recheck and the run stays parked.
+# It claims the boot on the ledger first (after a reboot it may be the first
+# host entry point to reach it). It never cleans, moves or sizes anything.
+ExecStart=%h/hoh/plugin/bin/hoh resume-storage --storage-root ${HOH_STATE_ROOT}
+# It restores the state only; the run itself needs Herdr and is deliberately
+# NOT started from here.
+Nice=10
+IOSchedulingClass=idle
+# The service touches the run directory and the storage ledger, nothing else.
+ProtectSystem=strict
+ProtectHome=read-only
+# systemd expands environment variables in command lines only, never in
+# ReadWritePaths=: "${HOH_STATE_ROOT}" here would stay literal, the state root
+# would remain read-only under ProtectHome=, and claim_boot()/would_admit()
+# would fail closed on every tick -- a parked run would never resume by itself.
+# So the writable paths are specifiers systemd resolves: the XDG default state
+# root (%S/veriharness = ~/.local/state/veriharness for a user unit) and the
+# documented operator root (~/hoh-state); the '-' tolerates a path that
+# does not exist (an uninitialised root is then refused by the command itself).
+# A state root elsewhere needs a drop-in with its own ReadWritePaths= line.
+ReadWritePaths=%h/hoh/runs -%S/veriharness -%h/hoh-state
+PrivateTmp=true
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target

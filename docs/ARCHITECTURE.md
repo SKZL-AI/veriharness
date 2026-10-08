@@ -12,6 +12,11 @@ middle two, which was accurate about the code and incomplete about the
 system: the layer that decides *which runs happen at all* was missing from
 it, and that is the layer this project's own development ran on.
 
+*Read with the section at the end, "Since v0.1.0: what this description no
+longer covers". It corrects two statements below by addition -- they stay as
+written -- and names the parts of the package this document does not yet
+describe.*
+
 ## The four layers
 
 ```
@@ -141,3 +146,94 @@ Two objects cross from one side to the other on every role dispatch:
 Everything else -- which panes exist, which agent is idle, which workspace
 a worktree lives in -- stays on Herdr's side of the line and is read, never
 assumed, through `herdr.py`'s thin CLI wrapper.
+
+## Since v0.1.0: what this description no longer covers
+
+Added for the v0.3.0a1 pre-release. Nothing above is rewritten; where a
+statement above no longer holds, it is corrected here, with the evidence.
+
+**Correction 1 -- the package does carry a control plane.** The layer table
+says the orchestrator lives in "a deployment layer, **not** `src/hoh/`", and
+the paragraph after it says it is "not a scheduler shipped with this
+repository". Both were already inaccurate at the `v0.1.0` tag:
+`src/hoh/orchestrator.py` (with `src/hoh/launcher.py`) has been package code
+since 2026-09-11. Its `ProjectController` decides which runs of a project
+exist and in what order, runs the global gates over the merged result and
+creates repair nodes when they fail; the benchmark's arm C and the closure
+test exercise it. What the paragraphs above describe is still true of the
+**agentic** orchestrator -- the agent session that writes specifications,
+starts product runs, reads verdicts and holds the merge authority -- which
+drives the package from outside through the CLI and Herdr. There are
+therefore two orchestration layers, one in the package and one above it, and
+"the kernel cannot decide which runs exist" is true of `controller.py`, which
+drives one run, not of the package as a whole.
+
+**Correction 2 -- `run_check` is not the only constructor of a `Receipt`.**
+The cut table calls `runner.run_check` "the **only** place a `Receipt` is
+constructed". The controller also constructs two receipts itself, both for a
+check that was refused before it ran: one when the baseline's command is
+refused, one when the guard refuses a candidate's check. Both record exit
+code 126 and `runner_ok=False`, and both are written by HoH, never by a model.
+The property that matters -- a model cannot produce a receipt -- holds; the
+sentence that said exactly one function produces them does not.
+
+**Who decides what, now that HoH builds HoH.** Five steps, each with its own
+authority, and none of them implies the next:
+
+| Step | Decided by | Can refuse what the step before it passed |
+|---|---|---|
+| A product run writes candidate bytes | the developer role, in its own worktree | -- |
+| Acceptance | the controller, from the runner's receipts and QA's re-checked verdicts | yes: a candidate whose criteria are not all demonstrated |
+| Integration review | two independent reviewers, outside the run | yes: candidates the product accepted have been refused at this step |
+| Merge | the orchestrating session, which holds the merge authority, by byte-identical import of the accepted candidate | yes: one accepted and reviewed run stayed unmerged until its attribution could be recorded honestly (ledger O179) |
+| Phase closure | the phase gate, derived from the capability register and an independent supervisor review | yes: a phase does not close over an open finding |
+
+**What the package now holds that this document does not describe.** The
+modules below were added after `v0.1.0` (the list is the difference between
+`src/hoh/` at that tag's commit and now); grouped by concern, each module's own
+docstring is the description until this document is extended in a later
+revision:
+
+* *Durable programme runtime (P2):* `timers.py`, `sentinel.py`,
+  `resumption.py`, `resumeloop.py`, `epoch.py`, `succession.py`,
+  `autonomy.py`, `governance.py`, `checklist.py`, `supervisor.py`,
+  `capsule.py`, `programlogic.py`, `taskstate.py`, `rotation.py`,
+  `migrations.py`, `decisions.py`, `decisioncheck.py`, `thread.py`,
+  `projectcontract.py`, `gateway.py`, and, merged at `601168fe` and not yet
+  exercised live, `succession_capsule.py` and `rollover.py` (context rollover,
+  Layer A: a capsule of re-derivable facts and the protocol that hands the
+  master epoch to a fresh orchestrating session).
+* *Storage lifecycle (amendment A1, and P2-42):* `storage_registry.py`,
+  `storage_pressure.py`, `storage_park.py`, `storage_ephemeral.py`,
+  `durable_io.py`, `archive_bundle.py`, `archive_target.py`,
+  `rehydration.py`, `storage_coordinator.py`, `storage_host.py`,
+  `storage_tiers.py`, `verified_relocation.py`, `storage_steward.py`,
+  `legacy_scratch.py`.
+* *Role panes and processes:* `pane_ledger.py` and `procs.py` (the role-pane
+  lifecycle, merged at `caa732db`: HoH closes its own role panes and ends the
+  processes a role left running before the freeze, by a minted mark anchored to
+  the pane's own shell, and names, never signals, what it cannot tie to the pane).
+* *Isolation and integrity:* `integrity.py` (inventories before and after a
+  run) and `approval_policy.py` (what a role may do without asking). The
+  role capability witness, `capability.py`, and the namespace sandbox,
+  `sandbox.py`, are older and are extended: the witness now also seals and
+  freezes QA's candidate arena.
+* *Evidence and proof:* `proofclass.py` and `evidenceclaim.py`.
+
+**What crosses the boundary, revised.** The prompt no longer always crosses
+as one piece of text. A role prompt longer than one command-line argument may
+be is written to a prompt file in the run's `answers/` directory, and Herdr
+receives a short pointer to it (since the prompt-threshold merge, every role
+prompt above 8 KiB, or holding a character the input box treats specially,
+goes this way, so that the recovery after a stalled submit can verify the box); the dispatcher checks the file's SHA-256 after
+the turn against a digest it kept in memory, and records an audit line before
+the dispatch. The answer still comes back through a file path HoH gave the
+role. Known limit: the directory chain up to those files is trusted
+(`docs/LIMITATIONS.md`, *Current open limitations*).
+
+**Where HoH's own state now lives in the self-hosted deployment.** The
+project develops itself with each product run in an isolated clone pinned to
+one commit, under a registered run root outside the canonical repository; the
+canonical repository is written only by the orchestrating session's merges.
+This is a deployment choice, not a property of `hoh start`, whose default
+layout is unchanged (limit 6).

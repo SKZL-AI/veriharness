@@ -34,13 +34,14 @@ As everywhere here: **nothing is deleted.** A discarded objective becomes
 from __future__ import annotations
 
 import json
-import os
+import stat
 from pathlib import Path
 from typing import Literal
 
 from pydantic import Field
 
 from .contracts import Strict, utcnow
+from .durable_io import durable_create, durable_write
 
 #: More than this many new objectives in **one** proposal counts as widening
 #: the frame rather than continuing it. Mirrors MAX_PRIORITIES.
@@ -190,8 +191,10 @@ class Goalbook:
             suffix = f"-{n:03d}" if n else ""
             parked = self.path.with_name(f"goalbook.json.v{stamp}{suffix}")
             try:
-                with open(parked, "xb") as fh:
-                    fh.write(self.path.read_bytes())
+                # A copy published under a name that must not exist
+                # (P2-41b W4): never a half version, never a replaced one.
+                durable_create(parked, self.path.read_bytes(),
+                               mode=stat.S_IMODE(self.path.stat().st_mode))
                 return parked
             except FileExistsError:
                 continue
@@ -203,16 +206,18 @@ class Goalbook:
         self.root.mkdir(parents=True, exist_ok=True)
         if self.path.exists():
             self._park()
-        tmp = self.path.with_name(f".goalbook.{os.getpid()}.tmp")
-        tmp.write_text(
+        # P2-41b W3: temp beside, fsync, replace, directory fsync -- or the
+        # old goalbook stays exactly as it was. mode=None: the umask decides,
+        # as it did for the plain write before.
+        durable_write(
+            self.path,
             json.dumps(
                 {"schema": SCHEMA,
                  "objectives": [o.model_dump() for o in objectives]},
                 indent=2, ensure_ascii=False,
             ),
-            encoding="utf-8",
+            mode=None,
         )
-        os.replace(tmp, self.path)
 
     # -- The gate ------------------------------------------------------------- #
 

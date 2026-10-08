@@ -27,16 +27,29 @@ checkable, and the path shows up as evidence in the receipt directory.
 
 from __future__ import annotations
 
+import errno
 import hashlib
 import json
 import os
+import secrets
+import stat
 import subprocess
 import time
 from pathlib import Path
+from typing import NamedTuple
 
-from . import herdr
+from . import herdr, pane_ledger, procs
 from .contracts import Role, RunState, utcnow
-from .controller import DispatchError, WaitingForApproval
+from .controller import AnswerMissing, DispatchError, PaneNotClean, WaitingForApproval
+
+class PaneRelease(NamedTuple):
+    """What `HerdrDispatcher.release_role` answers: `closed` is True only when
+    the role's pane is closed **and** what the role left running is proven
+    gone. A `(False, "...")` tuple is truthy: test `.closed`, never the tuple."""
+
+    closed: bool
+    why: str
+
 
 #: Roles whose answer has to come back structured. The developer leaves its
 #: result in the artifact, not in an answer file.
@@ -50,11 +63,351 @@ STRUCTURED_ROLES = (Role.PLANNER, Role.QA)
 DEFAULT_TIMEOUT_MS = 2_700_000        # 45 minutes
 POLL_SECONDS = 2.0
 
+#: How long the answer file may take to appear after a structured role's turn
+#: ended, before the turn counts as ended without it (`AnswerMissing`).
+ANSWER_GRACE_SECONDS = 30.0
+
+#: The interval between two status reads while a role that ended its turn
+#: without the answer has resumed by itself (`HerdrDispatcher.follow_up`). One
+#: `herdr agent get` per interval, never a tight loop: never below 10 s.
+STATUS_POLL_SECONDS = 30.0
+
+#: Consecutive failed status reads that end that passive wait. A single failed
+#: read inside it is retried at the next interval.
+STATUS_READ_ATTEMPTS = 3
+
+#: The back-off before a stalled prompt is sent again. Herdr reports
+#: `agent_prompt_stalled` when the pane showed no state change within 5 s;
+#: asking again at once asks the same pane in the same state.
+STALL_RETRY_AFTER_S = 30.0
+
+#: After Enter was pressed on a stalled prompt, how long the agent gets to show
+#: that its turn started -- Herdr's own rule for `agent prompt --wait` is five
+#: seconds (`herdr agent prompt --help`, 0.8.0).
+SUBMIT_CONFIRM_SECONDS = 5.0
+
+#: Above this many UTF-8 bytes a role prompt is not sent as an argument but
+#: through a prompt file in the answers directory, with a short pointer in
+#: argv. Two reasons, one threshold:
+#:
+#: * Claude Code 2.1.292 keeps an input box longer than 10,000 characters as
+#:   its first 500 characters, a marker and its last 500. A first prompt into
+#:   a fresh pane stalls (runs ugt, qgg, qgg2, qfu, qfu2, qfu3: the prompt
+#:   stayed unsent in the box); the stalled-submit recovery (`_settle`,
+#:   `_submit_stalled`) presses Enter only when the box holds exactly the text
+#:   this dispatch sent, and it refused qfu's collapsed 1,073 characters. The
+#:   pointer is about 1.2 KiB and 25 lines (9,154 characters with both paths
+#:   at the Linux path limit), never collapsed, so a stalled pointer is
+#:   recovered. An inline prompt of at most 8 KiB is at most 8,192 UTF-16
+#:   units and is shown whole.
+#: * The argv limit is separate: Linux limits one argument to 131071 bytes
+#:   plus its NUL (`MAX_ARG_STRLEN`); run 20261002t1501z-sstew4 stopped at its
+#:   first developer dispatch with `[Errno 7] Argument list too long:
+#:   'herdr'`. `ARGV_ELEMENT_LIMIT` below guards that, independent of this.
+PROMPT_FILE_THRESHOLD = 8 * 1024
+
+#: Characters a paste into Claude Code's input box may drop (run qgg2's box
+#: read "Removed 4 invisible characters"). A prompt holding one goes through
+#: the prompt file, whatever its size. The list is deliberately conservative:
+#: format, control, private-use, unassigned, line and paragraph separators and
+#: space separators (the newline and U+0020 are exempt), plus the complete
+#: Default_Ignorable_Code_Point set and U+2800. Written as numbers only: this
+#: source never holds one of these characters itself.
+_PASTE_UNSAFE_CATEGORIES = frozenset({"Cc", "Cf", "Co", "Cn", "Zl", "Zp", "Zs"})
+_PASTE_UNSAFE_RANGES = (
+    (0x00AD, 0x00AD), (0x034F, 0x034F), (0x061C, 0x061C),
+    (0x115F, 0x1160), (0x17B4, 0x17B5), (0x180B, 0x180F),
+    (0x200B, 0x200F), (0x202A, 0x202E), (0x2060, 0x206F),
+    (0x2800, 0x2800), (0x3164, 0x3164), (0xFE00, 0xFE0F),
+    (0xFEFF, 0xFEFF), (0xFFA0, 0xFFA0), (0xFFF0, 0xFFF8),
+    (0x1BCA0, 0x1BCA3), (0x1D173, 0x1D17A), (0xE0000, 0xE0FFF),
+)
+
+
+def _paste_unsafe(text: str) -> bool:
+    """True if `text` holds a character a paste may drop (see above)."""
+    import unicodedata
+    for ch in text:
+        code = ord(ch)
+        if ch == "\n" or 0x20 <= code <= 0x7E:
+            continue
+        if unicodedata.category(ch) in _PASTE_UNSAFE_CATEGORIES:
+            return True
+        if any(low <= code <= high for low, high in _PASTE_UNSAFE_RANGES):
+            return True
+    return False
+
+
+#: The guard on every argv element `HerdrDispatcher.dispatch` builds, in UTF-8
+#: bytes. Its own constant, deliberately independent of PROMPT_FILE_THRESHOLD:
+#: a threshold raised (or a change that routes a long prompt inline again) must
+#: still not reach the kernel as one oversized argument.
+ARGV_ELEMENT_LIMIT = 64 * 1024
+
+#: The audit trail of every prompt sent through a file, in the run directory.
+#: Appended to before the dispatch, never read for a decision.
+PROMPT_BINDINGS = "prompt-bindings.jsonl"
+
+#: Upper bound for reading a dispatch marker: it is a small JSON object, and a
+#: planted huge file must not exhaust the dispatcher.
+_MARKER_READ_LIMIT = 1 << 20
+
+
+def _refuse(message: str) -> DispatchError:
+    return DispatchError(message, transient=False)
+
+
+def _open_dir(path: Path, what: str) -> int:
+    """Open a directory of this run from its lexical path, link-free at the
+    final component (`O_NOFOLLOW`). Every leaf operation of a dispatch happens
+    relative to the descriptor, so a name inside it is resolved exactly once,
+    in the directory that was checked. Any failure -- `ELOOP` for a symlink,
+    `ENOTDIR`, `ENOENT` -- is final: retrying does not change what is there.
+    """
+    try:
+        return os.open(path, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    except OSError as exc:
+        raise _refuse(
+            f"dispatch: the {what} {path} cannot be opened as a real directory "
+            f"(not a symlink, not a file): {exc}. Nothing was written.") from exc
+
+
+def _version_name(name: str, entry: str) -> bool:
+    """Is `entry` a version name of `name`: `<name>.v<stamp>.<counter>`?"""
+    if not entry.startswith(name + ".v"):
+        return False
+    stamp, _, counter = entry[len(name) + 2:].rpartition(".")
+    return bool(stamp) and counter.isdigit()
+
+
+def _check_leaf(dir_fd: int, name: str, where: str) -> str | None:
+    """Examine the current name before anything is written to it.
+
+    Returns "absent", "present" (a regular file with exactly one link, to be
+    parked before it is replaced) or the version name under which it is
+    already parked. Anything else is refused: a symlink, a directory, a FIFO, a
+    device -- and a regular file with a second link, which may be a file
+    outside this directory that a role linked in. The one second link that is
+    accepted is a versioning that crashed between `os.link` and `os.replace`:
+    a version name of this very name, in the same directory, same inode.
+    """
+    try:
+        st = os.lstat(name, dir_fd=dir_fd)
+    except FileNotFoundError:
+        return "absent"
+    except OSError as exc:
+        raise _refuse(f"dispatch: refusing {name!r} in {where}: lstat failed: "
+                      f"{exc}") from exc
+    if not stat.S_ISREG(st.st_mode):
+        kind = "a symbolic link" if stat.S_ISLNK(st.st_mode) else "not a regular file"
+        raise _refuse(f"dispatch: refusing {name!r} in {where}: it is {kind}. "
+                      "Nothing is written through it.")
+    if st.st_nlink == 1:
+        return "present"
+    if st.st_nlink == 2:
+        for entry in sorted(os.listdir(dir_fd)):
+            if not _version_name(name, entry):
+                continue
+            try:
+                other = os.lstat(entry, dir_fd=dir_fd)
+            except OSError:
+                continue
+            if (stat.S_ISREG(other.st_mode)
+                    and (other.st_dev, other.st_ino) == (st.st_dev, st.st_ino)):
+                return entry
+    raise _refuse(f"dispatch: refusing {name!r} in {where}: it has {st.st_nlink} "
+                  "links, and the second is not an interrupted versioning of it. "
+                  "Nothing is written through it.")
+
+
+def _write_leaf(dir_fd: int, name: str, data: bytes, where: str) -> str | None:
+    """Make `data` the content of `name` (relative to `dir_fd`) without losing
+    what was there, and without following a link at any name.
+
+    Order: the current name is examined (`_check_leaf`); the new content goes
+    to a fresh temp file (`O_EXCL | O_NOFOLLOW`, fsynced); an existing current
+    file is hard-linked to a version name -- timestamp plus a counter, so
+    several writes within one second each keep their own version; only then is
+    the temp file `os.replace`d onto the name and the directory fsynced.
+    `os.link` never creates over an existing name, a taken version name moves
+    on to the next counter, and any other link failure fails the dispatch:
+    there is no copy fallback. Nothing is unlinked -- a temp file left by a
+    failure stays, and the error names it.
+
+    **The condition that carries this:** the current file is never written in
+    place. A hard link shares the inode, so an in-place write would change the
+    parked version along with it; the `os.replace` gives the current name a
+    new inode instead. Returns the version name, or None if there was nothing
+    to park.
+    """
+    state = _check_leaf(dir_fd, name, where)
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW
+    while True:
+        tmp = f".{name}.{secrets.token_hex(8)}.tmp"
+        try:
+            fd = os.open(tmp, flags, 0o600, dir_fd=dir_fd)
+            break
+        except FileExistsError:
+            continue
+        except OSError as exc:
+            raise _refuse(f"dispatch: no temp file for {name!r} in {where}: "
+                          f"{exc}") from exc
+    try:
+        view = memoryview(data)
+        while view:
+            view = view[os.write(fd, view):]
+        os.fsync(fd)
+    except OSError as exc:
+        raise _refuse(f"dispatch: writing the temp file {tmp!r} in {where} for "
+                      f"{name!r} failed (left in place): {exc}") from exc
+    finally:
+        os.close(fd)
+
+    parked = None if state in ("absent", "present") else state
+    if state == "present":
+        stamp = utcnow()
+        counter = 1
+        while True:
+            candidate = f"{name}.v{stamp}.{counter}"
+            try:
+                # The name itself is parked, not what a symlink points to.
+                os.link(name, candidate, src_dir_fd=dir_fd, dst_dir_fd=dir_fd,
+                        follow_symlinks=False)
+            except FileExistsError:
+                counter += 1
+                continue
+            except OSError as exc:
+                raise _refuse(
+                    f"dispatch: parking {name!r} in {where} as {candidate!r} "
+                    f"failed: {exc}. No copy fallback; the temp file {tmp!r} "
+                    "is left in place.") from exc
+            parked = candidate
+            break
+    try:
+        os.replace(tmp, name, src_dir_fd=dir_fd, dst_dir_fd=dir_fd)
+        os.fsync(dir_fd)
+    except OSError as exc:
+        raise _refuse(f"dispatch: replacing {name!r} in {where} with the temp "
+                      f"file {tmp!r} failed (left in place): {exc}") from exc
+    return parked
+
+
+def _append_audit(dir_fd: int, record: dict, where: str) -> None:
+    """Append one JSON line to the run's prompt-binding audit file.
+
+    Opened link-free relative to the run directory and refused unless it is a
+    regular file with exactly one link, so a hard link to a file elsewhere is
+    never appended to. `O_NONBLOCK` keeps a planted FIFO from blocking.
+    """
+    flags = (os.O_WRONLY | os.O_APPEND | os.O_CREAT | os.O_NOFOLLOW
+             | os.O_NONBLOCK)
+    try:
+        fd = os.open(PROMPT_BINDINGS, flags, 0o600, dir_fd=dir_fd)
+    except OSError as exc:
+        raise _refuse(f"dispatch: refusing {PROMPT_BINDINGS!r} in {where}: "
+                      f"{exc}") from exc
+    try:
+        st = os.fstat(fd)
+        if not stat.S_ISREG(st.st_mode) or st.st_nlink != 1:
+            raise _refuse(
+                f"dispatch: refusing {PROMPT_BINDINGS!r} in {where}: not a "
+                f"regular file with exactly one link (links: {st.st_nlink}). "
+                "Nothing was appended.")
+        line = (json.dumps(record, sort_keys=True) + "\n").encode("utf-8")
+        view = memoryview(line)
+        while view:
+            view = view[os.write(fd, view):]
+        os.fsync(fd)
+    except OSError as exc:
+        raise _refuse(f"dispatch: appending to {PROMPT_BINDINGS!r} in {where} "
+                      f"failed: {exc}") from exc
+    finally:
+        os.close(fd)
+    try:
+        os.fsync(dir_fd)
+    except OSError as exc:
+        raise _refuse(f"dispatch: fsync of {where} failed: {exc}") from exc
+
+
+def _check_audit(dir_fd: int, where: str) -> None:
+    """The audit file examined before anything of the dispatch is written."""
+    try:
+        st = os.lstat(PROMPT_BINDINGS, dir_fd=dir_fd)
+    except FileNotFoundError:
+        return
+    except OSError as exc:
+        raise _refuse(f"dispatch: refusing {PROMPT_BINDINGS!r} in {where}: "
+                      f"{exc}") from exc
+    if not stat.S_ISREG(st.st_mode) or st.st_nlink != 1:
+        raise _refuse(f"dispatch: refusing {PROMPT_BINDINGS!r} in {where}: not a "
+                      f"regular file with exactly one link (links: {st.st_nlink}). "
+                      "Nothing is written through it.")
+
+
+def _rehash(dir_fd: int, name: str, size: int) -> str:
+    """SHA-256 of `name` relative to `dir_fd`, or a description of why there is
+    none -- which never equals a digest, so it counts as a mismatch.
+
+    Opened `O_NOFOLLOW | O_NONBLOCK` and read only if `fstat` shows a regular
+    file of exactly the expected size: a FIFO, a device or a huge hard-linked
+    file can neither block nor exhaust the dispatcher. At most `size + 1`
+    bytes are read, so a file growing after the `fstat` still mismatches.
+    """
+    try:
+        fd = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK,
+                     dir_fd=dir_fd)
+    except OSError as exc:
+        return f"(unreadable: {exc})"
+    try:
+        st = os.fstat(fd)
+        if not stat.S_ISREG(st.st_mode):
+            return "(not a regular file)"
+        if st.st_size != size:
+            return f"(size {st.st_size} bytes, {size} expected)"
+        digest = hashlib.sha256()
+        left = size + 1
+        while left > 0:
+            chunk = os.read(fd, min(left, 1 << 20))
+            if not chunk:
+                break
+            digest.update(chunk)
+            left -= len(chunk)
+        return digest.hexdigest()
+    except OSError as exc:
+        return f"(unreadable: {exc})"
+    finally:
+        os.close(fd)
+
+
+def _pointer_prompt(prompt_path: Path, size: int, digest: str) -> str:
+    """The short prompt that stands in for one sent through a prompt file.
+
+    Its words are pinned by the recorded box of run qaw3
+    (`QAW3_RESIDUE` in tests/test_dispatch_robustness.py); "too long for one
+    command-line argument" no longer names the only reason (see
+    PROMPT_FILE_THRESHOLD)."""
+    return f"""[prompt-file]
+Your instructions for this turn are too long for one command-line argument,
+so they were written to a file. That file **is** your prompt; this message
+only points to it.
+
+  path:    {prompt_path}
+  bytes:   {size} (UTF-8)
+  sha256:  {digest}
+
+Read the **whole** file before you do anything else. A long file comes back
+in parts: read it page by page, passing an offset each time, and keep going
+until you have reached the end of the file -- not just its beginning. Then
+follow it as your instructions. Do not change, move or delete the file: the
+dispatcher checks its SHA-256 again after your turn, and a changed file fails
+the dispatch.
+"""
+
 
 def _answer_instruction(path: Path) -> str:
     return f"""
 
-/answer-file
+[answer-file]
 Write your JSON answer **as a file** to:
 
   {path}
@@ -63,6 +416,152 @@ Only the JSON object, nothing else -- no code fence, no surrounding text. Reply
 in the chat with a single sentence saying that the file is written. The file is
 authoritative; your chat text is not evaluated.
 """
+
+
+#: The first characters that put a coding agent's input box into another mode
+#: instead of taking a prompt: `/` a slash command, `!` a shell command. Run
+#: padopt: a pointer beginning with `/prompt-file` was appended to an unsent
+#: one, and Claude Code 2.1.288 answered `Unknown command: /prompt-file` --
+#: no turn started. No dispatched message starts with one of them.
+INPUT_MODE_PREFIXES = ("/", "!")
+
+#: The mark of a pane Herdr restored and HoH adopted (`_ensure_agent`). It
+#: holds no digest: what is in its input box was typed by an earlier process,
+#: or by nobody, and is checked before its first prompt (`_check_restored`).
+RESTORED = "restored"
+
+#: The horizontal rule above and below Claude Code's input box, and the mark
+#: that opens the box's first line (pane view of padopt at 01:17:47Z).
+_BOX_RULE = "\u2500"
+_INPUT_MARK = "\u276f"
+
+
+def _first_line_guard(text: str, what: str) -> None:
+    """Refuse a message whose first character switches the input mode.
+
+    Raised before anything is sent: a refused message is never sent.
+    """
+    head = text.lstrip()
+    if head.startswith(INPUT_MODE_PREFIXES):
+        raise _refuse(
+            f"{what}: the message starts with {head[:1]!r}, which an agent's "
+            "input box reads as a command (a slash or shell command), not as "
+            f"a prompt: {head[:80]!r}. It is not sent.")
+
+
+def _pending_input(view: str) -> str | None:
+    """The text in Claude Code's input box, read off a pane view.
+
+    The last two rule lines frame the box, and its first body line must start
+    with the input mark. Returns the box's text, `""` for an empty box, or
+    None when no such box is found -- another agent kind, a dialog, a view cut
+    off -- which proves nothing about what is in the box.
+    """
+    lines = view.splitlines()
+    rules = [i for i, line in enumerate(lines)
+             if len(line.strip()) >= 3 and set(line.strip()) == {_BOX_RULE}]
+    if len(rules) < 2:
+        return None
+    top, bottom = rules[-2], rules[-1]
+    body = lines[top + 1:bottom]
+    if not body or not body[0].lstrip().startswith(_INPUT_MARK):
+        return None
+    first = body[0].lstrip()[len(_INPUT_MARK):]
+    text = "\n".join([first, *body[1:]])
+    return text.strip()
+
+
+def _box_width(view: str) -> int | None:
+    """The width a line of Claude Code's input box can take, read off the
+    pane view: the box's bottom rule spans the pane, and a line breaks two
+    columns short of it (runs qaw3 and qaw4: rule 88 columns, every broken
+    line 86). None when no rule is found."""
+    rules = [ln.rstrip() for ln in view.splitlines()
+             if len(ln.strip()) >= 3 and set(ln.strip()) == {_BOX_RULE}]
+    return len(rules[-1]) - 2 if rules else None
+
+
+def _same_input(box: str, sent: str, width: int | None) -> bool:
+    """Does Claude Code's input box hold exactly `sent`, as typed?
+
+    `box` is `_pending_input`'s text and `width` is `_box_width` of the same
+    pane view. The box shows every line after the first indented by exactly
+    two spaces, and breaks a line longer than the box at `width` columns
+    (counting the indentation, and the input mark on the first line),
+    mid-word, into further indented lines (runs qaw3 and qaw4: `.../20` +
+    `  261005t1503z...`). So: every non-empty box line after the first must
+    carry the two-space indentation; no box line may be wider than `width`;
+    each line of `sent` is one or more consecutive box lines with the
+    indentation removed, and it may continue onto a further box line only
+    where the box line before is exactly `width` wide; a blank line of `sent`
+    is a blank box line; no box line is left over. Anything else -- other
+    text, a missing or extra character or space, a line break short of the
+    width, an unindented line, an unknown width -- is a mismatch.
+    """
+    if not width:
+        return False
+    raw = box.split("\n")
+    shown, cols = [raw[0]], [len(raw[0]) + 2]
+    for ln in raw[1:]:
+        if ln.strip() == "":
+            shown.append("")
+            cols.append(0)
+            continue
+        if not ln.startswith("  "):
+            return False
+        shown.append(ln[2:])
+        cols.append(len(ln))
+    if max(cols) > width:
+        return False
+    i = 0
+    for want in sent.strip().split("\n"):
+        if want == "":
+            if i >= len(shown) or shown[i] != "":
+                return False
+            i += 1
+            continue
+        got = ""
+        while len(got) < len(want):
+            if i >= len(shown) or shown[i] == "":
+                return False
+            if got and cols[i - 1] != width:
+                return False
+            got += shown[i]
+            i += 1
+        if got != want:
+            return False
+    return i == len(shown)
+
+
+class _Resubmit:
+    """`_settle`'s answer when the box holds exactly this dispatch's stalled
+    prompt: `refusal` is what it would have raised, raised by
+    `_submit_stalled` if any of its own checks fails."""
+
+    def __init__(self, refusal: BaseException) -> None:
+        self.refusal = refusal
+
+
+def _read_json_leaf(dir_fd: int, name: str) -> dict | None:
+    """A small JSON record, read link-free relative to `dir_fd`; None for
+    anything but a regular file holding a JSON object."""
+    try:
+        fd = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=dir_fd)
+    except OSError:
+        return None
+    try:
+        if not stat.S_ISREG(os.fstat(fd).st_mode):
+            return None
+        data = os.read(fd, 1 << 16)
+    except OSError:
+        return None
+    finally:
+        os.close(fd)
+    try:
+        value = json.loads(data)
+    except ValueError:
+        return None
+    return value if isinstance(value, dict) else None
 
 
 class _Base:
@@ -162,19 +661,56 @@ class _Base:
     def _marker_for(answer_path: Path) -> Path:
         return answer_path.with_name(answer_path.name + ".dispatch.json")
 
-    def _write_dispatch_marker(self, answer_path: Path, full: str) -> None:
+    def _write_dispatch_marker(self, answer_path: Path, full: str,
+                               dir_fd: int | None = None) -> None:
         """Remember what was asked, so a later dispatch can tell whether the
         answer on disk answers *this* question. A previous marker is kept with
-        a version suffix, never overwritten."""
-        marker = self._marker_for(answer_path)
-        if marker.exists():
-            marker.rename(marker.with_name(f"{marker.name}.v{utcnow()}"))
-        marker.write_text(json.dumps({
-            "prompt_sha256": self._prompt_digest(full),
-            "dispatched_at": time.time(),
-        }) + "\n", encoding="utf-8")
+        a version suffix, never overwritten -- and, like the prompt marker,
+        the new one goes to a temp file that is `os.replace`d onto the name,
+        relative to the answers directory's descriptor, never through a link.
+        """
+        own = dir_fd is None
+        if own:
+            dir_fd = _open_dir(answer_path.parent, "answers directory")
+        try:
+            _write_leaf(dir_fd, self._marker_for(answer_path).name, (json.dumps({
+                "prompt_sha256": self._prompt_digest(full),
+                "dispatched_at": time.time(),
+            }) + "\n").encode("utf-8"), str(answer_path.parent))
+        finally:
+            if own:
+                os.close(dir_fd)
 
-    def _resumable_answer(self, role: Role, answer_path: Path, full: str) -> bool:
+    def _read_marker(self, answer_path: Path, dir_fd: int | None) -> bytes:
+        """The dispatch marker's bytes, read link-free relative to the answers
+        directory: `O_NOFOLLOW | O_NONBLOCK`, a regular file, bounded in size.
+        Anything else raises OSError, which `_resumable_answer` reads as "no
+        evidence it was asked"."""
+        own = dir_fd is None
+        if own:
+            dir_fd = os.open(answer_path.parent,
+                             os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        try:
+            fd = os.open(self._marker_for(answer_path).name,
+                         os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=dir_fd)
+            try:
+                if not stat.S_ISREG(os.fstat(fd).st_mode):
+                    raise OSError(errno.EINVAL, "dispatch marker is not a regular file")
+                data = b""
+                while len(data) <= _MARKER_READ_LIMIT:
+                    chunk = os.read(fd, 1 << 16)
+                    if not chunk:
+                        return data
+                    data += chunk
+                raise OSError(errno.EFBIG, "dispatch marker is implausibly large")
+            finally:
+                os.close(fd)
+        finally:
+            if own:
+                os.close(dir_fd)
+
+    def _resumable_answer(self, role: Role, answer_path: Path, full: str,
+                          dir_fd: int | None = None) -> bool:
         """Is the answer on disk the completed answer to this very prompt?
 
         O199. A dialog aborted the iteration; the operator answered it; the
@@ -191,12 +727,13 @@ class _Base:
         """
         if role not in STRUCTURED_ROLES:
             return False
-        marker = self._marker_for(answer_path)
         try:
-            meta = json.loads(marker.read_text(encoding="utf-8"))
+            meta = json.loads(self._read_marker(answer_path, dir_fd))
             written_at = answer_path.stat().st_mtime
             nonempty = bool(answer_path.read_text(encoding="utf-8").strip())
         except (OSError, ValueError):
+            return False
+        if not isinstance(meta, dict):
             return False
         return (nonempty
                 and meta.get("prompt_sha256") == self._prompt_digest(full)
@@ -249,12 +786,55 @@ class _Base:
                     f"the approval policy can be applied to Claude roles only; "
                     f"{role.value} is configured as {kind!r}. Run it without a "
                     "policy, or give the role the claude harness.")
-            settings, prompt = policy.write_role_files(self.store_dir, role.value)
+            settings, prompt = policy.write_role_files(self.store_dir, role.value,
+                                                       answers_dir=self.answers_dir)
             extra += policy.args(role.value, settings, prompt)
         return extra
 
     def endpoint_evidence(self, role: Role) -> str:
         return self.endpoints.get(role, "(no endpoint recorded)")
+
+
+#: Variables every role pane is launched with.
+#:
+#: `PYTHONDONTWRITEBYTECODE` is here because of O215: a role session's own python
+#: wrote `src/hoh/__pycache__/*.pyc` into a protected arena during its dispatch,
+#: and the capability witness correctly reported that a protected tree had
+#: changed. The check runner already suppresses bytecode on both of its paths
+#: (`runner.py` for the unsandboxed one, `sandbox.py` for STRICT); role sessions
+#: had no environment set at all.
+#:
+#: **This is hygiene, not enforcement, and the difference matters.** An agent that
+#: wants to write bytecode still can -- `sys.dont_write_bytecode = False`,
+#: `py_compile`, `python -m compileall`, or simply `env -u
+#: PYTHONDONTWRITEBYTECODE python3` -- each verified to defeat it. What this
+#: removes is the *accidental* artifact that was blocking honest runs. The
+#: witness is unchanged and still fires on a planted `.pyc`, which is the
+#: property that must not be traded away.
+ROLE_PANE_ENV = {"PYTHONDONTWRITEBYTECODE": "1"}
+
+
+def role_environment() -> dict[str, str]:
+    """The environment for a role launched as a **direct** subprocess.
+
+    Used by `HarnessDispatcher`, which starts the agent itself, so the child does
+    inherit this. It is **not** the path that matters for O215: `HerdrDispatcher`
+    is the only backend an evidencing run may use (`build_dispatcher` refuses
+    anything else unless `--no-herdr` is asked for, and says in as many words that
+    `--no-herdr` carries no acceptance value), and there the pane is a child of
+    the Herdr server rather than of any process this module starts. That path is
+    reached through `ROLE_PANE_ENV` and `--env` at tab create instead.
+
+    The first version of this repair set only this function and was **inert on the
+    mandatory path** -- caught by an independent reviewer, who measured that every
+    pane is a direct child of a server started days earlier and that a pane's
+    environment carries nothing from the CLI client.
+
+    Everything else is inherited unchanged; passing the environment explicitly
+    adds exactly one variable and removes none, which was measured rather than
+    argued.
+    """
+    return {**os.environ, **ROLE_PANE_ENV}
 
 
 class HarnessDispatcher(_Base):
@@ -313,6 +893,7 @@ class HarnessDispatcher(_Base):
                 capture_output=True,
                 text=True,
                 timeout=self.timeout,
+                env=role_environment(),
             )
         except subprocess.TimeoutExpired as exc:
             raise DispatchError(
@@ -422,12 +1003,43 @@ class HerdrDispatcher(_Base):
         # instead of adopted.
         restored = self._reusable_agent(name, state)
         if restored is not None:
+            # Known gap: **O215 does not reach a reused pane.** ROLE_PANE_ENV is
+            # applied by `_new_tab_pane` through `herdr tab create --env`, and a
+            # pane Herdr restored was created before that -- possibly before the
+            # setting existed at all. Its environment cannot be changed from here;
+            # `herdr agent start` has no `--env`, and rewriting a live shell's
+            # environment from outside is not something to do quietly. So a
+            # restored pane may still leave bytecode in a protected tree, the
+            # witness will still catch it, and the run will still block -- which
+            # is the correct outcome, just not the improved one.
             self.agents[role] = name
             self.endpoints[role] = restored
+            self._unsettled()[name] = (RESTORED, 0.0, None)
+            adopted = self._adopted().get(name)
+            if adopted and adopted[1]:
+                # The adopted pane is the role's, so its turn end can release it.
+                self._role_panes()[role] = adopted[1]
             return name
 
-        pane = self._new_tab_pane(f"hoh {role.value}", cwd=self.role_cwd.get(role))
+        # One mark per pane, minted here and handed to `_new_tab_pane` through
+        # an attribute (the signature tests stub does not change). Every process
+        # the role starts in the pane inherits it (`procs`).
+        mark = procs.mint(self.store_dir.name, role.value)
+        made_in = self.role_cwd.get(role) or getattr(self, "cwd", None) or ""
+        self.__dict__["_pane_mark"] = mark
+        try:
+            pane = self._new_tab_pane(f"hoh {role.value}", cwd=self.role_cwd.get(role))
+        finally:
+            self.__dict__.pop("_pane_mark", None)
         self.own_panes.append(pane)
+        # Recorded **before** `agent start`: a start that fails after Herdr
+        # registered the agent leaves a pane that the run end can still
+        # recognise as ours (identity check, `_close_own_pane`).
+        self._role_panes()[role] = pane
+        self._pane_marks()[pane] = mark
+        self._pane_names().setdefault(pane, set()).add(name)
+        if made_in:
+            self._pane_dirs()[pane] = str(made_in)
         self._start_agent(name, kind, pane, self._agent_args(role))
         self.agents[role] = name
         return name
@@ -456,16 +1068,22 @@ class HerdrDispatcher(_Base):
         # work tree was missing, then the arena root where planner and QA sit
         # now. Both times the guard rejected one of our own roles as a "foreign
         # session" -- a protection that does not know our own roles is none.
-        own_roots = [str(p) for p in (
-            getattr(self, "store_dir", None),
-            getattr(self, "arenas_dir", None),
-            state.repo_path,
-            *self.role_cwd.values(),
-        ) if p]
+        own_roots = self._own_roots(state)
         for row in snapshot.get("agents", []) or []:
             if str(row.get("name") or "") != name:
                 continue
             cwd = str(row.get("foreground_cwd") or row.get("cwd") or "")
+            if not cwd or not os.path.isabs(cwd):
+                # An empty or relative directory resolves against HoH's own
+                # working directory, so whether the agent counted as this
+                # run's depended on where `hoh run` was started. Unknown is
+                # no-touch: nothing is read, closed or sent.
+                raise PaneNotClean(
+                    f"The agent name {name} is taken, but Herdr reports no "
+                    f"absolute directory for it ({cwd!r}), so it cannot be "
+                    "proven to belong to this run. HoH does not adopt it; "
+                    "nothing in its pane was read, closed or sent -- check the "
+                    "pane and close it deliberately.")
             if own_roots and not self._is_under(cwd, own_roots):
                 raise DispatchError(
                     f"The agent name {name} is taken, but the agent sits in {cwd!r} "
@@ -489,12 +1107,14 @@ class HerdrDispatcher(_Base):
                 # that with `agent_not_ready`. A revived name without an agent
                 # is a dead end that only clearing away our **own** pane leads
                 # out of -- cwd is checked above.
-                dead_tab = str(row.get("tab_id") or "")
-                if dead_tab:
-                    try:
-                        self._cli(["herdr", "tab", "close", dead_tab], "close dead tab")
-                    except DispatchError:
-                        pass
+                #
+                # The **pane** is closed, never its tab: what else sits in
+                # that tab is not ours to close (`_close_dead`). The result is
+                # recorded, not swallowed.
+                dead_pane = str(row.get("pane_id") or "")
+                if dead_pane:
+                    self._pane_dirs()[dead_pane] = cwd
+                    self._close_dead(name, dead_pane, str(row.get("tab_id") or ""))
                 return None
             ep = herdr.Endpoint(
                 pane_id=str(row.get("pane_id", "")),
@@ -507,36 +1127,560 @@ class HerdrDispatcher(_Base):
             tab = str(row.get("tab_id") or "")
             if tab and tab not in self.own_tabs:
                 self.own_tabs.append(tab)
+            self._adopted()[name] = (tab, str(row.get("pane_id") or ""))
+            # What the live identity check compares with: the directory this
+            # pane was found in, and the one agent name HoH adopted there.
+            adopted_pane = str(row.get("pane_id") or "")
+            if adopted_pane:
+                self._pane_dirs()[adopted_pane] = cwd
+                self._pane_names().setdefault(adopted_pane, set()).add(name)
             return ep.evidence()
         return None
 
+    # -- Closing what HoH opened: only what it can prove is its own ---------- #
+    #
+    # Roles' panes live for one role turn (`release_role`) or until the run's
+    # end (`close_own`). Every Herdr close goes through `_close_own_pane`
+    # (the one stated exception is `_replace_restored`, which keeps its own,
+    # stricter proof). Whatever cannot be proven is **kept and recorded**.
+
+    def _lazy(self, name: str, factory):
+        """A bookkeeping table made on first use, so a dispatcher built with
+        `__new__` has it too (like `_unsettled`)."""
+        value = self.__dict__.get(name)
+        if value is None:
+            value = self.__dict__[name] = factory()
+        return value
+
+    def _role_panes(self) -> dict:
+        """role -> the pane HoH created for it or adopted for it."""
+        return self._lazy("_role_pane_ids", dict)
+
+    def _kept(self) -> dict:
+        """pane -> why it is kept open (`keep_open`)."""
+        return self._lazy("_kept_panes", dict)
+
+    def _pane_marks(self) -> dict:
+        """pane -> the mark its processes carry (`procs.mint`)."""
+        return self._lazy("_pane_mark_ids", dict)
+
+    def _pane_names(self) -> dict:
+        """pane -> the agent names HoH recorded for it (the role's, recorded
+        **before** `agent start`, and a dead agent's)."""
+        return self._lazy("_pane_agent_names", dict)
+
+    def _pane_dirs(self) -> dict:
+        """pane -> the directory HoH made it in (or found it in, if adopted)."""
+        return self._lazy("_pane_made_in", dict)
+
+    def _own_pane_ids(self) -> set[str]:
+        """Every pane that is HoH's own: created by it (`own_panes`) or the
+        pane of an adopted agent. The record alone is not trusted for a close:
+        `_identity_problem` looks at what is in the pane now."""
+        ids = {str(p) for p in self.own_panes}
+        ids.update(str(pane) for _tab, pane in self._adopted().values() if pane)
+        return ids
+
+    def _roots(self) -> list[str]:
+        """The run's directories, for a pane with no record of where it was made."""
+        return [str(p) for p in (
+            getattr(self, "store_dir", None),
+            getattr(self, "arenas_dir", None),
+            getattr(self, "cwd", None),
+            *self.role_cwd.values(),
+        ) if p]
+
+    def _record(self, event: str, **fields) -> bool:
+        """One ledger line in the run directory; False if it cannot be written."""
+        return pane_ledger.append(self.store_dir, event, **fields)
+
+    @staticmethod
+    def _rows(snapshot: dict, key: str) -> list[dict]:
+        return [r for r in (snapshot.get(key) or []) if isinstance(r, dict)]
+
+    def _read_snapshot(self) -> tuple[dict | None, str]:
+        """`(snapshot, "")`, or `(None, why)` when it proves nothing: unreadable,
+        lacking any of the lists `agents`, `panes`, `tabs`, or listing **no pane
+        at all** (`hoh run` sits in a Herdr pane itself, so an empty snapshot is
+        a failed read, never "the pane is gone")."""
+        try:
+            snapshot = herdr.snapshot()
+        except Exception as exc:          # noqa: BLE001 - fail closed
+            return None, f"the Herdr snapshot cannot be read ({exc})"
+        if not isinstance(snapshot, dict):
+            return None, "the Herdr snapshot is not an object"
+        for key in ("agents", "panes", "tabs"):
+            if not isinstance(snapshot.get(key), list):
+                return None, f"the Herdr snapshot has no {key} list"
+        if not self._rows(snapshot, "panes"):
+            return None, "the Herdr snapshot lists no pane at all"
+        return snapshot, ""
+
+    def _listed(self, snapshot: dict) -> set[str]:
+        """Every pane id the snapshot lists, as a pane or as an agent's pane."""
+        return {str(r.get("pane_id") or "")
+                for key in ("panes", "agents") for r in self._rows(snapshot, key)}
+
+    def _herdr_says_gone(self, pane: str) -> bool:
+        """Does Herdr itself answer `pane_not_found` for this pane?
+
+        A snapshot that lists only some of the panes does not make a live pane
+        gone: the snapshot **and** this answer decide."""
+        try:
+            self._cli(["herdr", "pane", "read", pane], f"read pane {pane}", text=True)
+        except DispatchError as exc:
+            return "pane_not_found" in str(exc)
+        except Exception:                 # noqa: BLE001 - unknown is not gone
+            return False
+        return False
+
+    def keep_open(self, role: Role, why: str) -> None:
+        """Keep the role's pane open until a later dispatch to it returns
+        normally: a pane that waits for an approval, or whose state is not
+        proven, is what the operator has to look at. Refused by **every** close.
+        With no pane recorded for the role it does nothing."""
+        pane = self._role_panes().get(role)
+        if not pane:
+            return
+        self._kept()[pane] = why
+        self._record("kept", role=role.value, pane=pane, why=why)
+
+    def _lift_keep(self, role: Role) -> None:
+        pane = self._role_panes().get(role)
+        if pane:
+            self._kept().pop(pane, None)
+
+    def _close_dead(self, name: str, pane: str, tab: str) -> bool:
+        """Close the pane of a restored agent whose process is dead -- the
+        pane, **never its tab**. The pane is adopted for the length of the
+        call; the tab is not in `own_tabs`, so it is not closed whole either.
+        If the close is refused or unconfirmed the pane goes into `own_panes`
+        (it is proven this run's), so the run end retries it, and the agent
+        name stays recorded with the pane so the identity check recognises its
+        row, which is likely still listed."""
+        self._pane_names().setdefault(pane, set()).add(name)
+        self._adopted()[name] = (tab, pane)
+        try:
+            closed = self._close_own_pane(pane, role=None, reason="dead restored agent")
+        finally:
+            self._adopted().pop(name, None)
+        if not closed and pane not in self.own_panes:
+            self.own_panes.append(pane)
+        return closed
+
+    def _identity_problem(self, pane: str, snapshot: dict) -> str:
+        """Why the pane is not what HoH recorded -- or "" if it is.
+
+        Herdr documents that closed ids are not reused for a running server,
+        not across a restart, so the recorded id alone is not trusted. If an
+        agent sits in the pane, its name must be one HoH recorded for that pane.
+        If none does, the pane's own directory must be absolute and under the
+        directory HoH made that pane in (for a pane with no record: the run's
+        directories). **Not a proof**: an operator's shell in the very same
+        directory passes (`docs/LIMITATIONS.md`)."""
+        known = self._pane_names().get(pane, set())
+        sitting = [r for r in self._rows(snapshot, "agents")
+                   if str(r.get("pane_id") or "") == pane]
+        for row in sitting:
+            name = str(row.get("name") or "")
+            if name not in known:
+                return (f"an agent {name!r} that HoH did not start for this pane "
+                        "sits in it")
+        if sitting:
+            return ""
+        rows = [r for r in self._rows(snapshot, "panes")
+                if str(r.get("pane_id") or "") == pane]
+        if not rows:
+            return "the snapshot has no row for the pane"
+        made_in = self._pane_dirs().get(pane)
+        roots = [made_in] if made_in else self._roots()
+        for row in rows:
+            reported = [str(row.get(k) or "") for k in ("foreground_cwd", "cwd")]
+            reported = [c for c in reported if c]
+            if not reported:
+                return "Herdr reports no directory for the pane"
+            for cwd in reported:
+                if not os.path.isabs(cwd):
+                    return f"Herdr reports no absolute directory for it ({cwd!r})"
+                if not roots or not self._is_under(cwd, roots):
+                    return (f"its directory {cwd!r} is not under the directory "
+                            f"HoH made it in ({', '.join(roots) or 'unknown'})")
+        return ""
+
+    def _refused(self, pane: str, role: Role | None, reason: str, why: str,
+                 **extra) -> bool:
+        """Record a refusal and remember its reason (`release_role` answers
+        with it). Always False."""
+        self.__dict__["_close_why"] = why
+        self._record("refused", role=role.value if role else None, pane=pane,
+                     reason=reason, why=why, **extra)
+        return False
+
+    def _close_own_pane(self, pane: str, *, role: Role | None, reason: str) -> bool:
+        """The one place a pane is closed (one stated exception: `_replace_restored`).
+
+        In order: a kept pane is never closed; a pane that is not an own pane
+        is never closed; the snapshot must be readable, complete and non-empty;
+        a pane the snapshot no longer lists **and** Herdr says is gone is
+        `closed` (`already_gone`), no command sent; the live identity; a whole
+        tab only when the snapshot proves every pane in it is HoH's own, passes
+        the identity check and is not kept, and the tab row counts exactly
+        those panes -- otherwise the pane alone; the `closing` line is written
+        **before** the command or nothing is attempted; what Herdr answers is
+        not the proof, a second snapshot and `pane_not_found` are; after a
+        confirmed close the pane is forgotten. True only for a confirmed close.
+        """
+        self.__dict__["_close_why"] = ""
+        label = role.value if role else None
+        if pane in self._kept():
+            why = self._kept()[pane]
+            self.__dict__["_close_why"] = f"the pane is kept open: {why}"
+            self._record("kept", role=label, pane=pane, reason=reason, why=why)
+            return False
+        if pane not in self._own_pane_ids():
+            return self._refused(pane, role, reason,
+                                 "the pane is not one HoH created or adopted")
+        snapshot, why = self._read_snapshot()
+        if snapshot is None:
+            return self._refused(pane, role, reason, why)
+        if pane not in self._listed(snapshot):
+            if self._herdr_says_gone(pane):
+                self._record("closed", role=label, pane=pane, reason=reason,
+                             already_gone=True)
+                self._forget_pane(pane)
+                return True
+            return self._refused(
+                pane, role, reason,
+                "the snapshot does not list the pane, but Herdr does not say it "
+                "is gone: a snapshot that lists only some panes does not make a "
+                "live pane gone")
+        problem = self._identity_problem(pane, snapshot)
+        if problem:
+            return self._refused(pane, role, reason, problem)
+
+        # A whole tab only when the snapshot proves all of it is ours.
+        tab = next((str(r.get("tab_id") or "") for r in self._rows(snapshot, "panes")
+                    if str(r.get("pane_id") or "") == pane), "")
+        targets = [pane]
+        command = ["herdr", "pane", "close", pane]
+        if tab and tab in self.own_tabs:
+            mine = [str(r.get("pane_id") or "") for r in self._rows(snapshot, "panes")
+                    if str(r.get("tab_id") or "") == tab]
+            tab_rows = [r for r in self._rows(snapshot, "tabs")
+                        if str(r.get("tab_id") or "") == tab]
+            whole = (len(tab_rows) == 1
+                     and tab_rows[0].get("pane_count") == len(mine)
+                     and pane in mine
+                     and all(m in self._own_pane_ids()
+                             and m not in self._kept()
+                             and not self._identity_problem(m, snapshot)
+                             for m in mine))
+            if whole:
+                targets = mine
+                command = ["herdr", "tab", "close", tab]
+
+        # Written before the command; no line, no attempt.
+        for target in targets:
+            if not self._record("closing", role=label if target == pane else None,
+                                pane=target, tab=tab or None, reason=reason,
+                                scope="tab" if command[1] == "tab" else "pane"):
+                return self._refused(
+                    pane, role, reason,
+                    "the close cannot be recorded in the ledger, so it is not "
+                    "attempted")
+        failure = ""
+        try:
+            self._cli(command, f"close {command[1]} {command[-1]}")
+        except Exception as exc:          # noqa: BLE001 - the snapshot decides
+            failure = str(exc)
+
+        # What Herdr answers is not the proof: a second snapshot is.
+        after, why = self._read_snapshot()
+        if after is None:
+            return self._refused(
+                pane, role, reason,
+                f"the close was asked for but cannot be confirmed: {why}"
+                + (f" (the command said: {failure})" if failure else ""))
+        still = [t for t in targets if t in self._listed(after)]
+        answering = [t for t in targets if t not in still and not self._herdr_says_gone(t)]
+        if still or answering:
+            return self._refused(
+                pane, role, reason,
+                "the close is not confirmed: "
+                + ("the snapshot still lists " + ", ".join(still) if still
+                   else "Herdr still answers for " + ", ".join(answering))
+                + (f" (the command said: {failure})" if failure else ""))
+        for target in targets:
+            self._record("closed", role=label if target == pane else None,
+                         pane=target, tab=tab or None, reason=reason)
+        for target in targets:
+            self._forget_pane(target)
+        self._settle_tab(tab, after)
+        return True
+
+    def _settle_tab(self, tab: str, after: dict) -> None:
+        """Account for the tab of a pane that was just closed: a tab that is
+        gone leaves `own_tabs`; one that survives with **none** of its
+        remaining panes ours also leaves it, and a `kept` line says which
+        panes hold it."""
+        if not tab or tab not in self.own_tabs:
+            return
+        present = {str(t.get("tab_id") or "") for t in self._rows(after, "tabs")}
+        if tab not in present:
+            self.own_tabs.remove(tab)
+            return
+        remaining = [str(r.get("pane_id") or "") for r in self._rows(after, "panes")
+                     if str(r.get("tab_id") or "") == tab]
+        if any(p in self._own_pane_ids() for p in remaining):
+            return
+        self.own_tabs.remove(tab)
+        if remaining:
+            self._record("kept", tab=tab, why="the tab stays open: it still holds "
+                         "panes that are not HoH's: " + ", ".join(remaining))
+
+    def _forget_pane(self, pane: str) -> None:
+        """Everything HoH remembers of a pane that is gone: its own-pane entry,
+        the adopted map, the role-to-pane map, the keep and the marks, the
+        role's cached agent (its next turn starts a fresh one) and the stall and
+        settle marks of its agent."""
+        if pane in self.own_panes:
+            self.own_panes[:] = [p for p in self.own_panes if p != pane]
+        adopted = self._adopted()
+        for name in [n for n, (_tab, p) in adopted.items() if p == pane]:
+            adopted.pop(name, None)
+        names = self._pane_names().pop(pane, set())
+        for role in [r for r, p in self._role_panes().items() if p == pane]:
+            self._role_panes().pop(role, None)
+            self.agents.pop(role, None)
+        for name in names:
+            self._unsettled().pop(name, None)
+            self._stalls().pop(name, None)
+        self._kept().pop(pane, None)
+        self._pane_marks().pop(pane, None)
+        self._pane_dirs().pop(pane, None)
+
+    # -- The role's processes ------------------------------------------------- #
+
+    def _proc_table(self):
+        """The process table (`procs.ProcTable`); a test stands in for it."""
+        return procs.ProcTable()
+
+    def _scan_processes(self, mark: str, listed: bool) -> procs.RoleScan:
+        """What the role's pane holds, taken **before** the close, while its
+        shell is alive. A pane that is already gone (`listed` is False) has no
+        root and none is looked for: its live marked processes are named and
+        the release is refused; with none left it is quiescent."""
+        try:
+            table = self._proc_table().snapshot()
+        except Exception as exc:          # noqa: BLE001 - fail closed
+            return procs.RoleScan(
+                problem=f"the process table cannot be read before the close ({exc})")
+        skip = procs.excluded(table, os.getpid())
+        if not listed:
+            left = procs.marked_left(table, mark, skip)
+            if left:
+                return procs.RoleScan(
+                    escaped=tuple(left),
+                    problem=("the pane is already gone, but processes still carry "
+                             "its mark (pids "
+                             + ", ".join(str(p.pid) for p in left)
+                             + "); nothing anchors them to it, so none is signalled"))
+            return procs.RoleScan()
+        # With a root, `escaped` is not a problem of the scan: the role's own
+        # command is still ended, and `_end_processes` refuses the release.
+        return procs.scan(table, mark, skip)
+
+    def _end_processes(self, mark: str, found: procs.RoleScan, *, role: Role | None,
+                       pane: str, reason: str) -> str:
+        """End what the role left running after its pane was closed, and say
+        what is left: "" when nothing is, else the problem. Recorded."""
+        label = role.value if role else None
+        table = self._proc_table()
+        try:
+            skip = procs.excluded(table.snapshot(), os.getpid())
+            outcome = procs.end(
+                table, mark, found, skip,
+                sleep=getattr(table, "sleep", time.sleep),
+                clock=getattr(table, "clock", time.monotonic))
+        except Exception as exc:          # noqa: BLE001 - fail closed
+            problem = f"the process table cannot be read after the close ({exc})"
+            self._record("refused", role=label, pane=pane, reason=reason, why=problem)
+            return problem
+        if outcome.gone:
+            self._record("ended", role=label, pane=pane, reason=reason,
+                         pids=list(outcome.gone), count=len(outcome.gone))
+        problems: list[str] = []
+        extra: dict = {}
+        if outcome.survivors:
+            pids = [p.pid for p in outcome.survivors]
+            problems.append("processes the role left running are still alive after "
+                            "SIGKILL (pids " + ", ".join(map(str, pids)) + ")")
+            extra["pids"] = pids
+        escaped = sorted({p.pid for p in (*found.escaped, *outcome.escaped)})
+        if escaped:
+            problems.append("marked processes outside the role's pane (pids "
+                            + ", ".join(map(str, escaped))
+                            + ") were named and never signalled")
+            extra["escaped"] = escaped
+        if not problems:
+            return ""
+        problem = "; ".join(problems)
+        self._record("refused", role=label, pane=pane, reason=reason, why=problem,
+                     **extra)
+        return problem
+
+    def _close_and_end_processes(self, role: Role | None, pane: str, reason: str, *,
+                                 require_mark: bool = True) -> tuple[bool, str]:
+        """`(pane closed, problem)`: close the pane, then end what its role left
+        running. In order: take the root and the members while the agent and
+        its shell are alive; close the pane (`_close_own_pane`); only if the
+        close is confirmed, end the members and prove them gone. The problem is
+        "" when nothing is left, else says what is (the pane **is** closed then).
+        A pane with no mark (an adopted one) cannot be told from the
+        operator's: with `require_mark` that is a problem, without it nothing
+        is looked for."""
+        mark = self._pane_marks().get(pane)
+        found: procs.RoleScan | None = None
+        problem = ""
+        if mark is None:
+            if require_mark:
+                problem = ("the pane has no mark (HoH did not create it), so what "
+                           "its role left running cannot be told")
+        else:
+            snapshot, _why = self._read_snapshot()
+            listed = True if snapshot is None else pane in self._listed(snapshot)
+            found = self._scan_processes(mark, listed)
+            problem = found.problem
+        if not self._close_own_pane(pane, role=role, reason=reason):
+            return False, ""
+        if mark is None or found is None or found.problem or found.root is None:
+            if problem:
+                self._record("refused", role=role.value if role else None, pane=pane,
+                             reason=reason, why=problem,
+                             **({"escaped": [p.pid for p in found.escaped]}
+                                if found is not None and found.escaped else {}))
+            return True, problem
+        return True, self._end_processes(mark, found, role=role, pane=pane,
+                                         reason=reason)
+
+    # -- The turn end ----------------------------------------------------------- #
+
+    def release_role(self, role: Role, state: RunState, *,
+                     reason: str = "turn finished") -> PaneRelease:
+        """End the role's session: its turn is over and the run will not use
+        this pane again. **Never raises.**
+
+        Refuses (records, returns `closed=False` with the reason) when no pane
+        is recorded for the role; the pane is kept; the snapshot is unreadable,
+        partial or empty; more than one agent carries the role's name; the
+        agent sits in another pane than the one HoH created; the agent is
+        `working` again; its status does not prove the turn ended (`blocked`
+        is released: a dialog met **after** the answer was delivered is not
+        what anything HoH asked is waiting for); the close is refused
+        (`_close_own_pane`); or, after the pane is closed, what the role left
+        running cannot be told or is not all gone (the pane **is** closed then).
+        An agent that is no longer listed does not stop the release."""
+        pane = ""
+        try:
+            pane = self._role_panes().get(role) or ""
+
+            def refuse(why: str) -> PaneRelease:
+                self._record("refused", role=role.value, pane=pane or None,
+                             reason=reason, why=why)
+                return PaneRelease(False, why)
+
+            if not pane:
+                return refuse(f"no pane is recorded for {role.value}")
+            if pane in self._kept():
+                why = self._kept()[pane]
+                self._record("kept", role=role.value, pane=pane, reason=reason, why=why)
+                return PaneRelease(False, f"the pane is kept open: {why}")
+            snapshot, why = self._read_snapshot()
+            if snapshot is None:
+                return refuse(why)
+            name = self.agents.get(role) or self._agent_name(role, state)
+            rows = [r for r in self._rows(snapshot, "agents")
+                    if str(r.get("name") or "") == name]
+            if len(rows) > 1:
+                return refuse(f"the snapshot shows {len(rows)} agents named {name}, "
+                              "not one")
+            if rows:
+                row = rows[0]
+                where = str(row.get("pane_id") or "")
+                if where != pane:
+                    return refuse(f"{name} sits in pane {where!r}, not in pane "
+                                  f"{pane!r} where HoH put it")
+                status = str(row.get("agent_status") or "unknown")
+                if status == "working":
+                    return refuse(f"{name} is working again after its turn ended")
+                if status not in ("idle", "done", "blocked"):
+                    return refuse(f"{name}'s status {status!r} does not prove that "
+                                  "its turn ended")
+            closed, problem = self._close_and_end_processes(role, pane, reason)
+            if not closed:
+                return PaneRelease(False, self.__dict__.get("_close_why")
+                                   or "the pane was not closed")
+            if problem:
+                return PaneRelease(False, problem)
+            return PaneRelease(True, "")
+        except Exception as exc:          # noqa: BLE001 - release never raises
+            why = f"the release failed: {type(exc).__name__}: {exc}"
+            try:
+                self._record("refused", role=role.value, pane=pane or None,
+                             reason=reason, why=why)
+            except Exception:             # noqa: BLE001
+                pass
+            return PaneRelease(False, why)
+
+    # -- The run end -------------------------------------------------------------- #
+
     def close_own(self) -> list[str]:
-        """Closes only the tabs this adapter created itself, and **confirms**
-        the termination.
+        """Closes what this adapter opened, **only** what it can prove is its
+        own, and **confirms** the termination.
 
         Handoff §7: *"`cancel` uses the existing controlled stop path for our
         own worker including its child processes; confirm the termination ...
-        An unconfirmed stop stays visibly open."* An earlier version only
-        closed and reported success without looking.
+        An unconfirmed stop stays visibly open."*
 
-        Foreign tabs and panes stay untouched.
+        Every own pane -- `own_panes` first, then adopted panes -- goes through
+        `_close_own_pane` (reason `run end`); the processes of every pane it
+        closes that has a mark are ended too (recorded, nothing raised). A pane
+        alone in its tab closes with the tab; a tab that holds anything else is
+        never closed. Returns the tabs among `own_tabs` that are **gone**;
+        `own_tabs` is reduced to the tabs that still hold an own pane, and
+        `unconfirmed` is those tabs plus every own pane still listed that is in
+        none of them. Foreign tabs and panes stay untouched.
         """
-        closed: list[str] = []
-        still_open: list[str] = []
-        for tab in self.own_tabs:
+        by_pane = {pane: role for role, pane in self._role_panes().items()}
+        tabs_before = list(self.own_tabs)
+        for pane in [*self.own_panes,
+                     *(p for _tab, p in self._adopted().values() if p)]:
+            if pane not in self._own_pane_ids():
+                continue                  # an earlier close took it with its tab
             try:
-                subprocess.run(["herdr", "tab", "close", tab],
-                               capture_output=True, timeout=30)
-            except (OSError, subprocess.TimeoutExpired):
-                still_open.append(tab)
+                self._close_and_end_processes(by_pane.get(pane), pane, "run end",
+                                              require_mark=False)
+            except Exception:             # noqa: BLE001 - one pane must not stop the rest
                 continue
-            if self._tab_gone(tab):
-                closed.append(tab)
-            else:
-                still_open.append(tab)
 
+        snapshot, _why = self._read_snapshot()
+        if snapshot is None:
+            # Not checkable does not mean confirmed.
+            self.unconfirmed = [*self.own_tabs, *self.own_panes]
+            return []
+        present = {str(t.get("tab_id") or "") for t in self._rows(snapshot, "tabs")}
+        mine = self._own_pane_ids()
+        holding: dict[str, list[str]] = {}
+        for row in self._rows(snapshot, "panes"):
+            pane = str(row.get("pane_id") or "")
+            if pane in mine:
+                holding.setdefault(str(row.get("tab_id") or ""), []).append(pane)
+        closed = [t for t in tabs_before if t not in present]
+        still_open = [t for t in self.own_tabs if t in holding]
+        covered = {p for t in still_open for p in holding[t]}
+        loose = [p for p in self._listed(snapshot) if p in mine and p not in covered]
         self.own_tabs = still_open
-        self.unconfirmed = still_open
+        self.unconfirmed = [*still_open, *loose]
         return closed
 
     def _tab_gone(self, tab: str) -> bool:
@@ -547,6 +1691,29 @@ class HerdrDispatcher(_Base):
             return False   # not checkable does not mean confirmed
         present = {str(x.get("tab_id")) for x in (snapshot.get("tabs", []) or [])}
         return tab not in present
+
+    def role_gone(self, role: Role, state: RunState) -> bool:
+        """Is this run's agent for `role` provably absent from Herdr?
+
+        Looked up by its deterministic name, so an agent Herdr restored from
+        an earlier `hoh run`, which this process never reattached, counts as
+        present too. QA's sealed arena is lifted only once this is true.
+        Unreadable counts as present: a snapshot that cannot be read, an
+        `agents` that is not a list, or any row without a non-empty string
+        `name` -- a row that cannot be matched could be the agent.
+        """
+        try:
+            snapshot = herdr.snapshot()
+        except Exception:
+            return False   # not checkable does not mean gone
+        rows = snapshot.get("agents") if isinstance(snapshot, dict) else None
+        if not isinstance(rows, list):
+            return False
+        if not all(isinstance(row, dict) and isinstance(row.get("name"), str)
+                   and row["name"] for row in rows):
+            return False
+        name = self._agent_name(role, state)
+        return not any(row["name"] == name for row in rows)
 
     def _new_tab_pane(self, label: str, *, cwd: str | None = None) -> str:
         """Every role gets its **own tab**, no further split.
@@ -562,6 +1729,22 @@ class HerdrDispatcher(_Base):
         """
         args = ["herdr", "tab", "create", "--cwd", cwd or self.cwd,
                 "--label", label, "--no-focus"]
+        # O215, and the only place it can go. Herdr is client/server: every pane
+        # is a direct child of the long-lived `herdr server`, so the environment
+        # of this short-lived CLI client never reaches the role session. Measured
+        # rather than assumed -- the server has run since before this change, 27
+        # panes are its children, and a pane's environ differs from the server's
+        # by six HERDR_* variables and nothing else. `--env` on tab create is the
+        # documented way to reach the launched process.
+        for key, value in ROLE_PANE_ENV.items():
+            args += ["--env", f"{key}={value}"]
+        # The mark of this pane (`_ensure_agent` mints it): every process the
+        # role starts inherits it, which is how what a closed pane left running
+        # is found (`procs`). Handed over through an attribute so the
+        # signature that tests stub does not change.
+        mark = self.__dict__.get("_pane_mark")
+        if mark:
+            args += ["--env", f"{procs.MARK_ENV}={mark}"]
         ws = os.environ.get("HERDR_WORKSPACE_ID")
         if ws:
             args += ["--workspace", ws]
@@ -625,15 +1808,46 @@ class HerdrDispatcher(_Base):
             return minimum
         return max(minimum, ms / 1000.0 + cls.WRAPPER_OVERHEAD_S)
 
-    def _cli(self, args: list[str], purpose: str) -> dict:
+    def _cli(self, args: list[str], purpose: str, *, text: bool = False):
+        """One Herdr call: its JSON as a dict, or with `text=True` its stdout
+        as a string (`agent read` writes the screen, not JSON)."""
         try:
             proc = subprocess.run(
-                args, capture_output=True, text=True, timeout=self._wrapper_timeout(args)
+                args, capture_output=True, text=True,
+                timeout=self._wrapper_timeout(args), env=role_environment(),
             )
-        except (OSError, subprocess.TimeoutExpired) as exc:
+        except OSError as exc:
+            if exc.errno == errno.E2BIG:
+                # Deterministic: the same argv fails the same way on every
+                # retry. Run 20261002t1501z-sstew4 retried it twice.
+                raise DispatchError(
+                    f"{purpose} failed: the command line exceeds the kernel's "
+                    "argument-length limit (one argument may hold at most "
+                    f"131071 bytes, MAX_ARG_STRLEN): {exc}",
+                    transient=False) from exc
+            raise DispatchError(f"{purpose} failed: {exc}", transient=True) from exc
+        except subprocess.TimeoutExpired as exc:
             raise DispatchError(f"{purpose} failed: {exc}", transient=True) from exc
         if proc.returncode != 0:
+            # Herdr's error code, from the JSON it writes to stderr
+            # (`{"error": {"code": ..., "message": ...}, "id": ...}`) -- never
+            # matched in the prose of the message. Stderr that is not that
+            # JSON keeps the classification below.
+            try:
+                error = json.loads((proc.stderr or "").strip()).get("error")
+                code = error.get("code") if isinstance(error, dict) else None
+            except (ValueError, AttributeError):
+                code = None
+            if code == "agent_prompt_stalled":
+                # Run 20260925t1801z-pqagate2: the prompt produced no observed
+                # state change within 5 s on an idle pane. Not a decision
+                # about the role: the only code that is transient, and it is
+                # asked again after a back-off, not at once.
+                raise DispatchError(f"{purpose} failed: {proc.stderr.strip()[:300]}",
+                                    transient=True, retry_after=STALL_RETRY_AFTER_S)
             raise DispatchError(f"{purpose} failed: {proc.stderr.strip()[:300]}")
+        if text:
+            return proc.stdout or ""
         try:
             return json.loads(proc.stdout)
         except json.JSONDecodeError as exc:
@@ -683,47 +1897,665 @@ class HerdrDispatcher(_Base):
         tail = "\n".join(ln for ln in view.splitlines() if ln.strip())[-1200:]
         return f"--- Visible in pane ---\n{tail or '(empty)'}\n-----------------------"
 
+    # -- Is the pane free to take a prompt? ---------------------------------- #
+
+    def _unsettled(self) -> dict:
+        """target -> (digest, monotonic send time, developer tree digest taken
+        before that send) for a target whose last prompt did not return, or
+        `(RESTORED, 0.0, None)` for a pane Herdr restored. Lazy, so a
+        dispatcher built with `__new__` has it too."""
+        marks = self.__dict__.get("_unsettled_marks")
+        if marks is None:
+            marks = self.__dict__["_unsettled_marks"] = {}
+        return marks
+
+    def _stalls(self) -> dict:
+        """target -> (sha256 of the full prompt, sha256 of the text sent) of a
+        send that ended in `agent_prompt_stalled` in this process. The only
+        licence to press Enter (`_submit_stalled`), used at most once. Lazy,
+        like `_unsettled`."""
+        stalls = self.__dict__.get("_stalled_sends")
+        if stalls is None:
+            stalls = self.__dict__["_stalled_sends"] = {}
+        return stalls
+
+    def _adopted(self) -> dict:
+        """agent name -> (tab id, pane id) of a restored agent this process
+        adopted (`_reusable_agent`): the only pane `_replace_restored` may
+        close. Lazy, like `_unsettled`."""
+        adopted = self.__dict__.get("_adopted_panes")
+        if adopted is None:
+            adopted = self.__dict__["_adopted_panes"] = {}
+        return adopted
+
+    def _own_roots(self, state: RunState) -> list[str]:
+        """The directories that belong to this run (see `_reusable_agent`)."""
+        return [str(p) for p in (
+            getattr(self, "store_dir", None),
+            getattr(self, "arenas_dir", None),
+            state.repo_path,
+            *self.role_cwd.values(),
+        ) if p]
+
+    def _settle(self, role: Role, target: str, full_sha: str,
+                state: RunState, sent: str | None = None):
+        """Is a pane whose last prompt did not return free for the next one?
+
+        Run padopt: a prompt stayed unsent in the input box, the stall retry
+        was sent without looking and appended to it, and the joined text began
+        with a slash command the agent did not know. Called before O199 and
+        before any write. An unmarked target, or a restored one (that is
+        `_check_restored`'s), returns None with no Herdr call.
+
+        Returns None when the pane is free -- idle or done, with an empty
+        input box. Returns `(read, send time, tree digest)` of the stalled
+        send when the agent turned out to be working on exactly this prompt
+        and its turn has now ended (T-DR1): nothing is sent again. Anything
+        else raises, and nothing is sent.
+        """
+        mark = self._unsettled().get(target)
+        if mark is None or mark[0] == RESTORED:
+            return None
+        digest, sent_at, _earlier = mark
+        try:
+            status = self._agent_state(role, target)
+        except Exception as exc:          # noqa: BLE001 - fail closed
+            raise PaneNotClean(
+                f"{role.value} dispatch not sent: the earlier prompt to {target} "
+                f"did not return, and the agent's status cannot be read ({exc}). "
+                "A pane whose state is unknown is never prompted.\n"
+                f"{self._pane_view(target)}") from exc
+        if status == "blocked":
+            raise WaitingForApproval(
+                f"{role.value} waits for an approval in pane {target}; the "
+                "earlier prompt did not return, and nothing is sent into a "
+                "dialog. A blocked dialog is not answered automatically.\n"
+                f"{self._pane_view(target)}")
+        if status == "working":
+            if digest == full_sha:
+                state.note(
+                    f"{role.value}: the earlier prompt to {target} did not "
+                    "return, and the agent is working on exactly that prompt; "
+                    "its turn is awaited, nothing is sent again")
+                return self._await_turn(role, target,
+                                        sent_at + self.timeout_ms / 1000)
+            raise PaneNotClean(
+                f"{role.value} dispatch not sent: the agent in {target} is "
+                "working, but not on this prompt (its last prompt did not "
+                "return and differs from this one). Nothing is sent into a "
+                f"live turn.\n{self._pane_view(target)}")
+        if status not in ("idle", "done"):
+            raise PaneNotClean(
+                f"{role.value} dispatch not sent: the earlier prompt to {target} "
+                f"did not return, and the agent's status {status!r} does not "
+                f"prove its input is free.\n{self._pane_view(target)}")
+        view = ""
+        try:
+            view = self._cli(
+                ["herdr", "agent", "read", target, "--source", "visible"],
+                f"{role.value} input read", text=True)
+            pending = _pending_input(view)
+            unread = None
+        except Exception as exc:          # noqa: BLE001 - fail closed
+            pending, unread = None, exc
+        if pending is None:
+            why = (f"its input could not be read ({unread})" if unread is not None
+                   else "no input box was found on its screen")
+            raise PaneNotClean(
+                f"{role.value} dispatch not sent: the earlier prompt to {target} "
+                f"did not return, and {why}, so the box is not proven empty.\n"
+                f"{self._pane_view(target)}")
+        if pending:
+            refusal = PaneNotClean(
+                f"{role.value} dispatch not sent: the earlier prompt to {target} "
+                f"did not return, and its input box still holds {len(pending)} "
+                f"characters of unsent text, beginning {pending[:120]!r}. "
+                "Nothing is sent on top of it, and Enter alone is not pressed: "
+                "the screen cannot prove the text is the prompt.\n"
+                f"whole input:\n{pending}\n{self._pane_view(target)}")
+            # The one exception: this process's own send of exactly this
+            # prompt stalled, and the box holds exactly that text.
+            if (sent is not None and self._stalls().get(target) == (
+                    full_sha, hashlib.sha256(sent.encode("utf-8")).hexdigest())
+                    and digest == full_sha
+                    and _same_input(pending, sent, _box_width(view))):
+                return _Resubmit(refusal)
+            raise refusal
+        state.note(f"{role.value}: the earlier prompt to {target} did not "
+                   "return; the pane was checked before the next one: idle, "
+                   "input box empty")
+        self._unsettled().pop(target, None)
+        return None
+
+    def _await_turn(self, role: Role, target: str,
+                    deadline: float) -> tuple[dict, float, str | None]:
+        """Wait, passively, for the turn of an agent that started a stalled
+        prompt late. One status read per `max(STATUS_POLL_SECONDS, 10)` s,
+        `STATUS_READ_ATTEMPTS` failed reads in a row end it, and so does the
+        role timeout counted from the stalled send. Returns the last read with
+        the stalled send's time and tree digest, once the turn ended."""
+        failures = 0
+        while True:
+            if time.monotonic() >= deadline:
+                raise _refuse(
+                    f"{role.value} was still working at the role timeout "
+                    f"({self.timeout_ms} ms after its stalled prompt was sent). "
+                    f"Nothing was sent again.\n{self._pane_view(target)}")
+            time.sleep(max(STATUS_POLL_SECONDS, 10.0))
+            try:
+                data = self._cli(["herdr", "agent", "get", target],
+                                 f"{role.value} status read")
+                agent = data.get("result", {}).get("agent", {}) if isinstance(data, dict) else {}
+                status = str((agent.get("agent_status") if isinstance(agent, dict)
+                              else None) or "")
+                failures = 0
+            except Exception as exc:      # noqa: BLE001 - counted, then fail closed
+                failures += 1
+                if failures >= STATUS_READ_ATTEMPTS:
+                    raise PaneNotClean(
+                        f"{role.value}: the status of {target} could not be "
+                        f"read {failures} times in a row while its turn was "
+                        f"awaited ({exc}). Nothing was sent again.\n"
+                        f"{self._pane_view(target)}") from exc
+                continue
+            if status == "working":
+                continue
+            if status not in ("idle", "done", "blocked"):
+                raise PaneNotClean(
+                    f"{role.value}: while its turn was awaited, {target} "
+                    f"reported {status!r}, which does not prove the turn "
+                    f"ended. Nothing was sent again.\n{self._pane_view(target)}")
+            _digest, sent_at, earlier = self._unsettled().pop(target)
+            return data, sent_at, earlier
+
+    def _submit_stalled(self, role: Role, state: RunState, target: str,
+                        full_sha: str, sent: str, refusal: BaseException,
+                        tampered, changed, marker_ok
+                        ) -> tuple[dict, float, str | None]:
+        """Press Enter once on this dispatch's own stalled prompt.
+
+        Runs qaw3 and qaw4: `agent prompt --wait` returned
+        `agent_prompt_stalled`, and the prompt stayed typed but unsent in the
+        box. `_settle` found the box holding exactly the text this process
+        sent in that stalled send. Before Enter: the stall record is spent
+        (never a second Enter), the prompt file and its marker still hold the
+        prompt, and the agent is idle or done in one of this run's panes. After
+        Enter the turn must be seen to start within SUBMIT_CONFIRM_SECONDS;
+        it is then awaited like the stalled send's own turn (`sent_at` and
+        the tree digest are the stalled send's). Anything else raises, and
+        nothing more is pressed or sent.
+        """
+        stall = self._stalls().pop(target, None)
+        if stall != (full_sha, hashlib.sha256(sent.encode("utf-8")).hexdigest()):
+            raise refusal
+        now = tampered()
+        if now is not None:
+            raise changed(now, "before Enter was pressed on the stalled prompt")
+        if not marker_ok():
+            raise refusal
+        try:
+            data = self._cli(["herdr", "agent", "get", target], f"{role.value} status read")
+            agent = data.get("result", {}).get("agent", {}) if isinstance(data, dict) else {}
+            status = str(agent.get("agent_status") or "")
+            pane = str(agent.get("pane_id") or "")
+        except Exception:                 # noqa: BLE001 - fail closed
+            raise refusal from None
+        if status == "blocked":
+            raise WaitingForApproval(
+                f"{role.value} waits for an approval in pane {pane or target}; its "
+                "stalled prompt is still typed in the box, and Enter is not "
+                "pressed: a blocked dialog is not answered automatically.\n"
+                f"{self._pane_view(target)}")
+        own = set(getattr(self, "own_panes", []) or []) | {
+            p for _t, p in self._adopted().values() if p}
+        if status not in ("idle", "done") or not pane or pane not in own:
+            raise refusal
+        # The box is read again right before Enter, from the very pane Enter
+        # goes to: what Enter submits is what was just compared.
+        try:
+            view = self._cli(["herdr", "pane", "read", pane, "--source", "visible"],
+                             f"{role.value} input read", text=True)
+        except Exception:                 # noqa: BLE001 - fail closed
+            raise refusal from None
+        pending = _pending_input(view)
+        if pending is None or not _same_input(pending, sent, _box_width(view)):
+            raise refusal
+        state.note(
+            f"{role.value}: the prompt to {target} stalled and stayed in its "
+            "input box; the box holds exactly the text this dispatch sent "
+            f"(sha256 {stall[1]}), pane {pane}: Enter is pressed once, "
+            "nothing is sent again")
+        try:
+            self._cli(["herdr", "pane", "send-keys", pane, "Enter"],
+                      f"{role.value} Enter on the stalled prompt", text=True)
+        except Exception as exc:          # noqa: BLE001 - fail closed
+            raise PaneNotClean(
+                f"{role.value}: Enter on the stalled prompt in {target} failed "
+                f"({exc}); whether it reached the pane is unknown. Nothing more "
+                f"is pressed or sent.\n{self._pane_view(target)}") from exc
+        time.sleep(SUBMIT_CONFIRM_SECONDS)
+        try:
+            data = self._cli(["herdr", "agent", "get", target], f"{role.value} status read")
+            agent = data.get("result", {}).get("agent", {}) if isinstance(data, dict) else {}
+            status = str(agent.get("agent_status") or "")
+        except Exception as exc:          # noqa: BLE001 - fail closed
+            raise PaneNotClean(
+                f"{role.value}: after Enter on the stalled prompt, the status of "
+                f"{target} cannot be read ({exc}). Nothing more is pressed or "
+                f"sent.\n{self._pane_view(target)}") from exc
+        if status == "working":
+            _d, sent_at, _e = self._unsettled()[target]
+            return self._await_turn(role, target, sent_at + self.timeout_ms / 1000)
+        if status in ("idle", "done"):
+            try:
+                pending = _pending_input(self._cli(
+                    ["herdr", "agent", "read", target, "--source", "visible"],
+                    f"{role.value} input read", text=True))
+            except Exception:             # noqa: BLE001 - fail closed
+                pending = None
+            if pending != "":
+                raise PaneNotClean(
+                    f"{role.value}: Enter was pressed once on the stalled prompt "
+                    f"in {target}, and the agent still shows no turn "
+                    f"({status!r}, input box {'not readable' if pending is None else 'still holding text'}). "
+                    f"Nothing more is pressed or sent.\n{self._pane_view(target)}")
+        elif status != "blocked":
+            raise PaneNotClean(
+                f"{role.value}: after Enter on the stalled prompt, {target} "
+                f"reported {status!r}, which does not prove a turn. Nothing more "
+                f"is pressed or sent.\n{self._pane_view(target)}")
+        _digest, sent_at, earlier = self._unsettled().pop(target)
+        return data, sent_at, earlier
+
+    def _check_restored(self, role: Role, state: RunState, target: str) -> str:
+        """The target to prompt: a restored pane proven idle with an empty
+        input box, or a fresh agent in its place. Runs after the O199
+        collection and before anything is written. A target that is not a
+        restored pane is returned with no Herdr call -- a freshly started
+        agent's box may not be drawn yet."""
+        mark = self._unsettled().get(target)
+        if mark is None or mark[0] != RESTORED:
+            return target
+        try:
+            status = self._agent_state(role, target)
+        except Exception as exc:          # noqa: BLE001 - fail closed
+            raise PaneNotClean(
+                f"{role.value}: the restored agent {target} is not prompted, its "
+                f"status cannot be read ({exc}).\n{self._pane_view(target)}") from exc
+        if status == "blocked":
+            raise WaitingForApproval(
+                f"{role.value}: the restored agent {target} waits for an "
+                "approval; nothing is sent into a dialog. A blocked dialog is "
+                f"not answered automatically.\n{self._pane_view(target)}")
+        if status not in ("idle", "done"):
+            raise PaneNotClean(
+                f"{role.value}: the restored agent {target} is not prompted, its "
+                f"status {status!r} does not prove its input is free.\n"
+                f"{self._pane_view(target)}")
+        try:
+            view = self._cli(
+                ["herdr", "agent", "read", target, "--source", "visible"],
+                f"{role.value} input read", text=True)
+            pending = _pending_input(view)
+            reason = ("no input box was found on its screen (another agent "
+                      "kind, a dialog, or a view cut off)") if pending is None else ""
+        except Exception as exc:          # noqa: BLE001 - recorded, then replaced
+            pending, reason = None, f"its input could not be read ({exc})"
+        if pending == "":
+            self._unsettled().pop(target, None)
+            state.note(f"{role.value}: restored pane {target} checked before its "
+                       "first prompt: input box empty")
+            return target
+        if pending:
+            reason = (f"its input box holds {len(pending)} characters of text "
+                      f"typed by an earlier process:\n{pending}\n")
+        return self._replace_restored(role, state, target, reason)
+
+    def _replace_restored(self, role: Role, state: RunState, target: str,
+                          reason: str) -> str:
+        """Close the restored pane HoH adopted, and start a fresh agent.
+
+        Only the pane this process adopted is ever closed, and only while the
+        snapshot still shows that agent in exactly that tab and pane, the tab
+        is one of `own_tabs`, and its directory is absolute and lies under the
+        run's roots. Any doubt refuses with `PaneNotClean`, and nothing is
+        closed or sent. The tab is never closed: a pane the operator opened
+        next to the agent survives.
+        """
+        state.note(f"restored pane {target} not reused: {reason}; nothing in it "
+                   f"is sent, it is replaced by a fresh agent\n{self._pane_view(target)}")
+        ledger_reason = "restored pane replaced"
+        seen: dict[str, str] = {"pane": ""}
+
+        def refuse(why: str) -> PaneNotClean:
+            self._record("refused", role=role.value, pane=seen["pane"] or None,
+                         agent=target, reason=ledger_reason, why=why)
+            return PaneNotClean(
+                f"{role.value}: the restored agent {target} is not prompted "
+                f"({reason}), and it is not replaced: {why}. Nothing was closed "
+                "and nothing was sent; check the pane and close it "
+                "deliberately.")
+
+        adopted = self._adopted().get(target)
+        if adopted is None:
+            raise refuse("this process did not record adopting it")
+        tab, pane = adopted
+        seen["pane"] = pane
+        if not tab or not pane:
+            raise refuse(f"the adopted tab or pane id is empty ({tab!r}, {pane!r})")
+        if pane in self._kept():
+            kept_why = self._kept()[pane]
+            self._record("kept", role=role.value, pane=pane, agent=target,
+                         reason=ledger_reason, why=kept_why)
+            raise PaneNotClean(
+                f"{role.value}: the restored agent {target} is not prompted "
+                f"({reason}), and it is not replaced: the pane is kept open "
+                f"({kept_why}). Nothing was closed and nothing was sent; check "
+                "the pane and close it deliberately.")
+        if tab not in self.own_tabs:
+            raise refuse(f"its tab {tab} is not one of this run's tabs")
+        try:
+            snapshot = herdr.snapshot()
+        except Exception as exc:          # noqa: BLE001 - fail closed
+            raise refuse(f"the Herdr snapshot cannot be read ({exc})") from exc
+        rows = [r for r in (snapshot.get("agents") or [])
+                if str(r.get("name") or "") == target]
+        if len(rows) != 1:
+            raise refuse(f"the snapshot shows {len(rows)} agents of that name, "
+                         "not exactly one")
+        row = rows[0]
+        now = (str(row.get("tab_id") or ""), str(row.get("pane_id") or ""))
+        if now != (tab, pane):
+            raise refuse(f"it sits in tab {now[0]!r}, pane {now[1]!r}, not in "
+                         f"the adopted tab {tab!r}, pane {pane!r}")
+        roots = self._own_roots(state)
+        reported = [str(row.get(k) or "") for k in ("foreground_cwd", "cwd")]
+        reported = [c for c in reported if c] or [""]
+        for cwd in reported:
+            if not cwd or not os.path.isabs(cwd):
+                raise refuse(f"Herdr reports no absolute directory for it ({cwd!r})")
+            if not roots or not self._is_under(cwd, roots):
+                raise refuse(f"its directory {cwd!r} is not under this run's "
+                             f"directories ({', '.join(roots)})")
+        # Written before the command; no line, no attempt.
+        if not self._record("closing", role=role.value, pane=pane, tab=tab,
+                            agent=target, reason=ledger_reason, scope="pane"):
+            raise refuse("the close cannot be recorded in the ledger, so it is "
+                         "not attempted")
+
+        def failed(why: str, message: str) -> PaneNotClean:
+            self._record("refused", role=role.value, pane=pane, agent=target,
+                         reason=ledger_reason, why=why)
+            return PaneNotClean(message)
+
+        try:
+            self._cli(["herdr", "pane", "close", pane],
+                      f"close the restored pane of {target}")
+        except Exception as exc:          # noqa: BLE001 - fail closed
+            raise failed(
+                f"closing the restored pane failed ({exc})",
+                f"{role.value}: closing the restored pane {pane} of {target} "
+                f"failed ({exc}); nothing was sent.") from exc
+        try:
+            after = herdr.snapshot()
+        except Exception as exc:          # noqa: BLE001 - fail closed
+            raise failed(
+                f"the snapshot cannot confirm the close ({exc})",
+                f"{role.value}: the restored pane {pane} of {target} was closed, "
+                f"but the Herdr snapshot cannot confirm it ({exc}); nothing was "
+                "sent.") from exc
+        listed = {str(x.get("pane_id") or "") for x in
+                  [*(after.get("panes") or []), *(after.get("agents") or [])]}
+        named = [r for r in (after.get("agents") or [])
+                 if str(r.get("name") or "") == target]
+        if pane in listed or named:
+            still = "the pane" if pane in listed else "an agent of that name"
+            raise failed(
+                f"the snapshot still lists {still}",
+                f"{role.value}: the restored pane {pane} of {target} was closed, "
+                f"but the snapshot still lists {still}; nothing was sent.")
+        self._record("closed", role=role.value, pane=pane, tab=tab, agent=target,
+                     reason=ledger_reason)
+        if tab in self.own_tabs:
+            self.own_tabs.remove(tab)
+        if pane in self.own_panes:
+            self.own_panes.remove(pane)
+        if tab in {str(t.get("tab_id") or "") for t in (after.get("tabs") or [])}:
+            state.note(f"tab {tab} still holds other panes after the restored "
+                       "agent's pane was closed; it is left alone")
+        self._adopted().pop(target, None)
+        self._unsettled().pop(target, None)
+        self.agents.pop(role, None)
+        self._forget_pane(pane)
+        fresh = self._ensure_agent(role, state)
+        if target in self._adopted() or self._unsettled().get(fresh, ("",))[0] == RESTORED:
+            raise PaneNotClean(
+                f"{role.value}: the restored pane {pane} of {target} was closed, "
+                "but the old agent was adopted again instead of a fresh one "
+                "being started; nothing was sent.")
+        state.note(f"{role.value}: restored pane {pane} closed, a fresh agent "
+                   f"{fresh} started in its place")
+        return fresh
+
     # -- Dispatch ------------------------------------------------------------ #
 
     def dispatch(self, role: Role, prompt: str, *, state: RunState) -> str:
+        # The answers directory and the run directory, opened link-free once
+        # per dispatch. Every write and re-read of the prompt file, the prompt
+        # marker, the dispatch marker and the audit file goes through these
+        # descriptors (Revision 2, item 0). The chain above them is assumed
+        # not to be swapped during the run (T-LP5).
+        answers_fd = _open_dir(self.answers_dir, "answers directory")
+        try:
+            run_fd = _open_dir(self.answers_dir.parent, "run directory")
+        except DispatchError:
+            os.close(answers_fd)
+            raise
+        try:
+            answer = self._dispatch(role, prompt, state, answers_fd, run_fd)
+        except WaitingForApproval:
+            self.keep_open(role, "an approval is waiting in it")
+            raise
+        except PaneNotClean:
+            self.keep_open(role, "its state is not proven; kept for inspection")
+            raise
+        finally:
+            os.close(run_fd)
+            os.close(answers_fd)
+        # A dispatch that came back with its answer ends the keep: the dialog
+        # that held the pane open was answered.
+        self._lift_keep(role)
+        return answer
+
+    def _dispatch(self, role: Role, prompt: str, state: RunState,
+                  answers_fd: int, run_fd: int) -> str:
+        where = str(self.answers_dir)
         target = self._ensure_agent(role, state)
         answer_path = self._answer_path(role, state)
         full = prompt + (
             _answer_instruction(answer_path) if role in STRUCTURED_ROLES else ""
         )
-        if answer_path.exists():
-            if self._resumable_answer(role, answer_path, full):
-                # O199: the answer to this exact prompt, finished after an
-                # operator answered the dialog that interrupted it. Collected,
-                # not asked again -- and recorded as collected.
-                self.endpoints[role] = (
-                    f"collected after an approved dialog: {answer_path.name} "
-                    f"written by {target} in answer to the same prompt")
-                self.collected_after_dialog = getattr(
-                    self, "collected_after_dialog", []) + [role.value]
-                return self._read_answer(answer_path, role)
+        # The binding of record: sha256(full), held here in memory. Every
+        # comparison below is against it -- never against a record on disk,
+        # which a role can write as easily as the prompt file.
+        full_bytes = full.encode("utf-8")
+        full_sha = hashlib.sha256(full_bytes).hexdigest()
+        # The threshold counts UTF-8 bytes, the unit the kernel limits; a
+        # character a paste may drop routes a short prompt through the file too.
+        through_file = (len(full_bytes) > PROMPT_FILE_THRESHOLD
+                        or _paste_unsafe(full))
+        stem = answer_path.name[:-len(".json")]
+        prompt_name = f"{stem}.prompt.md"
+        prompt_marker_name = f"{stem}.prompt.json"
+
+        # What this dispatch types into the box. A prompt longer than
+        # PROMPT_FILE_THRESHOLD, or one holding a character a paste may drop
+        # (`_paste_unsafe`), goes through a file; both
+        # markers, the audit record and the run history bind `full`, never
+        # the pointer. Absolute for the role; the leaf itself is never
+        # resolved, so a link planted there cannot redirect the pointer.
+        sent = full
+        prompt_file = self.answers_dir.resolve() / prompt_name
+        if through_file:
+            sent = _pointer_prompt(prompt_file, len(full_bytes), full_sha) + (
+                _answer_instruction(answer_path) if role in STRUCTURED_ROLES else "")
+
+        def tampered() -> str | None:
+            """The digest on disk if the prompt file no longer holds `full`."""
+            if not through_file:
+                return None
+            now = _rehash(answers_fd, prompt_name, len(full_bytes))
+            return None if now == full_sha else now
+
+        def changed(now: str, when: str) -> DispatchError:
+            return _refuse(
+                f"{role.value} dispatch: the prompt file {prompt_name} changed "
+                f"during the dispatch (sha256 {full_sha} when sent, {now} "
+                f"{when}). What the role was asked is no longer what is on "
+                "disk; the run does not go on from here.")
+
+        def marker_ok() -> bool:
+            """The prompt marker still names exactly the prompt typed."""
+            if not through_file:
+                return True
+            meta = _read_json_leaf(answers_fd, prompt_marker_name)
+            return bool(meta) and (meta.get("prompt_sha256") == full_sha
+                                   and meta.get("bytes") == len(full_bytes)
+                                   and meta.get("prompt_path") == str(prompt_file))
+
+        # A target whose last prompt did not return is read before anything
+        # else happens: sent into, it would append to an unsent prompt
+        # (padopt). `settled` is the stalled send's own turn, ended while it
+        # was awaited: then nothing is written and nothing is sent.
+        settled = self._settle(role, target, full_sha, state, sent)
+        if isinstance(settled, _Resubmit):
+            settled = self._submit_stalled(role, state, target, full_sha, sent,
+                                           settled.refusal, tampered, changed, marker_ok)
+        sending = settled is None
+
+        if (sending and answer_path.exists()
+                and self._resumable_answer(role, answer_path, full, answers_fd)):
+            if through_file:
+                # The answer was given to whatever the prompt file said. It is
+                # collected only if that is still exactly `full`.
+                now = _rehash(answers_fd, prompt_name, len(full_bytes))
+                if now != full_sha:
+                    raise _refuse(
+                        f"{role.value} dispatch: the answer {answer_path.name} "
+                        f"would be collected, but the prompt file {prompt_name} "
+                        f"no longer holds what is asked (sha256 {full_sha} "
+                        f"expected, {now} on disk). It is not collected.")
+            # O199: the answer to this exact prompt, finished after an
+            # operator answered the dialog that interrupted it. Collected,
+            # not asked again -- and recorded as collected.
+            self.endpoints[role] = (
+                f"collected after an approved dialog: {answer_path.name} "
+                f"written by {target} in answer to the same prompt")
+            self.collected_after_dialog = getattr(
+                self, "collected_after_dialog", []) + [role.value]
+            return self._read_answer(answer_path, role)
+
+        # A pane Herdr restored is checked only now, after an answer it gave
+        # to exactly this prompt was collected above, and before anything is
+        # written: used if its input box is empty, replaced otherwise.
+        if sending:
+            target = self._check_restored(role, state, target)
+
+        if sending:
+            # Refused before anything is written: a message the input box
+            # reads as a command is never sent.
+            _first_line_guard(sent, f"{role.value} dispatch")
+
+        # Every name this dispatch writes is examined before the first write,
+        # so a planted link fails the dispatch with nothing written at all.
+        if sending and role in STRUCTURED_ROLES:
+            _check_leaf(answers_fd, self._marker_for(answer_path).name, where)
+        if sending and through_file:
+            _check_leaf(answers_fd, prompt_name, where)
+            _check_leaf(answers_fd, prompt_marker_name, where)
+            _check_audit(run_fd, str(self.answers_dir.parent))
+
+        if sending and answer_path.exists():
             # Do not reuse an answer from an earlier round.
             answer_path.rename(answer_path.with_name(f"{answer_path.name}.v{utcnow()}"))
-        if role in STRUCTURED_ROLES:
-            self._write_dispatch_marker(answer_path, full)
+        if sending and role in STRUCTURED_ROLES:
+            self._write_dispatch_marker(answer_path, full, answers_fd)
+
+        if sending and through_file:
+            dispatched_at = time.time()
+            _write_leaf(answers_fd, prompt_name, full_bytes, where)
+            _write_leaf(answers_fd, prompt_marker_name, (json.dumps({
+                "prompt_sha256": full_sha,
+                "bytes": len(full_bytes),
+                "prompt_path": str(prompt_file),
+                "dispatched_at": dispatched_at,
+            }) + "\n").encode("utf-8"), where)
+            # Before the dispatch, so it survives one that is aborted. An
+            # audit trail only: no decision ever reads it.
+            _append_audit(run_fd, {
+                "role": role.value,
+                "iteration": state.iteration,
+                "attempt": state.attempt,
+                "prompt_file": prompt_name,
+                "prompt_sha256": full_sha,
+                "bytes": len(full_bytes),
+                "dispatched_at": dispatched_at,
+            }, str(self.answers_dir.parent))
+            # The binding in the run's own record, persisted with state.json
+            # by the controller's next write_state -- not only in the answers
+            # directory, which the role can write.
+            state.note(f"prompt {role.value}: sha256={full_sha} "
+                       f"bytes={len(full_bytes)} file={prompt_name}")
+
+        argv = ["herdr", "agent", "prompt", target, sent, "--wait",
+                "--timeout", str(self.timeout_ms)]
+        oversized = [len(a.encode("utf-8")) for a in argv
+                     if len(a.encode("utf-8")) > ARGV_ELEMENT_LIMIT]
+        if oversized:
+            raise _refuse(
+                f"{role.value} dispatch: an argument of {max(oversized)} bytes "
+                f"exceeds {ARGV_ELEMENT_LIMIT}; refusing to build it")
 
         # Witnessed before the dispatch, so an unstructured role's delivery can
         # be measured rather than read off its pane. Cheap: a digest over the
         # arena, which is the tree the role is expected to change.
         earlier = None
-        if role not in STRUCTURED_ROLES:
+        if sending and role not in STRUCTURED_ROLES:
             from .capability import tree_digest
 
             destination = self.role_cwd.get(role) or getattr(self, "cwd", None)
             if destination:
                 earlier = tree_digest(Path(destination))
+        if not sending:
+            # The stalled send's turn, awaited to its end: judged with that
+            # send's time and that send's tree digest, never re-sent.
+            data, sent_at, earlier = settled
+        else:
+            # The role timeout is counted from here, by a follow-up's passive
+            # wait as much as by Herdr.
+            sent_at = time.monotonic()
         try:
-            data = self._cli(
-                ["herdr", "agent", "prompt", target, full, "--wait",
-                 "--timeout", str(self.timeout_ms)],
-                f"{role.value} dispatch",
-            )
-        except DispatchError as exc:
+            if sending:
+                data = self._cli(argv, f"{role.value} dispatch")
+        except Exception as exc:
+            # The mark comes first, whatever the failure: until the pane is
+            # read, it is not known whether the prompt is in its input box,
+            # in a turn, or nowhere (`_settle`).
+            self._unsettled()[target] = (full_sha, sent_at, earlier)
+            # Only `agent_prompt_stalled` carries a back-off (`_cli`): the one
+            # failure after which the prompt may sit typed in the box.
+            if getattr(exc, "retry_after", 0):
+                self._stalls()[target] = (
+                    full_sha, hashlib.sha256(sent.encode("utf-8")).hexdigest())
+            else:
+                self._stalls().pop(target, None)
+            # A tampered prompt is never retried as transient, whatever the
+            # failure that ended the turn.
+            now = tampered()
+            if now is not None:
+                raise changed(now, f"when the dispatch failed with: {exc}") from exc
+            if not isinstance(exc, DispatchError):
+                raise
             # Every dispatch failure takes the pane content with it, not just
             # a block. A "timed out waiting for agent status" says nothing by
             # itself: behind it there can be an exhausted quota, a crash, a
@@ -731,7 +2563,10 @@ class HerdrDispatcher(_Base):
             # failed on a cause that was no longer determinable afterwards,
             # because the tab had been cleaned up.
             raise DispatchError(f"{exc}\n{self._pane_view(target)}",
-                                transient=getattr(exc, "transient", False)) from exc
+                                transient=getattr(exc, "transient", False),
+                                retry_after=getattr(exc, "retry_after", 0.0)) from exc
+        self._unsettled().pop(target, None)
+        self._stalls().pop(target, None)
 
         agent = data.get("result", {}).get("agent", {})
         self.endpoints[role] = herdr.Endpoint(
@@ -742,6 +2577,12 @@ class HerdrDispatcher(_Base):
             status=agent.get("agent_status"),
             cwd=agent.get("cwd"),
         ).evidence()
+
+        # Compared with the digest held here, never with the marker on disk:
+        # the role can rewrite that marker as easily as the file.
+        now = tampered()
+        if now is not None:
+            raise changed(now, "after the turn")
 
         status = str(agent.get("agent_status", ""))
         delivered_ = (
@@ -775,10 +2616,260 @@ class HerdrDispatcher(_Base):
             return f"developer run finished (status {status})"
 
         # The file can appear shortly after the end of the turn.
-        deadline = time.monotonic() + 30
-        while not answer_path.exists() and time.monotonic() < deadline:
+        deadline = time.monotonic() + ANSWER_GRACE_SECONDS
+        while (not self._answered(answer_path, role)
+               and time.monotonic() < deadline):
             time.sleep(POLL_SECONDS)
-        return self._read_answer(answer_path, role)
+        # Collected only while the prompt file still holds `full`; a change
+        # during the grace wait wins over the answer and over its absence.
+        now = tampered()
+        if now is not None:
+            raise changed(now, "after the turn")
+        if self._answered(answer_path, role):
+            return self._read_answer(answer_path, role)
+        # Idle is not done. The turn ended without the answer file -- a role
+        # that left work running in the background ends exactly like this.
+        # Raised as its own type, carrying what this dispatch sent, so the
+        # controller can ask once more (`follow_up`) instead of booking an
+        # outage. The pane view goes with it, as with every dispatch failure.
+        raise AnswerMissing(
+            f"{role.value} ended its turn without writing the answer file "
+            f"({answer_path}): it is missing or empty after "
+            f"{ANSWER_GRACE_SECONDS:.0f} s. Without a structured answer there "
+            f"is nothing to evaluate.\n{self._pane_view(target)}",
+            answer_path=answer_path, target=target, prompt_sha256=full_sha,
+            prompt_bytes=len(full_bytes),
+            prompt_file=prompt_name if through_file else None, sent_at=sent_at)
+
+
+    # -- Idle is not done: one follow-up ------------------------------------ #
+
+    def _agent_state(self, role: Role, target: str) -> str:
+        """The agent's status, `result.agent.agent_status` of `herdr agent get`.
+
+        Read through `_cli`, the seam every test fakes, and never through
+        `herdr.agent_status`, which refuses outside Herdr. Raises whatever
+        `_cli` raises; the caller decides what an unreadable status means.
+        """
+        data = self._cli(["herdr", "agent", "get", target], f"{role.value} status read")
+        agent = data.get("result", {}).get("agent", {}) if isinstance(data, dict) else {}
+        status = agent.get("agent_status") if isinstance(agent, dict) else None
+        return str(status or "")
+
+    def follow_up(self, role: Role, state: RunState, missing: AnswerMissing, *,
+                  charge) -> str:
+        """`_follow_up`, and a pane that waits for an approval, or whose state
+        is not proven, is kept open exactly as `dispatch` keeps it."""
+        try:
+            answer = self._follow_up(role, state, missing, charge=charge)
+        except WaitingForApproval:
+            self.keep_open(role, "an approval is waiting in it")
+            raise
+        except PaneNotClean:
+            self.keep_open(role, "its state is not proven; kept for inspection")
+            raise
+        self._lift_keep(role)
+        return answer
+
+    def _follow_up(self, role: Role, state: RunState, missing: AnswerMissing, *,
+                   charge) -> str:
+        """Ask a structured role once more for the answer its turn ended without.
+
+        Idle is not done: four iterations were lost to a role that started its
+        work in the background and ended its turn, and in `spark` the answer
+        arrived minutes after the iteration had been closed. Called by the
+        controller for an `AnswerMissing`, at most once per dispatch; `charge`
+        is the controller's callback that checks the witness and spends one
+        dispatch from the budget, raising if either refuses.
+
+        In order: the answer is re-checked (it may have arrived meanwhile) and
+        collected for free; the agent's status is read once, fail-closed; an
+        agent that resumed by itself (`working`) is waited for passively,
+        uncharged, up to the role timeout; a `blocked` pane is never prompted,
+        and neither is one whose status does not prove the turn ended; only
+        then is one dispatch charged and one short inline prompt sent.
+
+        Every collection first re-hashes the prompt file against the digest
+        `missing` carries from the dispatch that sent it, and refuses on a
+        mismatch. Nothing is written in `answers/`: no marker, no prompt file,
+        no audit record, no rename -- so the dispatch marker still binds the
+        original prompt, and O199 collects a late answer on a resume.
+        """
+        answer_path = missing.answer_path
+        target = missing.target
+        answers_fd = _open_dir(self.answers_dir, "answers directory")
+        try:
+            def check_prompt(when: str) -> None:
+                if missing.prompt_file is None:
+                    return
+                now = _rehash(answers_fd, missing.prompt_file, missing.prompt_bytes)
+                if now != missing.prompt_sha256:
+                    raise _refuse(
+                        f"{role.value} follow-up: the prompt file "
+                        f"{missing.prompt_file} changed {when} (sha256 "
+                        f"{missing.prompt_sha256} when sent, {now} now). What "
+                        "the role was asked is no longer what is on disk; the "
+                        "answer is not collected, and the run does not go on "
+                        "from here.")
+
+            def collect(when: str, how: str) -> str | None:
+                check_prompt(when)
+                if not self._answered(answer_path, role):
+                    return None
+                state.note(f"{role.value} answer {answer_path.name} {how}")
+                return self._read_answer(answer_path, role)
+
+            def grace() -> None:
+                deadline = time.monotonic() + ANSWER_GRACE_SECONDS
+                while (not self._answered(answer_path, role)
+                       and time.monotonic() < deadline):
+                    time.sleep(POLL_SECONDS)
+
+            def unreadable(exc: BaseException) -> DispatchError:
+                return _refuse(
+                    f"{role.value} follow-up not sent: the agent's status could "
+                    f"not be read ({exc}). A turn whose state is unknown is "
+                    f"never prompted.\n{self._pane_view(target)}")
+
+            # The answer may have arrived after the grace wait. Collected for
+            # free: no status read, no prompt, no charge.
+            answer = collect("before the follow-up",
+                             "collected before the follow-up: it arrived after "
+                             "the grace wait; nothing was sent")
+            if answer is not None:
+                return answer
+
+            # One status read, fail-closed, before anything is charged.
+            try:
+                status = self._agent_state(role, target)
+            except Exception as exc:
+                raise unreadable(exc) from exc
+
+            if status == "working":
+                # The agent resumed by itself. Waiting for its turn to end is
+                # not a dispatch: nothing is charged and nothing is sent. The
+                # answer is not taken mid-turn -- the role would go on working
+                # unwitnessed, and the next dispatch could reach it.
+                state.note(f"follow-up to {role.value} not sent, the agent "
+                           "resumed by itself; waiting for its turn to end")
+                deadline = missing.sent_at + self.timeout_ms / 1000
+                failures = 0
+                while status == "working" and time.monotonic() < deadline:
+                    time.sleep(max(STATUS_POLL_SECONDS, 10.0))
+                    try:
+                        status = self._agent_state(role, target)
+                        failures = 0
+                    except Exception as exc:
+                        # One failed read does not end the wait; it counts as
+                        # still working and is read again next interval.
+                        failures += 1
+                        if failures >= STATUS_READ_ATTEMPTS:
+                            raise unreadable(exc) from exc
+                if status == "working":
+                    answer = collect("during the wait for the agent's turn",
+                                     "collected at the role timeout while the "
+                                     "agent still reported working")
+                    if answer is not None:
+                        return answer
+                    raise _refuse(
+                        f"{role.value} was still working at the role timeout "
+                        f"({self.timeout_ms} ms after the prompt was sent), and "
+                        f"its answer file {answer_path} is missing or empty. "
+                        f"Nothing was sent.\n{self._pane_view(target)}")
+                grace()
+                answer = collect("during the wait for the agent's turn",
+                                 "collected after the agent's own turn ended "
+                                 f"(status {status}); nothing was sent")
+                if answer is not None:
+                    return answer
+
+            if status == "blocked":
+                # Never a follow-up into a dialog.
+                raise WaitingForApproval(
+                    f"{role.value} waits for an approval in pane {target}; its "
+                    "turn ended without the answer file, and no follow-up is "
+                    "sent into a dialog. A blocked dialog is not answered "
+                    f"automatically.\n{self._pane_view(target)}")
+            if status not in ("idle", "done"):
+                # Only idle and done prove that a turn ended
+                # (`herdr.liveness`). A follow-up could land in a live turn.
+                raise _refuse(
+                    f"{role.value} follow-up not sent: the agent's status "
+                    f"{status!r} does not prove that its turn ended.\n"
+                    f"{self._pane_view(target)}")
+
+            text = f"""[answer-file-missing]
+Your turn ended, but your answer file was not written:
+
+  {answer_path}
+
+If you started work in the background, wait for it to finish -- do not end
+your turn while it is still running -- and then write your JSON answer to
+exactly that path, as your instructions say. Reply in the chat with a single
+sentence saying that the file is written.
+"""
+            argv = ["herdr", "agent", "prompt", target, text, "--wait",
+                    "--timeout", str(self.timeout_ms)]
+            oversized = [len(a.encode("utf-8")) for a in argv
+                         if len(a.encode("utf-8")) > ARGV_ELEMENT_LIMIT]
+            if oversized:
+                raise _refuse(
+                    f"{role.value} follow-up: an argument of {max(oversized)} "
+                    f"bytes exceeds {ARGV_ELEMENT_LIMIT}; refusing to build it")
+
+            # Refused before the charge: a refused message is never sent, and
+            # never paid for.
+            _first_line_guard(text, f"{role.value} follow-up")
+            # Charged directly before the send: a charge never buys no prompt.
+            charge()
+            try:
+                data = self._cli(argv, f"{role.value} follow-up")
+            except Exception as exc:
+                # Like a dispatch that did not return: the next prompt to this
+                # pane reads it first (`_settle`).
+                self._unsettled()[target] = (
+                    hashlib.sha256(text.encode("utf-8")).hexdigest(),
+                    time.monotonic(), None)
+                check_prompt(f"when the follow-up failed with: {exc}")
+                # Never retried: one follow-up per dispatch.
+                raise _refuse(
+                    f"{exc}\n{role.value} follow-up failed; a follow-up is not "
+                    f"retried.\n{self._pane_view(target)}") from exc
+
+            check_prompt("after the follow-up turn")
+            agent = data.get("result", {}).get("agent", {})
+            self.endpoints[role] = herdr.Endpoint(
+                pane_id=str(agent.get("pane_id", "")),
+                workspace_id=str(agent.get("workspace_id", "")),
+                tab_id=str(agent.get("tab_id", "")),
+                agent=agent.get("agent"),
+                status=agent.get("agent_status"),
+                cwd=agent.get("cwd"),
+            ).evidence()
+            if (str(agent.get("agent_status", "")) == "blocked"
+                    and not self._answered(answer_path, role)):
+                raise WaitingForApproval(
+                    f"{role.value} waits for an approval in pane "
+                    f"{agent.get('pane_id')} after the follow-up. A blocked "
+                    "dialog is not answered automatically.\n"
+                    f"{self._pane_view(target)}")
+
+            grace()
+            answer = collect("after the follow-up turn", "collected after the follow-up")
+            if answer is not None:
+                return answer
+            raise AnswerMissing(
+                f"{role.value} ended its turn without writing the answer file "
+                f"({answer_path}), even after one follow-up. Without a "
+                f"structured answer there is nothing to evaluate.\n"
+                f"{self._pane_view(target)}",
+                answer_path=answer_path, target=target,
+                prompt_sha256=missing.prompt_sha256,
+                prompt_bytes=missing.prompt_bytes,
+                prompt_file=missing.prompt_file, sent_at=missing.sent_at,
+                followed_up=True)
+        finally:
+            os.close(answers_fd)
 
 
 def build_dispatcher(

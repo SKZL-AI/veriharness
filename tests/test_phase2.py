@@ -372,16 +372,67 @@ def test_a_house_rules_path_that_does_not_exist_is_not_claimed(monkeypatch):
 
 
 def test_an_existing_house_rules_path_is_named(tmp_path, monkeypatch):
+    """An existing file whose path passes the guard is named.
+
+    The path is relative to a working directory inside `tmp_path`: the
+    absolute `tmp_path` inside a self-hosted run's arena is already about 200
+    characters, so naming it would measure the environment against the guard's
+    200-character bound instead of the product.
+    """
     import importlib
 
     from hoh import roles
 
-    rules = tmp_path / "house-rules.md"
-    rules.write_text("nothing here\n", encoding="utf-8")
-    monkeypatch.setenv("HOH_HOUSE_RULES", str(rules))
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "house-rules.md").write_text("nothing here\n", encoding="utf-8")
+    monkeypatch.setenv("HOH_HOUSE_RULES", "house-rules.md")
     reloaded = importlib.reload(roles)
     try:
-        assert str(rules) in reloaded._HOUSE_RULES_POINTER
+        assert "(house-rules.md)" in reloaded._HOUSE_RULES_POINTER
+    finally:
+        monkeypatch.delenv("HOH_HOUSE_RULES", raising=False)
+        importlib.reload(roles)
+
+
+def test_a_house_rules_path_over_the_bound_is_not_named(tmp_path, monkeypatch):
+    """The guard's 200-character bound, pinned exactly at 201 and 200.
+
+    Both paths are relative and of the same shape, and both files exist, so
+    the only difference the guard can see is the length.
+    """
+    import importlib
+    import re
+    from pathlib import Path
+
+    from hoh import roles
+
+    monkeypatch.chdir(tmp_path)
+
+    def rules_path(length: int) -> str:
+        # Two fixed directories, a third that takes up the rest.
+        head = ["a" * 60, "b" * 60]
+        tail = length - len("/".join(head)) - len("//house-rules.md")
+        return "/".join(head + ["c" * tail, "house-rules.md"])
+
+    over, at = rules_path(201), rules_path(200)
+    for p, length in ((over, 201), (at, 200)):
+        Path(p).parent.mkdir(parents=True, exist_ok=True)
+        Path(p).write_text("nothing here\n", encoding="utf-8")
+        assert len(p) == length
+        assert Path(p).is_file()
+        assert re.fullmatch(r"[\w./~-]+", p)
+        assert str(Path(p)) == p
+
+    try:
+        monkeypatch.setenv("HOH_HOUSE_RULES", over)
+        reloaded = importlib.reload(roles)
+        assert ("The house rules of this machine apply\n"
+                in reloaded._HOUSE_RULES_POINTER)
+
+        # The positive control: one character less, and the file is named.
+        monkeypatch.setenv("HOH_HOUSE_RULES", at)
+        reloaded = importlib.reload(roles)
+        assert f"({at})" in reloaded._HOUSE_RULES_POINTER
     finally:
         monkeypatch.delenv("HOH_HOUSE_RULES", raising=False)
         importlib.reload(roles)

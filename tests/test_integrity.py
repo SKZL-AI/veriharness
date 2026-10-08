@@ -8,7 +8,10 @@ control is ordinary work inside the run's own worktree, which must pass.
 """
 from __future__ import annotations
 
+import json
+import os
 import subprocess
+import tempfile
 
 import pytest
 
@@ -120,3 +123,96 @@ def test_a_removed_worktree_fails(layout, tmp_path):
     before = integrity.snapshot(layout["run"])
     layout["other"].rename(tmp_path / "moved-away")
     assert any("worktree removed" in p for p in integrity.verify(before))
+
+
+
+# -- names that are not UTF-8 (O249) -----------------------------------------
+#
+# Git prints file and ref names as raw bytes. Every test here creates such a
+# name inside a `TemporaryDirectory()` it closes itself, never in `tmp_path`
+# or the `layout` fixture: a check that leaves one in the arena blocks the next
+# dispatch.
+
+_IDENT = (b"-c", b"user.email=t@t", b"-c", b"user.name=t")
+_QUOTEPATH_FALSE = {"GIT_CONFIG_COUNT": "1", "GIT_CONFIG_KEY_0": "core.quotePath",
+                    "GIT_CONFIG_VALUE_0": "false"}
+
+
+def _gitb(repo: bytes, *args: bytes) -> bytes:
+    return subprocess.run([b"git", b"-C", repo, *args], check=True,
+                          capture_output=True).stdout.strip()
+
+
+def _repo_with_tracked_non_utf8(base: bytes) -> bytes:
+    repo = os.path.join(base, b"proj")
+    os.mkdir(repo)
+    _gitb(repo, b"init", b"-q", b"-b", b"main")
+    with open(os.path.join(repo, b"caf\xe9.bin"), "wb") as f:
+        f.write(b"x\n")
+    _gitb(repo, b"add", b"-A")
+    _gitb(repo, *_IDENT, b"commit", b"-qm", b"initial")
+    return repo
+
+
+def _clear_quotepath_env(monkeypatch):
+    for key in _QUOTEPATH_FALSE:
+        monkeypatch.delenv(key, raising=False)
+
+
+def test_snapshot_tracked_non_utf8_name(monkeypatch):
+    """Default configuration: `ls-files -z` prints the raw bytes regardless."""
+    _clear_quotepath_env(monkeypatch)
+    with tempfile.TemporaryDirectory() as d:
+        repo = _repo_with_tracked_non_utf8(os.fsencode(d))
+        before = integrity.snapshot(os.fsdecode(repo))
+        assert before["tracked"] == [os.fsdecode(b"caf\xe9.bin")]
+        assert integrity.verify(before) == []
+
+
+def test_snapshot_verify_roundtrip_non_utf8(monkeypatch):
+    """Snapshot -> JSON -> verify, with a non-UTF-8 file, run branch and refs."""
+    _clear_quotepath_env(monkeypatch)
+    with tempfile.TemporaryDirectory() as d:
+        repo = _repo_with_tracked_non_utf8(os.fsencode(d))
+        _gitb(repo, b"checkout", b"-q", b"-b", b"lauf-\xe9")
+        # Two refs that one lossy decode would fold into a single key.
+        _gitb(repo, b"branch", b"fremd-\xe8")
+        _gitb(repo, b"branch", b"fremd-\xe9")
+
+        text = json.dumps(integrity.snapshot(os.fsdecode(repo)), indent=2)
+        assert "\\udce9" in text
+        before = json.loads(text)
+        assert before["run_branch"] == os.fsdecode(b"refs/heads/lauf-\xe9")
+        assert [os.fsencode(t) for t in before["tracked"]] == [b"caf\xe9.bin"]
+        assert {os.fsdecode(b"refs/heads/fremd-\xe8"),
+                os.fsdecode(b"refs/heads/fremd-\xe9")} <= set(before["refs"])
+        assert integrity.verify(before) == [], "the unchanged repository held"
+
+        # The run's own branch moving forward is fine ...
+        with open(os.path.join(repo, b"b.txt"), "wb") as f:
+            f.write(b"b\n")
+        _gitb(repo, b"add", b"-A")
+        _gitb(repo, *_IDENT, b"commit", b"-qm", b"forward")
+        assert integrity.verify(before) == []
+        # ... another non-UTF-8 ref moving is not.
+        tip = _gitb(repo, b"rev-parse", b"HEAD")
+        _gitb(repo, b"update-ref", b"refs/heads/fremd-\xe8", tip)
+        problems = integrity.verify(before)
+        assert len(problems) == 1, problems
+        assert problems[0].startswith(
+            "ref moved: " + os.fsdecode(b"refs/heads/fremd-\xe8") + " "), problems
+
+
+def test_tree_state_independent_of_quotepath(monkeypatch):
+    """A user's `quotePath=false` must not change an unrelated worktree's digest."""
+    _clear_quotepath_env(monkeypatch)
+    with tempfile.TemporaryDirectory() as d:
+        repo = _repo_with_tracked_non_utf8(os.fsencode(d))
+        with open(os.path.join(repo, b"neu-\xe9.txt"), "wb") as f:
+            f.write(b"untracked\n")
+        plain = integrity._tree_state(os.fsdecode(repo))
+        for key, value in _QUOTEPATH_FALSE.items():
+            monkeypatch.setenv(key, value)
+        raw = _gitb(repo, b"status", b"--porcelain", b"--untracked-files=all")
+        assert b"neu-\xe9.txt" in raw, "the environment did not switch quotePath off"
+        assert integrity._tree_state(os.fsdecode(repo)) == plain

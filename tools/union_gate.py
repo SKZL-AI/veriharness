@@ -18,8 +18,12 @@ Usage:
     python3 tools/union_gate.py [REPO_PATH]
 
 REPO_PATH defaults to '.'. Exit code is 0 unless at least one invariant is
-FAIL; a SKIPPED invariant never affects the exit code, but always appears in
-the printed output.
+FAIL or NOT_RUN; a SKIPPED invariant never affects the exit code, but always
+appears in the printed output. NOT_RUN means a command the invariant needs did
+not finish within its budget, or could not be started: nothing was verified,
+so it is never a pass. Its line is `U<n>: NOT_RUN: <reason>`, and the reason
+is the gate's own fixed text -- never the exception, its command line, a
+duration or a path -- so the same outcome reads the same on every machine.
 """
 
 from __future__ import annotations
@@ -28,6 +32,7 @@ import argparse
 import os
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -39,6 +44,19 @@ from pathlib import Path
 STATUS_PASS = "PASS"
 STATUS_FAIL = "FAIL"
 STATUS_SKIPPED = "SKIPPED"
+STATUS_NOT_RUN = "NOT_RUN"
+
+# The budget, in seconds, of every command the gate runs. Named, so each call
+# site states which budget it runs under and a test can check it; fixed, so
+# the outcome does not depend on the machine (load is not measured anywhere).
+# The suite gets the readiness board's suite budget (`readiness._run`'s
+# default timeout): one suite, one budget. In O237 the board's `tests` row
+# finished the suite under 1800 s while U5 timed out at 600 s.
+WHEEL_TIMEOUT_S = 300
+GIT_TIMEOUT_S = 60
+CLAIMS_TIMEOUT_S = 600
+SUITE_TIMEOUT_S = 1800
+LINT_TIMEOUT_S = 600
 
 # Every FAIL/SKIPPED reason is capped to this many characters before it is
 # collected onto a Result -- the runner truncates check output at 4 MB, and a
@@ -90,6 +108,10 @@ class Result:
     def skipped(detail: str) -> Result:
         return Result(STATUS_SKIPPED, _cap_reason(detail))
 
+    @staticmethod
+    def not_run(detail: str) -> Result:
+        return Result(STATUS_NOT_RUN, _cap_reason(detail))
+
 
 @dataclass(frozen=True)
 class WheelInfo:
@@ -115,6 +137,67 @@ def _oneline(text: str) -> str:
     return " ".join(text.split())
 
 
+def _did_not_complete(what: str, exc: BaseException, budget_s: int) -> str:
+    """The reason for a command that timed out or could not be started.
+
+    In the gate's own words, deliberately. `str(TimeoutExpired)` repeats the
+    command line, which starts with `sys.executable` -- a home path on most
+    machines -- and the budget; the readiness board copied that text into
+    CLAIMS.json, and the next pass found a home path there and moved three
+    more rows (O250). So nothing from the exception is interpolated: not the
+    exception, its `cmd`, its `timeout`, a duration or a path. Only the
+    subject, the budget and, for a start failure, the exception's type."""
+    if isinstance(exc, subprocess.TimeoutExpired):
+        return f"{what}: TIMEOUT (budget {budget_s} s)"
+    return f"{what}: could not be started ({type(exc).__name__})"
+
+
+def _kill_group(proc: subprocess.Popen) -> None:
+    """Kills the process group `proc` leads, then closes its pipes and reaps it.
+
+    Signals only while the leader is provably still ours: `returncode is None`
+    means Popen has not reaped it, so its pid -- and the group id it holds as
+    a session leader -- cannot have been reused by another process. A reaped
+    leader receives no signal. `killpg` reaches the command's own group only;
+    a descendant that starts its own session or group escapes it."""
+    try:
+        if proc.returncode is None:
+            try:
+                os.killpg(proc.pid, signal.SIGKILL)
+            except (ProcessLookupError, PermissionError):
+                pass
+    finally:
+        for stream in (proc.stdout, proc.stderr):
+            if stream is not None:
+                try:
+                    stream.close()
+                except OSError:
+                    pass
+        proc.wait()
+
+
+def _run_bounded(
+    argv: list[str], *, cwd: str, timeout: int, env: dict[str, str] | None = None,
+) -> subprocess.CompletedProcess:
+    """Runs `argv` in its own session under `timeout`, and on any way out other
+    than completion -- the timeout, an interrupt -- kills its whole group.
+
+    `subprocess.run(timeout=...)` kills only the direct child, and a test
+    suite's own subprocesses outlived it and kept the machine loaded (O250,
+    NOTES E2). The exception is re-raised for the caller to report."""
+    proc = subprocess.Popen(
+        argv, cwd=cwd, env=env,
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+        start_new_session=True,
+    )
+    try:
+        stdout, stderr = proc.communicate(timeout=timeout)
+    except BaseException:
+        _kill_group(proc)
+        raise
+    return subprocess.CompletedProcess(argv, proc.returncode, stdout, stderr)
+
+
 def _failure_line(stdout: str, stderr: str) -> str:
     """The informative last line of a command that failed.
 
@@ -132,6 +215,32 @@ def _failure_line(stdout: str, stderr: str) -> str:
         or _tail_nonempty_line(stdout)
         or "no output"
     )
+
+
+#: Only pytest's own summary line is rewritten: counts ("6 failed, 2884 passed,
+#: 5 skipped ...") followed by " in <seconds>s" and an optional "(h:mm:ss)", with
+#: or without the "=====" decoration. Any other line -- an assertion message that
+#: happens to contain " in 5s", a stderr traceback -- is returned unchanged
+#: (O238 review, splan-b M5).
+_PYTEST_SUMMARY = re.compile(
+    r"^(?P<lead>=*\s*)"
+    r"(?P<counts>\d+ [a-z]+(?:, \d+ [a-z]+)*|no tests ran)"
+    r"\s+in\s+[\d.]+s(?:\s+\(\d+:\d{2}:\d{2}\))?"
+    r"(?P<trail>\s*=*)$")
+
+
+def _without_duration(line: str) -> str:
+    """The failure line without pytest's wall-clock duration.
+
+    2026-09-30 (O238): the readiness board embeds this line in its
+    `union_invariants` cell, and `tools/regenerate.py` iterates until the board
+    stops changing. With any test failing, "in 396.50s" differed on every pass,
+    so the regeneration could never converge -- a cycle made of timing noise.
+    The counts stay; only the duration goes."""
+    m = _PYTEST_SUMMARY.match(line.strip())
+    if not m:
+        return line
+    return f"{m['lead']}{m['counts']}{m['trail']}".strip()
 
 
 def _tail_nonempty_line(text: str) -> str | None:
@@ -314,10 +423,11 @@ def build_wheel(repo_path: Path, work_dir: Path) -> WheelInfo:
                 sys.executable, "-m", "pip", "wheel", str(build_src),
                 "--no-deps", "--no-build-isolation", "-w", str(out_dir),
             ],
-            capture_output=True, text=True, timeout=300,
+            capture_output=True, text=True, timeout=WHEEL_TIMEOUT_S,
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
-        return WheelInfo(attempted=True, built=False, reason=f"pip wheel could not run: {exc}")
+        return WheelInfo(attempted=True, built=False,
+                         reason=_did_not_complete("pip wheel", exc, WHEEL_TIMEOUT_S))
 
     if proc.returncode != 0:
         tail = _failure_line(proc.stdout, proc.stderr)
@@ -469,10 +579,10 @@ def check_u2(repo_path: Path) -> Result:
     try:
         proc = subprocess.run(
             ["git", "-C", str(repo_path), "ls-files"],
-            capture_output=True, text=True, timeout=60,
+            capture_output=True, text=True, timeout=GIT_TIMEOUT_S,
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
-        return Result.skipped(f"could not run git: {exc}")
+        return Result.skipped(_did_not_complete("git ls-files", exc, GIT_TIMEOUT_S))
     if proc.returncode != 0:
         return Result.skipped(f"{repo_path} is not a git repository")
 
@@ -565,13 +675,12 @@ def check_u4(repo_path: Path) -> Result:
     # contract. Nothing from check_claims.py is imported or inspected beyond
     # what it prints and how it exits -- see the module docstring.
     try:
-        proc = subprocess.run(
+        proc = _run_bounded(
             [sys.executable, str(checker_path), "check", "all"],
-            cwd=str(repo_path),
-            capture_output=True, text=True, timeout=600,
+            cwd=str(repo_path), timeout=CLAIMS_TIMEOUT_S,
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
-        return Result.fail(f"could not run check_claims.py: {exc}")
+        return Result.not_run(_did_not_complete("check_claims.py check all", exc, CLAIMS_TIMEOUT_S))
 
     if proc.returncode == 0:
         return Result.ok()
@@ -591,36 +700,44 @@ def _no_bytecode_env() -> dict[str, str]:
     return env
 
 
-def check_u5(repo_path: Path) -> Result:
+def check_u5(repo_path: Path, work_dir: Path | None = None) -> Result:
     if not (repo_path / "tests").is_dir():
         return Result.skipped("no tests/ directory")
 
     # `-p no:cacheprovider` and PYTHONDONTWRITEBYTECODE keep pytest from
     # leaving `.pytest_cache/` or `__pycache__/` inside REPO_PATH; neither
-    # flag changes what counts as a pass or a fail.
+    # flag changes what counts as a pass or a fail. `--basetemp` names a
+    # directory of this run's own that does not exist yet (house rules A3
+    # item 3): the default `$TMPDIR/pytest-of-<user>` is shared, and pytest's
+    # retention there removes other sessions' directories. Without the gate's
+    # `work_dir`, a temporary directory of its own holds it for this call.
+    own_tmp = tempfile.TemporaryDirectory(prefix="union_gate_u5_") if work_dir is None else None
     try:
-        pytest_proc = subprocess.run(
-            [sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider"],
-            cwd=str(repo_path),
-            capture_output=True, text=True, timeout=600,
+        basetemp = Path(own_tmp.name if own_tmp else work_dir) / "pytest-basetemp"
+        pytest_proc = _run_bounded(
+            [sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider",
+             "--basetemp", str(basetemp)],
+            cwd=str(repo_path), timeout=SUITE_TIMEOUT_S,
             env=_no_bytecode_env(),
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
-        return Result.fail(f"could not run pytest: {exc}")
+        return Result.not_run(_did_not_complete("pytest", exc, SUITE_TIMEOUT_S))
+    finally:
+        if own_tmp is not None:
+            own_tmp.cleanup()
     if pytest_proc.returncode != 0:
-        tail = _failure_line(pytest_proc.stdout, pytest_proc.stderr)
+        tail = _without_duration(_failure_line(pytest_proc.stdout, pytest_proc.stderr))
         return Result.fail(f"pytest: {tail}")
 
     subset = [name for name in ("src", "tests", "tools") if (repo_path / name).exists()]
     if subset:
         try:
-            ruff_proc = subprocess.run(
+            ruff_proc = _run_bounded(
                 ["ruff", "check", "--no-cache", "--select", "F,E9", *subset],
-                cwd=str(repo_path),
-                capture_output=True, text=True, timeout=600,
+                cwd=str(repo_path), timeout=LINT_TIMEOUT_S,
             )
         except (OSError, subprocess.TimeoutExpired) as exc:
-            return Result.fail(f"could not run ruff: {exc}")
+            return Result.not_run(_did_not_complete("ruff", exc, LINT_TIMEOUT_S))
         if ruff_proc.returncode != 0:
             first = _head_nonempty_line(ruff_proc.stdout) or _head_nonempty_line(ruff_proc.stderr) or "no output"
             return Result.fail(f"ruff: {first}")
@@ -665,7 +782,7 @@ def run_gate(
             check_u2(repo_path),
             check_u3(repo_path, wheel_info),
             check_u4(repo_path),
-            check_u5(repo_path),
+            check_u5(repo_path, work_dir),
         ]
     return results, _exit_for(results, required)
 
@@ -673,7 +790,7 @@ def run_gate(
 def _exit_for(results: list[Result], required: frozenset[int] | None) -> int:
     """The exit code for a set of results, factored out so it is testable
     without running the gate -- which, through U5, runs the whole suite."""
-    exit_code = 1 if any(r.status == STATUS_FAIL for r in results) else 0
+    exit_code = 1 if any(r.status in (STATUS_FAIL, STATUS_NOT_RUN) for r in results) else 0
     for n in sorted(required or ()):
         if 1 <= n <= len(results) and results[n - 1].status == STATUS_SKIPPED:
             exit_code = 1
@@ -686,8 +803,10 @@ def build_arg_parser() -> argparse.ArgumentParser:
         description=(
             "Checks the five union invariants (U1..U5) proposed in "
             "dogfood/VORSCHLAG_UNION_GATE.md against a repository's combined "
-            "state: one PASS/FAIL/SKIPPED line per invariant. Reports only "
-            "-- it never repairs, and writes nothing outside its own stdout."
+            "state: one PASS/FAIL/SKIPPED/NOT_RUN line per invariant. FAIL "
+            "and NOT_RUN (a command did not finish within its budget or could "
+            "not be started) turn the exit code red; SKIPPED does not. Reports "
+            "only -- it never repairs, and writes nothing outside its own stdout."
         ),
     )
     parser.add_argument(

@@ -37,6 +37,13 @@ BOARD = HOH / "docs/READINESS.md"
 #: In order. The board is last in every pass because it reads what the others
 #: write; the others are in dependency order among themselves.
 STEPS: tuple[tuple[str, list[str]], ...] = (
+    # A1: the pinned operator amendments, first, because the build plan and the
+    # dispositions read them. This step needs no plan and cannot answer 3: an
+    # unpinned or unmapped amendment fails the regeneration.
+    ("programme amendments", [
+        "tools/program_scope.py",
+        "--amendments-out", str(PROGRAM / "PROGRAMME_AMENDMENTS.json"),
+        "--check-amendments"]),
     ("programme scope", [
         "tools/program_scope.py",
         "--out", str(PROGRAM / "AUTHORITATIVE_PROGRAM_SCOPE.json")]),
@@ -68,6 +75,31 @@ def _digest(path: Path) -> str:
     return hashlib.sha256("\n".join(lines).encode()).hexdigest()
 
 
+def _lines_by_row(path: Path) -> dict[str, str]:
+    """The board's lines that belong to a named row: a table line
+    ``| `name` | ...`` under `name`, a why-line ``* **`name`** ...`` under
+    `why:name`. Everything else on the board is left out."""
+    if not path.is_file():
+        return {}
+    out: dict[str, str] = {}
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if line.startswith("| `"):
+            name = line[3:].split("`", 1)[0]
+        elif line.startswith("* **`"):
+            name = "why:" + line[5:].split("`", 1)[0]
+        else:
+            continue
+        out[name] = line
+    return out
+
+
+def _changed(before: dict[str, str], after: dict[str, str]) -> list[str]:
+    """The sorted names whose line differs between two boards, including rows
+    that appeared or disappeared."""
+    return sorted(n for n in before.keys() | after.keys()
+                  if before.get(n) != after.get(n))
+
+
 def run_once(env: dict) -> list[str]:
     """One pass. Returns the steps that failed, in order."""
     failed = []
@@ -84,25 +116,41 @@ def run_once(env: dict) -> list[str]:
         if p.returncode not in allowed:
             failed.append(f"{name}: exit {p.returncode} "
                           f"{(p.stderr or p.stdout).strip()[-120:]}")
+            # O238 review (splan-a minor): stop at the first failed step, so no
+            # document downstream of it is rewritten from a broken input.
+            break
     return failed
 
 
 def regenerate(max_passes: int = 5, env: dict | None = None) -> dict:
     env = {**os.environ, **(env or {})}
     seen: list[str] = [_digest(BOARD)]
+    # O250: which rows moved in each completed pass. The O237 diagnosis needed
+    # a hand-written per-pass script to see that one row's text set off three
+    # others; this records it on every run.
+    changes: list[list[str]] = []
+    rows = _lines_by_row(BOARD)
     for i in range(1, max_passes + 1):
         failed = run_once(env)
         if failed:
             return {"converged": False, "passes": i, "failed": failed,
-                    "why": "a step failed, so the cycle was not completed"}
+                    "why": "a step failed, so the cycle was not completed",
+                    "changes": changes}
         now = _digest(BOARD)
+        now_rows = _lines_by_row(BOARD)
+        moved = _changed(rows, now_rows)
+        if not moved and now != seen[-1]:
+            moved = ["(lines outside the rows)"]
+        changes.append(moved)
+        rows = now_rows
         if now == seen[-1]:
             return {"converged": True, "passes": i, "failed": [],
-                    "why": "the board stopped changing"}
+                    "why": "the board stopped changing", "changes": changes}
         seen.append(now)
     return {"converged": False, "passes": max_passes, "failed": [],
             "why": (f"the board was still changing after {max_passes} passes, "
-                    "which is a cycle rather than slow convergence")}
+                    "which is a cycle rather than slow convergence"),
+            "changes": changes}
 
 
 def main(argv=None) -> int:
@@ -112,6 +160,8 @@ def main(argv=None) -> int:
     result = regenerate(args.max_passes)
     for line in result["failed"]:
         print(f"  FAILED {line}")
+    for i, names in enumerate(result["changes"], start=1):
+        print(f"  pass {i}: rows changed: {', '.join(names) if names else 'none'}")
     print(f"{'converged' if result['converged'] else 'DID NOT CONVERGE'} "
           f"after {result['passes']} pass(es): {result['why']}")
     return 0 if result["converged"] else 1

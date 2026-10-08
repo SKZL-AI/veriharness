@@ -47,12 +47,16 @@ lives, and it applies to check commands, not to agents in panes.
 
 from __future__ import annotations
 
+import errno
 import hashlib
 import os
+import stat
+import time
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
+from typing import NamedTuple
 
 
 class Capability(StrEnum):
@@ -98,6 +102,12 @@ class RoleExecutionPolicy:
     #: that legitimately gains a child between dispatches cannot be digested
     #: whole, but nothing legitimate adds one during a dispatch.
     protected_shallow: tuple[Path, ...] = ()
+    #: Trees that must be untouched **on disk**, not only in content: their
+    #: bytes, and every entry's mode, size, modification and change time
+    #: (`frozen_digest`). For QA's candidate arena, which is sealed read-only
+    #: for the dispatch: a write that was undone, a `chmod` and back, or a
+    #: timestamp set back after a content write all leave a change time.
+    frozen: tuple[Path, ...] = ()
     git_read: bool = False
     git_write: bool = False
     process_exec: bool = False
@@ -150,6 +160,7 @@ class RoleExecutionPolicy:
             f" · writes {len(self.write_scopes)} scope(s)"
             f" · protects {len(self.protected)} tree(s)"
             f" + {len(self.protected_shallow)} listing(s)"
+            f" · freezes {len(self.frozen)} tree(s)"
             f" · isolation {self.isolation}"
         )
 
@@ -198,7 +209,7 @@ def git_state_digest(root: Path | str) -> str:
     p = Path(root) / VCS_METADATA
     if p.is_file():                       # a worktree: .git is a pointer file
         try:
-            target = p.read_text().split("gitdir:", 1)[-1].strip()
+            target = os.fsdecode(p.read_bytes()).split("gitdir:", 1)[-1].strip()
         except OSError:                   # pragma: no cover
             return ""
         p = Path(target)
@@ -208,7 +219,7 @@ def git_state_digest(root: Path | str) -> str:
     shared = p / "commondir"
     if shared.is_file():
         try:
-            target = (p / shared.read_text().strip()).resolve()
+            target = (p / os.fsdecode(shared.read_bytes()).strip()).resolve()
         except OSError:                   # pragma: no cover
             target = None
         if target is not None and target.is_dir() and target != p:
@@ -218,7 +229,7 @@ def git_state_digest(root: Path | str) -> str:
         for name in GIT_STATE:
             f = place / name
             if f.is_file():
-                h.update(str(f).encode())
+                h.update(os.fsencode(str(f)))
                 h.update(f.read_bytes())
         for below in GIT_DIRECTORIES:
             tree_ = place / below
@@ -226,7 +237,7 @@ def git_state_digest(root: Path | str) -> str:
                 continue
             for f in sorted(tree_.rglob("*")):
                 if f.is_file():
-                    h.update(str(f.relative_to(place)).encode())
+                    h.update(os.fsencode(str(f.relative_to(place))))
                     h.update(f.read_bytes())
     return h.hexdigest()[:16]
 
@@ -238,19 +249,25 @@ def _entry(file_path: Path, rel: str, h) -> None:
     a symlink (as its target, not followed), an empty directory (which
     contains no files to notice), and a file's executable bit (which is not a
     content change). Each of those was a way past the check.
+
+    Names and link text are folded in with `os.fsencode`, never a strict
+    `.encode()`: a name that is not valid UTF-8 arrives as surrogate escapes,
+    and `.encode()` raised on it and blocked the next dispatch (O249). The
+    bytes are the filesystem's own, so two such names never collapse into
+    one, and a valid UTF-8 name gives the same bytes -- and digest -- as before.
     """
     if file_path.is_symlink():
         h.update(b"L")
-        h.update(rel.encode())
+        h.update(os.fsencode(rel))
         h.update(b"\x00")
-        h.update(os.readlink(file_path).encode())
+        h.update(os.fsencode(os.readlink(file_path)))
     elif file_path.is_dir():
         h.update(b"D")
-        h.update(rel.encode())
+        h.update(os.fsencode(rel))
         h.update(b"\x00")
     elif file_path.is_file():
         h.update(b"Fx" if os.access(file_path, os.X_OK) else b"F-")
-        h.update(rel.encode())
+        h.update(os.fsencode(rel))
         h.update(b"\x00")
         try:
             h.update(hashlib.sha256(file_path.read_bytes()).digest())
@@ -303,6 +320,10 @@ def repo_digest(root: Path | str) -> str:
     state. Files git ignores cannot reach a candidate -- `materialize()` builds
     it with `git archive` -- so they cannot affect a measurement, and the
     witness has no business failing a run over them.
+
+    `git status` runs with `core.quotePath=true` and is hashed as bytes: a
+    user's `quotePath=false` would otherwise print a non-UTF-8 name raw,
+    which both changed the digest and failed a strict decode.
     """
     p = Path(root)
     if not (p / VCS_METADATA).exists():
@@ -310,14 +331,65 @@ def repo_digest(root: Path | str) -> str:
     import subprocess
 
     out = subprocess.run(
-        ["git", "-C", str(p), "status", "--porcelain", "-uall"],
-        capture_output=True, text=True, check=False)
+        ["git", "-c", "core.quotePath=true", "-C", str(p),
+         "status", "--porcelain", "-uall"],
+        capture_output=True, check=False)
     if out.returncode != 0:                        # pragma: no cover - exotic
         return tree_digest(p)
     h = hashlib.sha256()
-    h.update(out.stdout.encode())
+    h.update(out.stdout)
     h.update(git_state_digest(p).encode())
     return h.hexdigest()[:16]
+
+
+def inode_digest(root: Path | str) -> str:
+    """A digest over what `tree_digest` cannot see: each entry's inode facts.
+
+    `lstat` of the root and of every entry below it (no link is followed),
+    folding in the relative name, `st_mode`, size, `st_mtime_ns` and
+    `st_ctime_ns`. The access time is left out: reading a frozen tree is the
+    work a reviewer is there to do, and it must not read as a touch.
+
+    The change time is what makes this worth having. A write that was undone,
+    a mode changed and changed back, or a content write whose modification
+    time was set back with `touch -d` all leave the bytes as they were -- and
+    all of them move `st_ctime_ns`, which no unprivileged process can set.
+    A path that does not exist digests as the empty string, like
+    `tree_digest`.
+    """
+    p = Path(root)
+    try:
+        st = os.lstat(p)
+    except OSError:
+        return ""
+    h = hashlib.sha256()
+
+    def fold(rel: str, st_: os.stat_result) -> None:
+        h.update(os.fsencode(rel))
+        h.update(b"\x00")
+        h.update(f"{st_.st_mode}:{st_.st_size}:{st_.st_mtime_ns}:"
+                 f"{st_.st_ctime_ns}".encode())
+        h.update(b"\x00")
+
+    fold(".", st)
+    if stat.S_ISDIR(st.st_mode):
+        entries = []
+        for dirpath, dirnames, filenames in os.walk(p, followlinks=False):
+            for name in dirnames + filenames:
+                full = os.path.join(dirpath, name)
+                entries.append(os.path.relpath(full, p))
+        for rel in sorted(entries):
+            try:
+                fold(rel, os.lstat(p / rel))
+            except OSError:                        # gone while walking
+                h.update(os.fsencode(rel))
+                h.update(b"\x00?\x00")
+    return h.hexdigest()[:16]
+
+
+def frozen_digest(root: Path | str) -> str:
+    """Contents and inode facts of a frozen tree, as one comparable string."""
+    return tree_digest(root) + ":" + inode_digest(root)
 
 
 def shallow_digest(root: Path | str) -> str:
@@ -336,7 +408,7 @@ def shallow_digest(root: Path | str) -> str:
         return ""
     h = hashlib.sha256()
     for kind in sorted(x.name for x in p.iterdir()):
-        h.update(kind.encode())
+        h.update(os.fsencode(kind))
         h.update(b"\x00")
     return h.hexdigest()[:16]
 
@@ -355,6 +427,7 @@ class CapabilityWitness:
     digests: dict[str, str] = field(default_factory=dict)
     shallow: dict[str, str] = field(default_factory=dict)
     git: dict[str, str] = field(default_factory=dict)
+    frozen: dict[str, str] = field(default_factory=dict)
 
     @classmethod
     def take(cls, policy: RoleExecutionPolicy) -> CapabilityWitness:
@@ -363,6 +436,7 @@ class CapabilityWitness:
             digests={str(p): repo_digest(p) for p in policy.protected},
             shallow={str(p): shallow_digest(p) for p in policy.protected_shallow},
             git={str(p): git_state_digest(p) for p in policy.protected},
+            frozen={str(p): frozen_digest(p) for p in policy.frozen},
         )
 
     def witness_again(self, paths: Iterable[Path | str]) -> list[str]:
@@ -398,6 +472,10 @@ class CapabilityWitness:
                 self.git[key] = git_state_digest(p)
             if key in self.shallow:
                 self.shallow[key] = shallow_digest(p)
+            if key in self.frozen:
+                self.frozen[key] = frozen_digest(p)
+                if key not in renewed:
+                    renewed.append(key)
         return renewed
 
     def violations(self) -> list[str]:
@@ -432,6 +510,12 @@ class CapabilityWitness:
                     f"a protected directory gained or lost a child during "
                     f"{self.policy.role}'s dispatch: {file_path}"
                 )
+        for file_path, before in self.frozen.items():
+            if frozen_digest(Path(file_path)) != before:
+                out_list.append(
+                    f"a frozen tree was touched during {self.policy.role}'s "
+                    f"dispatch (contents, modes or change times): {file_path}"
+                )
         return out_list
 
 
@@ -442,6 +526,174 @@ class CapabilityViolation(RuntimeError):
     acceptance checks measure has not produced a verdict about the product, and
     continuing would attach a result to a measurement that was interfered with.
     """
+
+
+# --------------------------------------------------------------------------- #
+# The seal: QA's candidate arena, read-only on disk for QA's dispatch
+# --------------------------------------------------------------------------- #
+
+#: How long `apply_seal` waits after its last `chmod`. Change times come from
+#: the kernel's coarse clock, so a `chmod` and back right after the seal could
+#: otherwise land in the same tick as the seal itself and leave the frozen
+#: digest unchanged. On a kernel with fine-grained timestamps the wait is
+#: merely unnecessary.
+SEAL_SETTLE_S = 0.05
+
+#: Every write bit. The seal clears exactly these and nothing else: the read
+#: and execute bits stay, so the candidate can still be read and run.
+_WRITE_BITS = stat.S_IWUSR | stat.S_IWGRP | stat.S_IWOTH
+
+
+class SealFailed(RuntimeError):
+    """The candidate arena could not be sealed; whatever was changed is rolled back."""
+
+
+class SealEntry(NamedTuple):
+    """One entry of a seal plan: its original mode and its inode identity.
+
+    The identity is what every later `chmod` is checked against. A path is
+    only a name; between the plan and the unseal a reviewer can rename an
+    entry and put a symlink or a hard link to a foreign file in its place.
+    """
+
+    mode: int
+    st_dev: int
+    st_ino: int
+
+
+def seal_plan(root: Path | str) -> dict[str, SealEntry]:
+    """Every entry under `root` with its mode and identity, root first.
+
+    Keyed by the path relative to `root` (`.` for the root itself), ordered
+    shallowest first, so the plan order is the `chmod` order. Symlinks are
+    left out: their own mode means nothing, and following one leads out of
+    the arena. A non-directory entry with more than one name (`st_nlink > 1`)
+    raises `SealFailed` before anything is changed: one of its names may lie
+    outside the arena, where a `chmod` would reach a file that is not ours,
+    and the count cannot tell the two cases apart.
+    """
+    p = Path(root)
+    st = os.lstat(p)
+    if not stat.S_ISDIR(st.st_mode):
+        raise OSError(errno.ENOTDIR, f"not a directory: {p}")
+    found: list[tuple[int, str, SealEntry]] = [
+        (0, ".", SealEntry(st.st_mode, st.st_dev, st.st_ino))]
+    for dirpath, dirnames, filenames in os.walk(p, followlinks=False):
+        for name in dirnames + filenames:
+            rel = os.path.relpath(os.path.join(dirpath, name), p)
+            st_ = os.lstat(p / rel)
+            if stat.S_ISLNK(st_.st_mode):
+                continue
+            if not stat.S_ISDIR(st_.st_mode) and st_.st_nlink > 1:
+                raise SealFailed(
+                    f"{rel} has {st_.st_nlink} hard links: a file with more than "
+                    "one name is not sealed, because one name may lie outside the "
+                    "arena and the count cannot tell; nothing changed")
+            found.append((rel.count(os.sep) + 1, rel,
+                          SealEntry(st_.st_mode, st_.st_dev, st_.st_ino)))
+    found.sort(key=lambda t: (t[0], t[1]))
+    return {rel: entry for _, rel, entry in found}
+
+
+def _open_inside(root: Path | str, rel: str) -> int:
+    """An `O_PATH` descriptor for `rel`, reached from `root` one component at a time.
+
+    No component is a symlink that gets followed: each is opened with
+    `O_NOFOLLOW`, relative to the descriptor of the one before, so a name
+    swapped for a link cannot lead the caller out of the arena. An absolute
+    `rel`, a `..` or an empty component is refused. Every descriptor but the
+    returned one is closed, on every way out.
+    """
+    if os.path.isabs(rel):
+        raise OSError(errno.EINVAL, f"refusing an absolute path: {rel}")
+    parts = [] if rel == "." else rel.split(os.sep)
+    if any(part in ("", ".", "..") for part in parts):
+        raise OSError(errno.EINVAL, f"refusing a path outside the arena: {rel!r}")
+    fd = os.open(root, os.O_PATH | os.O_NOFOLLOW | os.O_DIRECTORY)
+    try:
+        for i, part in enumerate(parts):
+            flags = os.O_PATH | os.O_NOFOLLOW
+            if i < len(parts) - 1:
+                flags |= os.O_DIRECTORY
+            next_ = os.open(part, flags, dir_fd=fd)
+            os.close(fd)
+            fd = next_
+    except BaseException:
+        os.close(fd)
+        raise
+    return fd
+
+
+def _chmod_verified(root: Path | str, rel: str, entry: SealEntry, mode: int) -> None:
+    """`chmod` the inode the plan recorded, and nothing else.
+
+    The entry is opened inside the arena (`_open_inside`), checked against
+    the plan's `(st_dev, st_ino)` and refused if it is a symlink or another
+    inode, and then changed through `/proc/self/fd/<fd>` -- the pinned
+    descriptor, so the name cannot be swapped between the check and the act.
+    """
+    fd = _open_inside(root, rel)
+    try:
+        st = os.fstat(fd)
+        if stat.S_ISLNK(st.st_mode):
+            raise OSError(errno.ELOOP, f"refusing a symlink in the arena: {rel}")
+        if (st.st_dev, st.st_ino) != (entry.st_dev, entry.st_ino):
+            raise OSError(errno.ESTALE,
+                          f"refusing a replaced entry in the arena: {rel}")
+        if not stat.S_ISDIR(st.st_mode) and st.st_nlink > 1:
+            # A name outside the arena (planted after the plan, or a forged
+            # plan for an arena that was released) would be changed too.
+            raise OSError(errno.EMLINK,
+                          f"a file with more than one name is left alone: {rel}")
+        os.chmod(f"/proc/self/fd/{fd}", mode & 0o7777)
+    finally:
+        os.close(fd)
+
+
+def unseal(root: Path | str, plan: dict[str, SealEntry]) -> list[str]:
+    """Restore every planned mode; return the entries refused or not reached.
+
+    Never raises: an unseal runs on ways out where an exception would hide
+    the one that is already travelling. What it could not restore is named,
+    for the caller to record.
+    """
+    failed: list[str] = []
+    for rel, entry in plan.items():
+        try:
+            _chmod_verified(root, rel, entry, entry.mode)
+        except Exception:                          # noqa: BLE001 - named, never raised
+            failed.append(rel)
+    return failed
+
+
+def apply_seal(root: Path | str, plan: dict[str, SealEntry]) -> None:
+    """Clear every write bit under `root`, in plan order, or change nothing.
+
+    On a failing `chmod` what was already changed is restored (`unseal`) and
+    `SealFailed` is raised. A sealed arena then waits `SEAL_SETTLE_S`.
+    """
+    done: dict[str, SealEntry] = {}
+    for rel, entry in plan.items():
+        try:
+            _chmod_verified(root, rel, entry, entry.mode & ~_WRITE_BITS)
+        except OSError as exc:
+            not_restored = unseal(root, done)
+            raise SealFailed(
+                f"sealing {root} failed at {rel}: {exc}"
+                + (f"; not restored: {not_restored}" if not_restored else "")
+            ) from exc
+        done[rel] = entry
+    time.sleep(SEAL_SETTLE_S)
+
+
+def seal_read_only(root: Path | str) -> dict[str, SealEntry]:
+    """Plan and apply the seal; the plan is what restores it."""
+    try:
+        plan = seal_plan(root)
+    except OSError as exc:
+        raise SealFailed(f"planning the seal of {root} failed: {exc}") from exc
+    apply_seal(root, plan)
+    return plan
 
 
 #: The three roles, with what each actually needs. Read this next to the
@@ -509,7 +761,8 @@ def developer_policy(*, arena: Path, answer: Path,
 
 def qa_policy(*, arena: Path, answer: Path,
               protected: tuple[Path, ...] = (),
-              shallow: tuple[Path, ...] = ()) -> RoleExecutionPolicy:
+              shallow: tuple[Path, ...] = (),
+              frozen: tuple[Path, ...] = ()) -> RoleExecutionPolicy:
     """Reads the candidate and the evidence; writes its verdict and nothing else.
 
     QA works *in* the arena rather than with its address in a prompt, because
@@ -521,6 +774,10 @@ def qa_policy(*, arena: Path, answer: Path,
     O125 objected to for the planner. The arenas it may not touch are
     therefore named in `protected` -- every one except the candidate it is
     reviewing -- rather than being merely out of the way.
+
+    The candidate it reviews is `frozen`: sealed read-only on disk for the
+    dispatch, and witnessed down to each entry's change time, so that a write
+    QA undid before answering is still a violation.
     """
     return RoleExecutionPolicy(
         role="qa",
@@ -528,6 +785,7 @@ def qa_policy(*, arena: Path, answer: Path,
         write_scopes=(answer,),
         protected=protected,
         protected_shallow=shallow,
+        frozen=frozen,
         git_read=True,
         git_write=False,
         process_exec=True,

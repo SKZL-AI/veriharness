@@ -120,6 +120,52 @@ Herdr panes. Useful for local development; it creates no Herdr endpoint, so
 such a run carries no acceptance value as evidence of a real, demonstrable
 agent session.
 
+### Rolling the orchestrating session over (context rollover, Layer A)
+
+Merged at `601168fe` and **not yet exercised on a live succession**: the commands
+are tested with fakes, and no P2 row is proven by them (`docs/LIMITATIONS.md`,
+*Context rollover (Layer A) is merged and has not run live*). They apply to a
+project governed by a master epoch.
+
+```sh
+# the first generation's bootstrap: become the governed master and stay one
+# (a lease is judged by its holder's process id, and a conversation is not a
+# long-lived process; run this in the background, give it the session's pid)
+hoh project hold <project> --session <id> --token-out <file> --watch-pid <pid>
+
+# the predecessor: freeze a succession capsule, start a successor with a pointer
+# prompt only, wait for its acknowledgement while renewing the lease, hand over
+# for a bounded window, and either see the successor hold the next epoch or
+# take the program back
+hoh project rollover <project> --session <id> --epoch <n> --token-file <file> \
+    [--successor <id>] [--model <model>] [--input capsule-input.json] \
+    [--transcript <file> --threshold <tokens>] [--ack-timeout <s>] [--takeover <s>]
+
+# read-only: re-derive a capsule and print every difference
+hoh project rollover-verify <project> --capsule <file> --session <id> \
+    [--digest <digest>] [--handover]
+
+# the successor: verify, acknowledge, take the handover only if everything
+# re-derives, then hold the lease
+hoh project rollover-accept <project> --capsule <file> --session <id> \
+    --digest <digest> [--token-out <file>] [--watch-pid <pid>]
+```
+
+The capsule holds three kinds of entry: **derived facts**, which the successor
+must re-derive from git, files and run states and which are refused if any has
+moved; **operator decisions**, kept verbatim and never answered by the machine;
+and **advisory context**, which has no authority. The outcome is one of
+`COMPLETE` (the successor holds the next epoch), `RECLAIMED` (the handover
+lapsed and the predecessor took the program back), `NO_ACK` or `BAD_ACK` (the
+predecessor stays master), `DEFERRED` (no safe point yet), `REFUSED` and
+`LAUNCH_FAILED`; every failure leaves the predecessor master, never two
+masters, and a stale predecessor is fenced. Tokens are written owner-only to
+`--token-out` and never printed. Two things to know before relying on it: the
+draining states are recorded and not enforced, and the first prompt of a fresh
+successor pane can stall and lose the pointer (the acknowledgement then times
+out; send the pointer again). Run the live smoke the spec names once, by hand,
+before the first real succession. A relative `--root` never rolls over.
+
 ## Where things live
 
 ```

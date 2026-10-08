@@ -1,0 +1,26 @@
+[Unit]
+Description=HoH: continue governed projects unattended (resume due waits, replace dead masters)
+Documentation=file://%h/hoh/docs/OPERATIONS.md
+After=network-online.target
+
+[Service]
+Type=oneshot
+# The unattended-mode consumer. `hoh-resume-quota.service` restores state only;
+# this one also *continues execution*:
+#   --drive    a project whose due usage-limit wait was resumed is driven on by
+#              a new governed master (a new epoch), if it registers a driver;
+#   --recover  a project whose master died -- killed, rebooted away, lease
+#              expired -- gets a new governed master (RECOVERY).
+# A released lease (an orderly halt, e.g. waiting for a human) and a live
+# holder are left alone, and only `usage_limit` waits are resumed; a digest
+# question, a contract park or a capability violation keep their owners.
+ExecStart=%h/hoh/plugin/bin/hoh resume-quota --drive --recover
+# Driving writes the project's repository, which may live anywhere under the
+# home directory, so the home is not mounted read-only here. Installing this
+# unit is the operator's decision to run unattended; nothing installs it.
+Nice=10
+IOSchedulingClass=idle
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target

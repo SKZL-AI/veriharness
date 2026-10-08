@@ -341,6 +341,72 @@ def _recheck(step: dict | None, out: str | None) -> dict:
             "pytest_summary": m.group(0).strip() if m else None}
 
 
+#: `hoh.stages.CAPABILITY_VIOLATION`, written out: this tool reads a preserved
+#: run state and imports nothing from the product it judges.
+CAPABILITY_VIOLATION_KIND = "capability_violation"
+
+
+def held_by_violation(state: dict) -> bool:
+    """Is the run held by a capability violation (`hoh.stages.violation_unresolved`)?
+
+    The sticky kind in any condition; for a run blocked before the kind
+    existed, a BLOCKED, PAUSED, CANCELLED or FAILED run whose block reason's
+    first line names the violation. A run held so has evidence that was interfered with, and its
+    checkpoint is not an acceptance until a person has looked.
+    """
+    if state.get("blocked_kind") == CAPABILITY_VIOLATION_KIND:
+        return True
+    if state.get("condition") not in ("BLOCKED", "PAUSED", "CANCELLED", "FAILED"):
+        return False
+    first = str(state.get("blocked_reason") or "").strip().splitlines()
+    return bool(first) and "capability violation" in first[0].lower()
+
+
+#: `hoh.controller.SEAL_LEDGER`, written out for the same reason.
+SEAL_LEDGER = "seals.jsonl"
+
+
+def open_seals(run: Path | None) -> list[str]:
+    """The arenas the captured run's seal ledger leaves sealed.
+
+    The rule of `hoh.controller.open_seal_arenas`, re-implemented because this
+    tool imports nothing from the product: a `planned` line opens an arena, a
+    `released` line closes it, a later `planned` line of an arena that is
+    already open changes nothing, and a line that does not parse is skipped. A
+    ledger that is there and cannot be read as UTF-8 text (a directory, a
+    symbolic link, invalid bytes) counts as one open seal named by the ledger's
+    own file name: what cannot be told is not "no open seal". No ledger is no
+    open seal.
+    """
+    if run is None:
+        return []
+    path = run / SEAL_LEDGER
+    if not os.path.lexists(path):
+        return []
+    try:
+        if path.is_symlink() or not path.is_file():
+            raise OSError("not a regular file")
+        text = path.read_bytes().decode("utf-8")
+    except (OSError, UnicodeError):
+        return [SEAL_LEDGER]
+    opened: dict[str, bool] = {}
+    for line in text.splitlines():
+        try:
+            rec = json.loads(line)
+        except ValueError:
+            continue
+        if not isinstance(rec, dict):
+            continue
+        event, arena = rec.get("event"), rec.get("arena")
+        if not isinstance(arena, str):
+            continue
+        if event == "planned":
+            opened.setdefault(arena, True)
+        elif event == "released":
+            opened.pop(arena, None)
+    return list(opened)
+
+
 def derive(evidence: Path) -> dict:
     ev = Path(evidence)
     root = ev.resolve()
@@ -444,7 +510,7 @@ def derive(evidence: Path) -> dict:
     history = state.get("history")
     integrity = _json(root, run / "approval" / "integrity.json") if run else {}
     p = _json(root, run / "approval" / "policy.json") if run else {}
-    return {
+    record = {
         "what": "P1-16: fresh clone -> documented install -> doctor -> small verified "
                 "programme, derived from raw captures",
         "record_version": 6,
@@ -520,6 +586,25 @@ def derive(evidence: Path) -> dict:
         "approval_policy": {"mode": p.get("mode"), "digest": p.get("digest"),
                             "denied": len(p.get("deny") or [])},
     }
+    # Added only when they say something, so a record derived before they
+    # existed still re-derives identically for an unheld run.
+    if held_by_violation(state):
+        record["held_by_capability_violation"] = {
+            "condition": state.get("condition"),
+            "blocked_kind": state.get("blocked_kind"),
+            "blocked_reason": state.get("blocked_reason"),
+        }
+    if "condition" not in state:
+        # Every state HoH writes has one. Without it, whether the run is held
+        # cannot be read -- unknown, never "not held".
+        record["run_condition_unknown"] = True
+    # A candidate arena still sealed for QA has not been compared at the
+    # release: whether it was touched is not known, so the checkpoint is not an
+    # acceptance (the launcher says the same, UNDETERMINED).
+    still_open = open_seals(run)
+    if still_open:
+        record["open_seals"] = still_open
+    return record
 
 
 def satisfied(record: dict) -> list[str]:
@@ -640,6 +725,17 @@ def satisfied(record: dict) -> list[str]:
         problems.append(f"the run was intervened in: {record.get('interventions')}")
     if not record.get("accepted_candidate") or record.get("stage") != "CHECKPOINTED":
         problems.append(f"not accepted (stage {record.get('stage')})")
+    if record.get("held_by_capability_violation"):
+        held = record["held_by_capability_violation"]
+        problems.append(f"the checkpoint is held by a capability violation "
+                        f"({held.get('condition')}, {held.get('blocked_kind')}): "
+                        f"{str(held.get('blocked_reason') or '')[:200]}")
+    if record.get("run_condition_unknown"):
+        problems.append("the run state records no condition, so whether a capability "
+                        "violation holds the checkpoint is unknown")
+    if record.get("open_seals"):
+        problems.append(f"a candidate arena sealed for QA is still open, so whether it "
+                        f"was touched is not known: {record['open_seals'][:5]}")
     if not record.get("qa_file"):
         problems.append("no QA result for the accepted candidate")
     verdicts = record.get("verdicts") or {}

@@ -17,6 +17,8 @@ imported by a single line. As long as that is the case, A01, A02 and A12 are
 
 from __future__ import annotations
 
+import json
+import time
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -31,6 +33,7 @@ from .contracts import (
     Budgets,
     Candidate,
     CheckVerdict,
+    Condition,
     DevelopmentPlan,
     Outcome,
     Receipt,
@@ -55,7 +58,7 @@ from .runner import (
     verify_log,
     verify_receipt,
 )
-from .capability import CapabilityViolation
+from .capability import CapabilityViolation, SealFailed
 from .store import RunStore
 from .telemetry import NOT_AVAILABLE, TelemetryLog, record_from_role
 from .workspace import commit_candidate, materialize, snapshot, unchanged
@@ -70,14 +73,47 @@ from .workspace import commit_candidate, materialize, snapshot, unchanged
 #: here -- and both sides move along with it.
 NO_QA_VERDICT = "NO QA VERDICT"
 
+#: The seal ledger, in the run directory: one JSON line per seal event of a
+#: candidate arena (`planned`, `sealed`, `kept`, `touched`, `releasing`,
+#: `released`). Append-only and durable, written before the first `chmod`, and
+#: protected during every dispatch like the rest of the run's evidence. It is
+#: what restores an arena a process left sealed, and what tells a later
+#: verification which arenas are still sealed and what they looked like.
+SEAL_LEDGER = "seals.jsonl"
+
+
+def arena_name(secret: str | None, iteration: int, attempt: int, suffix: str = "") -> str:
+    """The directory name `Controller._arena` gives an arena.
+
+    One function for `_arena` and for the ledger check in `_open_seals`, so the
+    two cannot drift: a `planned` line is honoured only for the arena whose
+    name this run's secret, and the iteration and attempt on the line, give.
+    """
+    return digest(f"{secret}:{iteration}:{attempt}:{suffix}")[:12]
+
+
+def _is_count(value: object) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool)
+
 
 class DispatchError(RuntimeError):
     """The role run did not come about. Transient or final -- the controller
     decides based on `transient`."""
 
-    def __init__(self, message: str, *, transient: bool = False) -> None:
+    #: Whether the role's pane stays open after this error, so the agent in it
+    #: may still act. `_verify` keeps QA's candidate arena sealed for such an
+    #: error rather than unsealing it under a pane that can still write.
+    pane_kept_open = False
+
+    def __init__(self, message: str, *, transient: bool = False,
+                 retry_after: float = 0.0) -> None:
         super().__init__(message)
         self.transient = transient
+        #: Seconds the controller waits before a transient retry. Zero for
+        #: every error but a stalled prompt: Herdr gave up after 5 s on a pane
+        #: that had not started its turn yet, and asking again at once asks
+        #: the same pane in the same state.
+        self.retry_after = retry_after
 
 
 class WaitingForApproval(DispatchError):
@@ -93,6 +129,89 @@ class WaitingForApproval(DispatchError):
     word, and the window in which the captain could have answered disappears
     again -- exactly the loss that the comment at the site of the finding
     describes as having already happened twice.
+    """
+
+    pane_kept_open = True
+
+
+class AnswerMissing(DispatchError):
+    """A structured role's turn ended, and its answer file is missing or empty.
+
+    Idle is not done. Four iterations were lost to it: QA started its full
+    suite in the background, ended its turn saying it would write the answer
+    when the suite finished, `herdr agent prompt --wait` returned on the idle
+    pane, and the dispatch was booked as an outage. In `spark` the answer
+    arrived 6 min 42 s after the rejection, into an iteration already closed.
+
+    Its own type so the controller can ask once more -- one charged,
+    witnessed follow-up -- instead of failing the iteration. Non-transient:
+    re-sending the whole prompt is not what the role needs.
+
+    Everything it carries comes from the dispatch that sent `full`, held in
+    memory; none of it is ever re-read from a marker or any other file.
+    """
+
+    def __init__(self, message: str, *, answer_path: Path, target: str,
+                 prompt_sha256: str, prompt_bytes: int, prompt_file: str | None,
+                 sent_at: float, followed_up: bool = False) -> None:
+        super().__init__(message, transient=False)
+        self.answer_path = Path(answer_path)
+        self.target = target
+        #: sha256 and UTF-8 length of `full`, the prompt of record.
+        self.prompt_sha256 = prompt_sha256
+        self.prompt_bytes = prompt_bytes
+        #: The prompt file's name in the answers directory, or None when the
+        #: prompt went inline.
+        self.prompt_file = prompt_file
+        #: `time.monotonic()` just before the prompt was sent: the role
+        #: timeout is counted from here.
+        self.sent_at = sent_at
+        self.followed_up = followed_up
+
+
+class PaneNotClean(DispatchError):
+    """A role's pane is not proven free to take a prompt, so none was sent.
+
+    Run padopt lost two QA iterations to it: a prompt stayed unsent in the
+    agent's input box, the stall retry was sent on top of it, and the joined
+    text began with a slash command the agent did not know. The dispatcher
+    now reads the pane after a prompt that did not return, and checks a pane
+    Herdr restored, before anything goes into it; whatever it cannot prove
+    free raises this.
+
+    Non-transient: re-sending is exactly what must not happen. Deliberately
+    not a `WaitingForApproval` (taxonomy walks the MRO) -- there is no dialog
+    to answer, there is a pane to inspect. `_verify` records it and lets it
+    through, so the run blocks once instead of booking a QA outage, and
+    `cli.cmd_run` keeps the role tabs open for it, by type.
+    """
+
+    #: `cli.cmd_run` keeps the role tabs open for it, so the QA pane may still
+    #: act: the candidate arena stays sealed.
+    pane_kept_open = True
+
+    def __init__(self, message: str) -> None:
+        super().__init__(message, transient=False)
+
+
+class RoleNotQuiescent(PaneNotClean):
+    """The developer ended its turn, but its session could not be ended, or what
+    it started could not be shown to be gone: the candidate is not frozen.
+
+    Closing a role's pane ends its agent and its shell, not the commands it
+    started in the background (live smoke, 2026-10-06), and a developer that can
+    still wake edits the tree after the freeze (runs qaw and qaw6). So before
+    the freeze `HerdrDispatcher.release_role` ends the session and the
+    processes the role left, and anything it cannot prove stops the developer's
+    step here.
+
+    A `PaneNotClean`, so `cli._waiting_for_approval` keeps the tabs open **by
+    type** and the exception path blocks the run once. Not transient. Its first
+    line names none of the words `taxonomy.classify_failure` reads. When the
+    pane could not be closed, `hoh unblock` and `hoh run` re-attach to the
+    still-open pane through the existing adoption; when it is the processes
+    that are the problem, the pane is already closed and the replanned
+    iteration starts a fresh, marked one.
     """
 
 
@@ -135,6 +254,20 @@ class LoopOutcome:
 
 
 class Controller:
+    """Drives one run's iterations.
+
+    Storage admission (STORAGE-B3, P2-40) is explicit: with a
+    ``storage_admission`` (a ``StorageAdmission`` -- `hoh run` always builds
+    one from the resolved state root and claims the boot first), every role
+    dispatch first reserves a ``role_run``; a refusal parks the run durably
+    as ``storage_pressure`` (`hoh.storage_park`) and no further role starts in
+    that iteration, and an admitted reservation is released after the
+    dispatch with the bytes it wrote under the run directory and its arena. A
+    Controller built **without** it -- every library caller and test that
+    does not pass one -- performs no admission and writes no storage file; it
+    records one note ``storage admission: not configured (library use)``.
+    """
+
     def __init__(
         self,
         store: RunStore,
@@ -143,8 +276,33 @@ class Controller:
         spec_path: Path | str,
         scratch_dir: Path | None = None,
         isolation: "sandbox_mod.Isolation | None" = None,
+        storage_admission=None,
+        park_policy=None,
+        steward=None,
     ) -> None:
         self.store = store
+        #: STORAGE-D: the project's storage steward, or None. It is only told
+        #: (`on_event`, which records one bounded line and returns) about a
+        #: terminal transition and -- through the park -- about a refused
+        #: admission; a controller without one emits no event.
+        self.steward = steward
+        #: STORAGE-B3: the admission every role dispatch asks first, or None
+        #: (library use: no admission, no storage file, one note).
+        self.storage_admission = storage_admission
+        self.park_policy = park_policy
+        self._storage_noted = False
+        # The digest `_seal_candidate` wrote into each `sealed` line, per arena,
+        # for `_release_seal` to compare with (it is in memory only: a process
+        # that ends mid-dispatch leaves the ledger's own digest to the next check).
+        self._sealed_digests: dict[str, str] = {}
+        #: The contract this run is governed by, if one was pinned. Read once
+        #: per controller: every block below routes through it, so what a
+        #: capability violation, a shrunken amendment chain, a spec drift, an
+        #: exhausted budget or a broken candidate binding *means* is the
+        #: contract's decision and not a constant. A reviewer counted five
+        #: block sites here that bypassed the contract entirely, which made
+        #: "the run obeys its contract" true only of the two sites in the CLI.
+        self._governor = None
         self.dispatcher = dispatcher
         self.spec_path = Path(spec_path).expanduser()
         self.scratch_dir = scratch_dir
@@ -200,19 +358,68 @@ class Controller:
         remedy is a version comparison on write (fencing) -- see
         RunState.write_seq and RunStore.write_state.
         """
+        before = (state.stage, state.condition)
         with self.store.lock():
-            try:
-                return self._run_iteration_locked(state)
-            except CapabilityViolation as exc:
-                # Fail closed, and as a *result* rather than as a crash. A
-                # violation is not an outage and must not be re-read as a
-                # missing verdict -- that path would let the loop treat it as
-                # an ordinary rejection and carry on. It blocks the run, keeps
-                # the reason, and leaves the evidence where it is.
-                stages.block(state, f"capability violation: {exc}")
-                self.store.write_state(state)
-                return LoopOutcome(state.iteration, False,
-                                   state.blocked_reason or str(exc))
+            outcome = self._run_iteration_guarded(state)
+        self._tell_steward_terminal(state, before)
+        return outcome
+
+    def _tell_steward_terminal(self, state: RunState, before: tuple) -> None:
+        """STORAGE-D: after the iteration (the run lock released), tell the
+        steward about a terminal transition -- a persisted state whose stage
+        is CHECKPOINTED or READY_FOR_DELIVERY or whose condition is FAILED or
+        CANCELLED, reached in this iteration. Isolated: whatever the steward
+        raises is noted, never propagated. Without a steward, nothing."""
+        steward = getattr(self, "steward", None)
+        if steward is None:
+            return
+        try:
+            persisted = self.store.read_state()
+        except Exception:                    # noqa: BLE001 - nothing provably persisted
+            return
+        terminal = (persisted.stage in (Stage.CHECKPOINTED, Stage.READY_FOR_DELIVERY)
+                    or persisted.condition in (Condition.FAILED, Condition.CANCELLED))
+        if not terminal or (persisted.stage, persisted.condition) == before:
+            return
+        try:
+            steward.on_event("terminal_transition")
+        except Exception as exc:             # noqa: BLE001 - never fails the run
+            state.note(f"storage steward: recording terminal_transition failed: "
+                       f"{type(exc).__name__}: {exc}"[:400])
+
+    def _run_iteration_guarded(self, state: RunState) -> LoopOutcome:
+        from .storage_park import StorageParked
+
+        try:
+            return self._run_iteration_locked(state)
+        except StorageParked as parked:
+            # The state was persisted by the park (or the NEEDS_YOU stop)
+            # itself, timer first. Nothing else is written and no further
+            # role starts in this iteration; the run is no longer ACTIVE,
+            # so `hoh run` stops looping.
+            return LoopOutcome(state.iteration, False, parked.reason)
+        except CapabilityViolation as exc:
+            # Fail closed, and as a *result* rather than as a crash. A
+            # violation is not an outage and must not be re-read as a
+            # missing verdict -- that path would let the loop treat it as
+            # an ordinary rejection and carry on. It blocks the run, keeps
+            # the reason, and leaves the evidence where it is.
+            # The kind is what keeps it blocked: sticky through a re-block,
+            # a pause and a resume, until a person runs `hoh unblock`.
+            state.blocked_kind = stages.CAPABILITY_VIOLATION
+            self._block(state, f"capability violation: {exc}")
+            self.store.write_state(state)
+            return LoopOutcome(state.iteration, False,
+                               state.blocked_reason or str(exc))
+        except SealFailed as exc:
+            # QA never started: an arena that could not be made read-only is
+            # rolled back and the run waits for a person, rather than letting
+            # QA review a candidate it could write.
+            self._block(state, f"the candidate arena could not be sealed, "
+                               f"QA was not started: {exc}")
+            self.store.write_state(state)
+            return LoopOutcome(state.iteration, False,
+                               state.blocked_reason or str(exc))
 
     def _run_iteration_locked(self, state: RunState) -> LoopOutcome:
         if state.started_at_wall is None:
@@ -223,7 +430,7 @@ class Controller:
             state.arena_secret = secrets.token_hex(8)
         exhausted = state.budget_exhausted()
         if exhausted:
-            stages.block(state, exhausted)
+            self._block(state, exhausted)
             self.store.write_state(state)
             return LoopOutcome(state.iteration, False, exhausted)
 
@@ -240,7 +447,7 @@ class Controller:
             # The chain got shorter. Whatever did that -- a rename, a prune, a
             # hand -- the obligation an amendment created does not evaporate
             # with the file that recorded it.
-            stages.block(
+            self._block(
                 state,
                 f"the amendment chain has {seen_} entries and this run has "
                 f"seen {state.amendments_seen}; the record of what was amended "
@@ -266,7 +473,7 @@ class Controller:
         # The specification must not change silently underneath a running run
         # -- otherwise two iterations plan and verify against different truths.
         if digest(spec_text) != state.spec_digest:
-            stages.block(
+            self._block(
                 state,
                 f"specification has changed (expected {state.spec_digest}, "
                 f"found {digest(spec_text)})",
@@ -351,9 +558,12 @@ class Controller:
         self._develop(state, spec_text=spec_text, plan=plan, evidence=evidence)
 
         # --- FREEZE: persisted boundary, not a prompt ----------------------- #
+        # The attempt belongs in the id, as in every other per-attempt name:
+        # the resumed attempt of an aborted iteration is another candidate,
+        # and its anchor must not be the earlier attempt's (run qaw4).
         candidate = snapshot(
             state.repo_path,
-            f"{state.run_id}-i{state.iteration}",
+            f"{state.run_id}-i{state.iteration}-a{state.attempt}",
             note=f"after developer run, plan {plan.plan_digest()}",
         )
         stages.freeze(state, plan_digest=plan.plan_digest(), candidate=candidate)
@@ -371,7 +581,7 @@ class Controller:
             result = self._verify(state, spec_text=spec_text, plan=plan, candidate=candidate)
         except stages.FreezeError as exc:
             # Sources changed between freeze and verdict (A05).
-            stages.block(state, f"candidate binding violated: {exc}")
+            self._block(state, f"candidate binding violated: {exc}")
             self.store.write_state(state)
             return LoopOutcome(iteration, False, str(exc))
 
@@ -523,7 +733,7 @@ class Controller:
             self.note_dispatch(
                 role=Role.PLANNER.value, run_id=state.run_id, iteration=state.iteration,
                 attempt=state.attempt, started_at=started_at, ended_at=utcnow(),
-                backend=type(self.dispatcher).__name__, outcome="failed",
+                backend=type(self.dispatcher).__name__, outcome=_failed_outcome(exc),
                 detail=str(exc), usage={}, state=state, exc=exc,
             )
             raise
@@ -581,11 +791,15 @@ class Controller:
         started_at = utcnow()
         try:
             self._dispatch(Role.DEVELOPER, prompt, state)
+            # Inside the same `try`: a developer whose session cannot be ended
+            # is booked as a failed dispatch, **before** the "ok" below and
+            # therefore before the freeze.
+            self._finish_turn(Role.DEVELOPER, state)
         except Exception as exc:
             self.note_dispatch(
                 role=Role.DEVELOPER.value, run_id=state.run_id, iteration=state.iteration,
                 attempt=state.attempt, started_at=started_at, ended_at=utcnow(),
-                backend=type(self.dispatcher).__name__, outcome="failed",
+                backend=type(self.dispatcher).__name__, outcome=_failed_outcome(exc),
                 detail=str(exc), usage={}, state=state, exc=exc,
             )
             raise
@@ -606,6 +820,10 @@ class Controller:
         """The runner executes, QA assesses. The binding is checked before AND
         after the assessment."""
         stages.assert_binding_intact(state, candidate)
+        # An arena an earlier QA dispatch left sealed -- its pane was kept
+        # open, or the process was interrupted -- is compared here, at every
+        # verification, and never unsealed: the pane may still be open.
+        self._check_open_seals(state)
 
         # Isolated copy: the verification never touches the live workspace.
         # Otherwise even a __pycache__ or a build folder breaks the binding,
@@ -690,10 +908,46 @@ class Controller:
         # any role.
         outage = ""
         qa_exc: Exception | None = None
+        interrupted: BaseException | None = None
+        witnessed = False
         self._begin_count()
         started_at = utcnow()
+        from .storage_park import StorageParked
+
+        # QA's view of the candidate is read-only on disk for its dispatch,
+        # and the plan that restores it is on the ledger before the first
+        # `chmod`. A seal that fails is rolled back and QA never starts.
+        sealed = self._seal_candidate(state, arena)
         try:
             raw = self._dispatch_with_repair(Role.QA, prompt, state)
+        except StorageParked as parked:
+            # Not an outage and not a verdict: the run parked (or stopped
+            # NEEDS_YOU) before QA started. Recorded as what it is, then the
+            # park ends the iteration (`run_iteration`).
+            self.note_dispatch(
+                role=Role.QA.value, run_id=state.run_id, iteration=state.iteration,
+                attempt=state.attempt, started_at=started_at, ended_at=utcnow(),
+                backend=type(self.dispatcher).__name__, outcome=_failed_outcome(parked),
+                detail=str(parked), usage={}, state=state, exc=parked,
+            )
+            raise
+        except PaneNotClean as exc:
+            # Not an outage and not a verdict: QA was never prompted, because
+            # its pane was not proven free. Recorded, then the run blocks once
+            # with the tabs open, so the pane can be inspected; a resumed run
+            # checks it again before any prompt.
+            state.note(f"qa not prompted, its pane is not proven free; the run "
+                       f"blocks: {str(exc)[:400]}")
+            self.note_dispatch(
+                role=Role.QA.value, run_id=state.run_id, iteration=state.iteration,
+                attempt=state.attempt, started_at=started_at, ended_at=utcnow(),
+                backend=type(self.dispatcher).__name__, outcome=_failed_outcome(exc),
+                detail=str(exc), usage={}, state=state, exc=exc,
+            )
+            # Its tabs stay open, so the `finally` must see it and keep the
+            # candidate arena sealed under that pane.
+            qa_exc = exc
+            raise
         except DispatchError as exc:
             # A pending permission dialog is remembered as a **type**, not as
             # a word in the reason: `cli.cmd_run` has to keep the role tabs
@@ -715,6 +969,25 @@ class Controller:
             raw = ""
             outage = str(exc)
             qa_exc = exc
+        except BaseException as exc:
+            # An interrupt (`KeyboardInterrupt`, `SystemExit`) ends the
+            # dispatch without the witness having been read. The arena stays
+            # sealed, and the next verification or the release compares it.
+            if not isinstance(exc, Exception):
+                interrupted = exc
+            elif isinstance(exc, CapabilityViolation):
+                # The dispatch's own witness found it; the release neither
+                # repeats the violation nor replaces it.
+                witnessed = True
+            raise
+        finally:
+            if interrupted is not None:
+                keep = f"interrupted by {type(interrupted).__name__}"
+            elif getattr(qa_exc, "pane_kept_open", False):
+                keep = "the QA pane is kept open"
+            else:
+                keep = ""
+            self._release_seal(state, arena, sealed, keep=keep, witnessed=witnessed)
 
         # What the verification produced belongs on the verification's own
         # record. It was left at 0 -- a missing measurement wearing a number,
@@ -1068,6 +1341,377 @@ class Controller:
             )
         return None
 
+    # -- The seal of QA's candidate arena ------------------------------------ #
+
+    def _seal_ledger(self, event: str, state: RunState | None = None,
+                     **fields) -> None:
+        """Append one event to the seal ledger, durably, or raise."""
+        from .durable_io import durable_append
+
+        line: dict = {"event": event, "at": utcnow()}
+        if state is not None:
+            line.update(run_id=state.run_id, iteration=state.iteration,
+                        attempt=state.attempt)
+        line.update(fields)
+        durable_append(self.store.dir / SEAL_LEDGER,
+                       json.dumps(line, sort_keys=True, ensure_ascii=True),
+                       single_link=True)
+
+    def _seal_candidate(self, state: RunState, arena: Path) -> dict:
+        """Seal the candidate arena read-only for QA's dispatch; return the plan.
+
+        `planned` is on the ledger before the first `chmod`, so a process
+        that ends mid-seal leaves the record that restores it. A failing seal
+        is rolled back, recorded as `released` with `failed`, and raises
+        `SealFailed`.
+        """
+        from . import capability as cap
+
+        try:
+            plan = cap.seal_plan(arena)
+        except OSError as exc:
+            raise SealFailed(f"planning the seal of {arena} failed: {exc}") from exc
+        try:
+            self._seal_ledger("planned", state, arena=str(arena),
+                              entries={rel: list(entry) for rel, entry in plan.items()})
+        except Exception as exc:
+            raise SealFailed(f"the seal ledger could not be written, nothing "
+                             f"was sealed: {exc}") from exc
+        # An interrupt passes through untouched: the ledger's `planned` line is
+        # what restores a seal a process left half done.
+        try:
+            cap.apply_seal(arena, plan)
+            digest = cap.frozen_digest(arena)
+            self._seal_ledger("sealed", state, arena=str(arena), frozen=digest)
+            self._sealed_digests[str(arena)] = digest
+        except Exception as exc:
+            missed: list[str] = []
+            if isinstance(exc, SealFailed):
+                failure = exc                 # `apply_seal` rolled itself back
+            else:
+                # Sealed, but the ledger cannot say so: undone, not used.
+                missed = cap.unseal(arena, plan)
+                failure = SealFailed(f"the seal of {arena} could not be recorded: {exc}"
+                                     + (f"; not restored: {missed}" if missed else ""))
+            try:
+                self._seal_ledger("released", state, arena=str(arena),
+                                  not_restored=missed, failed=str(failure)[:400],
+                                  on_close=False, touched=False)
+            except Exception as ledger_exc:   # noqa: BLE001 - noted, the failure travels
+                state.note(f"seal ledger: recording the failed seal of {arena} "
+                           f"failed: {ledger_exc}"[:400])
+            if failure is exc:
+                raise
+            raise failure from exc
+        return plan
+
+    def _seal_releasing(self, state: RunState | None, arena: Path) -> None:
+        """Announce an unseal. Its own failure is noted, never raised."""
+        try:
+            self._seal_ledger("releasing", state, arena=str(arena))
+        except Exception as exc:              # noqa: BLE001 - noted
+            if state is not None:
+                state.note(f"seal ledger: announcing the release of {arena} "
+                           f"failed: {exc}"[:400])
+
+    def _seal_released(self, state: RunState | None, arena: Path, plan: dict, *,
+                       on_close: bool = False, touched: bool = False) -> list[str]:
+        """Unseal through the recorded plan and record it; never raises."""
+        from . import capability as cap
+
+        missed = cap.unseal(arena, plan)
+        if missed and state is not None:
+            state.note(f"the candidate arena {arena} was unsealed, but these "
+                       f"entries were refused or not reached and keep their "
+                       f"sealed mode: {missed[:20]}"[:600])
+        try:
+            self._seal_ledger("released", state, arena=str(arena),
+                              not_restored=missed, failed=None,
+                              on_close=on_close, touched=touched)
+        except Exception as exc:              # noqa: BLE001 - noted
+            if state is not None:
+                state.note(f"seal ledger: recording the release of {arena} "
+                           f"failed: {exc}"[:400])
+        return missed
+
+    def _release_seal(self, state: RunState, arena: Path, plan: dict, *,
+                      keep: str = "", witnessed: bool = False) -> None:
+        """End of QA's dispatch: unseal, or keep the seal for a stated reason.
+
+        Runs in a `finally`. It raises only a `CapabilityViolation`, and only
+        after the arena is restored: with no `keep` reason it first compares
+        the arena with the digest it was sealed with (`witnessed` is true when
+        the dispatch's own witness has already raised a violation, which the
+        comparison neither repeats nor replaces). Every dispatch takes its
+        witness when it starts, so a touch before the first dispatch, between
+        two of them, or after the last one's check and before this unseal is
+        in no witness; this comparison is what sees it.
+        """
+        from . import capability as cap
+
+        sealed_digest = self._sealed_digests.pop(str(arena), None)
+        if keep:
+            state.note(f"the candidate arena {arena} stays sealed: {keep}")
+            try:
+                self._seal_ledger("kept", state, arena=str(arena), why=keep)
+            except Exception as exc:          # noqa: BLE001 - noted
+                state.note(f"seal ledger: recording the kept seal of {arena} "
+                           f"failed: {exc}"[:400])
+            return
+        violation: str | None = None
+        if sealed_digest is not None and not witnessed:
+            record: dict = {}
+            try:
+                now = cap.frozen_digest(arena)
+            except OSError as exc:
+                # The arena cannot be shown untouched, so it is taken as
+                # touched (a pane cannot cause this: a mode-000 file, a FIFO, a
+                # socket or a symlink all give a different digest instead).
+                record = {"unreadable": f"{type(exc).__name__}: {exc}"[:300]}
+                violation = (f"a frozen tree could not be compared with its seal "
+                             f"digest ({exc}), so it is taken as touched: {arena}")
+            else:
+                if now != sealed_digest:
+                    record = {"frozen": now}
+                    violation = ("a frozen tree was touched after it was sealed, "
+                                 "outside every dispatch's witness (contents, "
+                                 f"modes or change times): {arena}")
+            if violation is not None:
+                try:
+                    self._seal_ledger("touched", state, arena=str(arena), **record)
+                except Exception as exc:      # noqa: BLE001 - the violation travels
+                    state.note(f"seal ledger: recording the touch of {arena} "
+                               f"failed: {exc}"[:400])
+        self._seal_releasing(state, arena)
+        self._seal_released(state, arena, plan, touched=violation is not None)
+        if violation is not None:
+            state.note(violation)
+            raise CapabilityViolation(violation)
+
+    def _open_seals(self, state: RunState | None = None) -> dict[str, dict]:
+        """The arenas the ledger leaves sealed: plan, digest, and `releasing`.
+
+        Only the first `planned` line of an open seal counts, and only the
+        first usable `sealed` line sets its digest; a `touched` line is a
+        record of the last touched state found (`touched`), never the
+        baseline. A line that does not parse is skipped. A line naming anything other
+        than a direct child of this run's arena directory (or its
+        `scratch_dir`) is tampering: it raises `CapabilityViolation`, and no
+        `chmod` follows from it. So is a ledger that is a symbolic link, is
+        not a regular file, has more than one name or cannot be read
+        (`durable_io.read_single_link`), and so is the `planned` line that
+        opens a seal for a name this run's `_arena` does not give to the
+        iteration and attempt on that line (`arena_name`): a plan is honoured
+        only for the arena it was made for. `state` is the run's state (read
+        from the store when not given): it holds the run's arena secret.
+        """
+        from .capability import SealEntry
+        from .durable_io import read_single_link
+
+        path = self.store.dir / SEAL_LEDGER
+        try:
+            raw = read_single_link(path)
+        except OSError as exc:
+            raise CapabilityViolation(
+                f"the seal ledger {path} cannot be trusted ({exc}); nothing was "
+                f"unsealed") from exc
+        if raw is None:
+            return {}
+        text = raw.decode("utf-8", errors="replace")
+        if state is None:
+            state = self.store.read_state()
+        bases = {self.store.arenas_dir.resolve()}
+        if getattr(self, "scratch_dir", None):
+            bases.add(Path(self.scratch_dir).resolve())
+        seals: dict[str, dict] = {}
+        for line in text.splitlines():
+            try:
+                rec = json.loads(line)
+            except ValueError:
+                continue
+            if not isinstance(rec, dict):
+                continue
+            event, arena = rec.get("event"), rec.get("arena")
+            if event not in ("planned", "sealed", "kept", "touched",
+                             "releasing", "released") or not isinstance(arena, str):
+                continue
+            if not Path(arena).is_absolute() or Path(arena).resolve().parent not in bases:
+                raise CapabilityViolation(
+                    f"the seal ledger names {arena}, which is not an arena of "
+                    f"this run; nothing was unsealed")
+            if event == "planned":
+                try:
+                    plan = {str(rel): SealEntry(*(int(v) for v in entry))
+                            for rel, entry in rec["entries"].items()}
+                except (KeyError, TypeError, ValueError, AttributeError) as exc:
+                    raise CapabilityViolation(
+                        f"the seal ledger's plan for {arena} is malformed: "
+                        f"{exc}") from exc
+                if arena in seals:
+                    continue              # only the first `planned` of an open seal counts
+                iteration, attempt = rec.get("iteration"), rec.get("attempt")
+                if (state.arena_secret is None
+                        or not _is_count(iteration) or not _is_count(attempt)
+                        or Path(arena).name != arena_name(
+                            state.arena_secret, iteration, attempt)):
+                    raise CapabilityViolation(
+                        f"the seal ledger's plan for {arena} is not bound to an "
+                        f"arena this run sealed (iteration {iteration!r}, attempt "
+                        f"{attempt!r} do not give that name); nothing was unsealed")
+                seals[arena] = {"plan": plan, "frozen": None, "touched": None,
+                                "releasing": False}
+            elif arena not in seals:
+                continue
+            elif event == "sealed":
+                # Only the first usable digest is the seal's. A later line,
+                # or one with an empty or missing digest, cannot replace it.
+                frozen = rec.get("frozen")
+                if seals[arena]["frozen"] is None and isinstance(frozen, str) and frozen:
+                    seals[arena]["frozen"] = frozen
+            elif event == "touched":
+                # A record, never a baseline: the touched tree is compared
+                # against the seal's own digest at every later comparison.
+                frozen = rec.get("frozen")
+                if isinstance(frozen, str) and frozen:
+                    seals[arena]["touched"] = frozen
+            elif event == "releasing":
+                seals[arena]["releasing"] = True
+            elif event == "released":
+                seals.pop(arena)
+        return seals
+
+    def _compare_open(self, state: RunState | None, seals: dict) -> list[str]:
+        """Compare every open seal that can be compared; return the touched arenas.
+
+        Never unseals. A seal marked `releasing` was already compared (or
+        needed no comparison), and one with no digest was sealed mid-way, so
+        QA never started on it: neither is compared. A touch is **reported at
+        every comparison** (the digest it is compared with never moves); the
+        ledger gets one `touched` line per distinct state found, so repeated
+        comparisons do not grow it.
+        """
+        from . import capability as cap
+
+        touched: list[str] = []
+        for arena, seal in seals.items():
+            if seal["releasing"] or seal["frozen"] is None:
+                continue
+            now = cap.frozen_digest(arena)
+            if now == seal["frozen"]:
+                continue
+            touched.append(arena)
+            if now != seal["touched"]:
+                try:
+                    self._seal_ledger("touched", state, arena=arena, frozen=now)
+                except Exception as exc:      # noqa: BLE001 - the violation travels
+                    if state is not None:
+                        state.note(f"seal ledger: recording the touch of {arena} "
+                                   f"failed: {exc}"[:400])
+        return touched
+
+    def _check_open_seals(self, state: RunState) -> None:
+        """Compare every arena still sealed; a touch is a violation.
+
+        A seal whose last event is `releasing` was already compared, or
+        needed no comparison: its unseal was cut short, and it is finished
+        here. Every other open seal is compared against its recorded digest
+        and **stays sealed** -- the pane that may write into it may still be
+        open. A touch is recorded (`touched`) and raises
+        `CapabilityViolation`.
+        """
+        seals = self._open_seals(state)
+        for arena, seal in seals.items():
+            if seal["releasing"]:
+                self._seal_released(state, Path(arena), seal["plan"])
+        touched = self._compare_open(state, seals)
+        if touched:
+            why = ("a sealed candidate arena was touched while it stayed sealed "
+                   "after QA's dispatch: " + ", ".join(touched))
+            state.note(f"capability violation: {why}")
+            raise CapabilityViolation(why)
+
+    def compare_open_seals(self) -> dict:
+        """Compare every open seal, without unsealing any; a touch blocks the run.
+
+        For the end of a `hoh run` that leaves its seals in place (tabs kept
+        open, a tab not confirmed closed, a release that failed): a touch is
+        found then, not at some later verification, and the run is blocked
+        with the capability-violation kind. A ledger that names a path
+        outside this run's arenas blocks it too.
+        """
+        with self.store.lock():
+            state = self.store.read_state()
+            try:
+                seals = self._open_seals(state)
+            except CapabilityViolation as exc:
+                state.note(f"capability violation: {exc}")
+                self._block_violation(state, f"capability violation: {exc}")
+                self.store.write_state(state)
+                return {"touched": [], "open": [], "refused": str(exc)}
+            touched = self._compare_open(state, seals)
+            if touched:
+                why = ("a sealed candidate arena was touched while its seal "
+                       "stayed in place: " + ", ".join(touched))
+                state.note(f"capability violation: {why}")
+                self._block_violation(state, f"capability violation: {why}")
+            if touched:
+                self.store.write_state(state)
+            return {"touched": touched, "open": list(seals)}
+
+    def release_open_seals(self) -> dict:
+        """Unseal every arena the ledger leaves sealed, comparing each first.
+
+        Called by `hoh run` only after its own tabs closed and none is left
+        unconfirmed (`cli._close_own_and_release`). A dispatcher that can say
+        whether the run's QA agent is gone (`role_gone`) is asked as well; while
+        it is not gone, nothing is lifted. A touch, or a ledger that names a
+        path outside this run's arenas, blocks the run.
+        """
+        from . import capability as cap
+
+        with self.store.lock():
+            state = self.store.read_state()
+            try:
+                seals = self._open_seals(state)
+            except CapabilityViolation as exc:
+                state.note(f"capability violation: {exc}")
+                self._block_violation(state, f"capability violation: {exc}")
+                self.store.write_state(state)
+                return {"released": [], "touched": [], "refused": str(exc)}
+            if not seals:
+                return {"released": [], "touched": []}
+            gone = getattr(self.dispatcher, "role_gone", None)
+            if callable(gone) and not gone(Role.QA, state):
+                # The agent may still act, so nothing is lifted -- but a touch
+                # already made is not hidden by its presence.
+                present = self._compare_open(state, seals)
+                if present:
+                    why = ("a sealed candidate arena was touched while the QA "
+                           "agent was still present: " + ", ".join(present))
+                    state.note(f"capability violation: {why}")
+                    self._block_violation(state, f"capability violation: {why}")
+                    self.store.write_state(state)
+                return {"released": [], "touched": present, "kept": list(seals)}
+            released, touched = [], []
+            for arena, seal in seals.items():
+                hit = (not seal["releasing"] and seal["frozen"] is not None
+                       and cap.frozen_digest(arena) != seal["frozen"])
+                if hit:
+                    touched.append(arena)
+                self._seal_releasing(state, Path(arena))
+                self._seal_released(state, Path(arena), seal["plan"],
+                                    on_close=True, touched=hit)
+                released.append(arena)
+            state.note(f"candidate arena seal(s) released after the tabs closed: "
+                       f"{len(released)}")
+            if touched:
+                why = ("a sealed candidate arena was touched before the QA pane "
+                       "closed: " + ", ".join(touched))
+                state.note(f"capability violation: {why}")
+                self._block_violation(state, f"capability violation: {why}")
+            self.store.write_state(state)
+            return {"released": released, "touched": touched}
+
     def _arena(self, state: RunState, *, suffix: str = "",
                base: Path | None = None) -> Path:
         """A separate verification directory per iteration and attempt.
@@ -1097,8 +1741,7 @@ class Controller:
         # -- a reviewer got an iteration accepted without any change at all.
         # The name is now a digest over a run secret; it is stable (repeatable
         # runs) and indistinguishable.
-        raw_name = f"{state.arena_secret}:{state.iteration}:{state.attempt}:{suffix}"
-        name = digest(raw_name)[:12]
+        name = arena_name(state.arena_secret, state.iteration, state.attempt, suffix)
         arena = Path(base) / name
         if arena.exists():
             # No deleting: the previous run is parked with a version suffix.
@@ -1106,6 +1749,13 @@ class Controller:
             # after a prune(), because it jumps back.
             arena.rename(arena.with_name(f"{arena.name}.v{utcnow().replace(':', '-')}"))
         arena.mkdir(parents=True, exist_ok=True)
+        # STORAGE-B3: remembered (in memory only) so that dispatch sizing can
+        # measure this run's own arenas under a `scratch_dir` one by one --
+        # never the scratch_dir itself, which another run may share.
+        if not hasattr(self, "_own_arenas"):
+            self._own_arenas = []
+        if arena not in self._own_arenas:
+            self._own_arenas.append(arena)
         return arena
 
     def _execute(
@@ -1522,6 +2172,57 @@ class Controller:
                 return None
         return chain
 
+    def _contract_governor(self, state):
+        """The pinned contract's governor, bound once per controller, or None."""
+        from .governance import ContractRefused, bind
+
+        if self._governor is None:
+            try:
+                self._governor = bind(self.store.dir)
+            except ContractRefused as exc:
+                state.note(f"autonomy: the pinned contract is unusable ({exc}); "
+                           f"blocking without it")
+                self._governor = False          # asked once, answered once
+        return self._governor or None
+
+    def _block_violation(self, state, reason: str):
+        """Block for a capability violation, with the kind that keeps it held."""
+        state.blocked_kind = stages.CAPABILITY_VIOLATION
+        return self._block(state, reason)
+
+    def _block(self, state, reason: str):
+        """Block, under the contract if this run has one."""
+        from .governance import block_under_contract
+
+        governor = self._contract_governor(state)
+        routing = block_under_contract(state, reason, governor)
+        if state.blocked_kind == "usage_limit" and state.retry_after:
+            self._arm_quota_timer(state, governor)
+        return routing
+
+    def _arm_quota_timer(self, state, governor) -> None:
+        """A durable PROVIDER_RETRY timer for a quota wait (O211, DS3).
+
+        `retry_after` alone made the wait visible only to a scan of run states;
+        the resume loop consumes *timers*, exactly once, under the programme
+        epoch the run belongs to. A failure to arm is noted and not fatal: the
+        run keeps `retry_after`, which the loop's legacy path still honours.
+        """
+        from .resumeloop import _timer_form
+        from .timers import TimerKind, TimerStore
+
+        due = _timer_form(state.retry_after)
+        try:
+            TimerStore(self.store.dir.parent).arm_new(
+                kind=TimerKind.PROVIDER_RETRY, due_at=due,
+                reason=f"usage limit: {(state.blocked_reason or '')[:200]}",
+                program_id=(governor.contract.contract_id if governor else ""),
+                program_epoch=(governor.contract.program_epoch if governor else 0),
+                run_id=state.run_id)
+        except Exception as exc:                  # noqa: BLE001 - noted, not fatal
+            state.note(f"quota: the retry timer could not be armed ({exc}); the "
+                       f"retry_after path still applies")
+
     def _reopen_amended_criteria(self, chain, state: RunState) -> None:
         """Drop the criteria an amendment reopened from the preservation suite.
 
@@ -1646,6 +2347,9 @@ class Controller:
             run / "state.json", run / "checks.json", run / "evidence.json",
             run / "amendments.json",
             run / "receipts", run / "results", run / "logs",
+            # The seal ledger restores and checks QA's sealed arenas; a role
+            # that forged a line in it could aim an unseal or hide a touch.
+            run / SEAL_LEDGER,
         )
         # The arena root gains a child every iteration, so it cannot be
         # digested whole around a dispatch -- but nothing legitimate creates
@@ -1700,9 +2404,12 @@ class Controller:
             # arena except QA's own is still protected in full; what is given
             # up is noticing a *new* directory created during QA's dispatch.
             # Tracked as limit 12d.
+            # The arena it reviews is frozen: sealed read-only on disk for the
+            # dispatch, and witnessed down to every entry's change time.
             return cap.qa_policy(
                 arena=arenas, answer=reply,
                 protected=other_arenas(own_) + evidenz + (repo,),
+                frozen=(own_,) if own_ is not None else (),
             )
         return cap.denied_policy(
             role.value, protected=other_arenas() + evidenz + (repo,))
@@ -1732,7 +2439,93 @@ class Controller:
         self._last_calls = getattr(self, "_last_calls", 0) + 1
         self.store.write_state(state)
 
+    def _storage_gate(self, state: RunState):
+        """STORAGE-B3: ask admission before a role dispatch, before the budget
+        is charged. Returns the admitted reservation, or None without an
+        admission (library use, noted once). A refusal parks the run
+        (`storage_park.park_for_storage_pressure`, timer first) and raises
+        `StorageParked`; an admission that cannot answer at all, or refuses
+        for a reason that is not capacity, stops the run NEEDS_YOU ("storage
+        admission unavailable") -- fail closed, never skipped."""
+        from .storage_park import (
+            ADMISSION_UNAVAILABLE,
+            ParkPolicy,
+            StorageParked,
+            is_capacity_refusal,
+            park_for_storage_pressure,
+            stop_needs_you,
+        )
+
+        # getattr: a controller assembled with `__new__` (several tests do)
+        # has no admission, exactly like one built without it.
+        admission = getattr(self, "storage_admission", None)
+        if admission is None:
+            if not getattr(self, "_storage_noted", False):
+                state.note("storage admission: not configured (library use)")
+                self._storage_noted = True
+            return None
+        project_id = state.project_name or state.run_id
+        try:
+            decision = admission.reserve(project_id, op_kind="role_run")
+        except Exception as exc:              # noqa: BLE001 - fail closed, classified
+            reason = f"{ADMISSION_UNAVAILABLE}: {type(exc).__name__}: {exc}"[:400]
+            stop_needs_you(state, self.store, reason)
+            raise StorageParked(reason, parked=False) from exc
+        if getattr(decision, "admitted", False):
+            return decision
+        if not is_capacity_refusal(decision):
+            # Not free space: the ledger itself refused (another namespace, an
+            # unclaimed boot, a malformed file). Waiting does not fix that.
+            reason = f"{ADMISSION_UNAVAILABLE}: {getattr(decision, 'reason', decision)}"[:400]
+            stop_needs_you(state, self.store, reason)
+            raise StorageParked(reason, parked=False)
+        from datetime import UTC, datetime
+
+        parked = park_for_storage_pressure(
+            state, decision, store=self.store, governor=self._contract_governor(state),
+            policy=getattr(self, "park_policy", None) or ParkPolicy(), now=datetime.now(UTC),
+            steward=getattr(self, "steward", None))
+        reason = state.blocked_reason if parked else (state.stop_reason or "")
+        raise StorageParked(reason or str(decision), parked=parked)
+
     def _dispatch(self, role: Role, prompt: str, state: RunState) -> str:
+        reservation = self._storage_gate(state)
+        if reservation is None:
+            return self._dispatch_admitted(role, prompt, state)
+        from .storage_park import measure_owned_bytes
+
+        # Only what this run owns is sized -- never any other path, and no
+        # link is followed (`measure_owned_bytes`): the run directory, the
+        # store's arena directory (the planner's read copy and, without a
+        # `scratch_dir`, every arena), and -- with a `scratch_dir` -- each
+        # arena `_arena` created for this run, one by one. The scratch_dir
+        # root is never sized: another run may share it. An arena created
+        # during the dispatch is added afterwards and counts 0 before.
+        owned_before = self._owned_for_sizing()
+        before = measure_owned_bytes(owned_before)
+        try:
+            return self._dispatch_admitted(role, prompt, state)
+        finally:
+            owned_after = owned_before + [p for p in self._owned_for_sizing()
+                                          if p not in owned_before]
+            actual = max(0, measure_owned_bytes(owned_after) - before)
+            try:
+                self.storage_admission.release(reservation, actual)
+            except Exception as exc:          # noqa: BLE001 - noted, never silent
+                state.note(f"storage admission: releasing {reservation.id} "
+                           f"({actual} B) failed: {exc}"[:400])
+
+    def _owned_for_sizing(self) -> list[Path]:
+        """The directories one dispatch's written bytes are measured over."""
+        owned = [self.store.dir, self.store.arenas_dir]
+        if getattr(self, "scratch_dir", None):
+            for arena in getattr(self, "_own_arenas", []):
+                inside = any(arena == base or base in arena.parents for base in owned[:2])
+                if not inside and arena not in owned:
+                    owned.append(arena)
+        return owned
+
+    def _dispatch_admitted(self, role: Role, prompt: str, state: RunState) -> str:
         # Handoff §8: "Check budget and deadline before every dispatch; count
         # retries and supervision in." Previously it was counted only once per
         # iteration and checked only at the start of the iteration.
@@ -1750,28 +2543,97 @@ class Controller:
         # is built from what exists when the dispatch starts, so it is a
         # property of this dispatch and not of the source.
         self._witness_scope = (len(policy.protected), len(policy.protected_shallow))
+
+        def delivered(answer: str) -> str:
+            violated = witness_.violations()
+            if violated:
+                # Fail closed, and loudly. A run whose planner wrote into
+                # the tree its acceptance checks measure has not produced
+                # a verdict about the product; continuing would attach a
+                # result to a measurement that was interfered with.
+                state.note(
+                    f"capability violation by {role.value}: "
+                    + "; ".join(violated)
+                )
+                raise CapabilityViolation(
+                    f"{policy.summary()} -- " + "; ".join(violated)
+                )
+            self._retire_task(
+                ref, state, endpoint=self.dispatcher.endpoint_evidence(role)
+            )
+            return answer
+
+        def violation(when: str, cause: BaseException) -> CapabilityViolation | None:
+            """A recorded violation to raise in place of `cause`, if any."""
+            violated = witness_.violations()
+            if not violated:
+                return None
+            state.note(f"capability violation by {role.value} {when}: "
+                       + "; ".join(violated))
+            found_ = CapabilityViolation(f"{policy.summary()} -- " + "; ".join(violated))
+            found_.__cause__ = cause
+            return found_
+
+        def followed_up_answer(follow_up, missing: AnswerMissing) -> str:
+            """The dispatcher's one follow-up for `missing`, witnessed.
+
+            The witness is checked before the follow-up; inside the charge,
+            before the budget is touched (otherwise a role's write to
+            `state.json` during a passive wait is folded into the re-baseline
+            below and never recorded); and before any error leaves the
+            follow-up. A violation takes precedence over every other outcome,
+            because the run's evidence is no longer intact. An answer it
+            returns goes through `delivered` like any answer.
+            """
+            found = violation("on a turn that ended without the answer file", missing)
+            if found is not None:
+                raise found
+
+            def charge() -> None:
+                found_ = violation("before the follow-up charge", missing)
+                if found_ is not None:
+                    raise found_
+                try:
+                    self._budget_or_refusal(state)
+                except DispatchError as refusal_:
+                    state.note(
+                        f"follow-up to {role.value} not sent: the turn ended "
+                        f"without the answer file, and the budget is spent: {refusal_}")
+                    raise refusal_ from missing
+                # A second provider call for the same answer, counted as a
+                # repair is; `_last_calls` counted it through the charge.
+                self._last_retries = getattr(self, "_last_retries", 0) + 1
+                state.note(
+                    f"follow-up to {role.value}: the turn ended without the "
+                    f"answer file {missing.answer_path.name}; one follow-up "
+                    "prompt is sent")
+                # The charge wrote `state.json`; only that is re-baselined.
+                witness_.witness_again([self.store.state_path])
+
+            try:
+                return follow_up(role, state, missing, charge=charge)
+            except CapabilityViolation:
+                raise
+            except Exception as exc:
+                found = violation("during the follow-up", exc)
+                if found is not None:
+                    raise found from exc
+                raise
+
         attempts = 0
+        followed_up = False
         while True:
             try:
-                answer = self.dispatcher.dispatch(role, prompt, state=state)
-                violated = witness_.violations()
-                if violated:
-                    # Fail closed, and loudly. A run whose planner wrote into
-                    # the tree its acceptance checks measure has not produced
-                    # a verdict about the product; continuing would attach a
-                    # result to a measurement that was interfered with.
-                    state.note(
-                        f"capability violation by {role.value}: "
-                        + "; ".join(violated)
-                    )
-                    raise CapabilityViolation(
-                        f"{policy.summary()} -- " + "; ".join(violated)
-                    )
-                self._retire_task(
-                    ref, state, endpoint=self.dispatcher.endpoint_evidence(role)
-                )
-                return answer
+                return delivered(self.dispatcher.dispatch(role, prompt, state=state))
             except DispatchError as exc:
+                follow_up = getattr(self.dispatcher, "follow_up", None)
+                if (isinstance(exc, AnswerMissing) and not exc.followed_up
+                        and not followed_up and callable(follow_up)):
+                    # Idle is not done: the turn ended without the answer
+                    # file. At most one follow-up per call, charged like any
+                    # provider call and witnessed on every way out.
+                    followed_up = True
+                    return delivered(followed_up_answer(follow_up, exc))
                 if exc.transient and attempts < state.budgets.max_transient_retries:
                     # Checked here, before the controller writes anything of
                     # its own, and for two reasons. It closes the window the
@@ -1814,7 +2676,28 @@ class Controller:
                     # it was taken with, so a write anywhere else is still
                     # caught when this attempt returns.
                     witness_.witness_again([self.store.state_path])
+                    # The back-off waits only now, after the re-baseline: a
+                    # wait before it would fold a role's write to
+                    # `state.json` during those seconds into the new
+                    # baseline, and it would never be recorded. A refused
+                    # charge has raised above, before any wait.
+                    if exc.retry_after > 0:
+                        time.sleep(exc.retry_after)
                     continue
+                # The final way out of a failed dispatch is witnessed too: a
+                # write the role undid before it failed must not be absorbed
+                # as an outage or an approval wait.
+                found = violation("on a failed dispatch", exc)
+                if found is not None:
+                    raise found from exc
+                raise
+            except CapabilityViolation:
+                raise
+            except Exception as exc:
+                # And so is a crash of the dispatcher itself.
+                found = violation("on a dispatch that crashed", exc)
+                if found is not None:
+                    raise found from exc
                 raise
 
     def _dispatch_with_repair(self, role: Role, prompt: str, state: RunState) -> str:
@@ -1836,7 +2719,6 @@ class Controller:
         raw = self._dispatch(role, prompt, state)
         try:
             validate(raw)
-            return raw
         except roles.RoleOutputError as exc:
             # Handoff §8 means "one schema repair **per role output**". The
             # counter was a run counter and was never reset: after ONE repair
@@ -1857,14 +2739,97 @@ class Controller:
             state.note(f"schema repair for {role.value}: {exc}")
             repaired = self._dispatch(role, roles.repair_prompt(role, str(exc), raw), state)
 
+            try:
+                validate(repaired)
+            except roles.RoleOutputError as exc2:
+                raise DispatchError(
+                    f"{role.value} violates the output contract even after the "
+                    f"repair; the repair budget is exhausted: {exc2}"
+                ) from exc2
+            # The repair went to the same pane: it is released once, after it.
+            self._finish_turn(role, state)
+            return repaired
+        # The first answer validated.
+        self._finish_turn(role, state)
+        return raw
+
+    def _finish_turn(self, role: Role, state: RunState) -> None:
+        """End the role's session: its turn is over and the run will not use
+        this pane again (`HerdrDispatcher.release_role`).
+
+        An optional hook, like `follow_up` and `role_gone`: a dispatcher
+        without it (the subprocess adapter, a test double) has no session to
+        end. Only the developer's refusal stops the run -- its pane, or what it
+        left running, could still change the tree after the freeze; for the
+        planner and QA it is recorded and the run goes on. Tested on
+        `.closed`, never on the truthiness of the answer.
+        """
+        release = getattr(self.dispatcher, "release_role", None)
+        if not callable(release):
+            return
+        answer = release(role, state)
+        if role is Role.DEVELOPER and not answer.closed:
+            # The reason goes on the second line: only the first line of a
+            # failure is read for its class (`taxonomy.classify_failure`), and
+            # a reason may quote a dialog or a timeout.
+            raise RoleNotQuiescent(
+                f"{role.value}: its session could not be ended before the "
+                f"candidate was frozen.\n{answer.why}")
+
+
+def open_seal_arenas(run_dir: Path | str) -> list[str]:
+    """The arenas a run's seal ledger leaves sealed, for the gates that read it.
+
+    The same first-`planned` rule as `Controller._open_seals`: a `planned`
+    line opens an arena, a `released` line closes it, and a later `planned`
+    line of an arena that is already open changes nothing. Lines that do not
+    parse are skipped. A ledger that cannot be read counts as **one** open
+    seal, named by the ledger's own path (fail closed): a gate that cannot
+    tell whether an arena is still sealed holds. A ledger that is a symbolic
+    link, is not a regular file or has more than one name cannot be told
+    either (`durable_io.read_single_link`): a link to an empty file must not
+    hide an open seal.
+    """
+    from .durable_io import read_single_link
+
+    path = Path(run_dir) / SEAL_LEDGER
+    try:
+        raw = read_single_link(path)
+        if raw is None:
+            return []
+        text = raw.decode("utf-8")
+    except (OSError, UnicodeError):
+        return [str(path)]
+    opened: dict[str, bool] = {}
+    for line in text.splitlines():
         try:
-            validate(repaired)
-        except roles.RoleOutputError as exc:
-            raise DispatchError(
-                f"{role.value} violates the output contract even after the "
-                f"repair; the repair budget is exhausted: {exc}"
-            ) from exc
-        return repaired
+            rec = json.loads(line)
+        except ValueError:
+            continue
+        if not isinstance(rec, dict):
+            continue
+        event, arena = rec.get("event"), rec.get("arena")
+        if not isinstance(arena, str):
+            continue
+        if event == "planned":
+            opened.setdefault(arena, True)
+        elif event == "released":
+            opened.pop(arena, None)
+    return list(opened)
+
+
+def _failed_outcome(exc: BaseException) -> str:
+    """The telemetry outcome of a dispatch that did not return.
+
+    A storage park is not a failed dispatch: no role was started, nothing was
+    spent. It is booked `storage_parked` (parked, a recheck is armed) or
+    `storage_unavailable` (stopped NEEDS_YOU); everything else stays `failed`.
+    """
+    from .storage_park import StorageParked
+
+    if isinstance(exc, StorageParked):
+        return "storage_parked" if exc.parked else "storage_unavailable"
+    return "failed"
 
 
 def _receipts_summary(receipts: list[Receipt]) -> str:

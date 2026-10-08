@@ -133,3 +133,27 @@ such as `d2c2` and `a03`. None of these are excluded from the table above by
 accident: `POSITION_PAPER.md`'s own acceptance check strips exactly this
 category before extracting numbers, and this table follows the same rule
 rather than padding itself with non-measurements.
+
+## Erratum, added 2026-10-07 for the v0.3.0a1 pre-release
+
+Nothing above was edited: no row, number or claim id of this table was changed.
+Two statements about the table no longer hold, and both are corrected here by
+addition.
+
+* **Completeness.** The introduction says this table lists every number in the
+  prose of `POSITION_PAPER.md`. It did not at the release: the first limitation
+  of the paper states 65 runs, 1,988 receipts, 880 control runs and 3.5 days of
+  elapsed wall-clock, and its test section states the passes 1221 and 1223,
+  and none of these has a row here. They are the paper's own sentences, bound
+  in `CLAIMS.json` like the rest; this table stays as published.
+* **Claim-id pairs.** For the same figures the paper and this table name
+  different claim ids. The paper cites C-446, C-447 and C-448 for the three
+  rows of the third campaign's table, where this table lists the figures under
+  C-455, C-456 and C-457; the paper cites C-255 for the closure's zero human
+  decisions, this table C-458; the paper cites C-203 for the seven planted
+  violations, this table C-461; and the paper cites C-452 for the export-marker
+  failures, this table C-462. Every one of these ids exists in `CLAIMS.json` and
+  binds the same figure; neither document was changed.
+
+The figures of the development after the release are in
+`paper/NUMBERS_V2.md`, with their own sources and regeneration commands.

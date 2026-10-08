@@ -6,6 +6,98 @@ real, current limit of HoH, not a hedge. Where a limit lives in one specific
 module, this says so, so a reader can go look rather than take the claim on
 faith.
 
+## Status at the v0.3.0a1 pre-release -- read this first
+
+The numbered entries further down were written up to and for `v0.1.0`, and
+they stay as they were written: an entry is not deleted because it was fixed,
+and a fixed entry's old wording is part of the record. This section was added
+for the pre-release `v0.3.0a1` that follows the release. It sorts those
+entries, and the limits found since, into three groups: what is open now, what
+is resolved or materially changed since `v0.1.0`, and what is a historical
+release reference. The pre-release is a snapshot of phase P2 (*v0.3 Durable
+Program Runtime*), which is **in progress and not closed**; every open gate
+below is **NOT_YET_PROVEN**, and a gate that reads red stays red here. The
+first row of the table is the integrity gate, which held the cut back until the
+qaw-followup strand merged and now reads met for the replayed paths, with one
+residual stated.
+
+The distinction this whole section depends on, in one line:
+
+    candidate creation != product acceptance != integration acceptance != merge authority != phase closure
+
+Where a row rests on the development repository's working ledger, which this
+export does not carry, it names the ledger entry (`O` and a number) without a
+path. A figure tagged `[Vnn]` is resolved to its source and to the command
+that regenerates it in `paper/NUMBERS_V2.md`.
+
+### Current open limitations
+
+| Limit | State at the pre-release | Evidence |
+|---|---|---|
+| **The integrity gate is met for the replayed paths; one residual and the tracked minors stay** | The qa-arena-write repair (merge `a455edc0`) seals QA's candidate arena and holds a run that was blocked for a capability violation, for every state shape the current build writes. Its integration reviewer proved three findings open, and this pre-release was held for them (the text of that state is kept in the dated correction at the end of limit 12d): (1) a violation state written before the hold existed could be unblocked by `resume_runs` and the launcher then reported the run ACCEPTED; (2) `tools/acceptance_record.py` did not count an open seal as a problem; (3) a `seals.jsonl` replaced by a symlink made the controller append ledger lines to the foreign file, and a forged `planned` line for a sibling arena of the same run was honoured. **The qaw-followup merge (`ab41589f`, 2026-10-07) closes them for the replayed paths:** the resume loop, its fallback and `hoh resume-storage` refuse a run the hold covers (`test_l1`: the run stays BLOCKED and the launcher verdict is UNDETERMINED); an open QA seal is not an acceptance (`test_n1`); the seal ledger is read and appended only as a single regular link (`O_NOFOLLOW`, checked on the descriptor), so a symlink, a FIFO, a dangling link or a second name is refused before a byte is written (`test_m4`); and a `planned` line is honoured only for an arena this run sealed (`test_m3`). Both integration reviewers replayed each path on the merged tree, the strand's 13 criteria pass under NONE and STRICT and its 54 mutant rows are killed. **Not claimed:** that no other false-ACCEPTED or foreign-write path exists. **Stated and pinned by the strand (P6):** a role pane that has read the run's `arena_secret` and copies iteration and attempt gets a forged plan honoured -- the ledger is a record and a restore aid, not an access control against a process of the same user. Tracked minor: `acceptance_record.open_seals` does not count link names (not reachable from the drive, because evidence is copied without hard links), and a held run under storage pressure is booked as `storage_unavailable` (the strand's own reading says the flow is unreachable). | `docs/LIMITATIONS.md` limit 12d; ledger O253, O254, O255 |
+| P2 is not closed, and the board is red | `TECHNICALLY_STABLE_READY = no`. The P2 gate has 17 requirements blocking and open, 5 exit conditions bound to requirements that are not PROVEN, and 3 exit conditions no instrument measures yet `[V12]`. Amendment A5 added a P2 requirement, P2-43, which delays closure further. | `docs/READINESS.md`; the build plan's gate report; ledger O252 |
+| **A provider usage limit that stops a QA role is booked as a rejected iteration** | Eight iterations were lost this way `[V26]`: wmig, kbr, ugt, pcon, dres2, ecl and rpl in iteration 1, lgs in iteration 2. Each state history reads "candidate rejected: unverified, no QA verdict", followed within about two minutes by the planner's quota block. The same limit in a planner is classified as a resumable block. The orchestrator parked and resumed each run and did not treat a lost iteration as a verdict on the candidate; the dres2 and ecl acceptances in iteration 2 also followed an iteration lost this way. **The repair (failure-classes, the core of amendment A5's P2 item P2-43) is not merged**; P2-43 reads MISSING `[V40]`. The eighth (rpl) is read from its run state, committed with the ledger. `state.json` also keeps a stale `blocked_kind` after `resume-quota` (medium). | ledger O252 and its addition, O253 |
+| End-to-end durability evidence is stale | P2-33 to P2-37 were proven once, on evidence taken at an earlier commit. Every later change under `src/hoh/` made that evidence stale, and the durability record no longer re-derives under the current deriver. They read IMPLEMENTED_NOT_PROVEN until fresh evidence is taken at the head and reviewed. | ledger O237, O250, O251; `docs/READINESS.md` rows `durability` and `acceptance` |
+| No real reboot has been run | P2-11, crash and reboot recovery, rests on stressor DS2, a real restart driven by the operator. It has never been run, so P2-11 has never been proven. | ledger O234, O237 |
+| What "unattended" covers | Where the durability evidence held, it covered the orchestration layer with fixture role runs and the harness's own tick loop -- not systemd, not the plugin entry point, and not a real role agent's permission dialogs. Limit 1 below still holds in full. | ledger O237 |
+| The first prompt after an agent starts can be typed and not submitted, and the recovery has a width limit | A startup race: the first prompt is typed, and `herdr agent prompt --wait` reports a stall. Dispatch recovers: after a stalled submit it presses Enter once, only when the box holds exactly this dispatch's own text, and types nothing again. In the four runs that had the recovery before the prompt-threshold merge, seven first prompts stalled and each was recovered `[V31]`. The prompt-threshold merge (`33320bfc`) sends every role prompt above 8,192 bytes, and every prompt holding a paste-unsafe character, through the pointer file, because a long inline paste is rendered collapsed and the box could not be verified (qfu, qfu2 and qfu3 blocked this way). That is a recovery made verifiable, **not a fix of the race**, and it does not prove the dialog boundary, which only the tests pin: a dialog that opens between the screen read and the key press would receive the Enter. **Width limit (run qfu4, PROVEN from the recorded box):** the recovery models a break in the box only mid-word at exactly the box width; Claude Code breaks at a word boundary when the line does not fit. In a 79-column pane (box width 76) the pointer's first line, 77 columns with its indentation, wrapped before its last word, the recovery refused as designed, and the run was blocked at its first planner dispatch before any candidate; the same pointer text passed in a 106-column pane. Residuals the prompt-threshold spec records: recovery works only for prompts the pointer carries; a short inline prompt taller than the pane is refused (T8); a long path can defeat the comparison (T7, SUSPECTED); the pointer's wording "too long for one command-line argument" is now incomplete (T2). Readiness of the first prompt and the wrap model are the next P2 strand, not started. | ledger O253, O255; `src/hoh/dispatchers.py` |
+| A role can be re-woken by its own background task, and what the lifecycle does about it | A role turn is taken as ended while the role still has a background task that can wake it and write. One run saw a developer edit source files while QA ran; the candidate-binding check failed the run closed, as designed. A live smoke showed that closing the pane stops the agent from waking and does not end its background descendants `[V32]`. **The role-pane lifecycle is merged (`caa732db`, with its tests-only follow-up):** HoH closes its own role panes and ends the processes a role left running before the freeze, never touching a foreign pane or process (a process is ended only when it carries the pane's minted mark and is anchored to the pane's own shell; a signal goes to one process, never a group; a marked process outside the pane is named and not signalled). Its first live use was the rpl-tests run (its `pane-lifecycle.jsonl`): the planner and developer panes were closed at the turn's end; the QA pane's release was refused because two marked processes had escaped the pane (named, never signalled), and the pane was gone without anyone closing it by hand (the orchestrator found it already gone). Not claimed: that no role can still change the tree after the freeze by a route the lifecycle does not see (the numbered limit 21, written by that run, says what a close proves and does not: a shared daemon is named and never ended and blocks the developer's release; that the mark reaches every command an agent's own shell tool starts has not been shown by a test). Tracked minor: extra mutants of the pane-count guard in `_close_own_pane` and three accounting mutants survive the tests (fail closed); a detached daemon adopted by a subreaper is documented as escaping; the run state keeps a stale iteration-1 QA task and `blocked_kind` after acceptance (controller, low). The pre-existing whole-tab close of a dead agent in `dispatchers.py` is the lifecycle's own tracked area. | ledger O252, O253, O254, O255 |
+| A long role timeout is booked as an unclassified block | The default role timeout is 2700 seconds; one run was blocked at that limit while its developer still worked `[V29]`. A role timeout and a fresh-agent startup stall are routed to the digest as unclassified, non-delegable decisions; the classes (ROLE_TIMEOUT, PROMPT_STALLED) belong to the failure-classes strand. The timeout is not recorded in the run. | ledger O252 |
+| Invisible characters stopped an inline prompt paste (merged: prompt-threshold) | A specification carrying four invisible characters stalled two planner dispatches `[V28]`: the agent interface announced the removal and waited, so the inline paste was never submitted. The remedy (every role prompt above 8,192 bytes, and any prompt with control, format, private-use characters, tab or carriage return, through the file pointer) was merged as `33320bfc`. It was built by a product run under one declared deviation, a bootstrap harness (the previous source plus only the reviewed dispatcher change; the operator delegated the choice), retired at the merge. The residuals are in the first-prompt row above. | ledger O252, O255; `src/hoh/dispatchers.py` |
+| Disk-full-safe writes are partial | P2-41 reads PARTIAL: the run store, the timer store and 15 further writers (W1 to W15) use the durable write; 12 writers remain on the migration list `[V44]`, and the second migration strand has not run. | ledger O242, O252 |
+| Registered temporary roots are merged; the register holds the row at PARTIAL | P2-42 (a registered project-owned temporary root, creator-cleaned workspaces, admitted writes, an inode signal) was merged after two runs that integration review refused `[V38]`. The EPHEMERAL_TMP tier, the release proof and the relocation of temporary paths (P5-35) are deferred. The capability register's row for P2-42 reads PARTIAL `[V10d]`: the register edit that followed the merge names the symbol with an equivalent, which holds the row below PROVEN. The vet that admits a scratch is the memory of one process; a second process is outside the single-creator design (minor, tracked). | `src/hoh/storage_ephemeral.py`; ledger O253 |
+| The storage steward has not acted on VeriHarness's own data | Section P ran on the real project: it was adopted as its own storage trust root, the legacy survey found 0 of 188 roots eligible `[V33]`, `adopt-legacy` ended with an empty outcome list and exit code 2, and the steward's real pass reported state NORMAL, observed only, with 0 bytes reclaimed. Section P produced no `VERIFIED_RELOCATION` receipt. 157 committed briefs under `dogfood/` already designate 98 of the 188 roots `[V33b]`, and no committed report names any, so every root stays refused. The survey is not incremental: it needed about 3.4 hours detached, after two attempts were cut off by the background limit (medium, tracked). | ledger O252 |
+| Inode exhaustion has happened twice, and the product is not what handled it | The development machine ran out of inodes twice on 2026-10-05, at 67,107,099 of 67,108,864 `[V35]`, from accumulated small-file scratch of reviewers and drafters; the process that made the final push is not identified. The orchestrator's two cleanups removed their own reproducible scratch under the operator's temporary-file rule: 15,558,933 entries `[V36]`, then 6,562,367 entries and 37,598,417,431 bytes `[V37]`. The steward's inode axis (P2-42) is merged, and no record shows it meeting a real pressure event. | ledger O252, O253 |
+| A gap QA records as blocking does not block acceptance | `RoleResult.accepted()` reads only the criteria's verdicts; the QA answer's `open_gaps` never decides anything. The product accepted candidates over a QA-recorded defect at least three times `[V09]`. The QA-gap gate was refused at integration twice; a later attempt was blocked at planning by the invisible characters above. It is not merged. | `src/hoh/contracts.py`; ledger O236, O237, O240, O252 |
+| A candidate's changed paths are not compared with its contract's scope | The product checks that a scope exists, not that the candidate stayed inside it; out-of-scope files were merged as recorded deviations. | ledger O244, O245, O249 |
+| The planner re-types the specification's criteria | Nothing compares a planned criterion with the specification's text. The planner transcribed criteria with a stray quote (one iteration lost), added a `--deselect`, wrapped criteria, added or dropped criteria and replaced them. A replay of 53 planner answers found 195 deviating checks in 42 answers `[V34]`. The reviewers ran the specification verbatim each time; the product did not. The criterion-fidelity strand is released in review and not built. | ledger O252 |
+| Long prompts: the directory chain is trusted | Prompts longer than one argument travel as prompt files with link-safe leaf names and an in-memory digest. The directory chain up to those files is assumed not to be swapped by a same-user role (T-LP5, high; its strand is released in review and not built); approval and answer files can still follow planted links (T-LP1, T-LP2, medium). | ledger O251, O252 |
+| The clean-tree check decodes `git status` strictly | The witness, the integrity snapshots and the run state handle names that are not UTF-8. The clean-tree check still decodes `git status` strictly (medium). | ledger O251, O252 |
+| A role's deletion guard is a list of literal prefixes | The mandatory deny rule that never matched is fixed. Quoted `-delete`, absolute binary paths and `command` or `xargs` wrappers are still not matched by a role's own rules (medium, tracked); the machine-wide deny hook still applies to every session. | `src/hoh/approval_policy.py`; ledger O252 |
+| The runner puts pytest's basetemp under the arena | `tools/preserve.py` classifies `_arenas/` as an evidence container, so `tests/test_preserve.py` fails in any run whose criteria include it (high, tracked). | ledger O252 |
+| QA's arena seal is detection plus mode bits | Besides the residual in the first row: a role running as root is detected, not prevented; an agent with a shell can `chmod` first and is detected by the change time; a forged `released` line between dispatches hides a touch; after a plain role timeout the arena is unsealed while the pane may still work. The numbered limit 12d records each. | `docs/LIMITATIONS.md` limit 12d; ledger O253 |
+| No capacity planner | Project-native parallelism is MISSING in the board's baseline row, and numeric provider-concurrency targets raised provider burn without raising completed work, which the development ledger records as an input to P3 (P3-41 reads MISSING `[V40]`). | `docs/READINESS.md` row `parallelism_baseline`; ledger O253 |
+| A dialog-free role answer is not yet observed in the run bytes | Roles may write their own answer files without a permission prompt (merged), but no run record shows a live session doing so without one; the claim is "rule written", not "dialog removed". Not re-checked since. | ledger O239, O240 |
+| Context rollover (Layer A) is merged and has not run live | `hoh project hold`, `rollover`, `rollover-verify` and `rollover-accept` (merge `601168fe`) are tested with fakes; **no live succession has been run, and no P2 row is proven by it** (the one handoff of 2026-10-07 was written by hand before the protocol existed and is not that evidence). The draining states between the freeze and the validated successor are **recorded, not enforced**: nothing refuses `hoh start` or `hoh run` in that window. The first-prompt stall can lose the successor's pointer; the acknowledgement deadline then fails closed (the predecessor stays master) and the pointer is sent again. A capsule's derived facts are only as good as the code that derives them (git, files, run states); a fact nobody derives is not checked, and an operator decision's `decided` status is author-set. **Open follow-up items (tracked HIGH, a prerequisite of the live canary):** the capsule id is not pattern-validated, so an unverified capsule can place its create-only, owner-only acknowledgement file outside the rollover directory; `acquire` is not atomic with the last verification, so a master gap is possible (never two masters); a relative `--root` never rolls over (fail closed); a non-object `--input` raises instead of refusing; `hold --interval` accepts zero or a negative value; nine guard sites have no test that kills their removal. An automatic rotation policy (Layer B) is not built. | ledger O255; `src/hoh/rollover.py`, `src/hoh/succession_capsule.py` |
+| The developer role can leave a filesystem-wide search running | Twice on 2026-10-07 (qfu5, crl) a developer ended its turn with a foreground-detached `find /` running for minutes; each was stopped by the orchestrator, which signalled only those processes. The specs had named scratch paths the role cannot reach (a rule against that is in place); the role prompt does not yet forbid searching outside the worktree and the arena (medium, tracked). | ledger O255 |
+| The board's `tests` row and this environment's failures | `docs/READINESS.md` measures the suite in a checkout with the git history and the runs directory, and reads that environment's failures. A history-less copy of the same tree, as the integration reviewers and the orchestrator use for base-against-candidate comparisons, fails 18 tests that need the git history, the runs directory or the host's units (`test_attribution`, `test_isolation_record`, `test_preflight`, `test_readiness`, `test_repetition_plan`, `test_sandbox_toolchain`, `test_succession`). They are the same on base and candidate in every comparison recorded; they are two environments, not two versions of the code. | ledger O255 |
+| The remaining release gates | Besides the integrity gate above: the exact-head external CI, the export synchronisation, the benchmark freeze, the succession capsule, the installed-unit check, the durability and acceptance rows, the programme checklist and supervisor review, the lint and identifier checks, the union gate's U5 and the test suite all read red or `NOT_RUN` on the board, each for a reason the board states. | `docs/READINESS.md` |
+
+Every other numbered limit below still holds as written, as far as this
+snapshot re-checked it -- not every one was re-measured: limits 3, 5, 7, 10,
+11, 12, 12c, 12e, 12f, 12g, 13, 13a, 13b, 13c, 14, 17, 18 and 20. Limits 2,
+12b and 15 already record their own resolution or result and are unchanged
+since `v0.1.0`. Limit 21 was written by the role-pane-lifecycle run itself and
+is not re-measured here.
+
+### Resolved or materially changed since v0.1.0
+
+The entry itself stays below, unedited; this is what changed and the evidence
+for it.
+
+| Limit | What changed | State now | Evidence |
+|---|---|---|---|
+| 1 -- long-duration unattended operation | A durable programme runtime now exists: durable timers, a sentinel, session succession with a master epoch, a resume loop, and an optional unattended continuation unit. | **Open.** Built and partly proven on fixtures; not demonstrated over days without intervention, and not across a real reboot. | ledger O233, O234, O237; P2 rows of the capability matrix |
+| 4 -- the check guard is a tripwire | Three changes. The self-hosted runs have executed their checks under `--isolation strict` since 2026-09-24, so the entry's sentence that no check in this project's history ran inside the sandbox no longer holds. An operator-side policy file can now only sharpen the shipped command policy, never relax it. And the mandatory deny rule that never matched was fixed. | **Open** as a limit: a denylist is still not a security boundary. | ledger O235, O252; the guard-union and deny-rule product runs' merges |
+| 6 -- the arena inside the project's git tree | The deployment this project uses for itself places each run's clone and arenas under a registered run root outside the canonical repository. | **Unchanged for a default `hoh start`**; changed for the self-hosted deployment. | ledger O212, O239 |
+| 8 -- what the dogfood evidence shows about `src/` | Product runs have written kernel logic under `src/hoh/` since 2026-09-23: 34 of the 46 product-run merges since 2026-09-25 change it `[V02]` `[V01]`. The entry's "no run has ever added or edited a line of Python inside `src/`" is true of the v0.1.0 history and false of the development after it. | **Superseded** for the development line. | ledger P2-26 entry, O236 to O255; the merge history |
+| 9 -- composition | A second independent layer now stands between acceptance and merge: two integration reviewers per accepted candidate, who refused 26 candidates the product had accepted `[V07t]`. | **Open**: review is a process, not a proof, and the union is still checked only against known failure shapes. | ledger O236 to O255 |
+| 12a -- trivially discriminating criteria | Detection now also recognises pytest's own "nothing executed" messages at exit 4, case-insensitively. | **Open**: nothing is subtracted from acceptance, and QA was recorded marking criteria the harness had flagged as artefactual as discriminating (not re-checked since). | ledger O236, O237; the artefactual-signature product run's merge |
+| 12d -- the witness compares two moments | The witness digests names that are not UTF-8 instead of crashing on them and the run state records such text losslessly; it stopped a run whose check wrote bytecode into a protected arena (root cause proven); and QA's candidate arena is now sealed and frozen in QA's witness, with a hold on capability violations that `hoh resume` and `hoh deliver` refuse for the states the current build writes (the three findings that were open at the first draft of this checkpoint are closed for the replayed paths by the qaw-followup merge; first row of the open table). | **Open**: detection, not prevention; see the open row on the seal. | ledger O241, O249, O251, O253 |
+| 16 -- quota exhaustion and a broken contract look alike | A resume loop now acts on due quota waits, a retry timer is never due before the provider's reset, and an agent that ends its turn without an answer gets one follow-up before the dispatch counts as unanswered. A provider limit in QA is still booked as a rejection (first open row). | **Not yet proven** on a real provider quota exhaustion in a live role run, and **open** for the QA case. | ledger O232, O233, O237, O252; the dispatch-robustness product run's merge |
+| 19 -- `benchmark_v3 = PASS` | The board's row reads `FAIL` at the current head: files under the campaign's freeze changed after the campaign without being named in its drift accounting. | The campaign's statement stays historical and correct; the present-tense "the row reads `PASS`" is **stale**. | `docs/READINESS.md` rows `benchmark_v3` and `benchmark_v3_preregistration` |
+| Union gate timeout (found after v0.1.0) | A fixed 600-second limit on the whole suite was suspected of the non-converging regeneration; the mechanism proved to be the timeout text, which began with an interpreter home path, entering the board and the claims ledger. A timeout is now a fixed `NOT_RUN` text, process groups are killed safely and the suite budget is 1800 seconds. | **Resolved**; the row `union_invariants` still reads red for the test failures of U5. | ledger O250, O251, O252; the union-gate-timeout merge |
+| Dispatch residue and stalled submits (found after v0.1.0) | A retry typed on top of unsent input; a pointer prompt starting with `/` was read as an unknown command and cost a run two iterations `[V22]`; a resumed iteration reused its candidate id and failed the run. Prompts no longer start with `/`, a pane with unsent input is refused, a stalled submit is recovered once, and a candidate id is fresh. | **Resolved** for these paths; the startup race behind the stalls is open (above). | ledger O252, O253 |
+| Long run paths (found after v0.1.0) | `roles._SAFE_PATH` bounds a path at 200 characters and a long arena's pytest temporary path exceeded it. The house-rules naming test no longer depends on arena depth. | **Resolved** for the test; the bound itself is unchanged. | `src/hoh/roles.py`; ledger O252 |
+
+### Historical release references
+
+The figures in limits 1, 2, 8, 12e and 19 -- the campaign's runs, receipts,
+merges and findings, the matched-budget benchmark, the reference counts at the
+`v0.1.0` tag -- are measurements of the `v0.1.0` campaign. They are correct
+for that campaign and are not current-development numbers. The development
+after it is measured in `paper/NUMBERS_V2.md`.
+
 ## 1. Multi-day orchestrated operation is demonstrated; long-duration operation without intervention is not
 
 This entry has now been wrong twice, in opposite directions, and both
@@ -737,6 +829,210 @@ now nothing pretends to either.
 one the planner already got: a working directory containing what the role may
 see and nothing else.
 
+**Addendum 2026-10-05 (qa-arena-write): QA's candidate arena is now sealed and
+frozen.** A dogfood run on 2026-10-03 showed the gap this section left open
+for the arena QA reviews: QA created `.qa_probe` there and moved it out again,
+and nothing noticed. What now holds:
+
+* The arena is **sealed** for QA's dispatch: every write bit under it is
+  cleared, with the plan (each entry's mode and inode identity) on the seal
+  ledger `runs/<id>/seals.jsonl` before the first `chmod`. A seal that fails is
+  rolled back and blocks the run before QA starts.
+* It is **frozen** in QA's witness: contents plus each entry's mode, size,
+  mtime and ctime. So the change-and-undo of the first point above is seen
+  there -- a write moved out again, a `chmod` and back, a content write whose
+  mtime was set back all leave a change time.
+* **Every `Exception` way out** of the dispatch reads the witness: an answer,
+  the final `DispatchError`, a crash.
+* **Interrupts and kept-open panes keep the seal**: a `KeyboardInterrupt` or
+  `SystemExit`, a `WaitingForApproval` and a `PaneNotClean` leave the arena
+  sealed, because the pane may still act.
+* A sealed arena is **checked at every later verification** and never unsealed
+  there; it is **unsealed only after the tabs close** (`close_own` returned,
+  nothing unconfirmed, and the run's QA agent gone from Herdr), comparing once
+  more. A touch found then makes `hoh run` exit non-zero. A QA agent that is
+  still present does not hide a touch: it keeps the seal, and the arena is
+  compared all the same.
+* **Every way a `hoh run` ends compares the seals it leaves in place**: tabs
+  kept open for an approval, a tab not confirmed closed, a `close_own` that
+  raised, a release that raised. A touch found there blocks the run and makes
+  `hoh run` exit non-zero, instead of waiting for a verification that may never
+  come. While a seal is open, the launcher reports the run UNDETERMINED (nothing
+  is merged) and `hoh deliver` refuses it; a ledger that cannot be read counts
+  as an open seal.
+* **Every `chmod` is identity-verified**: opened inside the arena component by
+  component without following a link, checked against the planned
+  `(st_dev, st_ino)`, and changed through the pinned descriptor. A swapped
+  symlink is refused, not changed.
+* **A file with more than one name is never sealed and never changed.** One of
+  its names may lie outside the arena, where a `chmod` would reach a file that is
+  not ours, and the link count cannot tell the two cases apart. The seal refuses
+  such a file before any `chmod` (the run blocks and QA does not start), and a
+  later `chmod` of one is refused too, so a forged plan cannot aim at it.
+* The ledger is **honoured only for this run's arenas**; a line naming any
+  other path is refused as tampering and blocks the run. Only the first
+  `planned` line of an open seal is its plan and only the first usable `sealed`
+  line is its digest; a `touched` line is a record and never the baseline, so a
+  touch is reported at every comparison and the ledger holds one `touched` line
+  per distinct state found. Forged `planned`, `sealed` and `touched` lines
+  therefore cannot hide a touch.
+* Every capability violation now sets `blocked_kind = "capability_violation"`,
+  which a re-block and a pause keep. While it is set -- or, for a run blocked
+  before the kind existed, while a BLOCKED, PAUSED, CANCELLED or FAILED run's
+  block reason names the violation -- the launcher never reports the run ACCEPTED (so nothing is
+  merged), `hoh deliver` refuses it, `hoh resume` refuses it (even with
+  `--force`) and returns a paused one to BLOCKED, the launcher never
+  auto-unblocks it, and `tools/acceptance_record.py` does not count its
+  checkpoint. **`hoh unblock` is the only command that clears the hold.**
+
+What remains, stated rather than left to be found:
+
+* **Root** ignores the cleared write bits; a role running as root is not
+  prevented, only detected.
+* An agent with a shell can **`chmod` first** and then write. That is not
+  prevented; it is detected, because the `chmod` itself moves the change time.
+* The ledger is protected during dispatches only, as `state.json` is. **A forged
+  `released` line appended between dispatches hides a touch** of the arena it
+  names, and a forged `releasing` line both hides a touch and gets the arena
+  unsealed at the next verification without a comparison.
+* **A run that is never run again keeps its arena sealed, and is neither merged
+  nor delivered.** Its touch, if any, is found by the next `hoh run` that
+  closes its tabs. `prune()` stops at such an arena: it cannot move a directory
+  without its write bit.
+* **The link count has a price.** It cannot tell a second name inside the arena
+  from one outside it, so a criterion that makes hard links inside the arena (a
+  package manager's installs, say) makes every QA dispatch of that run fail
+  closed before QA starts. That is availability, not safety. Counting the names
+  the walk finds inside the arena would admit such pairs, but it needs a count
+  that holds at plan, seal and release time and is a new attack surface; it is a
+  separate strand.
+* The seal waits `SEAL_SETTLE_S` (0.05 s) so that a `chmod` right after it lands
+  in a later clock tick; on a kernel with fine-grained timestamps the wait is
+  merely unnecessary.
+* The frozen digest reads the whole arena twice per QA dispatch, plus once at
+  each later verification and at the release while it stays sealed: the digest
+  cost of the third point above, now also paid for QA's own arena.
+* A contract whose routing for the violation is STOP or ABORT sets its own kind
+  (`contract_stop`, `contract_abort`) but keeps the block reason, and `hoh
+  cancel` keeps it too, so such a run stays held: the CANCELLED gap is closed.
+  `tools/benchmark.py` still counts a violation-held run as accepted; that is
+  tracked LOW.
+
+**Correction, after the integration review of the previous run (qa-arena-write,
+what holds now).** The last point above, that a contract's STOP or ABORT sets its
+own kind and the run "stays held" through the block reason, was true only until a
+second block rewrote the reason; the claim that the CANCELLED gap is closed was
+overbroad. The old text stays; what is true since this correction:
+
+* The hold has one carrier, `blocked_kind`, and one writer rule. A contract that
+  stops the programme or abandons the branch still cancels the run and records
+  its routing, but it **keeps the violation kind** and notes that the run stays
+  held; the park, collect and ask routings never replaced it. Only a person's
+  `hoh unblock` clears the kind.
+* **`hoh resume` refuses a held run in every condition but PAUSED**, with or
+  without `--force`, and writes nothing. A held PAUSED run returns to BLOCKED
+  with no reconciliation (it could only re-block the run and rewrite the reason
+  that names the violation). **`hoh deliver` reads the hold first**, before the
+  stage, the open seals, the contract and any git operation, in every condition.
+* **A held CANCELLED run has no automatic way back.** `hoh unblock` takes a
+  BLOCKED run only, so nothing lifts it by itself and nothing of it is merged or
+  delivered; the way on is a new run. A later block with no contract in force
+  turns it into BLOCKED, and a person's `hoh unblock` then lifts the hold.
+* **The release compares the arena with the digest it was sealed with**, before it
+  unseals. Every dispatch takes its witness when it starts, so a touch before
+  the first dispatch, between two of them, or after the last one's check was in
+  no witness; the comparison finds it, restores the modes, records it and blocks
+  the run with the kind. A digest that cannot be read is taken as a touch. The
+  price is one more digest of the arena per iteration.
+
+What this correction does not close, stated:
+
+* After a plain role-timeout `DispatchError` the arena is unsealed while the pane
+  may still be working; a write after that unseal and before the tabs close is
+  not witnessed. It accepts nothing (that attempt has no QA verdict, and the next
+  one uses a fresh arena), but the touch is not seen. Fixing it needs the agent's
+  status inside the dispatch code; it is tracked.
+* `tools/attribution.py`, `tools/self_hosted_topology.py` and `tools/benchmark.py`
+  read the accepted candidate as provenance and do not read the hold; the release
+  gates do. Tracked.
+* An ACTIVE run that carries the kind (no product writer makes one) can lose it
+  to a capacity refusal in `storage_park`, which is outside this strand's scope.
+  Tracked, with the guard that would close it.
+* The legacy fallback of the hold reads the block reason's first line, which can
+  hold an agent's own words; the effect is denial only, and a person's `hoh
+  unblock` lifts it. Tracked.
+
+**Addendum (qaw-followup, after the integration review of qa-arena-write).** What
+that review found is closed or narrowed here, and what stays is stated:
+
+* **Every automatic way back asks for the hold itself.** The `retry_after`
+  fallback of `hoh resume-quota` (`resumeloop._legacy_run`) had no check, so a run
+  whose kind was `usage_limit` and whose reason named the violation (a state an
+  earlier build wrote), or a caller that named `capability_violation` among the
+  classes it owns, was unblocked by its own `retry_after`. The timer path, the
+  fallback and `hoh resume-storage` now each refuse a run `stages.violation_unresolved`
+  holds, with the verdict NEEDS_OVERRIDE and the timer left armed. `park_for_storage_pressure`
+  no longer parks a held run (the capacity-refusal gap listed above): it keeps the
+  kind, keeps the reason, arms no timer and reports the run not parked. Project
+  nodes are not covered: a node is `usage_limit` only through the launcher's
+  provider verdict, which a held run never gives, and the launcher refuses a held
+  run at launch.
+* **`tools/acceptance_record.py` reads `seals.jsonl`.** A captured run with an open
+  seal (a `planned` line with no `released` line, the rule of `open_seal_arenas`)
+  is not an acceptance, and a ledger the tool cannot read as text counts as
+  one. The evidence copy of a symbolic-linked ledger is a regular file
+  (`copytree(symlinks=False)`), so the tool cannot see the link; the run it came
+  from is held by the controller the next time it reads the ledger.
+* **The seal ledger is written and read without following a link.** It is
+  opened with `O_NOFOLLOW` and checked on the descriptor: a regular file with exactly
+  one name. A symbolic link, a FIFO, a file with a second name (an append would
+  write to a file outside the run) is refused: `durable_append(single_link=True)`
+  raises before a byte is written, the gate (`open_seal_arenas`) counts the ledger
+  itself as one open seal, and the controller blocks the run with the violation
+  kind. A link to an empty file can no longer hide an open seal. **The price:** a
+  ledger with a second name (a `cp -al` snapshot of the run directory) is refused
+  too, which is availability and not safety. The directories above the ledger are
+  not checked; the run directory's own identity is the store's concern.
+  Telemetry and the succession log share `durable_append` and keep following links.
+  HoH never repairs a ledger: the way out is a person's (move the link aside,
+  which deletes nothing, put the real ledger back, then `hoh unblock`), and until
+  then `hoh deliver` says the arena is still open.
+* **A plan binds to its own arena.** A `planned` line that opens a seal is honoured
+  only for the directory whose name this run's secret and the iteration and attempt
+  on the line give (`controller.arena_name`, the function `_arena` uses). A forged
+  line for another directory of the arena root (a sibling, the planner's copy, an
+  arena of another run under a shared `scratch_dir`) is refused as tampering and
+  blocks the run. **What this does not do:** the secret is in `state.json`, which a
+  pane can read, so a pane that computes the name of a real arena of this run
+  still gets its forged plan honoured (a mode change inside this run's own arena,
+  which the pane could make itself). The ledger is a record and a restore aid, not
+  an access control against a process of the same user.
+
+**Correction by addition, 2026-10-07 (the review of the merge that carries this
+addendum).** The last point above, and the sentence that `hoh unblock` is the
+only command that clears the hold, hold for the states the current build writes
+and not for a state written before the hold existed. Three findings that the
+strand's own integration reviewer proved were not carried into the merge and are
+open: `resume_runs` unblocks a legacy violation state to ACTIVE, so the launcher
+can report the run ACCEPTED; `tools/acceptance_record.py` ignores the seal
+ledger, so an open seal is not a problem there; and a `seals.jsonl` replaced by
+a symlink gets ledger lines appended to the foreign file, with a forged
+`planned` line for a sibling arena of the same run honoured. A follow-up strand
+is being drafted; until it merges, the legacy fallback is **not** denial only,
+and the first row of *Current open limitations* above is the standing statement.
+
+**Closed for the replayed paths, 2026-10-07 (by addition; the correction above
+stays as the record of what was open).** The follow-up strand merged as
+`ab41589f` (run qfu5, accepted in iteration 1; both integration reviewers
+released it yes/yes). The legacy-state resume, the ignored open seal, the
+symlinked seal ledger and the forged sibling-arena plan line are refused on the
+merged tree, each replayed by both reviewers; the qaw-followup addendum above
+states how. The correction above was right when it was written and is wrong now
+for those four paths: the legacy fallback no longer unblocks a held run. What
+the strand states and pins itself stays open: a role pane that has read the
+run's `arena_secret` and copies iteration and attempt gets a forged plan
+honoured.
+
 ## 12e. Twenty-one published references point at documents the export does not carry
 
 The export gate checks something most projects do not: that a document which
@@ -1380,3 +1676,102 @@ file at all.
 It cannot tell a deliberate divergence from an accidental one. "Recording a
 new base" is a human act, and the tool believes it.
 
+
+
+## 21. Role panes are closed by HoH, and the close proves less than it sounds
+
+HoH now ends a role's session when the role's turn ends, and closes whatever it
+opened when the run ends. Both rest on the same closing rule, and the rule
+proves less than "closed" suggests. This entry says what it proves and what it
+does not.
+
+**What a close proves.** After a close the Herdr snapshot no longer lists the
+pane or its agent, and Herdr itself answers that the pane is not found. That
+session cannot take another prompt and cannot wake up: the developer that ended
+its turn "waiting for the notification" (run qaw) can no longer edit the tree
+after the freeze, because it is not there.
+
+**What a close does not prove.**
+
+- *That what the agent started has ended.* Closing a pane ends the agent and its
+  shell, not the commands the agent started in the background: measured live, a
+  background `sleep` stayed alive, orphaned, after `herdr pane close` returned
+  ok, and Herdr's documentation is silent on it. That is why the processes of a
+  closed pane are looked for and ended separately (below).
+- *That the ledger is evidence.* `pane-lifecycle.jsonl` is a record, not a gate.
+  It sits in the run directory beside protected evidence but is not in the
+  capability witness's set, because the dispatcher appends to it during a
+  dispatch, so a role that can write there can falsify it. Nothing decides from
+  it: ownership comes from the creation record and the live snapshot.
+- *That a crashed `hoh run` is cleaned up.* A run that dies leaves its panes
+  standing, and `hoh cancel` on a run with no live process closes nothing. A
+  later run adopts a pane by agent name and directory, and the turn end of an
+  adopted pane cannot say what its role left running (it has no mark).
+- *That the transcript of an accepted turn survives.* It goes with its pane.
+  The answer files and the receipts are the evidence; the pane is a place.
+- *That a dialog raised after the answer was seen.* A role that answered and
+  then sat at an input prompt is reported `blocked` by Herdr. The turn-end
+  release closes that pane: nothing HoH asked is waiting for the dialog. A dialog
+  raised during the turn keeps the pane open instead.
+- *That a pane id still names the pane HoH made.* Herdr documents that closed
+  ids are not reused for a running server, and says nothing across a restart. So
+  every close re-checks the live pane: an agent in it must be one HoH recorded
+  there, and with no agent the pane's directory must lie under the directory HoH
+  made it in. **That check is not a proof**: an operator's shell in the very same
+  directory, holding a recorded id after an id reuse, passes it. Reuse across a
+  restart is suspected, not measured.
+- *That a tab is only ever closed whole when it is all ours.* A whole tab closes
+  only when the snapshot proves every pane in it is HoH's own, passes the
+  identity check and is not kept open. A window of milliseconds remains between
+  that snapshot and the command: a pane the operator opens in the tab in that
+  window is closed with it. A single pane close has no such window.
+- *That there is one path.* Exactly one other place closes a pane: the
+  replacement of a restored pane whose input box is not provably empty. It keeps
+  its own, stricter proof and raises where the closing rule returns, but writes
+  the same ledger lines. A source scan pins that no third function spells a close
+  command; it is a tripwire for the literal spelling, and code review is the
+  other half.
+
+**The role's processes.** Every role pane is created with a mark in its
+environment, and every process the role starts inherits it. Before the pane is
+closed HoH takes the pane's root (its own shell, a session leader directly below
+the Herdr server) and the role's members: the root, everything in the root's
+session, and every descendant of those, by structure and not by mark. After the
+pane is closed the members are signalled one process at a time, with SIGTERM, a
+grace period, and SIGKILL, in rounds, and a final look at a fresh snapshot names
+any member still alive, including one born during the last round. Never a group,
+never a pid without the start time that was seen, never pid one, this process, its
+ancestors or what it started.
+
+- *What it does not find.* A command that scrubbed its mark, left the session
+  and was already detached from its parent when the pane was released. Unmarked
+  processes that merely hold files in the work tree are not touched or counted.
+  A pane that is already gone has no session to anchor on, so a command whose
+  mark cannot be read is not found there at all.
+- *A shared daemon is named and never ended.* A server that a role started first
+  (the lavish and chrome-devtools helpers are examples) inherits the mark and
+  detaches. It is reported as escaped, recorded, never signalled, and it blocks
+  the developer's release: the developer is not frozen while one exists. That
+  may be costly on a machine where such daemons are common.
+- *The root rule depends on the server's name and on the server not adopting
+  orphans.* Orphans are adopted by a subreaper (on the machine this was
+  measured on, the relay above Herdr), not by init, so a detached marked daemon
+  is also a session leader with an unmarked parent. The root is therefore
+  accepted only below a process named exactly `herdr` that leads its own
+  session, and never merely "the candidate that is left". If the server is not
+  named that on some install, every developer release is refused, visibly, with
+  nothing signalled. If a future Herdr became a subreaper, the release would be
+  refused without ending the role's command, which fails closed.
+- *A pane that is already gone* is not given a root: its marked leftovers are
+  named and the release is refused, and nothing is signalled.
+- *The interpreter may have no pidfd.* Where `os.pidfd_open` and
+  `signal.pidfd_send_signal` exist the signal goes through a pidfd opened before
+  the start time is read, so a reused pid cannot receive it. Where they do not
+  (the default interpreter of the machine this was measured on has none) the start time is re-read and
+  `kill` follows, and a window of microseconds remains in which a pid could be
+  reused.
+- *What the live smoke has not shown.* That the mark given to `tab create`
+  reaches the commands an agent's own shell tool starts, and that a closed pane
+  answers `pane_not_found`, are argued from the same channel and from Herdr's
+  schema, and are checked by the orchestrator against a live Herdr, not by any
+  test in this repository.

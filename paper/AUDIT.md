@@ -476,3 +476,25 @@ resolves to the same content, and that its evidence file or test is present --
 it does not re-derive the measurement itself. Where a cited figure needed
 re-derivation rather than lookup, the paper says which file carries it and,
 for the pre-registration timing, which test re-derives it on every run.
+
+## Erratum, added 2026-10-07 for the v0.3.0a1 pre-release
+
+Nothing above was edited and no verdict was changed. This audit covers
+`paper/POSITION_PAPER.md` as it stood on 2026-09-14; it is not an audit of
+anything written after it.
+
+* **The Methodology's counts are those of the first audit.** Its "all 47 claim
+  ids" and "38 numbers" are the counts at that audit. The later dated entries
+  added rows, and the tables and the Summary carry the later counts: 118
+  claim-id rows, 75 number rows and 203 rows in all.
+  `python3 tools/audit_refs.py summary-consistency` is the mechanical check of
+  those counts.
+* **Line numbers have moved.** Several rows say that a cited sentence is
+  "currently at line" so-and-so of `docs/LIMITATIONS.md`. That file has grown
+  since (a status section at its top, a QA-arena addendum), so those line
+  numbers are not current. The rows resolve through content anchors, which are
+  not line-based and still resolve.
+* **The development after the release is audited separately.**
+  `paper/AUDIT_V2.md` records the mechanical checks run for
+  `paper/POSITION_PAPER_V2.md` and lists the two independent reviews that
+  document still needs.

@@ -1,0 +1,17 @@
+[Unit]
+Description=Check regularly for HoH runs parked on storage pressure
+Documentation=file://%h/hoh/docs/OPERATIONS.md
+
+[Timer]
+# Every 10 minutes, the default recheck interval of a storage park. The due
+# time lives in the durable STORAGE_RECHECK timer -- this unit only has to look
+# often enough; `resume-storage` does nothing for a timer that is not due.
+OnBootSec=5min
+OnUnitActiveSec=10min
+# Catch up on missed runs, for instance after a reboot.
+Persistent=true
+AccuracySec=1min
+RandomizedDelaySec=60
+
+[Install]
+WantedBy=timers.target

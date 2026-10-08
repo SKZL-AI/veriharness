@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import os
+
 import pytest
 
 from hoh.contracts import AcceptanceCheck, Candidate, Outcome, Receipt
@@ -234,25 +236,264 @@ def test_guard_patterns_are_searched_for_in_the_package_too(tmp_path, monkeypatc
     runner.assert_command_allowed("python3 -m pytest -q")   # must not raise
 
 
-def test_the_operator_path_keeps_precedence(tmp_path, monkeypatch):
-    """A pattern the operator has sharpened must not be overruled by an older
-    copy that shipped with the package."""
+def _guard_dirs(tmp_path, monkeypatch, *, operator: str, package: str):
     from hoh import runner
 
-    operator, package = tmp_path / "operator", tmp_path / "package"
-    for d in (operator, package):
+    op, pkg = tmp_path / "operator", tmp_path / "package"
+    for d, extra in ((op, operator), (pkg, package)):
         d.mkdir()
-        (d / "dangerous-patterns.txt").write_text("# placeholder\n", encoding="utf-8")
-
-    monkeypatch.setattr(runner, "_HOME_PATTERNS", operator)
-    monkeypatch.setattr(runner, "_PACKAGE_PATTERNS", package)
+        (d / "dangerous-patterns.txt").write_text("# placeholder\n" + extra, encoding="utf-8")
+        (d / "house-rules-patterns.txt").write_text("# placeholder\n", encoding="utf-8")
+    monkeypatch.setattr(runner, "_HOME_PATTERNS", op)
+    monkeypatch.setattr(runner, "_PACKAGE_PATTERNS", pkg)
     monkeypatch.setattr(runner, "_REPO_PATTERNS", tmp_path / "missing")
+    return runner
 
-    assert runner._pattern_file("dangerous-patterns.txt").parent == operator
+
+def test_a_sharpened_operator_pattern_takes_effect_over_an_older_shipped_copy(
+        tmp_path, monkeypatch):
+    """The intent of the former `test_the_operator_path_keeps_precedence`
+    (first-found-wins, operator first): a pattern the operator sharpened must
+    not be overruled by an older copy shipped with the package. Now asserted as
+    behaviour rather than as which file wins."""
+    import pytest as _pytest
+
+    runner = _guard_dirs(tmp_path, monkeypatch, operator="sharpened-tool\n", package="")
+    with _pytest.raises(runner.HouseRuleViolation):
+        runner.assert_command_allowed("sharpened-tool --now")
+
+
+def test_an_operator_relaxation_does_not_weaken_the_shipped_policy(tmp_path, monkeypatch):
+    """2026-09-25: the operator relaxed a machine-wide rule for their own
+    sessions; under first-found-wins the product's guard lost the pattern and
+    the suite ran the refused command for real. The shipped policy always
+    applies; the operator's copy only adds."""
+    import pytest as _pytest
+
+    runner = _guard_dirs(tmp_path, monkeypatch, operator="", package="shipped-only-tool\n")
+    with _pytest.raises(runner.HouseRuleViolation):
+        runner.assert_command_allowed("shipped-only-tool -x")
+    runner.assert_command_allowed("harmless-tool -x")         # control: others still run
+
+
+def test_a_relaxed_operator_policy_cannot_make_the_suite_launch_a_refused_command(
+        tmp_path, monkeypatch, _no_refused_command_is_ever_executed):
+    """2026-09-25: with the operator's copy authoritative, relaxing it let
+    two tests really launch their payload. With the operator's copy emptied
+    and the *real* shipped policy in place, the check is refused before any
+    process is spawned."""
+    from hoh import runner
+
+    op = tmp_path / "operator"
+    op.mkdir()
+    for name in ("dangerous-patterns.txt", "house-rules-patterns.txt"):
+        (op / name).write_text("# relaxed: no patterns\n", encoding="utf-8")
+    monkeypatch.setattr(runner, "_HOME_PATTERNS", op)
+    marker = tmp_path / "must-not-exist"
+    with pytest.raises(HouseRuleViolation):
+        run_check(check(f"touch {marker}; nvidia-smi"), cand(),
+                  run_id="r1", iteration=1, attempt=1, cwd=tmp_path)
+    assert not marker.exists()
+    # (A regression would already have failed inside run_check: the stub
+    # raises pytest's Failed, which pytest.raises(HouseRuleViolation) does not
+    # catch.)
+
+
+def test_even_a_guard_with_no_patterns_at_all_cannot_launch_the_payload(
+        tmp_path, monkeypatch, _no_refused_command_is_ever_executed):
+    """The second line of defence: if classification fails completely (every
+    pattern file empty), the test boundary turns the would-be execution into
+    an ordinary test failure instead of starting the command. Guards against
+    a future guard regression leaving real processes on the machine. The
+    payload is a neutral sentinel: here the stub is the only barrier."""
+    from _pytest.outcomes import Failed
+
+    runner = _guard_dirs(tmp_path, monkeypatch, operator="", package="")
+    marker = tmp_path / "must-not-exist"
+    # Relative to cwd: an absolute tmp path outside the arena is refused by the
+    # arena check before the stub is reached whenever tmp lies under /home --
+    # as it does under a self-hosted run's strict isolation (found by the
+    # guard-union product run, 20260925t1540z-pguard, iteration 1, K2).
+    with pytest.raises(Failed, match="guard regression"):
+        runner.run_check(check("touch must-not-exist; hoh-never-execute-sentinel"), cand(),
+                         run_id="r1", iteration=1, attempt=1, cwd=tmp_path)
+    assert not marker.exists(), "the stub refused before bash ever started"
+    assert len(_no_refused_command_is_ever_executed) == 1
+    _no_refused_command_is_ever_executed.clear()   # observed on purpose
+
+
+def test_the_test_boundary_also_covers_subprocess_run_and_os_system(
+        tmp_path, _no_refused_command_is_ever_executed):
+    """guard-b 1/2: the first stub sat only in front of `hoh.runner`'s Popen;
+    `SandboxBackend.run` (subprocess.run) and a refactor to another spawn API
+    walked past it. The stub now replaces subprocess.Popen itself and wraps
+    os.system."""
+    import subprocess
+    from _pytest.outcomes import Failed
+
+    marker = tmp_path / "must-not-exist"
+    with pytest.raises(Failed, match="guard regression"):
+        subprocess.run(["bash", "-c", f"touch {marker}; hoh-never-execute-sentinel"])
+    with pytest.raises(Failed, match="guard regression"):
+        os.system(f"touch {marker}; hoh-never-execute-sentinel")
+    assert not marker.exists()
+    assert len(_no_refused_command_is_ever_executed) == 2
+    _no_refused_command_is_ever_executed.clear()   # observed on purpose
+    subprocess.run(["bash", "-c", f"touch {marker}"], check=True)   # control
+    assert marker.exists()
+
+
+def test_the_test_boundary_catches_other_spawn_apis_and_no_mere_mention(
+        tmp_path, _no_refused_command_is_ever_executed):
+    """Review round 2 (guard-a N3/N4, guard-b 2/N1): `os.spawn*`, `os.exec*`
+    and `executable=` walked past the stub, and substring matching failed a
+    harmless `grep <payload>` or a role prompt that names the tool."""
+    import subprocess
+    from _pytest.outcomes import Failed
+
+    marker = tmp_path / "must-not-exist"
+    with pytest.raises(Failed, match="guard regression"):
+        os.spawnvp(os.P_WAIT, "bash", ["bash", "-c", f"touch {marker}; hoh-never-execute-sentinel"])
+    with pytest.raises(Failed, match="guard regression"):
+        # A path that does not exist: should the stub ever fail to engage, the
+        # real execv raises FileNotFoundError (a red test) instead of
+        # replacing the pytest process (a vanished run) -- review round 3.
+        os.execv("/nonexistent/hoh-never-execute-sentinel", ["hoh-never-execute-sentinel"])
+    with pytest.raises(Failed, match="guard regression"):
+        subprocess.run(["x"], executable="/opt/hoh-never-execute-sentinel")
+    assert not marker.exists()
+    assert len(_no_refused_command_is_ever_executed) == 3
+    _no_refused_command_is_ever_executed.clear()   # observed on purpose
+
+    # A mention is not an execution: these must start normally.
+    probe = tmp_path / "probe.txt"
+    probe.write_text("hoh-never-execute-sentinel\n", encoding="utf-8")
+    out = subprocess.run(["grep", "-c", "hoh-never-execute-sentinel", str(probe)],
+                         capture_output=True, text=True)
+    assert out.stdout.strip() == "1"
+    out = subprocess.run(["bash", "-c", "echo 'never run hoh-never-execute-sentinel'"],
+                         capture_output=True, text=True)
+    assert "never run" in out.stdout
+
+
+@pytest.mark.parametrize("script, executes", [
+    # Every B1/C12 bypass form of the guard tests, as the stub must see it.
+    ("hoh-never-execute-sentinel", True),
+    ("touch x; hoh-never-execute-sentinel", True),
+    ("FOO=1 hoh-never-execute-sentinel", True),
+    ("eval hoh-never-execute-sentinel", True),
+    ("exec hoh-never-execute-sentinel", True),
+    ("command hoh-never-execute-sentinel", True),
+    ("env hoh-never-execute-sentinel", True),
+    ('bash -c "hoh-never-execute-sentinel"', True),
+    ("A=1 timeout 5 hoh-never-execute-sentinel", True),
+    ("n=hoh-never-execute-sentinel; $n", True),
+    ("/usr/bin/hoh-never-execute-sentinel", True),
+    ("sudo hoh-never-execute-sentinel", True),
+    ("xargs hoh-never-execute-sentinel", True),
+    ("! hoh-never-execute-sentinel", True),
+    ("x=`hoh-never-execute-sentinel -L`", True),
+    ("echo ok && hoh-never-execute-sentinel", True),
+    ("grep x f | hoh-never-execute-sentinel", True),
+    # Mentions, not executions.
+    ("grep -rn hoh-never-execute-sentinel src/", False),
+    ("echo 'see hoh-never-execute-sentinel docs'", False),
+    ("pytest -q", False),
+])
+def test_the_stub_is_fail_closed_on_every_bypass_form(script, executes):
+    """Review round 3: the command-position matcher missed eleven forms the
+    guard's own tests use (`eval T`, `bash -c "T"`, ...). Classification of
+    the stub only; nothing is spawned here."""
+    import conftest
+
+    assert conftest._executes(script, "hoh-never-execute-sentinel") is executes
+
+
+@pytest.mark.parametrize("argv", [
+    ["env", "hoh-never-execute-sentinel"],
+    ["timeout", "5", "hoh-never-execute-sentinel"],
+    ["nice", "hoh-never-execute-sentinel"],
+    ["xargs", "hoh-never-execute-sentinel"],
+    ["bash", "-O", "extglob", "-c", "hoh-never-execute-sentinel"],
+    ["bwrap", "--ro-bind", "/", "/", "--", "hoh-never-execute-sentinel"],
+    ["rg", "--pre", "hoh-never-execute-sentinel", "x", "."],
+])
+def test_the_stub_checks_the_whole_argv_not_only_argv0(argv):
+    """Review round 4: only argv[0] and `-c` scripts were checked, so a
+    payload later in a plain argv list ran unseen. Classification only."""
+    import conftest
+
+    scripts = conftest._executed_scripts(argv)
+    assert any(conftest._executes(s, "hoh-never-execute-sentinel") for s in scripts)
+
+
+def test_an_unreadable_operator_file_fails_closed_as_policy_unavailable(tmp_path, monkeypatch):
+    """guard-a M3: an operator copy that is a directory (or unreadable, or not
+    UTF-8) raised a raw OSError, which the controller does not treat as a
+    guard outcome, so the run crashed instead of blocking visibly."""
+    import pytest as _pytest
+
+    runner = _guard_dirs(tmp_path, monkeypatch, operator="", package="")
+    target = tmp_path / "operator" / "dangerous-patterns.txt"
+    target.rename(tmp_path / "operator" / "moved.txt")
+    target.mkdir()
+    with _pytest.raises(runner.PolicyUnavailable, match=r"denylist \(operator\)"):
+        runner.assert_command_allowed("harmless-tool")
+    target.rename(tmp_path / "operator" / "was-a-directory.v1")  # control: a readable file
+    target.write_text("# fine\n", encoding="utf-8")
+    runner.assert_command_allowed("harmless-tool")
+
+
+def test_a_missing_shipped_file_does_not_name_the_operator_directory(tmp_path, monkeypatch):
+    """guard-a M2: the operator's copy cannot stand in for the shipped one, so
+    the error must not list it among the places searched."""
+    import pytest as _pytest
+
+    runner = _guard_dirs(tmp_path, monkeypatch, operator="", package="")
+    (tmp_path / "package" / "dangerous-patterns.txt").rename(tmp_path / "package" / "gone.txt")
+    with _pytest.raises(runner.PolicyUnavailable) as exc:
+        runner.assert_command_allowed("harmless-tool")
+    assert str(tmp_path / "package") in str(exc.value)
+    assert str(tmp_path / "operator") not in str(exc.value)
+
+
+def test_an_operator_copy_repeating_shipped_patterns_is_matched_once(tmp_path, monkeypatch):
+    """guard-a M4: a hardlinked or byte-identical operator copy was loaded a
+    second time. Round 2 (guard-a N1): deduplicating by comparing the files
+    first raced with the second read, so duplicates are now dropped after
+    loading -- a repeated pattern is attributed to the shipped policy."""
+    import pytest as _pytest
+
+    runner = _guard_dirs(tmp_path, monkeypatch, operator="same-tool\nextra-tool\n",
+                         package="same-tool\n")
+    with _pytest.raises(runner.HouseRuleViolation, match=r"violates denylist 'same-tool'"):
+        runner.assert_command_allowed("same-tool")
+    with _pytest.raises(runner.HouseRuleViolation, match=r"denylist \(operator\) 'extra-tool'"):
+        runner.assert_command_allowed("extra-tool")      # the addition still applies
+
+
+def test_a_dangling_operator_symlink_fails_closed(tmp_path, monkeypatch):
+    """guard-a round 2 N2: a dangling operator symlink used to be skipped
+    silently; it is now refused like any unreadable operator file, so a
+    broken operator setup is visible instead of quietly ignored."""
+    import pytest as _pytest
+
+    runner = _guard_dirs(tmp_path, monkeypatch, operator="", package="")
+    target = tmp_path / "operator" / "dangerous-patterns.txt"
+    target.rename(tmp_path / "operator" / "moved.txt")
+    target.symlink_to(tmp_path / "operator" / "nowhere.txt")
+    with _pytest.raises(runner.PolicyUnavailable, match=r"cannot be loaded completely"):
+        runner.assert_command_allowed("harmless-tool")
+    target.rename(tmp_path / "operator" / "dangling.v1")  # control: no operator copy at all
+    runner.assert_command_allowed("harmless-tool")
 
 
 def test_missing_patterns_name_every_searched_location(tmp_path, monkeypatch):
-    """Without a policy nothing runs -- so the message has to say where it looked."""
+    """Without a policy nothing runs -- so the message has to say where it looked.
+
+    Since O235 only the shipped locations count: the operator's directory can
+    add patterns but not replace a missing shipped file, so it is not named
+    (it used to be, when it was the first search stage)."""
     import pytest as _pytest
 
     from hoh import runner
@@ -264,8 +505,9 @@ def test_missing_patterns_name_every_searched_location(tmp_path, monkeypatch):
         runner.assert_command_allowed("echo hallo")
     text = str(exc.value)
     assert "searched in:" in text
-    for attr in ("_HOME_PATTERNS", "_PACKAGE_PATTERNS", "_REPO_PATTERNS"):
+    for attr in ("_PACKAGE_PATTERNS", "_REPO_PATTERNS"):
         assert f"missing{attr}" in text
+    assert "missing_HOME_PATTERNS" not in text
 
 
 # --------------------------------------------------------------------------- #

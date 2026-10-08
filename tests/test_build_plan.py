@@ -6,6 +6,7 @@ would let a bad order look like a good one.
 from __future__ import annotations
 
 import importlib.util
+import json
 import sys
 from pathlib import Path
 
@@ -182,3 +183,165 @@ def test_an_item_held_by_a_gate_is_still_on_the_checklist():
     held = {i["item_id"]: i for i in bp.checklist(plan)["items"]}
     assert held["P8-01"]["ready_now"] is False
     assert held["P8-01"]["held_by_phase_gate"] == ["P7"]
+
+
+# --------------------------------------------------------------------------- #
+# Gate binding (O220/F2, M5): a gate-kind plan item is measured through the
+# requirement of its own phase that claims it.
+# --------------------------------------------------------------------------- #
+
+def _gate_item(item_id, phase="P2", kind="gate", text=None):
+    return {"id": item_id, "phase": phase, "kind": kind, "text": text or item_id,
+            "capability": False}
+
+
+def _gate_scope(*items):
+    """Phases P1..P3 with the given gate items and nothing else."""
+    return {"phases": [{"phase": p} for p in ("P1", "P2", "P3")], "items": list(items)}
+
+
+def _req(rid, phase, item=None, also=()):
+    return {"id": rid, "name": rid, "target_phase": phase, "authoritative_item": item,
+            "also_covers": list(also), "core_required_1_0": True}
+
+
+def _row(rid, status, phase="P2", **kw):
+    return _cap(rid, phase, status, **kw)
+
+
+def _gates(monkeypatch, items, requirements, capabilities):
+    monkeypatch.setattr(bp, "_scope", lambda: _gate_scope(*items))
+    return bp.phase_gates(capabilities, requirements)[1]
+
+
+def test_a_gate_item_bound_to_a_proven_requirement_is_met(monkeypatch):
+    gates = _gates(monkeypatch, [_gate_item("P2.exit.a")],
+                   [_req("P2-33", "P2", "P2.exit.a")], [_row("P2-33", "PROVEN")])
+    assert gates["P2"][0] is True, gates["P2"][1]
+    assert gates["P2"][1] == "1 exit condition(s), each bound to a PROVEN requirement"
+
+
+def test_a_bound_gate_item_is_measured_not_assumed(monkeypatch):
+    """Bound is not met: the matrix decides, and no row is no measurement."""
+    items, reqs = [_gate_item("P2.exit.a")], [_req("P2-33", "P2", "P2.exit.a")]
+    met, why = _gates(monkeypatch, items, reqs,
+                      [_row("P2-33", "IMPLEMENTED_NOT_PROVEN")])["P2"]
+    assert met is False and "P2-33 IMPLEMENTED_NOT_PROVEN" in why, why
+    met, why = _gates(monkeypatch, items, reqs, None)["P2"]
+    assert met is False and "P2-33 not measured" in why, why
+
+
+def test_an_unbound_gate_item_still_counts_as_unmeasured(monkeypatch):
+    met, why = _gates(monkeypatch,
+                      [_gate_item("P2.exit.a"), _gate_item("P2.exit.free")],
+                      [_req("P2-33", "P2", "P2.exit.a")],
+                      [_row("P2-33", "PROVEN")])["P2"]
+    assert met is False
+    assert "1 exit condition(s) nothing here measures yet" in why, why
+    assert "not PROVEN" not in why, why
+
+
+def test_a_waiver_does_not_meet_an_exit_condition(monkeypatch):
+    """A documented waiver satisfies a requirement for the build order; it does
+    not run the exit test the plan names (DECISIONS Q1)."""
+    row = _row("P2-33", "PARTIAL",
+               waiver={"reason": "later", "document": "docs/ROUTING.md"})
+    met, why = _gates(monkeypatch, [_gate_item("P2.exit.a")],
+                      [_req("P2-33", "P2", "P2.exit.a")], [row])["P2"]
+    assert met is False and "P2-33 PARTIAL" in why, why
+
+
+def test_a_claim_from_another_phase_binds_nothing(monkeypatch):
+    met, why = _gates(monkeypatch, [_gate_item("P2.exit.a")],
+                      [_req("P1-01", "P1", "P2.exit.a")],
+                      [_row("P1-01", "PROVEN", phase="P1")])["P2"]
+    assert met is False and "nothing here measures yet" in why, why
+    assert bp.gate_bindings([_gate_item("P2.exit.a")],
+                            [_req("P1-01", "P1", "P2.exit.a")]) == {"P2.exit.a": []}
+
+
+def test_also_covers_binds_like_the_authoritative_item(monkeypatch):
+    items = [_gate_item("P2.exit.a"), _gate_item("P2.exit.b")]
+    reqs = [_req("P2-33", "P2", "P2.exit.a", also=["P2.exit.b"])]
+    assert bp.gate_bindings(items, reqs) == {"P2.exit.a": ["P2-33"],
+                                             "P2.exit.b": ["P2-33"]}
+    met, why = _gates(monkeypatch, items, reqs, [_row("P2-33", "PROVEN")])["P2"]
+    assert met is True, why
+
+
+def test_every_requirement_bound_to_an_item_must_be_proven(monkeypatch):
+    met, why = _gates(monkeypatch, [_gate_item("P2.exit.a")],
+                      [_req("P2-33", "P2", "P2.exit.a"),
+                       _req("P2-34", "P2", "P2.exit.other", also=["P2.exit.a"])],
+                      [_row("P2-33", "PROVEN"), _row("P2-34", "MISSING")])["P2"]
+    assert met is False and "P2-34 MISSING" in why, why
+
+
+def test_the_count_is_of_bound_items_not_met(monkeypatch):
+    met, why = _gates(monkeypatch, [_gate_item("P2.exit.a"), _gate_item("P2.exit.b")],
+                      [_req("P2-33", "P2", "P2.exit.a"), _req("P2-34", "P2", "P2.exit.b")],
+                      [_row("P2-33", "PROVEN"), _row("P2-34", "MISSING")])["P2"]
+    assert met is False
+    assert why == "1 exit condition(s) bound to requirement(s) not PROVEN: P2-34 MISSING"
+
+
+def test_a_phase_without_gate_items_has_no_gate_entry(monkeypatch):
+    gates = _gates(monkeypatch, [_gate_item("P2.exit.a")],
+                   [_req("P2-33", "P2", "P2.exit.a")], [_row("P2-33", "PROVEN")])
+    assert set(gates) == {"P2"}
+
+
+def test_the_command_line_measures_the_bound_gate_items(tmp_path, monkeypatch, capsys):
+    """`main` hands the measured rows and the register to `phase_gates`; called
+    bare, every bound item would read as not measured."""
+    register = tmp_path / "program/v3_3/REQUIREMENTS.json"
+    register.parent.mkdir(parents=True)
+    register.write_text(json.dumps({"requirements": [
+        _req("P2-33", "P2", "P2.exit.a")]}), encoding="utf-8")
+    monkeypatch.setattr(bp, "HOH", tmp_path)
+    monkeypatch.setattr(bp, "_scope", lambda: _gate_scope(_gate_item("P2.exit.a")))
+
+    def matrix_with(status):
+        class _Missing(Exception):
+            pass
+
+        class _Matrix:
+            RegisterMissing = _Missing
+
+            @staticmethod
+            def measure():
+                return {"capabilities": [_row("P2-33", status)]}
+        return lambda: _Matrix
+
+    monkeypatch.setattr(bp, "_matrix", matrix_with("IMPLEMENTED_NOT_PROVEN"))
+    assert bp.main([]) == 0
+    out = capsys.readouterr().out
+    assert "P2-33 IMPLEMENTED_NOT_PROVEN" in out, out
+
+    monkeypatch.setattr(bp, "_matrix", matrix_with("PROVEN"))
+    assert bp.main([]) == 0
+    out = capsys.readouterr().out
+    assert "gate P2" not in out, out
+
+
+def test_the_real_exit_includes_are_bound_and_the_checklist_gates_are_not():
+    """The positive control over the real inventory and register, nothing stubbed:
+    P2's five exit-includes are bound to P2-33..37, its three checklist gates to
+    nothing -- so even with everything PROVEN, P2's external gate stays shut on
+    exactly those three (DECISIONS Q2)."""
+    needs_evidence(PROGRAM_REGISTER)
+    scope = bp._scope()
+    requirements = bp._register_requirements()
+    bindings = bp.gate_bindings(scope["items"], requirements)
+    exits = {k: v for k, v in bindings.items() if k.startswith("P2.exit-includes.")}
+    assert len(exits) == 5, exits
+    assert sorted(rid for v in exits.values() for rid in v) == \
+        [f"P2-{n}" for n in range(33, 38)]
+    assert all(len(v) == 1 for v in exits.values()), exits
+    gates_ = {k: v for k, v in bindings.items() if k.startswith("P2.checklist-gate.")}
+    assert len(gates_) == 3 and all(v == [] for v in gates_.values()), gates_
+
+    proven = [_row(r["id"], "PROVEN", phase=r["target_phase"]) for r in requirements]
+    met, why = bp.phase_gates(proven, requirements)[1]["P2"]
+    assert met is False
+    assert why.startswith("3 exit condition(s) nothing here measures yet"), why

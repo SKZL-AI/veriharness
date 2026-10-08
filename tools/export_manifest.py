@@ -35,7 +35,7 @@ Rule set (14 named rules, plus the conservative default `unclassified`):
     tests                      tests/
     tooling                    tools/
     example                    examples/
-    operational-integration    ops/, plugin/, policy/ -- non-Python
+    operational-integration    ops/, plugin/, policy/, .claude/ -- non-Python
                                deployment/runtime-integration material
                                (systemd units, a cron example, the Herdr
                                plugin manifest, the guard's own policy pattern
@@ -275,6 +275,14 @@ _DIRECTORY_RULES = (
     ("ops", "INCLUDE", "operational-integration"),
     ("plugin", "INCLUDE", "operational-integration"),
     ("policy", "INCLUDE", "operational-integration"),
+    # O213: the project-local wiring that puts this repository's
+    # destructive-operation policy in front of an orchestrator's commands. It
+    # has to ship, or a clone gets `tools/preserve.py` with nothing consulting
+    # it -- the same "component with tests rather than a capability" gap P2-24
+    # and P2-26 were held at PARTIAL for. Classified like `policy/`: it
+    # configures the host harness rather than being imported by `hoh`, and it
+    # carries no machine-local path (the hook resolves `$CLAUDE_PROJECT_DIR`).
+    (".claude", "INCLUDE", "operational-integration"),
     ("dogfood", "EXCLUDE", "internal-working-document"),
     ("paper", "INCLUDE", "paper"),
 )

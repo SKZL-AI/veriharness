@@ -41,17 +41,93 @@ from .orchestrator import (
     BudgetExhausted, MergeFailure, MergeResult, RunLauncher, RunOutcome,
     RunVerdict,
 )
+from .controller import open_seal_arenas
 from .project import ActionClass, TaskNode
-from .store import RunStore, StoreError
+from .stages import violation_unresolved
+from .store import LockBusy, RunStore, StoreError
 
 #: Blocked kinds that mean the provider, not the work.
-PROVIDER_BLOCKED = frozenset({"usage_quota", "quota", "rate_limit", "provider"})
+PROVIDER_BLOCKED = frozenset({"usage_quota", "quota", "rate_limit", "provider",
+                              # What `stages.block` actually writes for an
+                              # exhausted quota. Missing here, a real quota wait
+                              # read as UNDETERMINED and halted the project
+                              # AMBIGUOUS instead of parking it (found 2026-09-25
+                              # once the durability fixture stopped re-implementing
+                              # this mapping).
+                              "usage_limit"})
+
+#: Phrases with which `hoh run` refuses to start, or a run stops, because
+#: storage admission is not usable (STORAGE-B3). A run that says one of them
+#: is STORAGE_UNAVAILABLE (NEEDS_YOU), never UNDETERMINED. The blocked kind of
+#: a storage park, `storage_pressure`, is deliberately *not* in
+#: PROVIDER_BLOCKED: it is its own class with its own consumer.
+STORAGE_REFUSED = ("storage state root is not initialised", "WSL: configure host_paths",
+                   "WSL: the VHDX volume is not observed", "storage admission unavailable",
+                   "storage pressure: the recheck timer could not be armed")
 
 #: Phrases in a stop reason that mean a person has to answer something. Matched
 #: on the reason text rather than a code because HoH records this case in prose:
 #: `blocked_kind` was None for the trust dialog that first exposed it.
 APPROVAL_WAITING = frozenset({"waits for an approval", "trust this folder",
                               "blocked dialog", "awaiting approval"})
+
+
+def accepted_identity_problem(git, sha: str, outcome: RunOutcome) -> str | None:
+    """Why commit `sha` is not the accepted candidate, or None when it is.
+
+    The accepted identity is the verified *tree* when the outcome carries one:
+    `sha` must have exactly that tree. Without a tree (an older launcher) it is
+    the candidate commit itself. `git` is a callable running git in the
+    repository and returning a CompletedProcess.
+    """
+    if outcome.candidate_tree:
+        tree = git("rev-parse", "--verify", "--quiet", sha + "^{tree}").stdout.strip()
+        if tree != outcome.candidate_tree:
+            return (f"branch head {sha[:12]} carries tree {tree[:12] or '?'}, but the "
+                    f"accepted tree is {outcome.candidate_tree[:12]}: the branch moved "
+                    f"after acceptance, or the accepted work was never committed onto it")
+        return None
+    if outcome.candidate and outcome.candidate != sha:
+        return (f"branch head {sha[:12]} is not the accepted candidate "
+                f"{outcome.candidate[:12]}, and no verified tree was recorded to "
+                f"show they carry the same content")
+    return None
+
+
+def _timer_form(stamp: str | None) -> str | None:
+    """`RunState.retry_after` (ISO 8601 with offset) in the timer form, or None.
+
+    None, not a guess, when it cannot be read: the node then keeps a human
+    owner instead of parking on a time nobody can check.
+
+    A fractional moment is rounded *up* to the next whole second. The timer
+    form has no fractions, and cutting them off made the timer due up to one
+    second before the provider's reset: the tick resumed a run the provider
+    still refused, while `quota.is_due` said not due (O237). The resume loop's
+    copy calls this one, so both round the same way.
+    """
+    if not stamp:
+        return None
+    from datetime import UTC, datetime, timedelta
+
+    try:
+        moment = datetime.fromisoformat(stamp.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if moment.tzinfo is None:
+        return None
+    moment = moment.astimezone(UTC)
+    if moment.microsecond:
+        moment = moment.replace(microsecond=0) + timedelta(seconds=1)
+    return moment.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def storage_refusal(text: str | None) -> str | None:
+    """The first line of `text` that names a storage refusal, or None."""
+    for line in (text or "").splitlines():
+        if any(phrase in line for phrase in STORAGE_REFUSED):
+            return line.strip()[:300]
+    return None
 
 
 @dataclass
@@ -81,8 +157,20 @@ class HohRunLauncher(RunLauncher):
         approvals: "ApprovalProvider | None" = None,
         isolation: str = "none",
         dispatch_budget: int | None = None,
+        storage_root: Path | str | None = None,
+        storage_admission_factory=None,
     ) -> None:
         self.root = Path(root).expanduser().resolve()
+        #: STORAGE-B3: the storage state root every spawned `hoh run` is given
+        #: (`--storage-root`): this launcher's own configuration, else
+        #: `$HOH_STATE_ROOT` as resolved now, at construction. None leaves the
+        #: child to resolve its own default -- which refuses an uninitialised
+        #: root rather than inventing one.
+        configured = storage_root or os.environ.get("HOH_STATE_ROOT") or None
+        self.storage_root = Path(configured).expanduser() if configured else None
+        #: Builds the admission whose boot the launcher claims before it
+        #: spawns (Revision 9 item 7); injectable for tests.
+        self._storage_admission_factory = storage_admission_factory
         self.repo_path = Path(repo_path).expanduser().resolve()
         self.mainline = mainline
         self.iterations = iterations
@@ -151,11 +239,21 @@ class HohRunLauncher(RunLauncher):
         )
         return Dispatch(p.returncode, p.stdout, p.stderr)
 
-    def _git(self, *args: str, cwd: Path | None = None) -> subprocess.CompletedProcess:
-        return subprocess.run(
-            ["git", *args], capture_output=True, text=True,
-            cwd=str(cwd or self.repo_path),
-        )
+    #: A merge runs under the program lock (it must not race a successor's),
+    #: so a git that hangs -- a hook, a signing prompt, a credential helper --
+    #: must not hold that lock for ever (review A3, N3).
+    MERGE_TIMEOUT = 600
+
+    def _git(self, *args: str, cwd: Path | None = None,
+             timeout: float | None = None) -> subprocess.CompletedProcess:
+        try:
+            return subprocess.run(
+                ["git", *args], capture_output=True, text=True,
+                cwd=str(cwd or self.repo_path), timeout=timeout,
+            )
+        except subprocess.TimeoutExpired:
+            return subprocess.CompletedProcess(["git", *args], 124, "",
+                                               f"git timed out after {timeout} s")
 
     def prepare(self, node: TaskNode) -> str | None:
         """Creates the worktree, specification and run for a node that has none.
@@ -322,6 +420,14 @@ class HohRunLauncher(RunLauncher):
             state = store.read_state()
         except StoreError as exc:
             return f"run {run_id} has an unreadable state: {exc}"
+        # Before any approval or unblock: a capability violation is lifted by
+        # a person who has looked, never by this launcher -- whatever else the
+        # block reason happens to mention.
+        if violation_unresolved(state):
+            reason = (state.blocked_reason or state.stop_reason or "").splitlines()
+            return (f"run {run_id} is blocked by a capability violation; only a "
+                    f"person lifts that (hoh unblock): "
+                    f"{reason[0][:200] if reason else 'no reason recorded'}")
         if state.condition is not Condition.BLOCKED:
             return None
 
@@ -429,17 +535,30 @@ class HohRunLauncher(RunLauncher):
             state = store.read_state()
         except StoreError as exc:
             return RunOutcome(RunVerdict.UNDETERMINED, f"run state unreadable: {exc}")
-        # A controller still holding the run's lock means the work is live, not
-        # crashed. Taking a verdict from a run in flight would be a guess.
+        # A run still being executed by a live process is in flight -- not
+        # crashed, and not something to take a verdict from. Two witnesses:
+        # the process marker `hoh run` keeps for its whole lifetime (the run
+        # lock alone is free between iterations, review B3 C), and the lock
+        # itself for a run started by a version without the marker. Only a
+        # busy lock counts; any other error probing it is UNDETERMINED, since
+        # an unreadable lock file is not a live controller (review A3, F2).
+        live = store.running_process()
+        if live is not None:
+            return RunOutcome(
+                RunVerdict.IN_FLIGHT,
+                f"run {node.run_id or node.id} is still executed by pid {live.get('pid')} "
+                f"(since {live.get('since')})")
         try:
             with store.lock():
                 pass
-        except Exception:
-            return RunOutcome(
-                RunVerdict.UNDETERMINED,
-                f"run {node.run_id or node.id} is still held by a live controller",
-            )
-        return self._verdict_from_baseline(state, node.accepted_before)
+        except LockBusy as exc:
+            return RunOutcome(RunVerdict.IN_FLIGHT, str(exc)[:200])
+        except Exception as exc:                          # noqa: BLE001 - classified
+            return RunOutcome(RunVerdict.UNDETERMINED,
+                              f"the run lock could not be probed: {exc}"[:200])
+        return self._verdict_from_baseline(
+            state, node.accepted_before,
+            open_seals=bool(open_seal_arenas(store.dir)))
 
     def launch(self, node: TaskNode) -> RunOutcome:
         if self.dry_run:
@@ -452,12 +571,29 @@ class HohRunLauncher(RunLauncher):
         # back to reading it here covers a launcher used without a controller.
         before = node.accepted_before or self.accepted_baseline(node)
 
-        d = self._run_cli([
+        argv = [
             "python3", "-m", "hoh.cli", "--root", str(self.root), "run", run_id,
             "--iterations", str(self.iterations),
             "--planner", self.planner, "--developer", self.developer, "--qa", self.qa,
             "--isolation", self.isolation,
-        ])
+        ]
+        if self.storage_root is not None:
+            argv += ["--storage-root", str(self.storage_root)]
+            refused = self._claim_storage_boot()
+            if refused is not None:
+                return RunOutcome(RunVerdict.STORAGE_UNAVAILABLE, refused)
+        d = self._run_cli(argv)
+        if d.exit_code == 2 and (d.stderr or "").lstrip().startswith(
+                f"Run {run_id} is already being executed"):
+            # Another process executes this run (its process lock refused ours):
+            # the run is in flight, not rejected by this dispatch (review A5, M1).
+            return RunOutcome(RunVerdict.IN_FLIGHT, d.stderr.strip()[:200])
+        if d.exit_code != 0:
+            said = storage_refusal(d.stderr)
+            if said is not None:
+                # `hoh run` refused to start for its storage configuration:
+                # nothing ran, and a person has to fix the configuration.
+                return RunOutcome(RunVerdict.STORAGE_UNAVAILABLE, said)
 
         try:
             state = store.read_state()
@@ -467,16 +603,101 @@ class HohRunLauncher(RunLauncher):
                 f"run {run_id} left no readable state (cli exit {d.exit_code}): {exc}",
             )
 
-        return self._verdict(state, before, d)
+        return self._verdict(state, before, d,
+                             open_seals=bool(open_seal_arenas(store.dir)))
 
-    def _verdict_from_baseline(self, state, previous_id: str | None) -> RunOutcome:
-        return self._verdict(state, previous_id, Dispatch(0, "", ""))
+    def _claim_storage_boot(self) -> str | None:
+        """Claim the boot on the storage ledger before spawning (Revision 9
+        item 7: every host entry point that starts runs claims first). Returns
+        a refusal text, or None when claimed. An uninitialised root is left
+        for the child to refuse, in its own words."""
+        root = self.storage_root
+        if root is None or not (root / "OWNER.json").is_file():
+            return None
+        try:
+            if self._storage_admission_factory is not None:
+                admission = self._storage_admission_factory(root)
+            else:
+                from .storage_pressure import StorageAdmission, StoragePolicy
 
-    def _verdict(self, state, before, d: Dispatch) -> RunOutcome:
+                policy_file = root / "storage-policy.json"
+                policy = (StoragePolicy.load(policy_file) if policy_file.is_file()
+                          else StoragePolicy())
+                admission = StorageAdmission.for_state_root(root, policy)
+            admission.claim_boot()
+        except Exception as exc:                          # noqa: BLE001 - classified
+            return f"storage admission unavailable: the launcher cannot claim the boot: {exc}"
+        return None
+
+    def _open_seals_of(self, state) -> bool:
+        """Does this run's own seal ledger leave a candidate arena sealed?
+
+        For a caller that did not say (`open_seals=None`). A missing ledger is
+        "no". An unreadable ledger, or a run id that names no directory of the
+        root, is "yes": a gate that cannot tell holds.
+        """
+        try:
+            run_dir = RunStore(self.root, state.run_id).dir
+        except Exception:                                 # noqa: BLE001 - fail closed
+            return True
+        return bool(open_seal_arenas(run_dir))
+
+    def _verdict_from_baseline(self, state, previous_id: str | None, *,
+                               open_seals: bool | None = None) -> RunOutcome:
+        return self._verdict(state, previous_id, Dispatch(0, "", ""),
+                             open_seals=open_seals)
+
+    def _verdict(self, state, before, d: Dispatch, *,
+                 open_seals: bool | None = None) -> RunOutcome:
         # `vorher` is a candidate id (from project state) or a Candidate (from a
         # direct read). Normalised here so both callers share one comparison.
         previous_id = getattr(before, "candidate_id", before)
         after = state.last_accepted_candidate
+
+        # Ahead of the rule that an acceptance is durable: a run held by a
+        # capability violation has evidence that was interfered with, so
+        # nothing it accepted is merged until a person has looked. UNDETERMINED
+        # halts the node for that person.
+        if violation_unresolved(state):
+            return RunOutcome(
+                RunVerdict.UNDETERMINED,
+                f"run blocked by a capability violation; nothing it accepted is "
+                f"merged until a person has looked: "
+                f"{state.blocked_reason or state.stop_reason or ''}"[:400],
+            )
+
+        # A candidate arena still sealed for QA has not been compared at the
+        # release: whether it was touched is not known yet, so nothing is
+        # merged until a `hoh run` has closed the tabs and released it. The
+        # flag is read from the run's own ledger when the caller did not say.
+        if open_seals is None:
+            open_seals = self._open_seals_of(state)
+        if open_seals:
+            return RunOutcome(
+                RunVerdict.UNDETERMINED,
+                "a candidate arena sealed for QA is still open; nothing is "
+                "merged until a later 'hoh run' has closed the tabs and "
+                "released it (compared first)",
+            )
+
+        # STORAGE-B3, checked before the generic fallbacks. A recorded
+        # acceptance still wins (it is durable, below); otherwise a storage
+        # park is a wait of its own class and a storage refusal needs a
+        # person. Neither ever reads as a provider wait or as UNDETERMINED.
+        new_acceptance = after is not None and (
+            previous_id is None or after.candidate_id != previous_id)
+        if not new_acceptance:
+            if state.condition is Condition.BLOCKED \
+                    and (state.blocked_kind or "") == "storage_pressure":
+                return RunOutcome(
+                    RunVerdict.STORAGE_WAIT,
+                    f"parked on storage pressure: {state.blocked_reason or ''}"[:300],
+                    retry_after=_timer_form(state.retry_after),
+                )
+            said = storage_refusal(state.stop_reason) if state.condition in (
+                Condition.PAUSED, Condition.BLOCKED) else None
+            if said is not None:
+                return RunOutcome(RunVerdict.STORAGE_UNAVAILABLE, said)
 
         # Handled first, and deliberately: an acceptance that a run recorded is
         # a fact about that run, and nothing that happens afterwards -- a
@@ -499,6 +720,7 @@ class HohRunLauncher(RunLauncher):
                 return RunOutcome(
                     RunVerdict.PROVIDER_UNAVAILABLE,
                     f"blocked on the provider: {state.blocked_reason or art}",
+                    retry_after=_timer_form(state.retry_after),
                 )
             # Blocked with nothing accepted is not a rejection either -- it is
             # a state nobody has classified, and guessing is what this whole
@@ -520,7 +742,7 @@ class HohRunLauncher(RunLauncher):
                 return RunOutcome(
                     RunVerdict.REJECTED,
                     f"no new candidate: still {after.candidate_id}",
-                    candidate=after.commit,
+                    candidate=after.commit, candidate_tree=after.tree_digest,
                 )
             # **An acceptance is durable.** It does not depend on the stage the
             # run happened to stop in afterwards. This check used to live
@@ -543,7 +765,7 @@ class HohRunLauncher(RunLauncher):
                     postscript += f": {state.blocked_reason}"
             return RunOutcome(RunVerdict.ACCEPTED,
                               f"accepted {after.candidate_id}{postscript}",
-                              candidate=after.commit)
+                              candidate=after.commit, candidate_tree=after.tree_digest)
 
         if state.stage in (Stage.CHECKPOINTED, Stage.READY_FOR_DELIVERY):
             return RunOutcome(RunVerdict.UNDETERMINED,
@@ -595,25 +817,38 @@ class HohRunLauncher(RunLauncher):
         wrong.
         """
         branch_ = node.branch or f"hoh-{node.run_id or node.id}"
-        result = MergeResult(landed=False, branch=branch_, candidate=outcome.candidate or "")
+        result = MergeResult(landed=False, branch=branch_, candidate=outcome.candidate or "",
+                             accepted_tree=outcome.candidate_tree or "")
         if self.dry_run:
             result.failure = MergeFailure.UNKNOWN
             result.detail = "dry run: no merge attempted"
             return result
 
-        if self._git("rev-parse", "--verify", "--quiet", branch_).returncode != 0:
+        head = self._git("rev-parse", "--verify", "--quiet", branch_ + "^{commit}")
+        if head.returncode != 0:
             result.failure = MergeFailure.NO_BRANCH
             result.detail = f"branch {branch_} does not exist in {self.repo_path}"
             return result
+        # Resolved once, here, and used by identity from now on: the branch is
+        # a mutable name, and everything after this line must be about the one
+        # commit that was checked against the acceptance.
+        sha = head.stdout.strip()
+        problem = accepted_identity_problem(self._git, sha, outcome)
+        if problem:
+            result.failure = MergeFailure.CANDIDATE_MISMATCH
+            result.detail = problem
+            return result
+        result.integrated = sha
 
         result.target_head_before = self._git(
             "rev-parse", "--short", self.mainline).stdout.strip()
         result.merge_base = self._git(
-            "merge-base", branch_, self.mainline).stdout.strip()[:12]
+            "merge-base", sha, self.mainline).stdout.strip()[:12]
 
         # Already contained: a resumed session must not merge twice, and the
-        # cheapest way to know is to ask whether the branch is an ancestor.
-        if self._git("merge-base", "--is-ancestor", branch_, self.mainline).returncode == 0:
+        # cheapest way to know is to ask whether the accepted commit is an
+        # ancestor of the mainline.
+        if self._git("merge-base", "--is-ancestor", sha, self.mainline).returncode == 0:
             result.landed = True
             result.detail = "already contained in the mainline"
             return result
@@ -626,8 +861,13 @@ class HohRunLauncher(RunLauncher):
                     if (out.stderr or out.stdout).strip() else "checkout failed"
                 return result
 
-        p = self._git("merge", "--no-ff", branch_, "-m",
-                      f"Take accepted candidate {node.id} ({outcome.detail})")
+        # Taken on the mainline, after any switch to it: the switch alone must
+        # not read as something the merge left behind (review A6, 3).
+        status_before = self._git("status", "--porcelain",
+                                  "--untracked-files=no").stdout.strip()
+        p = self._git("merge", "--no-ff", sha, "-m",
+                      f"Take accepted candidate {node.id} ({sha}): {outcome.detail}",
+                      timeout=self.MERGE_TIMEOUT)
         if p.returncode == 0:
             result.landed = True
             return result
@@ -636,8 +876,24 @@ class HohRunLauncher(RunLauncher):
         result.conflicting_paths = self._conflicting_paths(text)
         result.detail = self._first_meaningful(text)
         result.failure = self._classify(text)
-        # Leave no half-merge behind for the next session to puzzle over.
-        self._git("merge", "--abort")
+        # Leave no half-merge behind for the next session to puzzle over --
+        # where git lets us. `merge --abort` needs MERGE_HEAD; a git killed by
+        # the timeout (inside a hook, say) may have staged the candidate
+        # without writing it, and then nothing here may guess at a cleanup of
+        # the integration checkout. That is said, not hidden (review A4, G3).
+        merge_head = self._git("rev-parse", "-q", "--verify", "MERGE_HEAD")
+        if merge_head.returncode == 0:
+            self._git("merge", "--abort", timeout=self.MERGE_TIMEOUT)
+        leftover = self._git("status", "--porcelain", "--untracked-files=no").stdout.strip()
+        # Only what the merge itself left: changes that were there before it
+        # (an operator's edit in the way) keep their own classification
+        # (review A5, M2).
+        if leftover and leftover != status_before:
+            result.failure = MergeFailure.UNKNOWN
+            result.detail = (f"{result.detail or 'merge failed'}; the mainline checkout "
+                             f"is left with changes git did not undo ("
+                             f"{', '.join(leftover.splitlines()[:4])}) -- a person must "
+                             f"inspect it before any further merge")
         return result
 
     @staticmethod

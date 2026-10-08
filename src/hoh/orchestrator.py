@@ -36,6 +36,9 @@ possible, and what keeps the fault-injection tests free of agent quota.
 
 from __future__ import annotations
 
+import time
+from collections.abc import Iterator
+from contextlib import ExitStack, contextmanager, nullcontext
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Protocol
@@ -52,6 +55,71 @@ from .project import (
 )
 from .projectstore import ProjectStore
 from .store import LockBusy, StaleWrite, StoreError
+from .succession import MasterAuthority, StaleMaster
+from .timers import TimerKind, TimerStore, TimerStoreError, check_time
+
+
+@contextmanager
+def write_lock(store: ProjectStore, *, attempts: int = 50,
+               pause: float = 0.1) -> Iterator[None]:
+    """The program lock for one short critical section, waiting briefly.
+
+    Non-blocking attempts with a bounded wait rather than a blocking flock: a
+    holder that is frozen inside its own critical section must cost the
+    waiter a clear `LockBusy`, not an indefinite hang.
+    """
+    with ExitStack() as stack:
+        for i in range(attempts):
+            try:
+                stack.enter_context(store.lock())
+                break
+            except LockBusy:
+                # Only the *acquisition* is retried. An exception from the body
+                # is never mistaken for a busy lock and never re-runs it.
+                if i == attempts - 1:
+                    raise
+                time.sleep(pause)
+        yield
+
+
+def disarm_stale_waits(directory, state: ProjectState) -> list:
+    """Withdraw every armed timer of a node that is no longer waiting on one.
+
+    A node that leaves a `usage_limit` park by any route -- a merge
+    conflict, a budget stop, a human `unblock` -- must not keep a timer
+    that later resumes it as though it were still a provider wait
+    (review A, P1 and S5). A timer is left armed only for a node that is
+    BLOCKED on `usage_limit` with exactly that retry time.
+    """
+    timers = TimerStore(directory)
+    withdrawn = []
+    for t in list(timers.armed()):
+        if t.node_id is None:
+            continue
+        node = state.node(t.node_id)
+        if node is None:
+            continue
+        waiting = (node.lifecycle is Lifecycle.BLOCKED
+                   and node.blocked_kind == "usage_limit"
+                   and node.retry_after == t.due_at
+                   and t.kind is TimerKind.PROVIDER_RETRY)
+        # A timer armed for a RUNNING node is the arm-before-park window of
+        # this very transition; it becomes a real wait in the same write.
+        if not waiting and node.lifecycle is not Lifecycle.RUNNING \
+                and t.kind is TimerKind.PROVIDER_RETRY:
+            withdrawn.append(timers.disarm(
+                t.timer_id, f"node {node.id} is {node.lifecycle.value}"
+                            f"/{node.blocked_kind}: no longer this wait"))
+    return withdrawn
+
+
+def node_timer_key(node_id: str) -> str:
+    """The `run_id` a project node's timer carries.
+
+    `hoh.resumption` decides per run id; a node is not a run, so its timers
+    are keyed `node:<id>` and cannot collide with a real run's.
+    """
+    return f"node:{node_id}"
 
 
 class HaltClass(StrEnum):
@@ -92,6 +160,30 @@ class HaltClass(StrEnum):
     #: Separate from MERGE_CONFLICT because the remedy is different: clear the
     #: tree rather than reconcile content.
     MERGE_OBSTRUCTED = "MERGE_OBSTRUCTED"
+    #: This session is no longer the master: its epoch was superseded, its
+    #: lease was handed over, released or lost to a successor. Not AMBIGUOUS:
+    #: the state is known and healthy, it belongs to somebody else now, and the
+    #: correct response is to write nothing (P2-07/08/09, DS6, AC7).
+    SUPERSEDED = "SUPERSEDED"
+    #: The accepted candidate is not what its branch carries. Known and
+    #: classified -- the branch moved, or the verified tree was never committed
+    #: -- and nothing lands until a person looks, because landing either the
+    #: branch or nothing would be wrong.
+    CANDIDATE_MISMATCH = "CANDIDATE_MISMATCH"
+    #: A node's run is still executing in another live process (a role run
+    #: that survived its master). Nothing is decided and nothing is written:
+    #: re-dispatching would duplicate the work, taking a verdict would guess.
+    #: The resume loop comes back when the run has finished (finding #9).
+    RUN_IN_FLIGHT = "RUN_IN_FLIGHT"
+    #: A node's run is parked on storage pressure (STORAGE-B3): admission
+    #: refused its next role dispatch. A wait with a durable STORAGE_RECHECK
+    #: timer that `hoh resume-storage` consumes -- not a human's decision.
+    STORAGE_WAIT = "STORAGE_WAIT"
+    #: Storage admission could not be used at all -- the state root is not
+    #: initialised, WSL without an observed host volume, an unwritable ledger,
+    #: or a recheck timer that could not be armed. Fail closed: a person is
+    #: needed, and the halt names the reason.
+    STORAGE_UNAVAILABLE = "STORAGE_UNAVAILABLE"
     #: A state or verdict the controller cannot classify. The defect class:
     #: each one is a place where a human would have to step in.
     AMBIGUOUS = "AMBIGUOUS"
@@ -122,6 +214,7 @@ NEEDS_A_HUMAN = frozenset(
         HaltClass.BLOCKED_PROVIDER,
         HaltClass.BLOCKED_DEPENDENCY,
         HaltClass.CORRUPT_STATE,
+        HaltClass.STORAGE_UNAVAILABLE,
         HaltClass.AMBIGUOUS,
     }
 )
@@ -134,6 +227,10 @@ class RunVerdict(StrEnum):
     PROVIDER_UNAVAILABLE = "PROVIDER_UNAVAILABLE"
     #: Dispatched but its outcome is not yet determinable.
     UNDETERMINED = "UNDETERMINED"
+    #: The run is still being executed by a live process that is not this
+    #: controller -- typically a role run that outlived the master that
+    #: started it. Known, not ambiguous: the verdict comes when it finishes.
+    IN_FLIGHT = "IN_FLIGHT"
     #: The run exists and has not begun: no iteration, no candidate, no
     #: receipts. Distinct from UNDETERMINED because it is not unknown at all --
     #: it is the most knowable state a run can be in, and the right response is
@@ -154,6 +251,16 @@ class RunVerdict(StrEnum):
     #: somebody else's downtime: waiting fixes that one and cannot fix this
     #: one, and only a person can decide the work is worth more budget.
     BUDGET_EXHAUSTED = "BUDGET_EXHAUSTED"
+    #: The run is parked on storage pressure (`blocked_kind ==
+    #: "storage_pressure"`, STORAGE-B3). Not a provider wait: it never becomes
+    #: `usage_limit` or a PROVIDER_RETRY timer, and only `hoh resume-storage`
+    #: resumes it.
+    STORAGE_WAIT = "STORAGE_WAIT"
+    #: The run refused to start, or stopped, because storage admission is not
+    #: usable (uninitialised state root, WSL without the host volume, an
+    #: unavailable ledger, an unarmable recheck timer). NEEDS_YOU, never
+    #: UNDETERMINED.
+    STORAGE_UNAVAILABLE = "STORAGE_UNAVAILABLE"
 
 
 @dataclass
@@ -161,6 +268,15 @@ class RunOutcome:
     verdict: RunVerdict
     detail: str = ""
     candidate: str | None = None
+    #: For PROVIDER_UNAVAILABLE: the earliest retry the provider named, in the
+    #: timer form. With it the node parks on a durable timer that the resume
+    #: loop can consume; without it the node keeps a human owner.
+    retry_after: str | None = None
+    #: For ACCEPTED: the tree object QA verified (`Candidate.tree_digest`). The
+    #: accepted identity is this tree, not `candidate` -- for a dirty-tree
+    #: candidate `candidate` names the *base* commit, and the verified content
+    #: exists only as this tree until it is committed onto the run's branch.
+    candidate_tree: str | None = None
 
 
 class MergeFailure(StrEnum):
@@ -169,6 +285,10 @@ class MergeFailure(StrEnum):
     CONFLICT = "CONFLICT"
     OBSTRUCTED = "OBSTRUCTED"
     NO_BRANCH = "NO_BRANCH"
+    #: The branch does not carry what was accepted: its head's tree is not the
+    #: verified tree (it moved after acceptance, or the accepted work was never
+    #: committed onto it). Merging it would land something nobody verified.
+    CANDIDATE_MISMATCH = "CANDIDATE_MISMATCH"
     UNKNOWN = "UNKNOWN"
 
 
@@ -190,6 +310,11 @@ class MergeResult:
     target_head_before: str = ""
     merge_base: str = ""
     candidate: str = ""
+    #: The commit that was integrated (or found already integrated): the exact
+    #: object identity, never a branch name that could have moved since.
+    integrated: str = ""
+    #: The tree that was accepted, echoed so the receipt binds both.
+    accepted_tree: str = ""
 
     def summary(self) -> str:
         parts = [f"branch {self.branch}" if self.branch else ""]
@@ -315,12 +440,20 @@ class ProjectController:
         *,
         max_rounds: int = 40,
         max_repairs: int = 5,
+        authority: MasterAuthority | None = None,
     ) -> None:
         self.store = store
         self.launcher = launcher
         self.gates = gates
         self.max_rounds = max_rounds
         self.max_repairs = max_repairs
+        #: The master authority this controller drives under, or None for the
+        #: pre-P2 behaviour (fenced by `write_seq` and the project lock only).
+        #: With one, every authoritative act -- a state write, a dispatch that
+        #: spends, a merge that lands accepted work -- is preceded by a check
+        #: that this session still holds its epoch, and a stale one halts
+        #: SUPERSEDED having written nothing.
+        self.authority = authority
 
     # -- persistence ------------------------------------------------------- #
 
@@ -331,8 +464,51 @@ class ProjectController:
         the object it is given, and a controller that kept holding the
         pre-write object would fence itself out on the next round.
         """
-        self.store.write_state(state)
-        return self.store.read_state()
+        if self.authority is None:
+            self.store.write_state(state)
+            self._disarm_stale_waits(state)
+            return self.store.read_state()
+        # Under master authority the lease, not a drive-long lock, keeps a
+        # second master out, so the program lock is held only for this write:
+        # check the epoch, stamp it, write, renew -- one critical section. A
+        # frozen or partitioned master therefore holds nothing a successor
+        # needs, and when it wakes its next write is refused here.
+        with write_lock(self.store):
+            self.authority.stamp(state)
+            self.store.write_state(state)
+            # Only after the checked write: a superseded master withdrew a
+            # successor's timer before its own refusal (review A2, c).
+            self._disarm_stale_waits(state)
+            try:
+                self.authority.renew()
+            except Exception:                         # noqa: BLE001 - see below
+                # The write is durable; the lease is renewed at the next write
+                # or by the keepalive. Reporting this as a refusal would record
+                # a state change as not having happened (review A, S3).
+                pass
+            return self.store.read_state()
+
+    def _disarm_stale_waits(self, state: ProjectState) -> None:
+        try:
+            disarm_stale_waits(self.store.dir, state)
+        except TimerStoreError:
+            # An unreadable timer store must not crash a controller that did
+            # not need it before (review A2, N5); a stale timer it cannot
+            # withdraw is refused by the resume loop, which re-checks the node.
+            pass
+
+    def _authorise(self, act: str) -> None:
+        """Refuse an authoritative act by a session that is not the master.
+
+        Called before the acts whose repetition would be duplicate work: a
+        dispatch (spends budget, may produce a second candidate) and a merge
+        (lands accepted work). A state write is checked in `_persist`.
+        """
+        if self.authority is not None:
+            try:
+                self.authority.check()
+            except StaleMaster as exc:
+                raise StaleMaster(f"{act} refused: {exc}") from exc
 
     def _record(
         self,
@@ -364,8 +540,28 @@ class ProjectController:
 
     def run(self) -> Result:
         try:
+            if self.authority is not None:
+                # The lease is the exclusion; see `_persist`. Holding the
+                # program lock for a whole drive would let a frozen master
+                # block every successor for as long as it stays frozen.
+                self.authority.check()
+                with self.authority.keepalive():
+                    return self._drive()
+            if (self.store.dir / "epochs.json").is_file():
+                # A governed project is driven only by a master. An ungoverned
+                # controller re-reads the current epoch from disk and would pass
+                # the store fence while a live master believes it is alone
+                # (review A, P8).
+                return Result(halt=HaltClass.SUPERSEDED, reason=(
+                    f"project {self.store.project_id} is governed by a master epoch; "
+                    "a controller without authority may not drive it"))
             with self.store.lock():
                 return self._drive()
+        except StaleMaster as exc:
+            # Before StaleWrite, which it subclasses: a superseded master is a
+            # known, healthy state that belongs to a successor. Nothing was
+            # written by this session after the refusal.
+            return Result(halt=HaltClass.SUPERSEDED, reason=str(exc))
         except LockBusy as exc:
             return Result(
                 halt=HaltClass.BLOCKED_DEPENDENCY,
@@ -418,6 +614,11 @@ class ProjectController:
         for n in laufend:
             outcome_ = self.launcher.evaluate(n)
             steps_.append(Step(0, "EVALUATED", n.id, f"{outcome_.verdict}: {outcome_.detail}"))
+            if outcome_.verdict is RunVerdict.IN_FLIGHT:
+                why = (f"node {n.id}: its run is still executing in another live process "
+                       f"({outcome_.detail}); waiting for it rather than guessing")
+                steps_.append(Step(0, HaltClass.RUN_IN_FLIGHT, n.id, why))
+                return Result(HaltClass.RUN_IN_FLIGHT, why, steps_)
             if outcome_.verdict is RunVerdict.NOT_STARTED:
                 # Marked RUNNING, but the run never began -- a process died
                 # between persisting the lifecycle and dispatching. Nothing was
@@ -479,6 +680,8 @@ class ProjectController:
                 obstacle = self.launcher.prepare(task)
             except BudgetExhausted as empty:
                 task.lifecycle = Lifecycle.BLOCKED
+                task.blocked_kind = None
+                task.retry_after = None
                 task.note = str(empty)
                 state = self._persist(state)
                 why = f"node {task.id} has no budget left: {empty}"
@@ -488,6 +691,8 @@ class ProjectController:
                               round_, reparaturen)
             if obstacle:
                 task.lifecycle = Lifecycle.BLOCKED
+                task.blocked_kind = None
+                task.retry_after = None
                 task.note = obstacle
                 state = self._persist(state)
                 why = f"node {task.id} cannot be made runnable: {obstacle}"
@@ -506,6 +711,11 @@ class ProjectController:
             # after the obstruction was cleared the node was READY again with
             # its acceptance still sitting in the run record.
             in_advance = self.launcher.evaluate(task)
+            if in_advance.verdict is RunVerdict.IN_FLIGHT:
+                why = (f"node {task.id} is READY but a live process still executes its "
+                       f"run ({in_advance.detail}); dispatching again would duplicate it")
+                steps_.append(Step(round_, HaltClass.RUN_IN_FLIGHT, task.id, why))
+                return Result(HaltClass.RUN_IN_FLIGHT, why, steps_, round_, reparaturen)
             if in_advance.verdict is RunVerdict.ACCEPTED:
                 steps_.append(Step(round_, "ALREADY_ACCEPTED", task.id, in_advance.detail))
                 result = self._settle(state, task.id, in_advance, round_, steps_)
@@ -525,6 +735,8 @@ class ProjectController:
             task.accepted_before = self.launcher.accepted_baseline(task)
             try:
                 state = self._persist(state)
+            except StaleMaster:
+                raise
             except StaleWrite as exc:
                 why = f"another orchestrator advanced this project: {exc}"
                 steps_.append(Step(round_, HaltClass.AMBIGUOUS, task.id, why))
@@ -532,6 +744,7 @@ class ProjectController:
             task = state.node(task.id)          # the re-read copy
             assert task is not None
 
+            self._authorise(f"dispatch of node {task.id}")
             outcome_ = self.launcher.launch(task)
             result = self._settle(state, task.id, outcome_, round_, steps_)
             if isinstance(result, Result):
@@ -545,6 +758,70 @@ class ProjectController:
         why = f"{self.max_rounds} rounds without reaching a fixpoint"
         steps_.append(Step(self.max_rounds, HaltClass.ROUND_LIMIT, detail=why))
         return Result(HaltClass.ROUND_LIMIT, why, steps_, self.max_rounds, reparaturen)
+
+    def _settle_storage_wait(
+        self, state: ProjectState, task, node_id: str, outcome_: RunOutcome,
+        round_: int, steps_: list[Step],
+    ) -> "Result":
+        """A node whose run parked on storage pressure (STORAGE-B3).
+
+        Same discipline as the provider wait, its own class: under the program
+        lock and the authority check, a STORAGE_RECHECK timer is armed
+        **first**, any superseded STORAGE_RECHECK timer of the node is then
+        disarmed by its id, and only then is the node persisted BLOCKED with
+        ``blocked_kind = "storage_pressure"`` -- never ``usage_limit``, never
+        a PROVIDER_RETRY timer. If the timer cannot be armed the node is not
+        parked and the halt is STORAGE_UNAVAILABLE (NEEDS_YOU).
+        """
+        from datetime import UTC, datetime
+
+        from .storage_park import ARM_FAILED, ParkPolicy, STORAGE_CLASS
+        from .timers import in_seconds
+
+        due = outcome_.retry_after
+        if due:
+            try:
+                check_time(due)
+            except ValueError:
+                due = None
+        if not due:
+            due = in_seconds(ParkPolicy().recheck_interval_s, now=datetime.now(UTC))
+        try:
+            with (write_lock(self.store) if self.authority is not None
+                    else nullcontext()):
+                self._authorise(f"arming the storage recheck timer of node {node_id}")
+                timers = TimerStore(self.store.dir)
+                superseded = [old.timer_id for old in timers.armed()
+                              if old.node_id == node_id
+                              and old.kind is TimerKind.STORAGE_RECHECK]
+                new = timers.arm_new(
+                    kind=TimerKind.STORAGE_RECHECK, due_at=due,
+                    reason=f"storage wait for node {node_id}: {outcome_.detail}"[:300],
+                    program_id=state.project_id,
+                    program_epoch=state.program_generation,
+                    session_epoch=(self.authority.epoch if self.authority is not None
+                                   else state.master_epoch) or 0,
+                    run_id=node_timer_key(node_id), node_id=node_id)
+                for timer_id in superseded:
+                    timers.disarm(timer_id, f"superseded by storage recheck {new.timer_id}")
+        except TimerStoreError as exc:
+            task.lifecycle = Lifecycle.BLOCKED
+            task.blocked_kind = None
+            task.retry_after = None
+            task.note = f"{outcome_.detail} | {ARM_FAILED} ({exc}); a person resumes this node"
+            self._persist(state)
+            why = f"node {node_id}: {ARM_FAILED} ({exc}), NEEDS_YOU"
+            steps_.append(Step(round_, HaltClass.STORAGE_UNAVAILABLE, node_id, why))
+            return Result(HaltClass.STORAGE_UNAVAILABLE, why)
+        task.lifecycle = Lifecycle.BLOCKED
+        task.blocked_kind = STORAGE_CLASS
+        task.retry_after = due
+        task.note = outcome_.detail
+        self._persist(state)
+        why = (f"node {node_id} waits on storage pressure (recheck {due}, "
+               f"`hoh resume-storage`): {outcome_.detail}")
+        steps_.append(Step(round_, HaltClass.STORAGE_WAIT, node_id, why))
+        return Result(HaltClass.STORAGE_WAIT, why)
 
     def _settle(
         self, state: ProjectState, node_id: str, outcome_: RunOutcome,
@@ -563,10 +840,75 @@ class ProjectController:
         if outcome_.verdict is RunVerdict.PROVIDER_UNAVAILABLE:
             task.lifecycle = Lifecycle.BLOCKED
             task.note = outcome_.detail
-            self._persist(state)
+            task.blocked_kind = None
+            task.retry_after = None
+            if outcome_.retry_after:
+                # DS3: a usage limit is a wait with a time, not a verdict. The
+                # node records it and a durable timer is armed under the
+                # programme generation, so whoever runs next -- this session,
+                # a successor, the systemd timer -- can resume it without a
+                # person, and a successor master resumes what this one armed.
+                task.blocked_kind = "usage_limit"
+                task.retry_after = check_time(outcome_.retry_after)
+            if task.retry_after:
+                # Armed *before* the state records the wait: a crash in between
+                # leaves a timer for a node that is not blocked, which the
+                # resume loop refuses harmlessly (RUN_NOT_PARKED). The other
+                # order would leave a blocked node that nothing will wake.
+                try:
+                    with (write_lock(self.store) if self.authority is not None
+                            else nullcontext()):
+                        # Checked under the program lock: a successor cannot
+                        # acquire between the check and the arm (review A, S1).
+                        self._authorise(f"arming the retry timer of node {node_id}")
+                        timers = TimerStore(self.store.dir)
+                        for old in timers.armed():
+                            if old.node_id == node_id and old.kind is TimerKind.PROVIDER_RETRY:
+                                timers.disarm(old.timer_id, "superseded by a new provider wait")
+                        timers.arm_new(
+                            kind=TimerKind.PROVIDER_RETRY, due_at=task.retry_after,
+                            reason=f"provider wait for node {node_id}: {outcome_.detail}"[:300],
+                            program_id=state.project_id,
+                            program_epoch=state.program_generation,
+                            session_epoch=(self.authority.epoch if self.authority is not None
+                                           else state.master_epoch) or 0,
+                            run_id=node_timer_key(node_id), node_id=node_id)
+                except TimerStoreError as exc:
+                    # No timer, so no timed park: a parked state is never durable
+                    # without its wake-up. The node keeps a human owner instead
+                    # (review A3, F4).
+                    task.blocked_kind = None
+                    task.retry_after = None
+                    task.note = (f"{outcome_.detail} | the retry timer could not be "
+                                 f"armed ({exc}); a person resumes this node")
+            state = self._persist(state)
             why = f"node {node_id}: {outcome_.detail or 'provider unavailable'}"
             steps_.append(Step(round_, HaltClass.BLOCKED_PROVIDER, node_id, why))
             return Result(HaltClass.BLOCKED_PROVIDER, why)
+
+        if outcome_.verdict is RunVerdict.STORAGE_WAIT:
+            return self._settle_storage_wait(state, task, node_id, outcome_, round_, steps_)
+
+        if outcome_.verdict is RunVerdict.STORAGE_UNAVAILABLE:
+            task.lifecycle = Lifecycle.BLOCKED
+            task.blocked_kind = None
+            task.retry_after = None
+            task.note = outcome_.detail
+            self._persist(state)
+            why = f"node {node_id}: storage admission unavailable, NEEDS_YOU: {outcome_.detail}"
+            steps_.append(Step(round_, HaltClass.STORAGE_UNAVAILABLE, node_id, why))
+            return Result(HaltClass.STORAGE_UNAVAILABLE, why)
+
+        if outcome_.verdict is RunVerdict.IN_FLIGHT:
+            # The run this dispatch meant to start is already being executed
+            # by another live process. The node stays RUNNING, as persisted
+            # before the dispatch, and nothing is written: the resume loop
+            # waits for that run and settles it when it has finished (review
+            # A7 -- the unclassified branch below made it a BLOCKED node that
+            # nothing resumed).
+            why = f"node {node_id}: its run is being executed elsewhere ({outcome_.detail})"
+            steps_.append(Step(round_, HaltClass.RUN_IN_FLIGHT, node_id, why))
+            return Result(HaltClass.RUN_IN_FLIGHT, why)
 
         if outcome_.verdict is RunVerdict.NOT_STARTED:
             task.lifecycle = Lifecycle.READY
@@ -575,6 +917,8 @@ class ProjectController:
 
         if outcome_.verdict is RunVerdict.NEEDS_APPROVAL:
             task.lifecycle = Lifecycle.BLOCKED
+            task.blocked_kind = None
+            task.retry_after = None
             task.note = outcome_.detail
             self._persist(state)
             why = f"node {node_id} is waiting for a human approval: {outcome_.detail}"
@@ -583,6 +927,8 @@ class ProjectController:
 
         if outcome_.verdict is RunVerdict.BUDGET_EXHAUSTED:
             task.lifecycle = Lifecycle.BLOCKED
+            task.blocked_kind = None
+            task.retry_after = None
             task.note = outcome_.detail
             self._persist(state)
             why = f"node {node_id} spent its budget: {outcome_.detail}"
@@ -597,7 +943,13 @@ class ProjectController:
             return Result(HaltClass.NOT_RUN, why)
 
         if outcome_.verdict is RunVerdict.ACCEPTED:
-            m = self.launcher.merge(task, outcome_)
+            with (write_lock(self.store) if self.authority is not None
+                  else nullcontext()):
+                # The check and the merge in one critical section: a successor
+                # acquires only after the merge returned, and then finds it
+                # already contained (review A, S1).
+                self._authorise(f"merge of node {node_id}")
+                m = self.launcher.merge(task, outcome_)
             if not isinstance(m, MergeResult):        # a bool, from an older launcher
                 m = MergeResult(landed=bool(m), failure=None if m else MergeFailure.UNKNOWN)
             if not m.landed:
@@ -609,10 +961,13 @@ class ProjectController:
                 class_name = {
                     MergeFailure.CONFLICT: HaltClass.MERGE_CONFLICT,
                     MergeFailure.OBSTRUCTED: HaltClass.MERGE_OBSTRUCTED,
+                    MergeFailure.CANDIDATE_MISMATCH: HaltClass.CANDIDATE_MISMATCH,
                 }.get(m.failure, HaltClass.AMBIGUOUS)
                 was = {
                     HaltClass.MERGE_CONFLICT: "git reported a content conflict",
                     HaltClass.MERGE_OBSTRUCTED: "the working tree was in the way",
+                    HaltClass.CANDIDATE_MISMATCH: "its branch does not carry the "
+                                                  "accepted tree",
                 }.get(class_name, "the merge failed and git did not say why")
                 why = (
                     f"node {node_id} was accepted but its candidate did not land: "
@@ -620,16 +975,26 @@ class ProjectController:
                     + (f" -- {m.detail}" if m.detail else "")
                 )
                 task.lifecycle = Lifecycle.BLOCKED
+                task.blocked_kind = None
+                task.retry_after = None
                 task.note = why
                 self._persist(state)
                 steps_.append(Step(round_, class_name, node_id, why))
                 return Result(class_name, why)
             task.lifecycle = Lifecycle.MERGED
+            # The receipt binds what was accepted to what landed: the accepted
+            # tree, the base the candidate named, and the exact commit that was
+            # integrated. "landed on <base>" was what this said before, which
+            # for a dirty-tree candidate named a commit that did not contain
+            # the accepted work at all (evidence audit, 2026-09-25).
+            integrated = getattr(m, "integrated", "") or ""
             self._record(
                 state, DecisionKind.MERGE_RELEASE,
-                f"every criterion passed and the candidate landed on "
-                f"{outcome_.candidate or 'the mainline'}",
-                {"node": node_id, "candidate": outcome_.candidate},
+                f"every criterion passed and commit "
+                f"{integrated or outcome_.candidate or '(unnamed)'} was integrated",
+                {"node": node_id, "candidate": outcome_.candidate,
+                 "accepted_tree": outcome_.candidate_tree,
+                 "integrated": integrated or None},
             )
             fresh_state = self._persist(state)
             steps_.append(Step(round_, "MERGED", node_id))
@@ -662,6 +1027,8 @@ class ProjectController:
                " (and the launcher gave no detail)")
         )
         task.lifecycle = Lifecycle.BLOCKED
+        task.blocked_kind = None
+        task.retry_after = None
         task.note = why
         self._persist(state)
         steps_.append(Step(round_, HaltClass.AMBIGUOUS, node_id, why))
@@ -677,6 +1044,15 @@ class ProjectController:
             # Nothing runnable and not terminal: something is blocked or
             # contingent, and the state does not say what to do next.
             blocked_ = [n.id for n in state.nodes if n.lifecycle is Lifecycle.BLOCKED]
+            storage_ = [n.id for n in state.nodes if n.lifecycle is Lifecycle.BLOCKED
+                        and n.blocked_kind == "storage_pressure"]
+            if blocked_ and storage_ == blocked_:
+                # Every block is a storage wait with its own recheck timer
+                # (STORAGE-B3): a wait, never a halt that needs a person.
+                why = ("no node is runnable; waiting on storage pressure: "
+                       + ", ".join(storage_) + " (`hoh resume-storage` resumes them)")
+                steps_.append(Step(round_, HaltClass.STORAGE_WAIT, detail=why))
+                return Result(HaltClass.STORAGE_WAIT, why), state, reparaturen
             why = (
                 "no node is runnable and the DAG is not terminal"
                 + (f"; blocked: {', '.join(blocked_)}" if blocked_ else "")
@@ -719,6 +1095,22 @@ class ProjectController:
             self._record(state, DecisionKind.CLOSURE_VERDICT, why,
                          {"subject": subject_, "generation": state.closure_generation})
             state = self._persist(state)
+            # DS4: a terminal project disarms every timer it armed, so nothing
+            # it scheduled while alive can wake it -- or spend -- afterwards.
+            # Under the program lock after a check, like every other write.
+            try:
+                with (write_lock(self.store) if self.authority is not None
+                      else nullcontext()):
+                    self._authorise("disarming the closed project's timers")
+                    disarmed = TimerStore(self.store.dir).disarm_all(
+                        f"project {state.project_id} closed: {why}"[:300])
+            except TimerStoreError:
+                disarmed = []
+                steps_.append(Step(round_, "TIMERS_UNREADABLE",
+                                   detail="the timer store could not be read to disarm"))
+            if disarmed:
+                steps_.append(Step(round_, "TIMERS_DISARMED",
+                                   detail=f"{len(disarmed)} timer(s)"))
             steps_.append(Step(round_, HaltClass.CLOSED, detail=why))
             return Result(HaltClass.CLOSED, why), state, reparaturen
 

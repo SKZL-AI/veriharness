@@ -54,9 +54,22 @@ REFUSED_MODES = {
 
 #: Denied in every mode, and a policy that omits any of them is refused. Each
 #: is the Claude permission-rule spelling of something the house rules forbid.
+#:
+#: `find` with `-delete` is spelled as two *wildcard* rules, not as a `:*`
+#: prefix rule. Claude Code reads `Tool(x:*)` as "the literal prefix x" and does
+#: not expand a `*` inside x, so the earlier `Bash(find * -delete:*)` matched
+#: only a command that literally began `find * -delete` and denied nothing in
+#: practice (Claude Code 2.1.289 said so at startup). `find * -delete*` covers
+#: `find <anything> -delete...`; `find -delete*` covers the path-less form,
+#: which the first cannot match because its `*` sits between two blanks.
+#: The first is broad on purpose: it also denies a `find` that deletes nothing
+#: but carries ` -delete` as text in its arguments (a quoted name pattern
+#: with a leading blank, say). For a deny rule that over-match is acceptable;
+#: the cost is a refused command, never a deletion let through.
 MANDATORY_DENY = (
     "Bash(rm:*)", "Bash(rmdir:*)", "Bash(shred:*)", "Bash(dd:*)",
-    "Bash(mkfs:*)", "Bash(find * -delete:*)", "Bash(truncate:*)",
+    "Bash(mkfs:*)", "Bash(find * -delete*)", "Bash(find -delete*)",
+    "Bash(truncate:*)",
     "Bash(git clean:*)", "Bash(git reset --hard:*)", "Bash(git push:*)",
     "Bash(git branch -D:*)", "Bash(git tag -d:*)", "Bash(git rebase:*)",
     "Bash(sudo:*)", "Bash(su:*)", "Bash(chown:*)",
@@ -68,6 +81,88 @@ MANDATORY_DENY = (
 
 #: Allow rules too broad to be a decision about anything.
 _UNSCOPED = re.compile(r"^(Bash|Write|Edit|NotebookEdit)(\(\s*\*?\s*(:\s*\*)?\s*\))?$")
+
+#: Tools whose `(path)` rules Claude Code's file checks never consult, with the
+#: tool whose rules they do consult instead: only Edit(...) and Read(...).
+_UNMATCHED_FILE_TOOLS = {"Write": "Edit", "NotebookEdit": "Edit",
+                         "MultiEdit": "Edit", "Glob": "Read"}
+
+#: Tools whose rules Claude Code reads as paths, where `:*` means nothing.
+_FILE_TOOLS = ("Read", "Write", "Edit", "Glob", "NotebookRead", "NotebookEdit", "Cd")
+
+#: A word that starts a redirection or a further command (`|`, `&&`, `;`,
+#: `2>`), after which Claude Code's allow-rule check stops looking.
+_OPERATOR_WORD = re.compile(r"^(?:[|&;<>]|\d+[<>])")
+
+
+def _unescaped_star(text: str) -> bool:
+    """A `*` not preceded by an odd number of backslashes."""
+    for i, ch in enumerate(text):
+        if ch == "*":
+            slashes, j = 0, i - 1
+            while j >= 0 and text[j] == "\\":
+                slashes, j = slashes + 1, j - 1
+            if slashes % 2 == 0:
+                return True
+    return False
+
+
+def _wildcard_before_command(content: str) -> bool:
+    """Claude Code's allow-rule check: a command word, then a `*` argument,
+    then a further word that is not an option (`git * push`). Such a rule also
+    approves any option inserted where the `*` stands."""
+    if content.endswith(":*"):
+        return False
+    words = content.split()
+    if len(words) < 3 or _unescaped_star(words[0]):
+        return False
+    seen = False
+    for word in words[1:]:
+        if _OPERATOR_WORD.match(word):
+            return False
+        if _unescaped_star(word):
+            seen = True
+            continue
+        if word.startswith("-"):
+            continue
+        return seen
+    return False
+
+
+def rule_defect(rule: str, behavior: str) -> str | None:
+    """Why Claude Code would match `rule` differently from how it reads, or
+    `None` when it matches as written.
+
+    Mirrors the rule checks of Claude Code's settings validator (2.1.289; the
+    warnings it prints at startup), restricted to the forms that change what a
+    rule matches. `behavior` is "deny" or "allow"; one check applies to allow
+    rules only, as in Claude Code. A whole-tool rule (`WebFetch`) has no
+    content and matches as written.
+    """
+    m = re.fullmatch(r"(\w+)\((.*)\)", rule.strip(), flags=re.S)
+    if not m:
+        return None
+    tool, content = m.group(1), m.group(2)
+    if tool == "Bash":
+        if content == ":*":
+            return "has an empty prefix before :*, which Claude Code rejects"
+        if content.endswith(":*"):
+            if _unescaped_star(content[:-2].rstrip()):
+                return ("mixes * with the trailing :* prefix syntax; Claude Code "
+                        "matches it as a literal prefix and does not expand the *")
+        elif ":*" in content:
+            return ("has a :* that is not at the end; Claude Code matches it as a "
+                    "* wildcard with a literal ':', not as a prefix rule")
+        if behavior == "allow" and _wildcard_before_command(content):
+            return ("has a wildcard before the rest of the command, so it also "
+                    "approves any option inserted at that position")
+        return None
+    if tool in _FILE_TOOLS and ":*" in content:
+        return "uses :*, which Claude Code accepts only for Bash prefix rules"
+    if tool in _UNMATCHED_FILE_TOOLS:
+        return (f"is not matched by Claude Code's file checks; only "
+                f"{_UNMATCHED_FILE_TOOLS[tool]}(path) rules are")
+    return None
 
 #: What the house-rules prompt must say, checked on load so it cannot be
 #: emptied into a formality.
@@ -87,7 +182,8 @@ class RoleApprovalPolicy:
     source: str = ""
     digest: str = ""
 
-    def write_role_files(self, run_dir: Path, role: str) -> tuple[Path, Path]:
+    def write_role_files(self, run_dir: Path, role: str, *,
+                         answers_dir: Path | None = None) -> tuple[Path, Path]:
         """The settings file and the house-rules prompt for one role, written
         into the run directory.
 
@@ -97,15 +193,32 @@ class RoleApprovalPolicy:
         quoting; a rule list might not, and a deny rule that the shell ate
         would be a deny rule that silently does not exist. The files stay in
         the run directory as the evidence of what each role could do.
+
+        With `answers_dir`, the role may also write its own answer file and
+        read its prompt file without asking: exactly one scoped Edit rule and
+        one scoped Read rule for the answers directory, scoped to that
+        directory and nothing else, are appended after the policy's own allow
+        rules (see `_answers_rule` and `_answers_read_rule`). A sanctioned
+        write location must not depend on what `auto` mode's classifier makes
+        of the words being written, and a prompt too long for argv reaches the
+        role only as a file there. The deny list is written unchanged and
+        still wins: a scoped allow never overrides a deny rule. `evidence()`
+        stays as the policy declares it; the written settings file is the
+        evidence of the added rules.
         """
         folder = Path(run_dir) / "approval"
         folder.mkdir(parents=True, exist_ok=True)
         settings = folder / f"{role}.settings.json"
         prompt = folder / "house_rules.md"
+        allow = list(self.allow.get(role) or ())
+        if answers_dir is not None:
+            for rule in (_answers_rule(answers_dir), _answers_read_rule(answers_dir)):
+                if rule not in allow:
+                    allow.append(rule)
         settings.write_text(json.dumps({"permissions": {
             "defaultMode": self.mode,
             "deny": list(self.deny),
-            "allow": list(self.allow.get(role) or ()),
+            "allow": allow,
         }}, indent=2) + "\n", encoding="utf-8")
         prompt.write_text(self.house_rules + "\n", encoding="utf-8")
         return settings, prompt
@@ -125,6 +238,29 @@ class RoleApprovalPolicy:
                     self.house_rules.encode()).hexdigest()}
 
 
+def _answers_rule(answers_dir: Path | str) -> str:
+    """The one allow rule that lets a role write into its answers directory.
+
+    `Edit(...)` because Claude Code's file-write checks match Edit rules, not
+    Write rules; `//` because a path with a single leading `/` is read
+    relative to the settings root, while `//` names an absolute path. The
+    directory is resolved first, so a relative or symlinked path grants the
+    real directory and nothing beside it.
+    """
+    return "Edit(/" + str(Path(answers_dir).resolve()) + "/**)"
+
+
+def _answers_read_rule(answers_dir: Path | str) -> str:
+    """The one allow rule that lets a role read its answers directory.
+
+    A prompt longer than one command-line argument reaches the role as a
+    prompt file there (`dispatchers.PROMPT_FILE_THRESHOLD`), and the role has
+    to be able to read it without a dialog. Same form as `_answers_rule`:
+    `//` for an absolute path, the directory resolved first.
+    """
+    return "Read(/" + str(Path(answers_dir).resolve()) + "/**)"
+
+
 def parse(data: dict, source: str = "") -> RoleApprovalPolicy:
     """Validate a policy document. Refuses, with the reason, rather than
     applying a policy that is weaker than it looks."""
@@ -138,11 +274,20 @@ def parse(data: dict, source: str = "") -> RoleApprovalPolicy:
         raise PolicyRefused(f"mode {mode!r} is not one of {sorted(MODES)}")
 
     deny = tuple(data.get("deny") or ())
+    for rule in deny:
+        if not isinstance(rule, str):
+            raise PolicyRefused(f"deny entry {rule!r} is not a permission rule "
+                                "string")
     missing = [d for d in MANDATORY_DENY if d not in deny]
     if missing:
         raise PolicyRefused(f"the deny-list is missing {len(missing)} mandatory "
                             f"entr{'y' if len(missing) == 1 else 'ies'}: "
                             + ", ".join(missing[:5]))
+    for rule in deny:
+        defect = rule_defect(rule, "deny")
+        if defect:
+            raise PolicyRefused(f"deny rule {rule!r} {defect}; a deny rule that "
+                                "matches nothing is a deny rule that does not exist")
 
     house = (data.get("house_rules") or "").strip()
     lower = house.lower()
@@ -155,6 +300,9 @@ def parse(data: dict, source: str = "") -> RoleApprovalPolicy:
     for role, rules in (data.get("roles") or {}).items():
         rules = tuple((rules or {}).get("allow") or ())
         for rule in rules:
+            if not isinstance(rule, str):
+                raise PolicyRefused(f"{role}: allow entry {rule!r} is not a "
+                                    "permission rule string")
             if _UNSCOPED.match(rule.strip()):
                 raise PolicyRefused(f"{role}: allow rule {rule!r} is unscoped; "
                                     "name the command or the path")
@@ -162,6 +310,9 @@ def parse(data: dict, source: str = "") -> RoleApprovalPolicy:
                 raise PolicyRefused(f"{role}: {rule!r} is network egress")
             if rule in deny:
                 raise PolicyRefused(f"{role}: {rule!r} is both allowed and denied")
+            defect = rule_defect(rule, "allow")
+            if defect:
+                raise PolicyRefused(f"{role}: allow rule {rule!r} {defect}")
         allow[role] = rules
 
     canonical = json.dumps(data, sort_keys=True).encode()

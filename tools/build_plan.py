@@ -46,6 +46,31 @@ def _matrix():
     return cm
 
 
+def _program_scope():
+    spec = importlib.util.spec_from_file_location("program_scope",
+                                                  HERE / "program_scope.py")
+    ps = importlib.util.module_from_spec(spec)
+    sys.modules["program_scope"] = ps
+    spec.loader.exec_module(ps)
+    return ps
+
+
+def _scope() -> dict | None:
+    """The programme inventory: the pinned plan's, plus the pinned operator
+    amendments (A1). Read through program_scope so there is one merge rule."""
+    ps = _program_scope()
+    return ps.load_merged_scope(HOH / "program/v3_3/AUTHORITATIVE_PROGRAM_SCOPE.json",
+                                HOH / "program/v3_3/PROGRAMME_AMENDMENTS.json")
+
+
+def _pulled_forward(r: dict) -> bool:
+    """A requirement the operator pulled ahead of its phase (A1). It may start
+    before the gates in front of its phase open -- IMPLEMENTED EARLY -- but it
+    still belongs to its phase and still holds that phase's own gate shut
+    until it is satisfied."""
+    return isinstance(r.get("pulled_forward"), dict)
+
+
 def layers(nodes: dict[str, list[str]]) -> tuple[list[list[str]], list[str]]:
     """Kahn's algorithm, reporting what it could not place.
 
@@ -98,7 +123,7 @@ def _ready_now(open_: dict, phase_order: list[str] | None,
     for rid, r in open_.items():
         if any(d in open_ for d in (r.get("depends_on") or [])):
             continue
-        if phase_order and r["target_phase"] in phase_order:
+        if phase_order and r["target_phase"] in phase_order and not _pulled_forward(r):
             i = phase_order.index(r["target_phase"])
             if not all(gate_open(ph) for ph in phase_order[:i]):
                 continue
@@ -150,12 +175,23 @@ def build(body: dict, phase_order: list[str] | None = None,
                               "external_met": (given[0] if given else None)}
         for rid, r in open_.items():
             i = phase_order.index(r["target_phase"]) if r["target_phase"] in phase_order else -1
-            if i > 0:
+            if i > 0 and not _pulled_forward(r):
                 nodes[rid] = nodes[rid] + [f"gate:{phase_order[i - 1]}"]
         for ph, (met, _) in gates.items():
             if not met:
                 nodes[f"unmet:{ph}"] = [f"unmet:{ph}"]     # a self-loop: never placed
     waves, unplaced = layers(nodes)
+    # A gate is open *now* when its phase has no open blocking requirement, no
+    # unmet external condition, and every gate before it is open. Being placed
+    # in a wave is not the same thing: the layering places a gate after the
+    # work it waits for, whether that work is done or not. (A1 needs the real
+    # answer to say IMPLEMENTED EARLY rather than PHASE REQUIREMENT SATISFIED.)
+    open_gates: list[str] = []
+    for ph in phase_order or []:
+        g = gate_state.get(ph) or {}
+        if g.get("blocking_open") or g.get("external_met") is False:
+            break
+        open_gates.append(ph)
     real_unplaced = [u for u in unplaced if not u.startswith(("gate:", "unmet:"))]
     held = sorted(u for u in real_unplaced
                   if any(d.startswith(("gate:", "unmet:")) for d in nodes.get(u, [])))
@@ -186,6 +222,7 @@ def build(body: dict, phase_order: list[str] | None = None,
                         "phase": caps[rid]["target_phase"],
                         "status": caps[rid]["status"],
                         "core_required_1_0": caps[rid]["core_required_1_0"],
+                        "pulled_forward": caps[rid].get("pulled_forward"),
                         "depends_on": [d for d in nodes[rid]
                                        if not d.startswith(("gate:", "unmet:"))]}
                        for rid in wave]}
@@ -194,6 +231,7 @@ def build(body: dict, phase_order: list[str] | None = None,
         "unplaceable": unplaced,
         "held_by_phase_gate": held,
         "phase_gates": gate_state,
+        "open_gates": open_gates,
         "ready_now": _ready_now(open_, phase_order, gate_state),
         "dangling_dependencies": dangling,
     }
@@ -219,6 +257,7 @@ def checklist(plan: dict) -> dict:
                 "ready_now": item["id"] in ready,
                 "phase_blocking": bool(item["core_required_1_0"]),
                 "blocked_by": item["depends_on"],
+                "pulled_forward": item.get("pulled_forward"),
                 "closes_when": ("the probe in program/v3_3/REQUIREMENTS.json "
                                 "reports PROVEN"),
             })
@@ -266,8 +305,10 @@ def render(plan: dict, check: dict) -> str:
                 "| id | requirement | phase | status | blocking | waits for |",
                 "|---|---|---|---|---|---|"]
         for item in wave["items"]:
+            early = (f" — pulled forward ({item['pulled_forward']['amendment']})"
+                     if item.get("pulled_forward") else "")
             out.append(
-                f"| `{item['id']}` | {item['name']} | {item['phase']} | "
+                f"| `{item['id']}` | {item['name']}{early} | {item['phase']} | "
                 f"{item['status']} | "
                 f"{'yes' if item['core_required_1_0'] else 'no'} | "
                 f"{', '.join(item['depends_on']) or '—'} |")
@@ -299,21 +340,69 @@ _GATE_KINDS = frozenset({"gate", "invariant", "validation", "release_gate",
                          "release_property"})
 
 
-def phase_gates() -> tuple[list[str], dict[str, tuple[bool, str]]]:
-    """The plan's phase order and, per phase, whether its non-requirement
-    conditions are met -- read from the inventory, never from the register.
+def gate_bindings(items: list[dict], requirements: list[dict]) -> dict[str, list[str]]:
+    """Which requirements claim each gate-kind plan item. Pure.
 
-    P0's condition is its deliverables existing. Any other phase whose exit
-    includes items nothing here measures yet is an *unmet* gate, and the
-    reason names how many: P2's unattended exit test, P3's invariants, P7's
-    whole product proof. That holds later phases shut, which is what "the
-    authoritative implementation sequence" means, rather than letting a v2.0
-    backend show up as ready beside a v0.2 gap.
+    Every inventory item whose kind is in `_GATE_KINDS` is a key; its value is
+    the sorted ids of the requirements that claim it, as `authoritative_item`
+    or under `also_covers` -- the claim `program_scope.dispositions` reads
+    (O204). Only a requirement of the item's own phase binds it: a claim across
+    phases is the completeness gate's refusal, not a measurement of this
+    phase's exit. An unclaimed item maps to `[]`. Pass live requirements only;
+    retired entries claim nothing.
     """
-    scope_file = HOH / "program/v3_3/AUTHORITATIVE_PROGRAM_SCOPE.json"
-    if not scope_file.is_file():
+    claims: dict[str, set[tuple[str, str]]] = {}
+    for r in requirements:
+        refs = [r.get("authoritative_item")] + list(r.get("also_covers") or [])
+        for ref in refs:
+            ref = str(ref or "").strip()
+            if ref:
+                claims.setdefault(ref, set()).add((r["id"], r.get("target_phase")))
+    return {i["id"]: sorted({rid for rid, ph in claims.get(i["id"], ())
+                             if ph == i["phase"]})
+            for i in items if i["kind"] in _GATE_KINDS}
+
+
+def _register_requirements() -> list[dict]:
+    """The register's live requirements, or `[]` without a register -- in
+    which case every gate item is unbound, the pin's fail-closed answer."""
+    path = HOH / "program/v3_3/REQUIREMENTS.json"
+    if not path.is_file():
+        return []
+    return json.loads(path.read_text(encoding="utf-8")).get("requirements") or []
+
+
+def phase_gates(capabilities: list[dict] | None = None,
+                requirements: list[dict] | None = None,
+                ) -> tuple[list[str], dict[str, tuple[bool, str]]]:
+    """The plan's phase order and, per phase, whether its non-requirement
+    conditions are met. Three sources, each for one question:
+
+    * the **inventory** says which conditions a phase has -- its gate-kind
+      items (`_GATE_KINDS`), and P0's deliverables;
+    * the **register** says who claims them (`gate_bindings`): a requirement
+      of the same phase naming the item as `authoritative_item` or under
+      `also_covers`. `requirements=None` reads the register's live ones;
+    * the **matrix** -- `capabilities`, its measured rows -- says whether they
+      are met.
+
+    P0's condition is its deliverables existing. A bound item is met only when
+    every requirement bound to it is measured exactly PROVEN: a waiver does
+    not meet an exit condition, and a bound requirement with no row is not
+    measured and unmet. An unbound item is an exit condition nothing here
+    measures yet, and stays unmet -- P2's checklist gates, P3's invariants,
+    P7's whole product proof. That holds later phases shut, which is what "the
+    authoritative implementation sequence" means, rather than letting a v2.0
+    backend show up as ready beside a v0.2 gap. A phase with no gate-kind item
+    is absent from the result.
+    """
+    scope = _scope()
+    if scope is None:
         return [], {}
-    scope = json.loads(scope_file.read_text(encoding="utf-8"))
+    if requirements is None:
+        requirements = _register_requirements()
+    status = {c["id"]: c.get("status") for c in capabilities or []}
+    bindings = gate_bindings(scope["items"], requirements)
     order = [p["phase"] for p in scope["phases"]]
     gates: dict[str, tuple[bool, str]] = {}
     for ph in order:
@@ -326,34 +415,81 @@ def phase_gates() -> tuple[list[str], dict[str, tuple[bool, str]]]:
                          "deliverables present" + (f"; missing {missing[:3]}"
                                                    if missing else ""))
             continue
-        unmeasured = [i for i in items if i["kind"] in _GATE_KINDS]
+        conditions = [i for i in items if i["kind"] in _GATE_KINDS]
+        if not conditions:
+            continue
+        unmeasured = [i for i in conditions if not bindings[i["id"]]]
+        unmet_bound = 0
+        not_proven: list[str] = []
+        for i in conditions:
+            short = [rid for rid in bindings[i["id"]] if status.get(rid) != "PROVEN"]
+            if short:
+                unmet_bound += 1
+                not_proven += [rid for rid in short if rid not in not_proven]
+        if not unmeasured and not unmet_bound:
+            gates[ph] = (True, f"{len(conditions)} exit condition(s), each bound "
+                               "to a PROVEN requirement")
+            continue
+        why = []
+        if unmet_bound:
+            named = ", ".join(f"{rid} {status.get(rid) or 'not measured'}"
+                              for rid in not_proven[:5])
+            if len(not_proven) > 5:
+                named += f" and {len(not_proven) - 5} more"
+            why.append(f"{unmet_bound} exit condition(s) bound to requirement(s) "
+                       f"not PROVEN: {named}")
         if unmeasured:
-            gates[ph] = (False, f"{len(unmeasured)} exit condition(s) nothing "
-                                "here measures yet, e.g. "
-                                f"{unmeasured[0]['text'][:60]!r}")
+            why.append(f"{len(unmeasured)} exit condition(s) nothing "
+                       "here measures yet, e.g. "
+                       f"{unmeasured[0]['text'][:60]!r}")
+        gates[ph] = (False, "; ".join(why))
     return order, gates
+
+
+def start_label(rid: str | None, status: str, waits_for_gate: str | None,
+                open_gates: set[str] | list[str], ready: set[str], held: set[str],
+                pulled: set[str]) -> str:
+    """What the dispositions table says about whether a requirement can start.
+
+    A1: PROVEN is "done" only when the gate in front of the requirement's phase
+    is open. Proven earlier -- pulled forward or not (O238 review, splan-a B2:
+    P5-17 read "done" with only P0/P1 open) -- it is IMPLEMENTED EARLY, and the
+    phase requirement is satisfied only once that gate opens."""
+    if not rid:
+        return "—"
+    if status == "PROVEN" and waits_for_gate and waits_for_gate not in open_gates:
+        return (f"IMPLEMENTED EARLY; phase requirement satisfied only "
+                f"after gate {waits_for_gate}")
+    if status == "PROVEN":
+        return "done"
+    if rid in pulled and rid in ready:
+        return "ready now (pulled forward)"
+    if rid in ready:
+        return "ready now"
+    if rid in held:
+        return f"held by gate {waits_for_gate}"
+    return "after its dependencies"
 
 
 def render_dispositions(plan: dict, body: dict) -> str | None:
     """Every plan item and what became of it, with the measured status and
     the gate it waits for joined in. O196: silence is not a disposition."""
-    scope_file = HOH / "program/v3_3/AUTHORITATIVE_PROGRAM_SCOPE.json"
-    if not scope_file.is_file():
+    ps = _program_scope()
+    scope = _scope()
+    if scope is None:
         return None
-    spec = importlib.util.spec_from_file_location("program_scope",
-                                                  HERE / "program_scope.py")
-    ps = importlib.util.module_from_spec(spec)
-    sys.modules["program_scope"] = ps
-    spec.loader.exec_module(ps)
-    scope = json.loads(scope_file.read_text(encoding="utf-8"))
     register = json.loads((HOH / "program/v3_3/REQUIREMENTS.json").read_text())
     status = {r["id"]: r["status"] for r in body["capabilities"]}
     ready = set(plan.get("ready_now") or [])
     held = {i["id"] for i in plan.get("held_items") or []}
     rows = ps.dispositions(scope, register)
+    pulled = {r["id"] for r in register.get("requirements") or []
+              if _pulled_forward(r)}
+    open_gates = set(plan.get("open_gates") or [])
     out = ["# Programme dispositions (V3.3)", "",
            "Generated by `python3 tools/build_plan.py`. One row per item of the",
-           "pinned production line: what it is, which requirement implements it,",
+           "pinned production line and of its pinned operator amendments (A1):",
+           "what it is, which requirement implements it,",
            "that requirement's measured status, and whether it can start. Held",
            "is represented, not absent. Nothing here is a state somebody set.", "",
            f"Measured at {plan['measured_at_utc']}.", ""]
@@ -370,17 +506,12 @@ def render_dispositions(plan: dict, body: dict) -> str | None:
             if r["kind"] == "baseline_deliverable":
                 present = (HOH / "program/v3_3" / r["text"]).is_file()
                 start = "file present" if present else "FILE MISSING"
-            elif not rid:
-                start = "—"
-            elif st == "PROVEN":
-                start = "done"
-            elif rid in ready:
-                start = "ready now"
-            elif rid in held:
-                start = f"held by gate {r['waits_for_gate']}"
             else:
-                start = "after its dependencies"
+                start = start_label(rid, st, r["waits_for_gate"], open_gates,
+                                    ready, held, pulled)
             text = r["item"].split(".", 2)[-1]
+            if r.get("amendment"):
+                text = f"{r['amendment']}: " + r["item"].split(".", 3)[-1]
             out.append(f"| {r['line']} | `{text[:48]}` | {r['kind']} | "
                        f"{rid or '—'} | {st} | {start} |")
         out.append("")
@@ -407,7 +538,7 @@ def main(argv=None) -> int:
     for r in body["capabilities"]:
         r["depends_on"] = deps.get(r["id"], [])
 
-    phase_order, gates = phase_gates()
+    phase_order, gates = phase_gates(body["capabilities"], register["requirements"])
     plan = build(body, phase_order, gates)
     check = checklist(plan)
     for wave in plan["waves"]:

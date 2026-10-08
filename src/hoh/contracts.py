@@ -9,11 +9,19 @@ exactly that).
 from __future__ import annotations
 
 import hashlib
+import re
 from datetime import datetime, timezone
 from enum import StrEnum
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_serializer,
+    field_validator,
+    model_validator,
+)
 
 SCHEMA_VERSION = 1
 
@@ -26,6 +34,74 @@ def utcnow() -> str:
 def digest(text: str) -> str:
     """Short, stable digest for spec, plan and policy binding."""
     return hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
+
+
+#: The trigger of rule 3: a text holding it anywhere is quoted, so a UTF-8 text
+#: can never pass for a recorded one.
+MARKER_LITERAL = "[hoh-recorded:"
+
+#: The decoder: the marker exactly, at the end of the text, the hex in whole
+#: byte pairs. Group 1 or 2 is the error handler, group 3 the hex.
+_RECORDED = re.compile(
+    r"(?:\A| )\[hoh-recorded: (?:non-UTF-8 text, undecodable bytes shown as \\xNN; "
+    r"exact text as utf-8/(surrogateescape|surrogatepass)|quoted text; exact text "
+    r"as utf-8/(strict)) hex: ((?:[0-9a-f]{2})*)\]\Z"
+)
+
+
+class RecordedText(str):
+    """A text already in its recorded form; it is never recorded again."""
+
+    __slots__ = ()
+
+
+def recordable_text(text: str) -> RecordedText:
+    """The form in which a free text enters the run state.
+
+    Strict UTF-8, lossless (`recorded_original` returns the exact text),
+    injective on raw texts, and unchanged by a load: every record that is not
+    the text itself ends in its marker and equals its own `.strip()`. A
+    `RecordedText` is returned as it is.
+    """
+    if isinstance(text, RecordedText):
+        return text
+    if any(0xD800 <= ord(ch) <= 0xDFFF for ch in text):
+        try:
+            raw = text.encode("utf-8", "surrogateescape")
+            canonical = raw.decode("utf-8", "surrogateescape") == text
+        except UnicodeError:
+            canonical = False
+        if canonical:
+            kind = "surrogateescape"
+        else:
+            kind, raw = "surrogatepass", text.encode("utf-8", "surrogatepass")
+        # An escaped byte is shown as \xNN, any other surrogate as \uXXXX.
+        shown = "".join(
+            f"\\x{ord(ch) - 0xDC00:02x}" if 0xDC80 <= ord(ch) <= 0xDCFF
+            else f"\\u{ord(ch):04x}" if 0xD800 <= ord(ch) <= 0xDFFF
+            else ch
+            for ch in text)
+        return RecordedText(
+            (shown + " [hoh-recorded: non-UTF-8 text, undecodable bytes shown "
+             f"as \\xNN; exact text as utf-8/{kind} hex: {raw.hex()}]").lstrip())
+    if MARKER_LITERAL in text or text != text.strip():
+        return RecordedText(
+            (text + " [hoh-recorded: quoted text; exact text as utf-8/strict hex: "
+             f"{text.encode('utf-8').hex()}]").lstrip())
+    return RecordedText(text)
+
+
+def recorded_original(recorded: str) -> str:
+    """The exact text a record stands for. Never raises: what is not a valid
+    record is taken literally."""
+    match = _RECORDED.search(recorded)
+    if match is None:
+        return str(recorded)
+    kind = match.group(1) or match.group(2)
+    try:
+        return bytes.fromhex(match.group(3)).decode("utf-8", kind)
+    except (ValueError, UnicodeError):
+        return str(recorded)
 
 
 class Strict(BaseModel):
@@ -612,8 +688,36 @@ class RunState(Strict):
     )
 
     def note(self, text: str) -> None:
-        self.history.append(f"{utcnow()} {text}")
+        self.history.append(recordable_text(f"{utcnow()} {text}"))
         self.updated_at = utcnow()
+
+    def __setattr__(self, name: str, value) -> None:
+        # A reason is recorded when it is assigned, so the state in memory is
+        # the state on disk.
+        if name in ("stop_reason", "blocked_reason") and isinstance(value, str):
+            value = recordable_text(value)
+        super().__setattr__(name, value)
+
+    @field_validator("history", "stop_reason", "blocked_reason", mode="after")
+    @classmethod
+    def _loaded_text_is_recorded(cls, value):
+        # What a state is constructed from is the store's file, and what the
+        # file holds is already the record: tagged, not converted again.
+        if value is None:
+            return None
+        if isinstance(value, list):
+            return [RecordedText(item) for item in value]
+        return RecordedText(value)
+
+    @field_serializer("history", "stop_reason", "blocked_reason")
+    def _text_is_written_recorded(self, value):
+        # Records what bypassed `note` and assignment (a direct append, a
+        # `model_copy(update=...)`) on the way out; the value in memory stays.
+        if value is None:
+            return None
+        if isinstance(value, list):
+            return [recordable_text(item) for item in value]
+        return recordable_text(value)
 
     started_at_wall: str | None = Field(
         default=None,

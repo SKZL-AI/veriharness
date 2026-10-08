@@ -36,6 +36,7 @@ declared withholding and must never buy a green test.
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -175,3 +176,158 @@ def needs_parked_predecessor(baseline: str) -> None:
 def benchmark_tasks() -> Path:
     needs_evidence(HIDDEN_FIXTURES)
     return ROOT / HIDDEN_FIXTURES.path
+
+
+# --------------------------------------------------------------------------- #
+# The test boundary: a guard regression must fail a test, never run a command
+# --------------------------------------------------------------------------- #
+
+#: Payloads the test suite uses to exercise the guard. They are here so that,
+#: if the guard ever stops refusing one of them, the suite fails instead of
+#: executing it. 2026-09-25: an operator-side relaxation silently weakened the
+#: product guard, and guard tests really launched their payload (among them an
+#: endless GPU query loop, left orphaned on the machine for over an hour).
+#: `hoh-never-execute-sentinel` is the neutral payload for tests in which this
+#: stub is meant to be the only barrier.
+NEVER_EXECUTE_IN_TESTS = ("nvidia-smi", "hoh-never-execute-sentinel")
+
+
+def _executes(script: str, token: str) -> bool:
+    """Fail closed: `token` as a word anywhere in an executed script counts as
+    executing it -- `eval T`, `bash -c "T"`, `sudo T`, `xargs T`, `! T` and
+    every other form alike (review round 3: a command-position matcher missed
+    eleven of them). The one exception is a single command, with no shell
+    separator or substitution, whose first word only prints or searches text
+    (`grep T file`, `echo '... T ...'`): a mention, not an execution (review
+    round 2: plain substring matching failed those falsely)."""
+    import re
+
+    if not re.search(r"(?<![\w-])" + re.escape(token) + r"(?![\w-])", script):
+        return False
+    words = script.strip().split()
+    single = re.search(r"[;&|`\n<>]|\$\(", script) is None
+    mention_only = {"grep", "egrep", "fgrep", "echo", "printf"}  # not rg: `rg --pre T` runs T
+    if single and words and os.path.basename(words[0]) in mention_only:
+        return False
+    return True
+
+
+def _executed_scripts(args, executable=None) -> list[str]:
+    """What a spawn would execute: argv[0] (and `executable=`), the rest of
+    argv as one line, and every script handed to a shell with `-c`, each on
+    its own. A string is a shell command line."""
+    if isinstance(args, (str, bytes, os.PathLike)):
+        return [os.fsdecode(args)] + ([os.fsdecode(executable)] if executable else [])
+    argv = [os.fsdecode(a) if isinstance(a, (bytes, os.PathLike)) else str(a) for a in args]
+    shells = {"sh", "bash", "dash", "zsh", "ksh"}
+    script_at: set[int] = set()
+    for i, a in enumerate(argv):
+        if os.path.basename(a) not in shells:
+            continue
+        # The shell's own options up to the first operand: `-c` (or a cluster
+        # such as `-lc`) makes the next argument the script. Options that take
+        # a value (`-O extglob`, `-o pipefail`) and long options are skipped.
+        j = i + 1
+        while j < len(argv) and argv[j].startswith("-"):
+            opt = argv[j]
+            if not opt.startswith("--") and "c" in opt[1:] and j + 1 < len(argv):
+                script_at.add(j + 1)
+                break
+            j += 2 if opt in ("-O", "+O", "-o", "+o") else 1
+    # The whole argv as one line as well -- minus the `-c` scripts, which are
+    # checked on their own: a payload later in a plain argv list (`["env", T]`,
+    # `["timeout", "5", T]`, `bwrap ... -- T`) is executed too (review round
+    # 4). Fail closed: a role prompt naming a payload, passed as argv, is
+    # refused as well -- no test spawns one.
+    rest = " ".join(a for k, a in enumerate(argv) if k not in script_at)
+    return (argv[:1] + [rest] + [argv[k] for k in sorted(script_at)]
+            + ([os.fsdecode(executable)] if executable else []))
+
+
+def _refuse_if_listed(args, attempts: list[str], executable=None) -> None:
+    scripts = _executed_scripts(args, executable)
+    hit = [p for p in NEVER_EXECUTE_IN_TESTS
+           if any(_executes(s, p) for s in scripts)]
+    if hit:
+        text = " | ".join(scripts)
+        attempts.append(text)
+        # pytest.fail raises a BaseException, so `except OSError` /
+        # `except Exception` in the code under test cannot turn it into a
+        # receipt: the test fails at this line and nothing is started.
+        pytest.fail(
+            f"guard regression: code under test tried to EXECUTE a command the "
+            f"policy must refuse ({hit[0]!r}); refused, not started: {text!r}",
+            pytrace=False,
+        )
+
+
+@pytest.fixture(autouse=True)
+def _no_refused_command_is_ever_executed(monkeypatch):
+    """A stub in front of the process-spawn APIs of the pytest process.
+
+    Covered: `subprocess.Popen` itself (replaced by a subclass, so isinstance
+    and subclassing keep working), hence `subprocess.run`, `check_output` and
+    friends however they are imported, including `executable=`; `os.system`;
+    `os.posix_spawn[p]`; `os.spawn*`; `os.exec*`. **Not** covered: `os.fork`
+    followed by exec, including `pty.spawn` -- the refusal would be raised in
+    the forked child, which would then run the rest of the session, while the
+    parent sees no failure (review round 3); nothing in src/, tests/ or tools/
+    forks today -- and child Python processes, which do not inherit this
+    fixture (both tracked in the dogfood ledger, O235). This is a safety net
+    for the suite's own guard payloads, not a classifier: see `_executes`.
+    """
+    import subprocess as _subprocess
+
+    attempts: list[str] = []
+    real_popen = _subprocess.Popen
+
+    class _GuardedPopen(real_popen):  # type: ignore[misc, valid-type]
+        def __init__(self, args, *a, **kw):
+            _refuse_if_listed(args, attempts, kw.get("executable"))
+            super().__init__(args, *a, **kw)
+
+    monkeypatch.setattr(_subprocess, "Popen", _GuardedPopen)
+    real_system = os.system
+    monkeypatch.setattr(os, "system",
+                        lambda cmd: (_refuse_if_listed(cmd, attempts), real_system(cmd))[1])
+    def _wrap_path_argv(real):          # f(path, argv, ...) -- posix_spawn*, execv*
+        def wrapped(path, argv, *a, **kw):
+            _refuse_if_listed([*argv], attempts, path)
+            return real(path, argv, *a, **kw)
+        return wrapped
+
+    def _wrap_path_varargs(real):       # f(path, arg0, arg1, ...) -- execl*
+        def wrapped(path, *args):
+            _refuse_if_listed([a for a in args if isinstance(a, (str, bytes, os.PathLike))],
+                              attempts, path)
+            return real(path, *args)
+        return wrapped
+
+    def _wrap_spawn(real, varargs):     # f(mode, path, ...) -- spawnv*/spawnl*
+        def wrapped(mode, path, *rest):
+            argv = rest if varargs else rest[0]
+            _refuse_if_listed([a for a in argv if isinstance(a, (str, bytes, os.PathLike))],
+                              attempts, path)
+            return real(mode, path, *rest)
+        return wrapped
+
+    for name in ("posix_spawn", "posix_spawnp", "execv", "execve", "execvp", "execvpe"):
+        if hasattr(os, name):
+            monkeypatch.setattr(os, name, _wrap_path_argv(getattr(os, name)))
+    for name in ("execl", "execle", "execlp", "execlpe"):
+        if hasattr(os, name):
+            monkeypatch.setattr(os, name, _wrap_path_varargs(getattr(os, name)))
+    for name in ("spawnv", "spawnve", "spawnvp", "spawnvpe"):
+        if hasattr(os, name):
+            monkeypatch.setattr(os, name, _wrap_spawn(getattr(os, name), False))
+    for name in ("spawnl", "spawnle", "spawnlp", "spawnlpe"):
+        if hasattr(os, name):
+            monkeypatch.setattr(os, name, _wrap_spawn(getattr(os, name), True))
+    try:                                   # modules that did `from subprocess import Popen`
+        from hoh import runner as _runner
+        if getattr(_runner, "Popen", None) is real_popen:
+            monkeypatch.setattr(_runner, "Popen", _GuardedPopen)
+    except Exception:
+        pass
+    yield attempts
+    assert not attempts, f"refused commands reached the executor: {attempts}"

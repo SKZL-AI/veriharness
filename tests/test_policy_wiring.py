@@ -390,19 +390,35 @@ def test_two_ordinary_iterations_in_a_row_are_still_accepted(tmp_path, repo, spe
     assert second.accepted, second.reason
 
 
-def test_qa_writing_in_the_arena_it_reviews_is_not_a_violation(tmp_path, repo, spec):
-    """Bytecode from running the thing is the ordinary case, not an attack."""
-    def work_items(state: RunState) -> None:
+def test_qa_running_the_candidate_from_its_arena_is_not_a_violation(tmp_path, repo, spec):
+    """Running the thing it reviews is QA's work, not an attack.
+
+    Replaces `test_qa_writing_in_the_arena_it_reviews_is_not_a_violation`
+    (qa-arena-write, 2026-10-05). That test planted `__pycache__` in QA's own
+    arena and asserted acceptance; since then the arena QA reviews is sealed
+    read-only for its dispatch and any write there is a capability violation
+    (`tests/test_qa_arena_readonly.py`), so the write it planted is now
+    refused by design. What it protected stays protected here: QA importing
+    and running the candidate from its arena -- the interpreter's bytecode
+    write fails quietly on the sealed tree -- and a test runner's cache in the
+    directory QA works from are still not violations.
+    """
+    ran: list[str] = []
+
+    def run_the_candidate(state: RunState) -> None:
         own_ = getattr(ctrl, "_qa_arena", None)
-        if own_ is not None:
-            (own_ / "__pycache__").mkdir(exist_ok=True)
-            (own_ / "__pycache__" / "app.cpython-313.pyc").write_bytes(b"\x00")
+        assert own_ is not None
+        out = subprocess.run(
+            ["python3", "-c", "import app; print(app.add(2, 3))"],
+            cwd=own_, capture_output=True, text=True, check=True)
+        ran.append(out.stdout.strip())
         # ... and the cache a test runner leaves in the directory QA works from
         (ctrl.store.arenas_dir / ".pytest_cache").mkdir(exist_ok=True)
 
-    d = Dispatcher(repo=repo, qa_effect=work_items)
+    d = Dispatcher(repo=repo, qa_effect=run_the_candidate)
     ctrl, state, _ = build(tmp_path, repo, spec, d)
     out = ctrl.run_iteration(state)
+    assert ran == ["5"]
     assert out.accepted, out.reason
 
 

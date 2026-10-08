@@ -185,13 +185,28 @@ def anchor(repo: Path | str, candidate: Candidate) -> str | None:
     A linked worktree shares the object database with the main repository, so
     maintenance run by a third party is enough to trigger this. A ref is the
     smallest measure that rules it out: it is created, never removed, and makes
-    the object reachable. A failure here is not fatal -- it is reported so that
-    it does not stay silent.
+    the object reachable.
+
+    **An anchor never moves** (run qaw4: the resumed attempt of an aborted
+    iteration reused the candidate id, `update-ref` moved the anchor to the
+    new tree, and the integrity guard -- refs never move -- failed the run).
+    The ref is created only if it does not exist (`update-ref <ref> <tree>
+    ""`, atomic: git refuses an existing ref). An anchor that already holds
+    this tree is the anchor, and its name is returned. One that holds another
+    tree is left exactly as it is, and None is returned, as for any other
+    failure to anchor (not fatal). The controller never asks for that: every
+    attempt has its own candidate id.
     """
     path = Path(repo).expanduser().resolve()
     ref = f"{ANCHOR_PREFIX}/{candidate.candidate_id}"
+    held = subprocess.run(
+        ["git", "-C", str(path), "rev-parse", "--verify", "--quiet", ref],
+        capture_output=True, text=True,
+    )
+    if held.returncode == 0:
+        return ref if held.stdout.strip() == candidate.tree_digest else None
     proc = subprocess.run(
-        ["git", "-C", str(path), "update-ref", ref, candidate.tree_digest],
+        ["git", "-C", str(path), "update-ref", ref, candidate.tree_digest, ""],
         capture_output=True, text=True,
     )
     return ref if proc.returncode == 0 else None

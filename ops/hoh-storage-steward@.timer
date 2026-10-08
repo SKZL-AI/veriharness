@@ -1,0 +1,16 @@
+[Unit]
+Description=Regular storage-steward pass for project %i (STORAGE-D)
+Documentation=file://%h/hoh/docs/OPERATIONS.md
+
+[Timer]
+# One timer instance per project (hoh-storage-steward@<project>.timer starts
+# hoh-storage-steward@<project>.service). The run hooks only record events; this
+# tick is what acts on them. No daemon, no polling loop.
+OnBootSec=10min
+OnUnitActiveSec=30min
+Persistent=true
+AccuracySec=1min
+RandomizedDelaySec=120
+
+[Install]
+WantedBy=timers.target

@@ -5,6 +5,9 @@ a permission dialog sits unanswered in a pane, a provider's quota runs out
 mid-iteration. This document describes what HoH does in each case, and why
 "restart and hope" is not one of the options.
 
+*The section at the end, "Since v0.1.0", describes the recovery paths added
+after the tag and corrects one statement below by addition.*
+
 ## The rule behind all of it: an unclear state blocks, it does not restart
 
 Handoff §7, the founding design note this project builds from, states the
@@ -121,3 +124,69 @@ history, and returns the run to `ACTIVE`. The next `hoh run` invocation then
 replans the interrupted iteration conservatively rather than resuming
 mid-flight, following the same `begin_iteration` recovery path described
 above.
+
+## Since v0.1.0
+
+Added for the v0.3.0a1 pre-release; the sections above stay as written.
+
+**Idle is not done.** The three liveness verdicts above are unchanged. On the
+dispatch side, a role that ended its turn without writing its answer file --
+typically while a background job it started was still running -- used to cost
+the whole iteration as "no answer". Now the dispatcher sends that agent **one**
+follow-up naming the exact answer path and waits again; only a second missing
+answer fails the dispatch, with the pane view attached. A Herdr
+`agent_prompt_stalled` failure is now transient and retried rather than
+blocking the run. After a stalled submit the dispatcher presses Enter once, on
+this dispatch's own prompt, and never types again; a pane that still holds
+unsent input is refused rather than typed into, and prompts no longer begin
+with `/`, which the agent interface read as an unknown command. Known gap: the
+first prompt after an agent starts can still be typed and not submitted -- the
+dispatch recovers, the startup race is not fixed (`docs/LIMITATIONS.md`,
+*Current open limitations*). Every role prompt above 8 KiB, or holding a
+character the input box treats specially, now goes through a pointer file so the
+recovery can verify the box; the recovery still refuses, as designed, when
+Claude Code word-wraps the pointer line in a narrow pane (it blocked one run
+before any candidate, and the readiness fix is the next P2 strand).
+
+**Durable waits and an acting resume loop.** A wait is now a durable timer on
+disk, not a sleeping process. `hoh resume-quota` acts on due timers; with
+`--drive --recover`, the unattended continuation unit drives a resumed project
+on under a new governed master, and recovers a project whose master died.
+Only a holder that is provably gone is replaced: session succession and the
+master epoch make a returning old master's writes non-authoritative. A retry
+timer is rounded up, so it is never due before the provider's reset.
+
+**A correction to "every other block has a cause a human has to clear".**
+That still holds for the quota path it describes, and there is now a second
+automatic consumer: a run parked under storage pressure (`STORAGE_PRESSURE`)
+is resumed by `hoh resume-storage` once admission allows it again. A
+capability violation, a contract park and a question for a human keep their
+owners: a run held for a capability violation is refused by `hoh resume` in
+every state but PAUSED, is never delivered, and only `hoh unblock` lifts the
+hold.
+
+**Interrupted state at the orchestrator level.** When the machine's disk
+filled on 2026-09-25, an uncommitted working tree of the development
+repository held single-copy evidence. It was preserved as a commit object on a
+preserve reference without touching the working tree, and recovered days later
+by merging that commit with the line that had moved on, with no history
+rewritten and nothing removed. This is the orchestrating session's practice,
+not a product feature; the product's own storage lifecycle exists so that the
+next incident is admitted, parked and resumed instead.
+
+**A fresh orchestrating session (context rollover, Layer A).** The master
+epoch can be handed to a successor session without a gap and without two
+masters: the outgoing session freezes a capsule of facts, the successor
+re-derives every one, acknowledges, and takes the epoch only if nothing moved;
+otherwise the outgoing session stays master or takes the programme back, and a
+stale one is fenced (`docs/OPERATIONS.md`, *Rolling the orchestrating session
+over*). Merged and tested with fakes, **not run on a live succession**, and not
+a proof of any register row.
+
+**Not yet proven:** recovery across a real reboot (stressor DS2) has never
+been run, and the end-to-end durability evidence for the unattended path is
+stale since the code changed. A provider usage limit that stops a QA role is
+still booked as a rejected iteration rather than a resumable block, and a
+role's background processes, which closing its pane does not end, are ended by
+the merged role-pane lifecycle only by a mark anchored to the pane, with the
+limits `docs/LIMITATIONS.md` states.

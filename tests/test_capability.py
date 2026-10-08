@@ -26,6 +26,8 @@ from __future__ import annotations
 
 import os
 import subprocess
+import sys
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -713,3 +715,187 @@ def test_a_directory_that_is_not_a_repository_is_still_digested_whole(tmp_path):
     before = repo_digest(d)
     (d / "__pycache__" / "a.cpython-313.pyc").write_bytes(b"\x00")
     assert repo_digest(d) != before
+
+
+
+# -- names that are not UTF-8 (O249) -----------------------------------------
+#
+# A check that left `caf\xe9.bin` in the arena blocked the next dispatch: the
+# witness folded names in with a strict `.encode()`, which raises on the
+# surrogate escape Python uses for such a byte. Every test below that creates
+# such a name does it inside a `TemporaryDirectory()` it closes itself, never
+# in `tmp_path` -- a run's checks must leave no such name in the arena, or the
+# dispatch after them blocks on exactly this bug.
+
+def _write(path: bytes, data: bytes = b"x\n") -> None:
+    with open(path, "wb") as f:
+        f.write(data)
+    os.chmod(path, 0o644)
+
+
+def _git_bytes(repo: bytes, *args: bytes) -> bytes:
+    return subprocess.run([b"git", b"-C", repo, *args], check=True,
+                          capture_output=True).stdout
+
+
+def test_tree_digest_non_utf8_names():
+    """A file, a directory and a symlink, each named in latin-1 bytes."""
+    from hoh.capability import tree_digest
+
+    with tempfile.TemporaryDirectory() as d:
+        root = os.path.join(os.fsencode(d), b"tree")
+        os.mkdir(root)
+        _write(os.path.join(root, b"caf\xe9.bin"))
+        os.mkdir(os.path.join(root, b"d\xe9"))
+        os.symlink(b"ziel", os.path.join(root, b"l\xe9"))
+        digest = tree_digest(os.fsdecode(root))
+        assert len(digest) == 16
+        assert tree_digest(os.fsdecode(root)) == digest, "a digest is deterministic"
+
+
+def test_tree_digest_non_utf8_symlink_text():
+    """The link's *text* is folded in as the bytes it is."""
+    from hoh.capability import tree_digest
+
+    with tempfile.TemporaryDirectory() as d:
+        base = os.fsencode(d)
+        digests = []
+        for target in (b"ziel-\xe9", b"ziel-\xe8"):
+            root = os.path.join(base, b"t" + target[-1:])
+            os.mkdir(root)
+            os.symlink(target, os.path.join(root, b"link"))
+            digests.append(tree_digest(os.fsdecode(root)))
+        assert all(len(x) == 16 for x in digests)
+        assert digests[0] != digests[1], "two link texts collapsed into one"
+
+
+def test_tree_digest_distinguishes_non_utf8_names():
+    """`caf\xe9` and `caf\xe8` are two names, so two digests: nothing lossy."""
+    from hoh.capability import tree_digest
+
+    with tempfile.TemporaryDirectory() as d:
+        base = os.fsencode(d)
+        digests = []
+        for i, name in enumerate((b"caf\xe9", b"caf\xe8")):
+            root = os.path.join(base, b"t%d" % i)
+            os.mkdir(root)
+            _write(os.path.join(root, name), b"same content\n")
+            digests.append(tree_digest(os.fsdecode(root)))
+        assert digests[0] != digests[1]
+
+
+def _utf8_fixture(base: Path) -> tuple[Path, Path]:
+    """UTF-8 names only, and nothing that depends on where it is built."""
+    tree = base / "tree"
+    (tree / "dé").mkdir(parents=True)
+    (tree / "café.txt").write_bytes(b"caf\xc3\xa9\n")
+    (tree / "dé" / "über.md").write_bytes(b"inhalt\n")
+    os.chmod(tree / "café.txt", 0o644)
+    os.chmod(tree / "dé" / "über.md", 0o644)
+    os.symlink("dé/über.md", tree / "verknüpfung")
+    # Refs only: HEAD and the other GIT_STATE files fold their absolute path.
+    repo = base / "repo"
+    (repo / ".git" / "refs" / "heads").mkdir(parents=True)
+    (repo / ".git" / "refs" / "tags").mkdir()
+    (repo / ".git" / "refs" / "heads" / "zweig-ü").write_bytes(b"0" * 40 + b"\n")
+    (repo / ".git" / "refs" / "tags" / "größe").write_bytes(b"1" * 40 + b"\n")
+    return tree, repo
+
+
+def test_utf8_digests_unchanged():
+    """Digests of valid UTF-8 names are exactly what the pin computed.
+
+    The literals were computed with the pin's strict-`.encode()` algorithm
+    (commit 929fbb2c) over this very fixture. `os.fsencode` gives the same
+    bytes for a valid UTF-8 name under the filesystem encoding `utf-8` with
+    `surrogateescape`, so every digest an earlier run recorded stays valid.
+    """
+    from hoh.capability import git_state_digest, shallow_digest, tree_digest
+
+    assert sys.getfilesystemencoding() == "utf-8"
+    assert sys.getfilesystemencodeerrors() == "surrogateescape"
+    with tempfile.TemporaryDirectory() as d:
+        tree, repo = _utf8_fixture(Path(d))
+        assert tree_digest(tree) == "d81808b15b399a59"
+        assert git_state_digest(repo) == "8b260474731cdbca"
+        assert shallow_digest(tree) == "2ce1f4b2584b45ba"
+
+
+def test_git_state_digest_non_utf8_name():
+    """A non-UTF-8 absolute path (folded with HEAD) and a non-UTF-8 ref."""
+    from hoh.capability import git_state_digest
+
+    with tempfile.TemporaryDirectory() as d:
+        base = os.fsencode(d)
+        digests = []
+        for i, ref in enumerate((b"zweig-\xe9", b"zweig-\xe8")):
+            root = os.path.join(base, b"repo-\xe9%d" % i)
+            heads = os.path.join(root, b".git", b"refs", b"heads")
+            os.makedirs(heads)
+            _write(os.path.join(root, b".git", b"HEAD"), b"ref: refs/heads/" + ref + b"\n")
+            _write(os.path.join(heads, ref), b"0" * 40 + b"\n")
+            digests.append(git_state_digest(os.fsdecode(root)))
+        assert all(len(x) == 16 for x in digests)
+        assert len(set(digests)) == 2
+
+
+def test_shallow_digest_non_utf8_name():
+    from hoh.capability import shallow_digest
+
+    with tempfile.TemporaryDirectory() as d:
+        base = os.fsencode(d)
+        digests = []
+        for i, name in enumerate((b"caf\xe9", b"caf\xe8")):
+            root = os.path.join(base, b"s%d" % i)
+            os.mkdir(root)
+            os.mkdir(os.path.join(root, name))
+            digests.append(shallow_digest(os.fsdecode(root)))
+        assert all(len(x) == 16 for x in digests)
+        assert digests[0] != digests[1]
+
+
+_QUOTEPATH_FALSE = {"GIT_CONFIG_COUNT": "1", "GIT_CONFIG_KEY_0": "core.quotePath",
+                    "GIT_CONFIG_VALUE_0": "false"}
+
+
+def test_repo_digest_independent_of_quotepath(monkeypatch):
+    """A user's `quotePath=false` prints the name raw; the digest must not care."""
+    from hoh.capability import repo_digest
+
+    for key in _QUOTEPATH_FALSE:
+        monkeypatch.delenv(key, raising=False)
+    with tempfile.TemporaryDirectory() as d:
+        repo = os.path.join(os.fsencode(d), b"repo")
+        os.mkdir(repo)
+        _git_bytes(repo, b"init", b"-q")
+        _write(os.path.join(repo, b"caf\xe9.bin"))
+        plain = repo_digest(os.fsdecode(repo))
+        for key, value in _QUOTEPATH_FALSE.items():
+            monkeypatch.setenv(key, value)
+        raw = _git_bytes(repo, b"status", b"--porcelain", b"-uall")
+        assert b"caf\xe9.bin" in raw, "the environment did not switch quotePath off"
+        assert repo_digest(os.fsdecode(repo)) == plain
+
+
+def test_git_state_digest_non_utf8_gitdir_pointer():
+    """A linked worktree whose `gitdir:` (and `commondir`) are not UTF-8."""
+    from hoh.capability import git_state_digest
+
+    with tempfile.TemporaryDirectory() as d:
+        base = os.fsencode(d)
+        common = os.path.join(base, b"common-\xe9")
+        os.makedirs(os.path.join(common, b"refs", b"heads"))
+        _write(os.path.join(common, b"refs", b"heads", b"main"), b"0" * 40 + b"\n")
+        gitdir = os.path.join(common, b"worktrees", b"wt-\xe9")
+        os.makedirs(gitdir)
+        _write(os.path.join(gitdir, b"HEAD"), b"ref: refs/heads/main\n")
+        # Relative, through the non-UTF-8 name: ../../../common-\xe9 is `common`.
+        _write(os.path.join(gitdir, b"commondir"), b"../../../common-\xe9\n")
+        root = os.path.join(base, b"wt")
+        os.mkdir(root)
+        _write(os.path.join(root, b".git"), b"gitdir: " + gitdir + b"\n")
+        before = git_state_digest(os.fsdecode(root))
+        assert len(before) == 16
+        _write(os.path.join(common, b"refs", b"heads", b"main"), b"1" * 40 + b"\n")
+        assert git_state_digest(os.fsdecode(root)) != before, \
+            "the pointer and commondir were followed to the refs"

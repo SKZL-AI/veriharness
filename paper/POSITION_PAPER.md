@@ -1037,3 +1037,55 @@ an instrument nobody has tried to break is not evidence, and that this project
 now has the record of trying. Neither section says anything about tasks other
 than the five, agents other than the ones dispatched, or a horizon longer than
 the campaigns measured.
+
+## Errata and dated notes, added 2026-10-07 for the v0.3.0a1 pre-release
+
+Added by the documentation checkpoint of the pre-release `v0.3.0a1`. Nothing
+above this heading was edited, and no number of this paper was changed: every
+note below points at a passage above, says in what way it no longer holds, and
+names the evidence. Each passage stays *historical but correct for 2026-09-14*,
+the date of the `v0.1.0` release, except where a note says it was already
+inaccurate then. The account of the development after the release is
+`paper/POSITION_PAPER_V2.md`; a figure tagged `[Vnn]` here is listed, with its
+source and the command that regenerates it, in `paper/NUMBERS_V2.md`.
+
+* **E1 -- "today".** Where this paper says what a reader evaluating
+  VeriHarness "today" needs (section 1, after the two instances), "today" is
+  2026-09-14.
+* **E2 -- "The orchestrator is a deployment layer, not a component of
+  `src/hoh/`".** This was already inaccurate at the release. Since 2026-09-11
+  the package carries a control plane, `src/hoh/orchestrator.py`
+  (`ProjectController`), which decides which runs of a project exist and in what
+  order and creates repair nodes; the benchmark's third arm and the closure test
+  exercise it. The statement stays true of the *agentic* orchestrator, the
+  session that writes specifications, starts runs and holds the merge authority.
+  `docs/ARCHITECTURE.md` carries the same correction.
+* **E3 -- "the only third-party packages ... imports at runtime".** After the
+  release `src/hoh/archive_bundle.py` imports `zstandard` lazily and refuses
+  without it (the optional extra `archive`). The sentence was true at the
+  release.
+* **E4 -- "complete against `docs/LIMITATIONS.md`".** The sentence is dated
+  2026-09-10, when that file held sixteen numbered limits. It now carries 31
+  numbered headings `[V45]` and opens with a status section.
+* **E5 -- "forbidden `src/hoh/` and `tests/` throughout every dogfood run";
+  "no run ... has ever added or edited a line inside `src/`"; "it says nothing
+  about pointing the loop at `src/hoh/` itself".** The campaign sentences
+  describe the campaign (limit 8 already recorded the policy files and the three
+  test files). They do not describe the development line: product runs have
+  written `src/hoh/` since 2026-09-23, and 34 of the 46 product-run merges
+  since 2026-09-25 change it `[V02]` `[V01]`.
+* **E6 -- "there is no supported path to amend one".** Limit 15's own later
+  subsection records `hoh amend` (2026-09-13); the headline sentence was already
+  superseded at the release.
+* **E7 -- "how an orchestrator survives its own restart".** Session succession
+  and the master epoch (P2-07, P2-08) exist since after the release and read
+  PROVEN in the capability register; the property is not demonstrated across a
+  real reboot (P2-11, stressor DS2, never run).
+* **E8 -- "HoH never detects a quota exhaustion by itself and never
+  automatically resumes a run blocked for that reason".** Since the release a
+  resume loop acts on due quota waits (`hoh resume-quota --drive --recover`, with
+  optional units under `ops/`). A real provider exhaustion in a live role run is
+  still not proven, and a QA role's usage limit is still booked as a rejected
+  iteration (`docs/LIMITATIONS.md`).
+* **E9 -- "findings are numbered to O167".** The development ledger, which the
+  export does not carry, now runs to O255.

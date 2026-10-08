@@ -26,6 +26,7 @@ from __future__ import annotations
 import fcntl
 import os
 import re
+import stat
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -33,6 +34,7 @@ from typing import Iterator
 
 from pydantic import ValidationError
 
+from .durable_io import durable_create
 from .project import Lifecycle, ProjectState
 from .store import LockBusy, StaleWrite, StoreError, _atomic_write
 
@@ -129,7 +131,12 @@ class ProjectStore:
             if m:
                 highest = max(highest, int(m.group(1)))
         target = path.with_name(f"{path.name}.v{highest + 1}.{_stamp()}")
-        os.replace(path, target)
+        # A copy, not a move (P2-41b W12): the live state stays in place until
+        # the next write replaces it, so a full disk in that write can no
+        # longer leave the project without a state file. Published under a
+        # name that must not exist, whole or not at all, with the source's mode.
+        durable_create(target, path.read_bytes(),
+                       mode=stat.S_IMODE(path.stat().st_mode))
         return target
 
     def parked_states(self) -> list[Path]:
@@ -168,6 +175,17 @@ class ProjectStore:
                 raise StaleWrite(
                     f"State on disk belongs to project {current_.project_id}, "
                     f"but the write is for {state.project_id}"
+                )
+            if state.master_epoch < current_.master_epoch:
+                # Imported here, not at module level: `hoh.succession` builds on
+                # this module's store primitives.
+                from .succession import StaleMaster
+
+                raise StaleMaster(
+                    f"Stale master for project {self.project_id}: the write carries "
+                    f"master epoch {state.master_epoch}, the state on disk was "
+                    f"written at epoch {current_.master_epoch}. A replaced master "
+                    "may not write, however fresh the state it read."
                 )
             if state.write_seq < current_.write_seq:
                 raise StaleWrite(
@@ -292,7 +310,7 @@ def resume_decision(state: ProjectState) -> tuple[str, str]:
 
 
 def unblock(store: "ProjectStore", node_id: str, reason: str,
-            *, actor: str = "human") -> ProjectState:
+            *, actor: str = "human", authority=None) -> ProjectState:
     """Returns a BLOCKED node to READY, on the record.
 
     A blocked node is one the orchestrator refused to decide about -- an
@@ -322,6 +340,11 @@ def unblock(store: "ProjectStore", node_id: str, reason: str,
     before = node.note
     node.lifecycle = Lifecycle.READY
     node.note = (f"{before} | unblocked {utc()}: {reason}" if before else reason)
+    # The wait is over by decision, so its machine-readable form goes too; a
+    # stale `usage_limit` would let an old timer resume this node later as
+    # though it still waited on the provider (review A, P1).
+    node.blocked_kind = None
+    node.retry_after = None
     state.decisions.append(
         DecisionRecord(
             id=f"D{len(state.decisions) + 1:04d}",
@@ -331,7 +354,12 @@ def unblock(store: "ProjectStore", node_id: str, reason: str,
             payload={"node": node_id, "was_blocked_for": before or ""},
         )
     )
+    if authority is not None:
+        authority.stamp(state)
     store.write_state(state)
+    from .orchestrator import disarm_stale_waits
+
+    disarm_stale_waits(store.dir, state)
     return store.read_state()
 
 
@@ -395,7 +423,7 @@ def record_external_action(
     store: "ProjectStore", *, actor: str, reason: str,
     repo_path: Path | str | None = None, node: str | None = None,
     action_class: str = "repository-mutation",
-    head_before: str = "", head_after: str = "",
+    head_before: str = "", head_after: str = "", authority=None,
 ) -> ProjectState:
     """Writes a repository mutation made outside the loop into project state.
 
@@ -423,6 +451,8 @@ def record_external_action(
             write_seq=state.write_seq,
         )
     )
+    if authority is not None:
+        authority.stamp(state)
     store.write_state(state)
     return store.read_state()
 

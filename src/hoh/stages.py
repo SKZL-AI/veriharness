@@ -34,8 +34,40 @@ HALTED: frozenset[Condition] = frozenset(
 )
 
 
+#: The `blocked_kind` of a run blocked by a capability violation. Sticky: a
+#: re-block keeps it (`block`), a pause keeps it, a resume returns the run to
+#: BLOCKED (`resume`), and only `unblock` -- a person's `hoh unblock` --
+#: clears it. While it is set, nothing the run accepted is merged or
+#: delivered.
+CAPABILITY_VIOLATION = "capability_violation"
+
+
 class TransitionError(RuntimeError):
     """A forbidden transition. Fail loud instead of quietly bending the state."""
+
+
+def violation_unresolved(state: RunState) -> bool:
+    """Is this run held by a capability violation nobody has looked at yet?
+
+    True for the sticky kind, **whatever the condition**: `hoh pause` accepts
+    a BLOCKED run, and a check that asked for BLOCKED let the paused run merge
+    and deliver. For a run blocked before the kind existed, the block reason's
+    first line is classified by the project's own classifier, for a BLOCKED,
+    PAUSED, CANCELLED or FAILED run: a contract STOP or ABORT replaces the kind
+    but keeps the reason, and `hoh cancel` keeps it too, so neither frees a
+    run that was held.
+    """
+    if state.blocked_kind == CAPABILITY_VIOLATION:
+        return True
+    if state.condition not in (Condition.BLOCKED, Condition.PAUSED,
+                               Condition.CANCELLED, Condition.FAILED):
+        return False
+    if not state.blocked_reason:
+        return False
+    from .taxonomy import FailureClass, classify_failure
+
+    return (classify_failure(None, detail=state.blocked_reason)
+            is FailureClass.CAPABILITY_VIOLATION)
 
 
 class FreezeError(RuntimeError):
@@ -190,6 +222,16 @@ def pause(state: RunState, reason: str) -> RunState:
 def resume(state: RunState) -> RunState:
     if state.condition is not Condition.PAUSED:
         raise TransitionError(f"Resume only out of PAUSED, not out of {state.condition.value}")
+    if violation_unresolved(state):
+        # A pause does not lift a capability violation, and neither does the
+        # resume after it: the run goes back to where the violation left it.
+        # So no ACTIVE run carries the kind for a later block to inherit.
+        state.blocked_kind = CAPABILITY_VIOLATION
+        state.condition = Condition.BLOCKED
+        state.stop_reason = state.blocked_reason
+        state.note("RESUMED into BLOCKED: still a capability violation; only "
+                   "hoh unblock lifts it")
+        return state
     state.condition = Condition.ACTIVE
     state.stop_reason = None
     state.note("RESUMED")
@@ -206,9 +248,20 @@ def block(state: RunState, reason: str) -> RunState:
     """
     from . import quota
 
+    # Read before the reason is overwritten: a legacy hold (a reason naming
+    # the violation, no kind) is adopted here rather than rewritten away.
+    held = violation_unresolved(state)
     state.condition = Condition.BLOCKED
     state.blocked_reason = reason
     state.stop_reason = reason
+    if held:
+        # Still a capability violation, whatever the new reason says: the
+        # kind stays until a person unblocks, and a quota text does not turn
+        # it into a wait the resume loop would lift by itself.
+        state.blocked_kind = CAPABILITY_VIOLATION
+        state.retry_after = None
+        state.note(f"BLOCKED (still a capability violation): {reason}")
+        return state
     if quota.is_quota_exhausted(reason):
         state.blocked_kind = "usage_limit"
         state.retry_after = quota.next_attempt_at(reason).isoformat()
@@ -243,6 +296,8 @@ def unblock(state: RunState, resolution: str) -> RunState:
         raise TransitionError("A block is only lifted with a reasoned resolution")
     state.condition = Condition.ACTIVE
     state.note(f"UNBLOCKED: {resolution} (previously: {state.blocked_reason})")
+    if state.blocked_kind == CAPABILITY_VIOLATION:
+        state.blocked_kind = None
     state.blocked_reason = None
     state.stop_reason = None
     return state

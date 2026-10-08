@@ -1,6 +1,6 @@
 [project]
 name = "hoh"
-version = "0.1.0"
+version = "0.3.0a1"
 description = "VeriHarness — an evidence-bound Harness-of-Harness for verifiable long-horizon agent development. hoh is the package, module, and CLI that implement the Harness-of-Harness pattern; VeriHarness is the project built on it."
 requires-python = ">=3.11"
 # SPDX expression only. The captain decided MIT for this project (see
@@ -40,6 +40,10 @@ readme = "README.md"
 # the product itself does not need it: `pip install -e ".[test]"`.
 [project.optional-dependencies]
 test = ["pytest>=7"]
+# STORAGE-C1 (P5-25/P5-26). hoh.archive_bundle writes and verifies
+# payload.tar.zst; it imports zstandard lazily and refuses, with no fallback
+# format, when it is missing: `pip install -e ".[archive]"`.
+archive = ["zstandard>=0.21"]
 
 [project.urls]
 # PLACEHOLDER -- VeriHarness is the decided project name, but no host or
@@ -68,3 +72,11 @@ hoh = ["policy/*.txt"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+
+[tool.ruff.lint.per-file-ignores]
+# These two files take the shared `w` fixture from tests/test_storage_tiers.py
+# by import; pyflakes reads every test parameter named `w` as a redefinition
+# (F811). Scoped to exactly these files (O249); tracked: move the fixture into
+# tests/conftest.py and drop this ignore, which also hides real F811s here.
+"tests/test_verified_relocation.py" = ["F811"]
+"tests/test_storage_steward.py" = ["F811"]

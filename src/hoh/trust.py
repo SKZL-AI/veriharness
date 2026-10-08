@@ -21,9 +21,11 @@ from __future__ import annotations
 
 import json
 import os
+import stat
 from pathlib import Path
 
 from .contracts import utcnow
+from .durable_io import durable_create, durable_write
 
 
 class TrustRefused(RuntimeError):
@@ -67,15 +69,33 @@ def register(path: Path | str, *, owned_root: Path | str) -> bool:
     if entry.get("hasTrustDialogAccepted") is True:
         return False
 
+    # The config keeps the mode it has now: the user's choice wins (P2-41b
+    # W11), and the backup takes the same mode (W10).
+    mode = stat.S_IMODE(conf.stat().st_mode)
+
     # Nothing is deleted: the previous state is parked next to it with a
-    # version stamp.
-    backup = conf.with_name(f".claude.json.hoh-{utcnow()}.bak")
-    backup.write_text(raw, encoding="utf-8")
+    # version stamp. Published under a name that must not exist, so a second
+    # backup in the same second gets the next suffix -- before `.bak`, so
+    # `.claude.json.hoh-*.bak` still matches -- and never overwrites the first.
+    stamp = utcnow()
+    for n in range(1000):
+        suffix = f"-{n:03d}" if n else ""
+        backup = conf.with_name(f".claude.json.hoh-{stamp}{suffix}.bak")
+        try:
+            durable_create(backup, raw, mode=mode)
+            break
+        except FileExistsError:
+            continue
+    else:
+        raise TrustRefused(
+            f"no free backup name for {conf} at {stamp} -- 1000 taken; "
+            "nothing touched"
+        )
 
     entry["hasTrustDialogAccepted"] = True
-    tmp = conf.with_name(f".claude.json.hoh-tmp-{os.getpid()}")
-    tmp.write_text(json.dumps(data, indent=2), encoding="utf-8")
-    os.replace(tmp, conf)
+    # Temp beside, fsync, replace, directory fsync -- or the config keeps its
+    # bytes and its mode.
+    durable_write(conf, json.dumps(data, indent=2), mode=mode)
     return True
 
 

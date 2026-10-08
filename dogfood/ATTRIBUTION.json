@@ -1,637 +1,2015 @@
 {
-  "what": "Who executed each unit of work after O105, and on what evidence. The categories are a judgement; the coverage is checked by tools/attribution.py, which refuses a history with a commit that belongs to no entry.",
-  "anchor": "13628f3224983bf9924cf728a82174abd4310cb9",
-  "anchor_is": "O105 -- the commit that recorded the first unattended fixpoint. Everything after it is this phase.",
-  "honest_reading": "Most of this phase was written by the main session, not by the product. That is the number, and the entries say for each unit why it was or was not a candidate for the product path. Bootstrap and security-boundary work is a defensible reason; 'it was quicker' is not one, and does not appear below.",
-  "entries": [
-    {
-      "id": "meta-evidence-and-isolation",
-      "category": "MAIN_ORCHESTRATOR_DIRECT",
-      "is_development_node": true,
-      "commits": [
-        "ded88f5d37acc6fbfcb3d9ceffabbcb5b0a8d7ab"
-      ],
-      "why_not_the_product": "The isolation record is the evidence the product's own acceptance rests on, and assurance.py is the rule layer that decides what counts as measured. A product that certifies its own measuring instrument through the instrument is a circle. Independent meta-audit is one of the three cases where direct work is the right answer."
-    },
-    {
-      "id": "approval-scope-hardening",
-      "category": "MAIN_ORCHESTRATOR_DIRECT",
-      "is_development_node": true,
-      "commits": [
-        "cee1585f005ae83182f2d06b358b5289017ccf8a"
-      ],
-      "why_not_the_product": "A security boundary: PrefixScopedProvider can hand an agent write access to a directory. Having an agent write the check that governs what agents may be trusted with is the one delegation this project should not make."
-    },
-    {
-      "id": "evidence-integrity-after-review",
-      "category": "MAIN_ORCHESTRATOR_DIRECT",
-      "is_development_node": true,
-      "commits": [
-        "5d54479e1dbf4949f7a1c9a67b14ee3c17e73abf"
-      ],
-      "why_not_the_product": "Responses to an adversarial review of the product's own evidence path, including the finding that its first STRICT campaign proved nothing. Auditing the audit belongs outside the thing being audited."
-    },
-    {
-      "id": "proof-pipe",
-      "category": "MAIN_ORCHESTRATOR_DIRECT",
-      "is_development_node": true,
-      "commits": [
-        "c501fb6b2fcc78afe96236b728c180e623cab5d6"
-      ],
-      "why_not_the_product": "Same boundary: the mechanism that proves the sandbox isolated. A reviewer had just shown the previous version was forgeable by the checked command itself."
-    },
-    {
-      "id": "taxonomy-telemetry-amendment",
-      "category": "MAIN_ORCHESTRATOR_DIRECT",
-      "is_development_node": true,
-      "commits": [
-        "d2bd7aa21d0299121888e504b3482600d2d663be",
-        "940422995e1cb1a79b657505c085853b4967a45c"
-      ],
-      "why_not_the_product": "Bootstrap. These three modules are the contracts the product path would record against; they had to exist before a node could be specified in terms of them. The *wiring* of telemetry into the controller was then handed to the product -- see telemetry-wiring."
-    },
-    {
-      "id": "strict-evidence-and-routing",
-      "category": "MAIN_ORCHESTRATOR_DIRECT",
-      "is_development_node": false,
-      "commits": [
-        "808a4b879072b8e41de70961f09c83060ae0da0d"
-      ],
-      "why_not_the_product": "Not a development node: it installs the evidence four product runs produced, and disposes of routing. Collecting and reporting what the product did is the orchestrator's job by definition."
-    },
-    {
-      "id": "benchmark-infrastructure",
-      "category": "MAIN_ORCHESTRATOR_DIRECT",
-      "is_development_node": false,
-      "commits": [
-        "77fd07ffa6e0578c1579b3273cf58df854c675e5"
-      ],
-      "why_not_the_product": "Not a development node: it is the measuring apparatus for comparing the product against a baseline, including the hidden suites the product must never see. An arm that could read its own measurement is not an arm."
-    },
-    {
-      "id": "attribution-ledger",
-      "category": "MAIN_ORCHESTRATOR_DIRECT",
-      "is_development_node": false,
-      "range": {
-        "from": "77fd07ffa6e0578c1579b3273cf58df854c675e5",
-        "to": "3dcbc7b7574cdbe1b5a492024b08f1dc8ad7d260"
-      },
-      "why_not_the_product": "Not a development node: it is the measurement of who did the development. Named as a range rather than as a list because the commit that writes this entry cannot know its own sha -- the same self-reference O97 hit with the attribution table, solved the same way, by naming a boundary instead of a value."
-    },
-    {
-      "id": "telemetry-wiring",
-      "category": "VERIHARNESS_RUN",
-      "is_development_node": true,
-      "node_id": "telemetry-wiring",
-      "project_state": "dogfood/selfhost-e2e/root/projects/selbst/project.json",
-      "range": {
-        "from": "3dcbc7b7574cdbe1b5a492024b08f1dc8ad7d260",
-        "to": "bfc169f4c12ecb4cdb5afe7ae150c2de4a661810"
-      },
-      "why_not_the_product": "This one *was* the product. The control plane specified it, dispatched three iterations, accepted a candidate and decided the merge; the main session started the process and answered four blocks, each recorded in the project state with its reason. The range runs to HEAD because the merge and the entry describing it cannot name their own shas -- the same self-reference O97 hit, solved the same way. **Range closed on 2026-09-13.** It ran to HEAD, and HEAD moved: four commits of capability, measurement and amendment work -- none of which the product executed -- were silently inside it. The tiling check cannot see that, because the range still tiles. A closed range and a second commit are the answer to the self-reference, and the entry below is that second commit.",
-      "merge_commit": "6512538ac54173ef6606348c2e80c57a42b92c02"
-    },
-    {
-      "id": "capability-boundary-and-amendment-path",
-      "category": "MAIN_ORCHESTRATOR_DIRECT",
-      "is_development_node": true,
-      "commits": [
-        "f3b36e9c9b7372e01e757795cc09682f87477368",
-        "450de48e29fec6ec5679d122417613dbc673b159",
-        "f8a4003c6dd615b1d8581acc750cdfcba2f14d6f",
-        "8c10b89b246b9281bfae3a35196dfc4dbf992c4b",
-        "b5b9a52ddc26dcf22b8fb0a5bef0e79890cdcae9",
-        "58842af86d36e5e04d371ff291e28488b412833c",
-        "6cb3dbb2c0c36f37e48b460d0e420919f317936e",
-        "c233566269a1ac80d1412d757fc7cb0b71ea99e8",
-        "73b64cd8207eedd98e27d138573193eb2e49dcc9",
-        "d9f113dc11b271d4faa4c04b7c19546705b057eb",
-        "793a2351b751af7a95ce38f08f57ee073e6bbe4f",
-        "bde348abf6ec6c2e018f1aeb42abeebf9ddbea42",
-        "dd9fa13e35f88ce473c568ce1d60b21307faeeba",
-        "a336edbd2eb6cdbccc45c321e71648333fd8772c",
-        "a52374c130bfb8cdc4d7e5dcec8e3467484fc5e0",
-        "a856df55cce6c81fa92ab134dfd7a35e5b6245b1",
-        "0ec026b7ca0e273ecc575de2c5635b172626b342",
-        "1c479d9cd2a7e2b4774ac848cb323797f91bb751",
-        "ef40a2266f10c895b34ab575357216adafd6b293",
-        "f1b1227322d1501eeecb9d68c07569e1283b9b7f",
-        "90bb9557664bfc138233ec3f7386aeb632718c4c",
-        "5124294a221062dfaac835241e73dbe056f7cad2",
-        "25f4ab9189598ab452769bf8d0a0ece70d835298",
-        "726ca7cae31a4531b4551f52eceb30337f9b50d7",
-        "640d05d58d47e35981e26b1aa1ff729b8668bea6",
-        "c3a17d7558131baedd41e8aeeb9de9e94acffe33",
-        "27193c0dc4f014fccc70852a113c65460dcb3399",
-        "f8c670ed95a61d965689f487d48e1d2b18b0fc57",
-        "20a92bded7553d43d2ad7fb47c4b8e321b53c847",
-        "d8dbcfd9cf6a3f54fb7e1af0434a22558f9715d1",
-        "4e6d64c027fc49a1e0e5b9e7c7928b8dc42ae594",
-        "aa3164d89f4cb9e5e9c5caa4d94cf451fa3cca9b",
-        "65f8cbb3a009064e2d8a345bfed9de71e12fa5fa",
-        "0368ccda6188fe12f19124adc0fe0fab6eecbb77"
-      ],
-      "why_not_the_product": "The main session wrote all of it directly. Two reasons, and only the first is a good one. The capability boundary is the mechanism that decides whether a run's roles may be trusted at all, so running it through the roles it constrains would have been a bootstrap: the product cannot supervise the installation of its own supervisor. The amendment path and the measurement tooling had no such excuse -- they are ordinary features, and they were written by hand because the session was already holding the context. That is the reason this phase's ratio is what it is, and it is written here rather than rounded off."
-    },
-    {
-      "id": "budget-enforcement-and-v3-preregistration",
-      "category": "MAIN_ORCHESTRATOR_DIRECT",
-      "is_development_node": true,
-      "commits": [
-        "b1994f4fd6cf95257dac503f526db692e355f8ae",
-        "c4308cd3415aff64e1e3bdb890bbdd61c20ef750",
-        "d22fc1536f43dafc0159397ecc41be99e18e3ecc",
-        "d6ae7cdd407eeb6fb4456af4846d74ca57aa75e0"
-      ],
-      "why_not_the_product": "The main session wrote all of it directly, and the reason is the same bootstrap the entry above names, one level further in. This work is the *budget* the product spends when it runs: the check that refuses a tenth dispatch, the counter the launcher reads across processes, and the instrument that falsifies both. A run of the product to install its own spending limit would have been supervised by the limit it was installing. The pre-registration and the freeze are the same shape: they are the rules a campaign of product runs is measured against, and a product run cannot be the thing that fixes what it will be measured by. What *was* delegated is the part that could be: two independent adversarial reviews, dispatched to refute the result rather than to produce it, both of which returned 'Freigabe: NEIN' and whose sixteen findings are recorded as O147 through O151. The campaign that follows this commit is the product doing the work -- 45 runs under the frozen instrument -- and that is where the ratio this ledger reports should start moving."
-    },
-    {
-      "id": "v3-campaign-closure-and-public-reference-work",
-      "category": "MAIN_ORCHESTRATOR_DIRECT",
-      "is_development_node": true,
-      "commits": [
-        "37d13e324be8f2bbcf809caf2ef6ae667796a4af",
-        "6e6f5abefe5c965f037e3e40ff043b0e2cb6f312",
-        "ed6f7a86ef4264edca9ef7e13d596ee21e034e38"
-      ],
-      "why_not_the_product": "Written by the main session while campaign v3's 45 runs were executing, and deliberately outside the frozen set: the public reference closure, the paper audit, and the record of a defect in the frozen instrument that was **not** repaired while it ran. None of it could have gone through the product without changing the instrument the campaign was being measured by, which is the one thing a running campaign forbids. The product's own contribution during this window is the campaign itself: 45 runs under an enforced budget, whose result is reported in docs/BENCHMARK_RESULTS_v3.md and is not flattering to it."
-    },
-    {
-      "id": "v3-closure-and-drift-accounting",
-      "category": "MAIN_ORCHESTRATOR_DIRECT",
-      "is_development_node": true,
-      "commits": [
-        "fb88ab630175f924e0e62efd0f92b4af74eeb1af",
-        "e29ad146a758f7ad392d0984dd74f2ba18033a4f",
-        "0f7bf70bbe57551cefaf6cad719013e07007af53",
-        "8883fa9fb71cf48ddb54ba60f4fe9cc65ee5a900",
-        "d4f5d97edc0af0d26c3b01c4cc2efd0079bd0b9e",
-        "1a3e42519e974bdc55c440abae190c75002c8fc7",
-        "eec9cb6fd51f6e98c2a15dbd95b5ff62d99d3005",
-        "4f218735182f8ac96f5d034c36161a791b5d77b6",
-        "559449a14cd102ee66f14f9e2e83c55b81c1ed58",
-        "0bef4c658036cfa8d56d129eb47c710ec3afcc2b",
-        "751d7bec94797b3217f095e26e41af510c626295",
-        "c56bd59dae653b2d7774eb2cc29adcb64e504e9c",
-        "f8c303879c2206172cad02fc510fd3c9d85602c9",
-        "b4d29362d8090dbb7d1bdcc130788ddb70a97a44",
-        "ddc9b5d0c62fee35c709220735920a1164d74506",
-        "6998759755f88b70584c31516b85a84bdfdc2b67",
-        "394473aafb892f5f2e347fbbf1affb4ab476b652",
-        "a5b504040114c2bb753734a4ca1eb6ca6315e99c"
-      ],
-      "why_not_the_product": "The campaign's own closure: its result, the classification of a defect in the frozen reporter, and the rule that decides when drift after a campaign is a repair rather than an escape. None of it could have gone through the product, for the reason the campaign itself measured -- under the budget the protocol declares, the control plane reached no fixpoint on any of the five benchmark tasks, so it is in no position to close work of this kind here either. That is the honest version of this field for this window: not 'the product was unsuitable for supervising its own instrument', which is also true, but 'the product does not currently close'. Extended as the closure continued: the telemetry evidence the campaign itself supplied, and the repair of a gate that failed its own next run."
-    },
-    {
-      "id": "v010-release-documentation",
-      "category": "MAIN_ORCHESTRATOR_DIRECT",
-      "is_development_node": true,
-      "commits": [
-        "c2a1aa17040dfef60abaac3d2c9a0b6abf824357",
-        "a071e8dc44ce99153b7e0f5ebc6011fa0b3542fe"
-      ],
-      "why_not_the_product": "The stable release's own documentation, written by the main session outside any run. Two reasons it could not have gone through the product, and neither is a preference. First, the work is *about* the product's own measurements -- the three benchmark campaigns, the arm table in which this control plane reaches no fixpoint, and three findings against this project's own gates (O165, O166, O167). A run writing the account of its own benchmark would be the circularity the benchmark exists to avoid. Second, it edits tools/readiness.py and tools/export_manifest.py -- the release gates themselves, and readiness.py is inside campaign v3's frozen set, where a repair has to be declared and accounted for rather than dispatched. The product's contribution to this release is the evidence the documents report, not the documents."
-    },
-    {
-      "id": "v010-attribution-and-o168",
-      "category": "MAIN_ORCHESTRATOR_DIRECT",
-      "is_development_node": false,
-      "commits": [
-        "42eda2116cb8ddbce44a57c52e8fd2e4d0be2b95",
-        "980a24875da24746ec148d8a530b8788ee433d98"
-      ],
-      "why_not_the_product": "Bookkeeping and one correction, both outside any run. The first commit is this ledger's own entry for the release documentation -- a ledger cannot be written by the thing it accounts for. The second is O168: three published documents quoted an export skip count that held for a shallow clone and not a full one, found by running the export's suite before pushing it. Correcting a statement this project makes about its own published artifact is orchestrator work by definition; a run would have had to be given the finding to write it up, which is the reporting step, not the finding."
-    },
-    {
-      "id": "v010-release-notes-completion",
-      "category": "MAIN_ORCHESTRATOR_DIRECT",
-      "is_development_node": false,
-      "commits": [
-        "49baa11e083fe67ee97f19b51953881b34c7a88b",
-        "7f5c26f968198ae5fc9a7c0011b5a9d32d229f40"
-      ],
-      "why_not_the_product": "The previous attribution entry, and the release notes' own findings list gaining the two entries it had left out. Neither could go through a run: a ledger cannot be written by the thing it accounts for, and the second is the same class -- deciding what this release says about its own defects is the orchestrator's judgement, and a run would have had to be handed the judgement to write it down."
-    },
-    {
-      "id": "v010-readiness-board",
-      "category": "MAIN_ORCHESTRATOR_DIRECT",
-      "is_development_node": false,
-      "commits": [
-        "c54b8e5322df9ab6538df3103e9d223e127c88f4"
-      ],
-      "why_not_the_product": "The readiness board and the external-CI evidence that binds it to the export CI actually tested. Running the gates and recording what they returned is the orchestrator's own act by construction: a run cannot be the thing that certifies the release it is part of, and the evidence file names a GitHub run id, which the product has no way to reach."
-    },
-    {
-      "id": "v010-tag-bookkeeping-and-o169",
-      "category": "MAIN_ORCHESTRATOR_DIRECT",
-      "is_development_node": false,
-      "commits": [
-        "3570d19226f9d2b6bdae5e9cd1409c1b204ed06e",
-        "738ab358b57de8a261e26c4588167e443d9cc656",
-        "bfa64658c5370a2efec7c2a6559159492d8c0265"
-      ],
-      "why_not_the_product": "The last three commits before the v0.1.0 tag: an attribution entry, the readiness board recorded at the export CI actually tested, and O169 -- the finding that this very check had no reachable green state, together with its fix and the negative control that keeps the fix from swallowing the check. None of it could go through a run. Two of the three are this ledger and that board writing themselves, which is the orchestrator's act by construction, and the third changes the gate that decides whether the ledger is complete. A run repairing the check that certifies it would be the circularity every other entry here is written to avoid."
-    },
-    {
-      "id": "v010-post-tag-correction",
-      "category": "MAIN_ORCHESTRATOR_DIRECT",
-      "is_development_node": false,
-      "commits": [
-        "0996717b704266cb1628a2acbed57ae17e493b9f",
-        "514eabe1fecfe6cbfd09db44832ac368030a0ef2"
-      ],
-      "why_not_the_product": "The readiness board at the tag, and O170 -- the correction found by verifying the published tag the way its own documents tell a reader to. Neither could go through a run: the first is the board recording the gates, and the second is this project correcting a statement it made about its own published artifact, which is the orchestrator's act by definition. The repair also touched tools/attribution.py's test, and a run repairing the check that certifies its own accounting is the circularity every entry here is written to avoid."
-    },
-    {
-      "id": "v010-o169-positionless",
-      "category": "MAIN_ORCHESTRATOR_DIRECT",
-      "is_development_node": false,
-      "commits": [
-        "d8cc3ec23e1058cc2af40a5c47d58aa904bb64db"
-      ],
-      "why_not_the_product": "The second repair of O169: the tolerance rule was positional and position is the wrong property. Outside any run for the same reason the first repair was -- it changes the gate that decides whether this ledger is complete, and a run repairing the check that certifies its own accounting is the circularity every entry here exists to avoid."
-    },
-    {
-      "id": "v010-post-tag-boards",
-      "category": "MAIN_ORCHESTRATOR_DIRECT",
-      "is_development_node": false,
-      "commits": [
-        "55995335abb4536eb0a21fc517bf3442db0e2595",
-        "b12a1217de0d294df82eb6a2ae46a081b5112058"
-      ],
-      "why_not_the_product": "The two readiness boards around the post-tag correction: the one that reported external_ci red because correcting a published figure changed exported files after CI had run on them, and the one that reports it green again after the re-export, the re-run and the re-record. Running the gates and writing down what they returned is the orchestrator's act by construction; the board is the thing a run would have to be certified by."
-    },
-    {
-      "id": "v010-trusted-distribution",
-      "category": "MAIN_ORCHESTRATOR_DIRECT",
-      "is_development_node": false,
-      "commits": [
-        "8edb1a2a1af6fe07f2db5bdaedfa6d2e041c289d",
-        "e1300f959d40539887678c38a7f9093a48a9cd91",
-        "f144d4236baa43c7ede6e5677888788ca4a76d49"
-      ],
-      "why_not_the_product": "Owner-authorized registry publication and independent supply-chain verification. This changes the release trust boundary and records external publishing evidence, so it is orchestrator work rather than a product-accepted development node. Recorded here from the export repository rather than re-derived: these commits were made in SKZL-AI/veriharness and none of their shas is in this development history, so the entry is marked as describing that history and is counted separately from the ratio this ledger reports.",
-      "history": "public-export"
-    },
-    {
-      "id": "v010-distribution-receipt",
-      "category": "MAIN_ORCHESTRATOR_DIRECT",
-      "is_development_node": false,
-      "commits": [
-        "eefb60a6e994b2f9925a0227f41519290ecfe3be"
-      ],
-      "why_not_the_product": "Independent verification of public registry and release bytes, provenance, installation receipts, and documentation after publication; no agent campaign or product acceptance is claimed. Recorded here from the export repository rather than re-derived: these commits were made in SKZL-AI/veriharness and none of their shas is in this development history, so the entry is marked as describing that history and is counted separately from the ratio this ledger reports.",
-      "history": "public-export"
-    },
-    {
-      "id": "release-supply-chain-hardening",
-      "category": "MAIN_ORCHESTRATOR_DIRECT",
-      "is_development_node": false,
-      "commits": [
-        "96b892086ceed40b90d7c794fadee932019c6318",
-        "ccd47e2bea5c1d3d9b6b73831ce0c8881cdb5372"
-      ],
-      "why_not_the_product": "Owner-authorized release trust-boundary maintenance: immutable release-tag rules, current artifact actions and an independent CI upload/download integrity check. Includes the preceding distribution-documentation merge; no product acceptance or benchmark result is claimed. Recorded here from the export repository rather than re-derived: these commits were made in SKZL-AI/veriharness and none of their shas is in this development history, so the entry is marked as describing that history and is counted separately from the ratio this ledger reports.",
-      "history": "public-export"
-    },
-    {
-      "id": "v010-distribution-integration-and-export-guard",
-      "category": "MAIN_ORCHESTRATOR_DIRECT",
-      "is_development_node": false,
-      "commits": [
-        "c501e5a3b0f1e998d0789eda287e0e42e5e6ebc4",
-        "67e04f31fe566d3c7cd6309e6fe177e8fb6f1e48",
-        "ac99d82af07e8fb62fe790e5fde1f4ffd9be7883"
-      ],
-      "why_not_the_product": "Integrating work that was done in the public repository, and building the guard that stops the next export from reverting it. Outside any run for three reasons that compound: the integration decides how one ledger absorbs another's record, which is the ledger writing itself; it repairs two gates (attribution, readiness) that would otherwise be asked to certify the run doing the repair; and the guard is the mechanism by which this project's own work reaches the public repository at all. A run cannot be the thing that decides whose version of a file survives."
-    },
-    {
-      "id": "v010-o176-board-regeneration",
-      "category": "MAIN_ORCHESTRATOR_DIRECT",
-      "is_development_node": false,
-      "commits": [
-        "dbb4ca7ba83e8f521e15f0caa2a20bfe219deeb6",
-        "0b5795e9a4939092cb78435f485092e67f48a3e1"
-      ],
-      "why_not_the_product": "The board run that deleted the distribution section, and the repair of both halves of O176. Outside any run by construction: the first commit is the board writing itself, and the second changes how that board decides which ledger entries it owns -- a run cannot be the thing that repairs the accounting which certifies it. The finding was also found by inspection rather than by a gate, and deciding what a claim's text should be is not work a dispatch can be given."
-    },
-    {
-      "id": "v010-board-before-review-repairs",
-      "category": "MAIN_ORCHESTRATOR_DIRECT",
-      "is_development_node": false,
-      "commits": [
-        "1bd8c84d960aa5b2ddaff79b4a6347a8618a3df9"
-      ],
-      "why_not_the_product": "The readiness board written immediately before an independent review's findings were addressed. Orchestrator work by construction: running the gates and recording what they returned is the act a run would have to be certified by, not one it can perform."
-    },
-    {
-      "id": "v010-review-repairs",
-      "category": "MAIN_ORCHESTRATOR_DIRECT",
-      "is_development_node": false,
-      "commits": [
-        "4a9bd4bc8b61a135a36644620889f8c3fb03df75",
-        "cc4890a37159bcdf1a65e1eac5c2ea1aa7f9ae2d",
-        "22d9901d19a56825fafdd6cca87778f1155278be"
-      ],
-      "why_not_the_product": "Closing five findings from an independent review, and the reviewed-but-held decision on the o175 candidate. Outside any run: four of the five defects were in gates -- the export guard, the readiness board's distribution section, the attribution CLI -- and a run cannot repair the checks that certify it. The fifth is a decision about what this ledger may claim, which is the ledger writing itself."
-    },
-    {
-      "id": "v010-review-reanchor",
-      "category": "MAIN_ORCHESTRATOR_DIRECT",
-      "is_development_node": false,
-      "commits": [
-        "14c0777e48e5dddfea73767d1644af875632686c",
-        "ded9b97282d89bda69a90d79d9ec32c1e5813042"
-      ],
-      "why_not_the_product": "The board written while external_ci was correctly red, and the re-anchoring of the two distribution claims that the derivation split apart: binding each assurance to its own receipt field turned one combined sentence into two, so the claims pointing at it moved. Both are ledger and board bookkeeping about a change to a gate, which is the orchestrator's act by construction."
-    },
-    {
-      "id": "o175-hardcoded-home-path-check",
-      "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
-      "is_development_node": true,
-      "run_state": "runs/o175w/state.json",
-      "candidate_id": "o175w-i2",
-      "commits": [
-        "e305cc6e34c5a6597044507c23ac6019488c8440",
-        "3b36e1e85e15fe4eb865e196a8455c29c6b6640d",
-        "f87a19d40b066a42869c6f3f6c15c2f41e9c5ecd"
-      ],
-      "why_not_the_product": "The product developed this through a plain `hoh run` -- plan, developer, independent QA, two iterations accepted against receipts -- and the orchestrator decided the merge after reviewing it, which is why this is not VERIHARNESS_RUN. It is not MAIN_ORCHESTRATOR_DIRECT either: the main session did not write it. The claim is bound to bytes rather than to a lifecycle string: runs/o175w/state.json records candidate o175w-i2 with tree digest 5f75a72eda5360c9b33a790ab90fc70879950283, which is the tree of commit 3b36e1e named here. What the review checked, and what it did not, is in the ledger at O179."
-    },
-    {
-      "id": "v010-vocabulary-extension",
-      "category": "MAIN_ORCHESTRATOR_DIRECT",
-      "is_development_node": false,
-      "commits": [
-        "7f2f075d7adc81eb08660a96694ea9b9ee0e5c67"
-      ],
-      "why_not_the_product": "The board written before the attribution vocabulary was extended. Orchestrator work by construction: a run cannot write the board that certifies it, and it cannot be the thing that decides which categories this ledger may use to describe its own provenance."
-    },
-    {
-      "id": "v010-receipt-strictness",
-      "category": "MAIN_ORCHESTRATOR_DIRECT",
-      "is_development_node": false,
-      "commits": [
-        "31afa6addc5cc758268687847612c8cbf19e266c",
-        "88b0349ae47accc7173dc852de4470c6829ffc18",
-        "ca10f3fb6ef764a0e457bf1dc196991bd6da156b"
-      ],
-      "why_not_the_product": "The two boards around the second review pass, and O180 -- making every receipt assurance compare by type and value instead of truthiness. Outside any run: running the gates and recording what they returned is the act a run would have to be certified by, and O180 changes how strictly that gate reads its own evidence."
-    },
-    {
-      "id": "v010-succession-capsule",
-      "category": "MAIN_ORCHESTRATOR_DIRECT",
-      "is_development_node": false,
-      "commits": [
-        "a619c8bafc8cde717278b4cbcd82ef1f8192fd77",
-        "f56ad977925e168763ba588f4e31a2859d4b152a",
-        "706ed48cef41bf2cb40149da5be07b62a45d701d"
-      ],
-      "why_not_the_product": "The two boards around the phase close, and the succession capsule itself. Outside any run by construction: the capsule is this session writing down what a successor inherits, which is the orchestrator's own act, and O181 changes the rule that decides what leaves this repository at all. A run cannot be the thing that classifies its own artefacts as public."
-    },
-    {
-      "id": "v010-english-surface",
-      "category": "MAIN_ORCHESTRATOR_DIRECT",
-      "is_development_node": false,
-      "commits": [
-        "59bc9cc963b1523b57eec878596b087b8f5ea5db",
-        "476519012a4f9e16b14e08badc24a93fefa5c69d"
-      ],
-      "why_not_the_product": "An instruction about the product's language, carried out by the orchestrator, plus the three defects that carrying it out exposed (O182-O184). Outside any run: the language of the published surface is a decision nobody dispatched, and two of the three defects were in the succession tooling itself -- a run cannot be the thing that repairs the instrument its own handover is measured with."
-    },
-    {
-      "id": "v010-phase-close",
-      "category": "MAIN_ORCHESTRATOR_DIRECT",
-      "is_development_node": false,
-      "commits": [
-        "71408e81a26baa9cf89e9bafef6f801196a96085",
-        "b361f505f90db155d48d579edac8a60112ea05d3"
-      ],
-      "why_not_the_product": "O185 and the board that closes the phase. Outside any run: O185 is a defect in the published test suite found by running it in the export rather than here, which is an act of comparing two trees and belongs to whoever holds both. The board is the measurement a run cannot make about itself."
-    },
-    {
-      "id": "v010-handover",
-      "category": "MAIN_ORCHESTRATOR_DIRECT",
-      "is_development_node": false,
-      "commits": [
-        "35ccedb085a8555ee22625b5b71c72f817ff7751",
-        "c67aabb92dd1062c6b9269db59548df9e202e381"
-      ],
-      "why_not_the_product": "The capsule and the handover note beside it. Outside any run by construction: both describe what a successor session inherits, and a run inside this phase cannot describe the boundary of the phase that contains it."
-    },
-    {
-      "id": "v010-bookkeeping-rule",
-      "category": "MAIN_ORCHESTRATOR_DIRECT",
-      "is_development_node": false,
-      "commits": [
-        "e0212e64c5c5eee9b61f7a5c98416b3c7bceaf4c",
-        "46da7dff2052ec72ffe7cc5b5a221bf58e837828"
-      ],
-      "why_not_the_product": "O186, the rule that decides which commits this ledger has to account for, and the board beside it. Outside any run by construction: a run cannot widen the rule that decides whether its own commits need attributing, and the board is the measurement a run cannot make about itself."
-    },
-    {
-      "id": "v010-final-board",
-      "category": "MAIN_ORCHESTRATOR_DIRECT",
-      "is_development_node": false,
-      "commits": [
-        "515a36c74eef861bb22033224c443653666adb93"
-      ],
-      "why_not_the_product": "The board that closes the phase, bound to CI run 35660398365 over export f2bc352. The measurement a run cannot make about itself."
-    },
-    {
-      "id": "v010-evidence-records",
-      "category": "MAIN_ORCHESTRATOR_DIRECT",
-      "is_development_node": false,
-      "commits": [
-        "6bc1f6781d61f33c898d50b9ad1720231138c8b9"
-      ],
-      "why_not_the_product": "The CI and sync records the closing board was measured against, written by exact_head_ci.py and export_sync.py and committed after the board that reads them. Outside any run: binding a CI result to a set of bytes is an act about two repositories, which no run inside one of them performs."
-    },
-    {
-      "id": "v3-3-p0-english-and-preflight",
-      "category": "MAIN_ORCHESTRATOR_DIRECT",
-      "is_development_node": false,
-      "commits": [
-        "83f1a2f90e003b75cf6da511f734a1fcd05b01bf",
-        "d01c66e4d9b44bcd0212c9f264e79fdf7b38c13a",
-        "f123f7823ca6f9c3346687b4c4acbc5d9bca1f18",
-        "7d6ed206441d3be1cb48ba3f9f1e4d2b2e7c4c1f",
-        "2196b3c2464a3e115ed76c5d85dbbf70f2910f51",
-        "9d63888c31abca150a1188c767f72c605e9338e5",
-        "514cb74685ec9f9af9b8029eb2f7a30a1778f37c"
-      ],
-      "why_not_the_product": "The English sweep (O182/O188-O191) and the V3.3 P0 preflight. Outside any run: the language of the published surface is a decision nobody dispatched, and the preflight is the instrument that decides whether a run may be started at all -- a run cannot be the thing that certifies its own environment."
-    },
-    {
-      "id": "v3-3-p0-baselines",
-      "category": "MAIN_ORCHESTRATOR_DIRECT",
-      "is_development_node": false,
-      "commits": [
-        "85f4668a87231a6e86e5561b25b86456d7f1c818",
-        "c8de984db21e2070555fe797fdc26327fbd9aa26",
-        "fd1dbc23ab09b4ce06ce3b6d7d30cbeaa629455c"
-      ],
-      "why_not_the_product": "The V3.3 P0 baselines: the parallelism measurement and the campaign-drift accounting the rename made necessary. Outside any run by construction -- a baseline is the description of what the product currently is, and the product cannot be the author of its own description without the ratio this ledger reports becoming circular. One of these commits carries the ledger together with the board and the evidence records, which is why it needed an entry at all: a commit that changes anything besides one bookkeeping file is work, whatever its message says (O186)."
-    },
-    {
-      "id": "v3-3-p0-capability-matrix",
-      "category": "MAIN_ORCHESTRATOR_DIRECT",
-      "is_development_node": false,
-      "commits": [
-        "38cba3207047b1af69842d4735778a191675b536",
-        "65072c71c17dfcf29b81417d087f7036194bc1e4"
-      ],
-      "why_not_the_product": "The V3.3 requirement register and the matrix derived from it. Outside any run by construction: the register is a reading of the plan, and the matrix is this repository's description of itself -- a run inside it cannot be the author of the list its own work will be measured against. Corrected on the day it was written: the first version of this entry claimed 44 commits because the script that built it decided 'already attributed' by scanning literal shas, while the checker resolves ranges as well. The checker caught it as a double claim; the entry now contains exactly the commits the checker says belong to no other entry (O192)."
-    },
-    {
-      "id": "v3-3-p0-build-order",
-      "category": "MAIN_ORCHESTRATOR_DIRECT",
-      "is_development_node": false,
-      "commits": [
-        "271f56cc685738fe070172a98ecfa4efbbbedc16",
-        "3346ed5bd049e247457f6f3de8bf2151b0085fbf",
-        "41d9731d4539c3aeee55ff90719d496b413e3b14",
-        "53533e23584f2631e8e461011648d9f44c698eeb"
-      ],
-      "why_not_the_product": "The implementation DAG and the build checklist. Outside any run by construction: a run executes one node of this order, and the order of the work is the question the run is an answer inside of. The tip was tolerated when the gaps were computed and stopped being the tip when this entry was committed, which is the positionless rule doing exactly what O169 built it for -- and why an entry is written twice before it closes."
-    },
-    {
-      "id": "v3-3-p0-complete",
-      "category": "MAIN_ORCHESTRATOR_DIRECT",
-      "is_development_node": false,
-      "commits": [
-        "1f8205173089cbfecad28f35399bd0e3a52e2619",
-        "577b3d2196b2a067b66dc5ab840f83f53a27ca80"
-      ],
-      "why_not_the_product": "The last three P0 baselines and the state-ownership ADR. Outside any run by construction: a baseline is this repository's description of itself, and an ADR is a decision about who owns what -- neither is a thing a run inside the repository can author about the repository. HEAD is included explicitly because the positionless rule tolerates the tip only until the next commit displaces it."
-    },
-    {
-      "id": "v3-3-agent-names-and-regeneration",
-      "category": "MAIN_ORCHESTRATOR_DIRECT",
-      "is_development_node": false,
-      "commits": [
-        "d4401f7400eb6a34230001d5f0ca0f2ce5093677",
-        "e22e9458db865cd361ae3607cba88fc545d64dea"
-      ],
-      "why_not_the_product": "The agent-name collision fix (O195) and the regeneration loop (O194). Outside any run: O195 changes how a run's own agents are named, which no run can change about itself without its restart reuse breaking mid-flight; O194 orders the instruments that measure the repository, which is the measurement a run is inside of."
-    },
-    {
-      "id": "v3-3-programme-scope",
-      "category": "MAIN_ORCHESTRATOR_DIRECT",
-      "is_development_node": false,
-      "commits": [
-        "58587b4b006ec88c75959190f85cc6bf37b60f03",
-        "aa90302e0edec0fe519407616c8c4ed6e40287fa",
-        "bdc976422a427f1589f971da1fc9d7ce563c52d8",
-        "ca3ed6916cc5be9d0b6c2e53c12faf51e05eca15",
-        "cf459012f9177cbf07db1d77c7bdffef78e1273e"
-      ],
-      "why_not_the_product": "The programme-scope gate (O196) and the board/matrix cycle (O197). Outside any run by construction: deciding what the programme *is* -- which work exists, in which phase, gated by what -- is the question every run is an answer inside of, and a run cannot author the inventory its own work is measured against."
-    },
-    {
-      "id": "p1-09-role-approval-policy",
-      "category": "MAIN_ORCHESTRATOR_DIRECT",
-      "is_development_node": true,
-      "commits": [
-        "af0dc0e60b5c340977621fe375b28c64a704c83a"
-      ],
-      "why_not_the_product": "P1-09 was built by the orchestrator because it is the capability a product run needs in order to run at all: without it the first dispatch of any run stops for a human (O198), and a run cannot build the policy that decides whether it may start. Counted as a development node, and not through the product, which is what it was."
-    },
-    {
-      "id": "p1-integrity-and-sandbox-toolchain",
-      "category": "MAIN_ORCHESTRATOR_DIRECT",
-      "is_development_node": true,
-      "commits": [
-        "c9bec51f178c4a3729fb61f1b86e3229860e4820"
-      ],
-      "why_not_the_product": "The integrity guard (O201) and the sandbox toolchain bind (O200) were built by the orchestrator: both are preconditions for a product run to be admissible at all, and a run cannot author the inventory that judges its own conduct. Counted as a development node outside the product."
-    },
-    {
-      "id": "p1-16-acceptance-record-and-o205",
-      "category": "MAIN_ORCHESTRATOR_DIRECT",
-      "is_development_node": true,
-      "commits": [
-        "25a5d835f0e127b03ac48f8e766f3241b0006209",
-        "6ff91551563401438635c19b41bd0d8b4695038b"
-      ],
-      "why_not_the_product": "The P1-16 acceptance record, its driver, O203 and the O205 drift accounting were built by the orchestrator under five adversarial review rounds: they are the instrument that judges whether a product run happened as documented, and a run cannot author the instrument that judges it. Counted as a development node outside the product."
-    },
-    {
-      "id": "p1-16-regeneration",
-      "category": "MAIN_ORCHESTRATOR_DIRECT",
-      "is_development_node": true,
-      "commits": [
-        "3e33bca68ae06e89046f3f6dc0a4976d813d6bdf"
-      ],
-      "why_not_the_product": "The fixpoint regeneration after the P1-16 fix set: generated documents re-derived from the tree by tools/regenerate.py. Mechanical, and outside the product for the same reason the instrument is -- a run does not regenerate the board that judges it."
-    },
-    {
-      "id": "p1-16-export-and-preflight",
-      "category": "MAIN_ORCHESTRATOR_DIRECT",
-      "is_development_node": true,
-      "commits": [
-        "0608989673bc68e1c043d6591da92667fcbb135b",
-        "98e3b1efe58dfc9c8d7436c1b3bf5630be77de21",
-        "a6d00630f6db2d028bb04786eeec969d65047a9b"
-      ],
-      "why_not_the_product": "Recording the export's CI evidence and the sync base, and the pre-flight corrections both reviewers required before the fourth drive (--until-accepted in the documented command, stdout-only parsing). Orchestrator work on the instrument and its evidence, outside the product."
-    },
-    {
-      "id": "p1-16-proven-fourth-run",
-      "category": "MAIN_ORCHESTRATOR_DIRECT",
-      "is_development_node": true,
-      "commits": [
-        "b5bbb39ff24aec2a922a32e957baf989668c53d1",
-        "74671a9eda6c475bb3ba663b7d2009d6e673790c",
-        "b7a2768e85ae1f83c652744e40ec9bba14fad26e"
-      ],
-      "why_not_the_product": "The fourth P1-16 drive and its record. The run itself was the product's -- HoH planned, developed and accepted the minimal programme with no human intervention -- but the drive around it, the record and the re-execution are the instrument that judges that run, and a run does not author what judges it."
-    },
-    {
-      "id": "p1-boundary-closure",
-      "category": "MAIN_ORCHESTRATOR_DIRECT",
-      "is_development_node": true,
-      "commits": [
-        "9f2058ebf071b2f6f4558f3f485f073ab2abf68d",
-        "eec82190f2101180e2b9f94260666d3aa801fcc3",
-        "139528189b1dcdde43312339719fc16d0f25f90e",
-        "d048013a095746751547a49b307971a4195d0b16"
-      ],
-      "why_not_the_product": "Closing the P1 boundary: the export's CI and sync records and the regenerated documents. Mechanical closure work on the instrument, outside the product."
-    },
-    {
-      "id": "p1-boundary-export-and-board",
-      "category": "MAIN_ORCHESTRATOR_DIRECT",
-      "is_development_node": true,
-      "commits": [
-        "8578c37b8b45e3c4cbd38f77939568a46ebb4b02",
-        "be5b937e6f6b0111c3fd424ecc8ddfe8823e1a6a",
-        "d962f192852f0c61cf70590e1473d21f44f96a12",
-        "2c8bff00b8a794f66004993f75d1458c26f1f627"
-      ],
-      "why_not_the_product": "The P1 boundary's export records and regenerated board. Mechanical closure work on the instrument."
-    },
-    {
-      "id": "p1-boundary-final-export",
-      "category": "MAIN_ORCHESTRATOR_DIRECT",
-      "is_development_node": true,
-      "commits": [
-        "fb814da5f6902aa44c2bd50335ca708ee8371db2",
-        "d25326182fe4e9ae46b1c0d074e25f76a73eebec",
-        "c62740e5f8d06ae2fb311a6ab00a34ab139235df"
-      ],
-      "why_not_the_product": "The final P1-boundary export: the board it carried, and the CI and sync records bound to it."
-    },
-    {
-      "id": "p1-boundary-closure-cycle",
-      "category": "MAIN_ORCHESTRATOR_DIRECT",
-      "is_development_node": true,
-      "commits": [
-        "965309a069e84a311e0ea80356211838ba318f2d",
-        "3f2b0ce950ce801336efeb00bfa8fb0cbd2f4722",
-        "011a0c98ec690abd2e3a262e41055fb776916cf4"
-      ],
-      "why_not_the_product": "The closure cycle of the P1 boundary: regenerated documents, the rewritten succession capsule, and the export's CI and sync records. Mechanical; it adds no capability and decides nothing."
-    }
-  ]
+ "what": "Who executed each unit of work after O105, and on what evidence. The categories are a judgement; the coverage is checked by tools/attribution.py, which refuses a history with a commit that belongs to no entry.",
+ "anchor": "13628f3224983bf9924cf728a82174abd4310cb9",
+ "anchor_is": "O105 -- the commit that recorded the first unattended fixpoint. Everything after it is this phase.",
+ "honest_reading": "Most of this phase was written by the main session, not by the product. That is the number, and the entries say for each unit why it was or was not a candidate for the product path. Bootstrap and security-boundary work is a defensible reason; 'it was quicker' is not one, and does not appear below.",
+ "entries": [
+  {
+   "id": "meta-evidence-and-isolation",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "ded88f5d37acc6fbfcb3d9ceffabbcb5b0a8d7ab"
+   ],
+   "why_not_the_product": "The isolation record is the evidence the product's own acceptance rests on, and assurance.py is the rule layer that decides what counts as measured. A product that certifies its own measuring instrument through the instrument is a circle. Independent meta-audit is one of the three cases where direct work is the right answer."
+  },
+  {
+   "id": "approval-scope-hardening",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "cee1585f005ae83182f2d06b358b5289017ccf8a"
+   ],
+   "why_not_the_product": "A security boundary: PrefixScopedProvider can hand an agent write access to a directory. Having an agent write the check that governs what agents may be trusted with is the one delegation this project should not make."
+  },
+  {
+   "id": "evidence-integrity-after-review",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "5d54479e1dbf4949f7a1c9a67b14ee3c17e73abf"
+   ],
+   "why_not_the_product": "Responses to an adversarial review of the product's own evidence path, including the finding that its first STRICT campaign proved nothing. Auditing the audit belongs outside the thing being audited."
+  },
+  {
+   "id": "proof-pipe",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "c501fb6b2fcc78afe96236b728c180e623cab5d6"
+   ],
+   "why_not_the_product": "Same boundary: the mechanism that proves the sandbox isolated. A reviewer had just shown the previous version was forgeable by the checked command itself."
+  },
+  {
+   "id": "taxonomy-telemetry-amendment",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "d2bd7aa21d0299121888e504b3482600d2d663be",
+    "940422995e1cb1a79b657505c085853b4967a45c"
+   ],
+   "why_not_the_product": "Bootstrap. These three modules are the contracts the product path would record against; they had to exist before a node could be specified in terms of them. The *wiring* of telemetry into the controller was then handed to the product -- see telemetry-wiring."
+  },
+  {
+   "id": "strict-evidence-and-routing",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": false,
+   "commits": [
+    "808a4b879072b8e41de70961f09c83060ae0da0d"
+   ],
+   "why_not_the_product": "Not a development node: it installs the evidence four product runs produced, and disposes of routing. Collecting and reporting what the product did is the orchestrator's job by definition."
+  },
+  {
+   "id": "benchmark-infrastructure",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": false,
+   "commits": [
+    "77fd07ffa6e0578c1579b3273cf58df854c675e5"
+   ],
+   "why_not_the_product": "Not a development node: it is the measuring apparatus for comparing the product against a baseline, including the hidden suites the product must never see. An arm that could read its own measurement is not an arm."
+  },
+  {
+   "id": "attribution-ledger",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": false,
+   "range": {
+    "from": "77fd07ffa6e0578c1579b3273cf58df854c675e5",
+    "to": "3dcbc7b7574cdbe1b5a492024b08f1dc8ad7d260"
+   },
+   "why_not_the_product": "Not a development node: it is the measurement of who did the development. Named as a range rather than as a list because the commit that writes this entry cannot know its own sha -- the same self-reference O97 hit with the attribution table, solved the same way, by naming a boundary instead of a value."
+  },
+  {
+   "id": "telemetry-wiring",
+   "category": "VERIHARNESS_RUN",
+   "is_development_node": true,
+   "node_id": "telemetry-wiring",
+   "project_state": "dogfood/selfhost-e2e/root/projects/selbst/project.json",
+   "range": {
+    "from": "3dcbc7b7574cdbe1b5a492024b08f1dc8ad7d260",
+    "to": "bfc169f4c12ecb4cdb5afe7ae150c2de4a661810"
+   },
+   "why_not_the_product": "This one *was* the product. The control plane specified it, dispatched three iterations, accepted a candidate and decided the merge; the main session started the process and answered four blocks, each recorded in the project state with its reason. The range runs to HEAD because the merge and the entry describing it cannot name their own shas -- the same self-reference O97 hit, solved the same way. **Range closed on 2026-09-13.** It ran to HEAD, and HEAD moved: four commits of capability, measurement and amendment work -- none of which the product executed -- were silently inside it. The tiling check cannot see that, because the range still tiles. A closed range and a second commit are the answer to the self-reference, and the entry below is that second commit.",
+   "merge_commit": "6512538ac54173ef6606348c2e80c57a42b92c02"
+  },
+  {
+   "id": "capability-boundary-and-amendment-path",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "f3b36e9c9b7372e01e757795cc09682f87477368",
+    "450de48e29fec6ec5679d122417613dbc673b159",
+    "f8a4003c6dd615b1d8581acc750cdfcba2f14d6f",
+    "8c10b89b246b9281bfae3a35196dfc4dbf992c4b",
+    "b5b9a52ddc26dcf22b8fb0a5bef0e79890cdcae9",
+    "58842af86d36e5e04d371ff291e28488b412833c",
+    "6cb3dbb2c0c36f37e48b460d0e420919f317936e",
+    "c233566269a1ac80d1412d757fc7cb0b71ea99e8",
+    "73b64cd8207eedd98e27d138573193eb2e49dcc9",
+    "d9f113dc11b271d4faa4c04b7c19546705b057eb",
+    "793a2351b751af7a95ce38f08f57ee073e6bbe4f",
+    "bde348abf6ec6c2e018f1aeb42abeebf9ddbea42",
+    "dd9fa13e35f88ce473c568ce1d60b21307faeeba",
+    "a336edbd2eb6cdbccc45c321e71648333fd8772c",
+    "a52374c130bfb8cdc4d7e5dcec8e3467484fc5e0",
+    "a856df55cce6c81fa92ab134dfd7a35e5b6245b1",
+    "0ec026b7ca0e273ecc575de2c5635b172626b342",
+    "1c479d9cd2a7e2b4774ac848cb323797f91bb751",
+    "ef40a2266f10c895b34ab575357216adafd6b293",
+    "f1b1227322d1501eeecb9d68c07569e1283b9b7f",
+    "90bb9557664bfc138233ec3f7386aeb632718c4c",
+    "5124294a221062dfaac835241e73dbe056f7cad2",
+    "25f4ab9189598ab452769bf8d0a0ece70d835298",
+    "726ca7cae31a4531b4551f52eceb30337f9b50d7",
+    "640d05d58d47e35981e26b1aa1ff729b8668bea6",
+    "c3a17d7558131baedd41e8aeeb9de9e94acffe33",
+    "27193c0dc4f014fccc70852a113c65460dcb3399",
+    "f8c670ed95a61d965689f487d48e1d2b18b0fc57",
+    "20a92bded7553d43d2ad7fb47c4b8e321b53c847",
+    "d8dbcfd9cf6a3f54fb7e1af0434a22558f9715d1",
+    "4e6d64c027fc49a1e0e5b9e7c7928b8dc42ae594",
+    "aa3164d89f4cb9e5e9c5caa4d94cf451fa3cca9b",
+    "65f8cbb3a009064e2d8a345bfed9de71e12fa5fa",
+    "0368ccda6188fe12f19124adc0fe0fab6eecbb77"
+   ],
+   "why_not_the_product": "The main session wrote all of it directly. Two reasons, and only the first is a good one. The capability boundary is the mechanism that decides whether a run's roles may be trusted at all, so running it through the roles it constrains would have been a bootstrap: the product cannot supervise the installation of its own supervisor. The amendment path and the measurement tooling had no such excuse -- they are ordinary features, and they were written by hand because the session was already holding the context. That is the reason this phase's ratio is what it is, and it is written here rather than rounded off."
+  },
+  {
+   "id": "budget-enforcement-and-v3-preregistration",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "b1994f4fd6cf95257dac503f526db692e355f8ae",
+    "c4308cd3415aff64e1e3bdb890bbdd61c20ef750",
+    "d22fc1536f43dafc0159397ecc41be99e18e3ecc",
+    "d6ae7cdd407eeb6fb4456af4846d74ca57aa75e0"
+   ],
+   "why_not_the_product": "The main session wrote all of it directly, and the reason is the same bootstrap the entry above names, one level further in. This work is the *budget* the product spends when it runs: the check that refuses a tenth dispatch, the counter the launcher reads across processes, and the instrument that falsifies both. A run of the product to install its own spending limit would have been supervised by the limit it was installing. The pre-registration and the freeze are the same shape: they are the rules a campaign of product runs is measured against, and a product run cannot be the thing that fixes what it will be measured by. What *was* delegated is the part that could be: two independent adversarial reviews, dispatched to refute the result rather than to produce it, both of which returned 'Freigabe: NEIN' and whose sixteen findings are recorded as O147 through O151. The campaign that follows this commit is the product doing the work -- 45 runs under the frozen instrument -- and that is where the ratio this ledger reports should start moving."
+  },
+  {
+   "id": "v3-campaign-closure-and-public-reference-work",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "37d13e324be8f2bbcf809caf2ef6ae667796a4af",
+    "6e6f5abefe5c965f037e3e40ff043b0e2cb6f312",
+    "ed6f7a86ef4264edca9ef7e13d596ee21e034e38"
+   ],
+   "why_not_the_product": "Written by the main session while campaign v3's 45 runs were executing, and deliberately outside the frozen set: the public reference closure, the paper audit, and the record of a defect in the frozen instrument that was **not** repaired while it ran. None of it could have gone through the product without changing the instrument the campaign was being measured by, which is the one thing a running campaign forbids. The product's own contribution during this window is the campaign itself: 45 runs under an enforced budget, whose result is reported in docs/BENCHMARK_RESULTS_v3.md and is not flattering to it."
+  },
+  {
+   "id": "v3-closure-and-drift-accounting",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "fb88ab630175f924e0e62efd0f92b4af74eeb1af",
+    "e29ad146a758f7ad392d0984dd74f2ba18033a4f",
+    "0f7bf70bbe57551cefaf6cad719013e07007af53",
+    "8883fa9fb71cf48ddb54ba60f4fe9cc65ee5a900",
+    "d4f5d97edc0af0d26c3b01c4cc2efd0079bd0b9e",
+    "1a3e42519e974bdc55c440abae190c75002c8fc7",
+    "eec9cb6fd51f6e98c2a15dbd95b5ff62d99d3005",
+    "4f218735182f8ac96f5d034c36161a791b5d77b6",
+    "559449a14cd102ee66f14f9e2e83c55b81c1ed58",
+    "0bef4c658036cfa8d56d129eb47c710ec3afcc2b",
+    "751d7bec94797b3217f095e26e41af510c626295",
+    "c56bd59dae653b2d7774eb2cc29adcb64e504e9c",
+    "f8c303879c2206172cad02fc510fd3c9d85602c9",
+    "b4d29362d8090dbb7d1bdcc130788ddb70a97a44",
+    "ddc9b5d0c62fee35c709220735920a1164d74506",
+    "6998759755f88b70584c31516b85a84bdfdc2b67",
+    "394473aafb892f5f2e347fbbf1affb4ab476b652",
+    "a5b504040114c2bb753734a4ca1eb6ca6315e99c"
+   ],
+   "why_not_the_product": "The campaign's own closure: its result, the classification of a defect in the frozen reporter, and the rule that decides when drift after a campaign is a repair rather than an escape. None of it could have gone through the product, for the reason the campaign itself measured -- under the budget the protocol declares, the control plane reached no fixpoint on any of the five benchmark tasks, so it is in no position to close work of this kind here either. That is the honest version of this field for this window: not 'the product was unsuitable for supervising its own instrument', which is also true, but 'the product does not currently close'. Extended as the closure continued: the telemetry evidence the campaign itself supplied, and the repair of a gate that failed its own next run."
+  },
+  {
+   "id": "v010-release-documentation",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "c2a1aa17040dfef60abaac3d2c9a0b6abf824357",
+    "a071e8dc44ce99153b7e0f5ebc6011fa0b3542fe"
+   ],
+   "why_not_the_product": "The stable release's own documentation, written by the main session outside any run. Two reasons it could not have gone through the product, and neither is a preference. First, the work is *about* the product's own measurements -- the three benchmark campaigns, the arm table in which this control plane reaches no fixpoint, and three findings against this project's own gates (O165, O166, O167). A run writing the account of its own benchmark would be the circularity the benchmark exists to avoid. Second, it edits tools/readiness.py and tools/export_manifest.py -- the release gates themselves, and readiness.py is inside campaign v3's frozen set, where a repair has to be declared and accounted for rather than dispatched. The product's contribution to this release is the evidence the documents report, not the documents."
+  },
+  {
+   "id": "v010-attribution-and-o168",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": false,
+   "commits": [
+    "42eda2116cb8ddbce44a57c52e8fd2e4d0be2b95",
+    "980a24875da24746ec148d8a530b8788ee433d98"
+   ],
+   "why_not_the_product": "Bookkeeping and one correction, both outside any run. The first commit is this ledger's own entry for the release documentation -- a ledger cannot be written by the thing it accounts for. The second is O168: three published documents quoted an export skip count that held for a shallow clone and not a full one, found by running the export's suite before pushing it. Correcting a statement this project makes about its own published artifact is orchestrator work by definition; a run would have had to be given the finding to write it up, which is the reporting step, not the finding."
+  },
+  {
+   "id": "v010-release-notes-completion",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": false,
+   "commits": [
+    "49baa11e083fe67ee97f19b51953881b34c7a88b",
+    "7f5c26f968198ae5fc9a7c0011b5a9d32d229f40"
+   ],
+   "why_not_the_product": "The previous attribution entry, and the release notes' own findings list gaining the two entries it had left out. Neither could go through a run: a ledger cannot be written by the thing it accounts for, and the second is the same class -- deciding what this release says about its own defects is the orchestrator's judgement, and a run would have had to be handed the judgement to write it down."
+  },
+  {
+   "id": "v010-readiness-board",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": false,
+   "commits": [
+    "c54b8e5322df9ab6538df3103e9d223e127c88f4"
+   ],
+   "why_not_the_product": "The readiness board and the external-CI evidence that binds it to the export CI actually tested. Running the gates and recording what they returned is the orchestrator's own act by construction: a run cannot be the thing that certifies the release it is part of, and the evidence file names a GitHub run id, which the product has no way to reach."
+  },
+  {
+   "id": "v010-tag-bookkeeping-and-o169",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": false,
+   "commits": [
+    "3570d19226f9d2b6bdae5e9cd1409c1b204ed06e",
+    "738ab358b57de8a261e26c4588167e443d9cc656",
+    "bfa64658c5370a2efec7c2a6559159492d8c0265"
+   ],
+   "why_not_the_product": "The last three commits before the v0.1.0 tag: an attribution entry, the readiness board recorded at the export CI actually tested, and O169 -- the finding that this very check had no reachable green state, together with its fix and the negative control that keeps the fix from swallowing the check. None of it could go through a run. Two of the three are this ledger and that board writing themselves, which is the orchestrator's act by construction, and the third changes the gate that decides whether the ledger is complete. A run repairing the check that certifies it would be the circularity every other entry here is written to avoid."
+  },
+  {
+   "id": "v010-post-tag-correction",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": false,
+   "commits": [
+    "0996717b704266cb1628a2acbed57ae17e493b9f",
+    "514eabe1fecfe6cbfd09db44832ac368030a0ef2"
+   ],
+   "why_not_the_product": "The readiness board at the tag, and O170 -- the correction found by verifying the published tag the way its own documents tell a reader to. Neither could go through a run: the first is the board recording the gates, and the second is this project correcting a statement it made about its own published artifact, which is the orchestrator's act by definition. The repair also touched tools/attribution.py's test, and a run repairing the check that certifies its own accounting is the circularity every entry here is written to avoid."
+  },
+  {
+   "id": "v010-o169-positionless",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": false,
+   "commits": [
+    "d8cc3ec23e1058cc2af40a5c47d58aa904bb64db"
+   ],
+   "why_not_the_product": "The second repair of O169: the tolerance rule was positional and position is the wrong property. Outside any run for the same reason the first repair was -- it changes the gate that decides whether this ledger is complete, and a run repairing the check that certifies its own accounting is the circularity every entry here exists to avoid."
+  },
+  {
+   "id": "v010-post-tag-boards",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": false,
+   "commits": [
+    "55995335abb4536eb0a21fc517bf3442db0e2595",
+    "b12a1217de0d294df82eb6a2ae46a081b5112058"
+   ],
+   "why_not_the_product": "The two readiness boards around the post-tag correction: the one that reported external_ci red because correcting a published figure changed exported files after CI had run on them, and the one that reports it green again after the re-export, the re-run and the re-record. Running the gates and writing down what they returned is the orchestrator's act by construction; the board is the thing a run would have to be certified by."
+  },
+  {
+   "id": "v010-trusted-distribution",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": false,
+   "commits": [
+    "8edb1a2a1af6fe07f2db5bdaedfa6d2e041c289d",
+    "e1300f959d40539887678c38a7f9093a48a9cd91",
+    "f144d4236baa43c7ede6e5677888788ca4a76d49"
+   ],
+   "why_not_the_product": "Owner-authorized registry publication and independent supply-chain verification. This changes the release trust boundary and records external publishing evidence, so it is orchestrator work rather than a product-accepted development node. Recorded here from the export repository rather than re-derived: these commits were made in SKZL-AI/veriharness and none of their shas is in this development history, so the entry is marked as describing that history and is counted separately from the ratio this ledger reports.",
+   "history": "public-export"
+  },
+  {
+   "id": "v010-distribution-receipt",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": false,
+   "commits": [
+    "eefb60a6e994b2f9925a0227f41519290ecfe3be"
+   ],
+   "why_not_the_product": "Independent verification of public registry and release bytes, provenance, installation receipts, and documentation after publication; no agent campaign or product acceptance is claimed. Recorded here from the export repository rather than re-derived: these commits were made in SKZL-AI/veriharness and none of their shas is in this development history, so the entry is marked as describing that history and is counted separately from the ratio this ledger reports.",
+   "history": "public-export"
+  },
+  {
+   "id": "release-supply-chain-hardening",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": false,
+   "commits": [
+    "96b892086ceed40b90d7c794fadee932019c6318",
+    "ccd47e2bea5c1d3d9b6b73831ce0c8881cdb5372"
+   ],
+   "why_not_the_product": "Owner-authorized release trust-boundary maintenance: immutable release-tag rules, current artifact actions and an independent CI upload/download integrity check. Includes the preceding distribution-documentation merge; no product acceptance or benchmark result is claimed. Recorded here from the export repository rather than re-derived: these commits were made in SKZL-AI/veriharness and none of their shas is in this development history, so the entry is marked as describing that history and is counted separately from the ratio this ledger reports.",
+   "history": "public-export"
+  },
+  {
+   "id": "v010-distribution-integration-and-export-guard",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": false,
+   "commits": [
+    "c501e5a3b0f1e998d0789eda287e0e42e5e6ebc4",
+    "67e04f31fe566d3c7cd6309e6fe177e8fb6f1e48",
+    "ac99d82af07e8fb62fe790e5fde1f4ffd9be7883"
+   ],
+   "why_not_the_product": "Integrating work that was done in the public repository, and building the guard that stops the next export from reverting it. Outside any run for three reasons that compound: the integration decides how one ledger absorbs another's record, which is the ledger writing itself; it repairs two gates (attribution, readiness) that would otherwise be asked to certify the run doing the repair; and the guard is the mechanism by which this project's own work reaches the public repository at all. A run cannot be the thing that decides whose version of a file survives."
+  },
+  {
+   "id": "v010-o176-board-regeneration",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": false,
+   "commits": [
+    "dbb4ca7ba83e8f521e15f0caa2a20bfe219deeb6",
+    "0b5795e9a4939092cb78435f485092e67f48a3e1"
+   ],
+   "why_not_the_product": "The board run that deleted the distribution section, and the repair of both halves of O176. Outside any run by construction: the first commit is the board writing itself, and the second changes how that board decides which ledger entries it owns -- a run cannot be the thing that repairs the accounting which certifies it. The finding was also found by inspection rather than by a gate, and deciding what a claim's text should be is not work a dispatch can be given."
+  },
+  {
+   "id": "v010-board-before-review-repairs",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": false,
+   "commits": [
+    "1bd8c84d960aa5b2ddaff79b4a6347a8618a3df9"
+   ],
+   "why_not_the_product": "The readiness board written immediately before an independent review's findings were addressed. Orchestrator work by construction: running the gates and recording what they returned is the act a run would have to be certified by, not one it can perform."
+  },
+  {
+   "id": "v010-review-repairs",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": false,
+   "commits": [
+    "4a9bd4bc8b61a135a36644620889f8c3fb03df75",
+    "cc4890a37159bcdf1a65e1eac5c2ea1aa7f9ae2d",
+    "22d9901d19a56825fafdd6cca87778f1155278be"
+   ],
+   "why_not_the_product": "Closing five findings from an independent review, and the reviewed-but-held decision on the o175 candidate. Outside any run: four of the five defects were in gates -- the export guard, the readiness board's distribution section, the attribution CLI -- and a run cannot repair the checks that certify it. The fifth is a decision about what this ledger may claim, which is the ledger writing itself."
+  },
+  {
+   "id": "v010-review-reanchor",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": false,
+   "commits": [
+    "14c0777e48e5dddfea73767d1644af875632686c",
+    "ded9b97282d89bda69a90d79d9ec32c1e5813042"
+   ],
+   "why_not_the_product": "The board written while external_ci was correctly red, and the re-anchoring of the two distribution claims that the derivation split apart: binding each assurance to its own receipt field turned one combined sentence into two, so the claims pointing at it moved. Both are ledger and board bookkeeping about a change to a gate, which is the orchestrator's act by construction."
+  },
+  {
+   "id": "o175-hardcoded-home-path-check",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "run_state": "runs/o175w/state.json",
+   "candidate_id": "o175w-i2",
+   "commits": [
+    "e305cc6e34c5a6597044507c23ac6019488c8440",
+    "3b36e1e85e15fe4eb865e196a8455c29c6b6640d",
+    "f87a19d40b066a42869c6f3f6c15c2f41e9c5ecd"
+   ],
+   "why_not_the_product": "The product developed this through a plain `hoh run` -- plan, developer, independent QA, two iterations accepted against receipts -- and the orchestrator decided the merge after reviewing it, which is why this is not VERIHARNESS_RUN. It is not MAIN_ORCHESTRATOR_DIRECT either: the main session did not write it. The claim is bound to bytes rather than to a lifecycle string: runs/o175w/state.json records candidate o175w-i2 with tree digest 5f75a72eda5360c9b33a790ab90fc70879950283, which is the tree of commit 3b36e1e named here. What the review checked, and what it did not, is in the ledger at O179."
+  },
+  {
+   "id": "v010-vocabulary-extension",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": false,
+   "commits": [
+    "7f2f075d7adc81eb08660a96694ea9b9ee0e5c67"
+   ],
+   "why_not_the_product": "The board written before the attribution vocabulary was extended. Orchestrator work by construction: a run cannot write the board that certifies it, and it cannot be the thing that decides which categories this ledger may use to describe its own provenance."
+  },
+  {
+   "id": "v010-receipt-strictness",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": false,
+   "commits": [
+    "31afa6addc5cc758268687847612c8cbf19e266c",
+    "88b0349ae47accc7173dc852de4470c6829ffc18",
+    "ca10f3fb6ef764a0e457bf1dc196991bd6da156b"
+   ],
+   "why_not_the_product": "The two boards around the second review pass, and O180 -- making every receipt assurance compare by type and value instead of truthiness. Outside any run: running the gates and recording what they returned is the act a run would have to be certified by, and O180 changes how strictly that gate reads its own evidence."
+  },
+  {
+   "id": "v010-succession-capsule",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": false,
+   "commits": [
+    "a619c8bafc8cde717278b4cbcd82ef1f8192fd77",
+    "f56ad977925e168763ba588f4e31a2859d4b152a",
+    "706ed48cef41bf2cb40149da5be07b62a45d701d"
+   ],
+   "why_not_the_product": "The two boards around the phase close, and the succession capsule itself. Outside any run by construction: the capsule is this session writing down what a successor inherits, which is the orchestrator's own act, and O181 changes the rule that decides what leaves this repository at all. A run cannot be the thing that classifies its own artefacts as public."
+  },
+  {
+   "id": "v010-english-surface",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": false,
+   "commits": [
+    "59bc9cc963b1523b57eec878596b087b8f5ea5db",
+    "476519012a4f9e16b14e08badc24a93fefa5c69d"
+   ],
+   "why_not_the_product": "An instruction about the product's language, carried out by the orchestrator, plus the three defects that carrying it out exposed (O182-O184). Outside any run: the language of the published surface is a decision nobody dispatched, and two of the three defects were in the succession tooling itself -- a run cannot be the thing that repairs the instrument its own handover is measured with."
+  },
+  {
+   "id": "v010-phase-close",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": false,
+   "commits": [
+    "71408e81a26baa9cf89e9bafef6f801196a96085",
+    "b361f505f90db155d48d579edac8a60112ea05d3"
+   ],
+   "why_not_the_product": "O185 and the board that closes the phase. Outside any run: O185 is a defect in the published test suite found by running it in the export rather than here, which is an act of comparing two trees and belongs to whoever holds both. The board is the measurement a run cannot make about itself."
+  },
+  {
+   "id": "v010-handover",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": false,
+   "commits": [
+    "35ccedb085a8555ee22625b5b71c72f817ff7751",
+    "c67aabb92dd1062c6b9269db59548df9e202e381"
+   ],
+   "why_not_the_product": "The capsule and the handover note beside it. Outside any run by construction: both describe what a successor session inherits, and a run inside this phase cannot describe the boundary of the phase that contains it."
+  },
+  {
+   "id": "v010-bookkeeping-rule",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": false,
+   "commits": [
+    "e0212e64c5c5eee9b61f7a5c98416b3c7bceaf4c",
+    "46da7dff2052ec72ffe7cc5b5a221bf58e837828"
+   ],
+   "why_not_the_product": "O186, the rule that decides which commits this ledger has to account for, and the board beside it. Outside any run by construction: a run cannot widen the rule that decides whether its own commits need attributing, and the board is the measurement a run cannot make about itself."
+  },
+  {
+   "id": "v010-final-board",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": false,
+   "commits": [
+    "515a36c74eef861bb22033224c443653666adb93"
+   ],
+   "why_not_the_product": "The board that closes the phase, bound to CI run 35660398365 over export f2bc352. The measurement a run cannot make about itself."
+  },
+  {
+   "id": "v010-evidence-records",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": false,
+   "commits": [
+    "6bc1f6781d61f33c898d50b9ad1720231138c8b9"
+   ],
+   "why_not_the_product": "The CI and sync records the closing board was measured against, written by exact_head_ci.py and export_sync.py and committed after the board that reads them. Outside any run: binding a CI result to a set of bytes is an act about two repositories, which no run inside one of them performs."
+  },
+  {
+   "id": "v3-3-p0-english-and-preflight",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": false,
+   "commits": [
+    "83f1a2f90e003b75cf6da511f734a1fcd05b01bf",
+    "d01c66e4d9b44bcd0212c9f264e79fdf7b38c13a",
+    "f123f7823ca6f9c3346687b4c4acbc5d9bca1f18",
+    "7d6ed206441d3be1cb48ba3f9f1e4d2b2e7c4c1f",
+    "2196b3c2464a3e115ed76c5d85dbbf70f2910f51",
+    "9d63888c31abca150a1188c767f72c605e9338e5",
+    "514cb74685ec9f9af9b8029eb2f7a30a1778f37c"
+   ],
+   "why_not_the_product": "The English sweep (O182/O188-O191) and the V3.3 P0 preflight. Outside any run: the language of the published surface is a decision nobody dispatched, and the preflight is the instrument that decides whether a run may be started at all -- a run cannot be the thing that certifies its own environment."
+  },
+  {
+   "id": "v3-3-p0-baselines",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": false,
+   "commits": [
+    "85f4668a87231a6e86e5561b25b86456d7f1c818",
+    "c8de984db21e2070555fe797fdc26327fbd9aa26",
+    "fd1dbc23ab09b4ce06ce3b6d7d30cbeaa629455c"
+   ],
+   "why_not_the_product": "The V3.3 P0 baselines: the parallelism measurement and the campaign-drift accounting the rename made necessary. Outside any run by construction -- a baseline is the description of what the product currently is, and the product cannot be the author of its own description without the ratio this ledger reports becoming circular. One of these commits carries the ledger together with the board and the evidence records, which is why it needed an entry at all: a commit that changes anything besides one bookkeeping file is work, whatever its message says (O186)."
+  },
+  {
+   "id": "v3-3-p0-capability-matrix",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": false,
+   "commits": [
+    "38cba3207047b1af69842d4735778a191675b536",
+    "65072c71c17dfcf29b81417d087f7036194bc1e4"
+   ],
+   "why_not_the_product": "The V3.3 requirement register and the matrix derived from it. Outside any run by construction: the register is a reading of the plan, and the matrix is this repository's description of itself -- a run inside it cannot be the author of the list its own work will be measured against. Corrected on the day it was written: the first version of this entry claimed 44 commits because the script that built it decided 'already attributed' by scanning literal shas, while the checker resolves ranges as well. The checker caught it as a double claim; the entry now contains exactly the commits the checker says belong to no other entry (O192)."
+  },
+  {
+   "id": "v3-3-p0-build-order",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": false,
+   "commits": [
+    "271f56cc685738fe070172a98ecfa4efbbbedc16",
+    "3346ed5bd049e247457f6f3de8bf2151b0085fbf",
+    "41d9731d4539c3aeee55ff90719d496b413e3b14",
+    "53533e23584f2631e8e461011648d9f44c698eeb"
+   ],
+   "why_not_the_product": "The implementation DAG and the build checklist. Outside any run by construction: a run executes one node of this order, and the order of the work is the question the run is an answer inside of. The tip was tolerated when the gaps were computed and stopped being the tip when this entry was committed, which is the positionless rule doing exactly what O169 built it for -- and why an entry is written twice before it closes."
+  },
+  {
+   "id": "v3-3-p0-complete",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": false,
+   "commits": [
+    "1f8205173089cbfecad28f35399bd0e3a52e2619",
+    "577b3d2196b2a067b66dc5ab840f83f53a27ca80"
+   ],
+   "why_not_the_product": "The last three P0 baselines and the state-ownership ADR. Outside any run by construction: a baseline is this repository's description of itself, and an ADR is a decision about who owns what -- neither is a thing a run inside the repository can author about the repository. HEAD is included explicitly because the positionless rule tolerates the tip only until the next commit displaces it."
+  },
+  {
+   "id": "v3-3-agent-names-and-regeneration",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": false,
+   "commits": [
+    "d4401f7400eb6a34230001d5f0ca0f2ce5093677",
+    "e22e9458db865cd361ae3607cba88fc545d64dea"
+   ],
+   "why_not_the_product": "The agent-name collision fix (O195) and the regeneration loop (O194). Outside any run: O195 changes how a run's own agents are named, which no run can change about itself without its restart reuse breaking mid-flight; O194 orders the instruments that measure the repository, which is the measurement a run is inside of."
+  },
+  {
+   "id": "v3-3-programme-scope",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": false,
+   "commits": [
+    "58587b4b006ec88c75959190f85cc6bf37b60f03",
+    "aa90302e0edec0fe519407616c8c4ed6e40287fa",
+    "bdc976422a427f1589f971da1fc9d7ce563c52d8",
+    "ca3ed6916cc5be9d0b6c2e53c12faf51e05eca15",
+    "cf459012f9177cbf07db1d77c7bdffef78e1273e"
+   ],
+   "why_not_the_product": "The programme-scope gate (O196) and the board/matrix cycle (O197). Outside any run by construction: deciding what the programme *is* -- which work exists, in which phase, gated by what -- is the question every run is an answer inside of, and a run cannot author the inventory its own work is measured against."
+  },
+  {
+   "id": "p1-09-role-approval-policy",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "af0dc0e60b5c340977621fe375b28c64a704c83a"
+   ],
+   "why_not_the_product": "P1-09 was built by the orchestrator because it is the capability a product run needs in order to run at all: without it the first dispatch of any run stops for a human (O198), and a run cannot build the policy that decides whether it may start. Counted as a development node, and not through the product, which is what it was."
+  },
+  {
+   "id": "p1-integrity-and-sandbox-toolchain",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "c9bec51f178c4a3729fb61f1b86e3229860e4820"
+   ],
+   "why_not_the_product": "The integrity guard (O201) and the sandbox toolchain bind (O200) were built by the orchestrator: both are preconditions for a product run to be admissible at all, and a run cannot author the inventory that judges its own conduct. Counted as a development node outside the product."
+  },
+  {
+   "id": "p1-16-acceptance-record-and-o205",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "25a5d835f0e127b03ac48f8e766f3241b0006209",
+    "6ff91551563401438635c19b41bd0d8b4695038b"
+   ],
+   "why_not_the_product": "The P1-16 acceptance record, its driver, O203 and the O205 drift accounting were built by the orchestrator under five adversarial review rounds: they are the instrument that judges whether a product run happened as documented, and a run cannot author the instrument that judges it. Counted as a development node outside the product."
+  },
+  {
+   "id": "p1-16-regeneration",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "3e33bca68ae06e89046f3f6dc0a4976d813d6bdf"
+   ],
+   "why_not_the_product": "The fixpoint regeneration after the P1-16 fix set: generated documents re-derived from the tree by tools/regenerate.py. Mechanical, and outside the product for the same reason the instrument is -- a run does not regenerate the board that judges it."
+  },
+  {
+   "id": "p1-16-export-and-preflight",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "0608989673bc68e1c043d6591da92667fcbb135b",
+    "98e3b1efe58dfc9c8d7436c1b3bf5630be77de21",
+    "a6d00630f6db2d028bb04786eeec969d65047a9b"
+   ],
+   "why_not_the_product": "Recording the export's CI evidence and the sync base, and the pre-flight corrections both reviewers required before the fourth drive (--until-accepted in the documented command, stdout-only parsing). Orchestrator work on the instrument and its evidence, outside the product."
+  },
+  {
+   "id": "p1-16-proven-fourth-run",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "b5bbb39ff24aec2a922a32e957baf989668c53d1",
+    "74671a9eda6c475bb3ba663b7d2009d6e673790c",
+    "b7a2768e85ae1f83c652744e40ec9bba14fad26e"
+   ],
+   "why_not_the_product": "The fourth P1-16 drive and its record. The run itself was the product's -- HoH planned, developed and accepted the minimal programme with no human intervention -- but the drive around it, the record and the re-execution are the instrument that judges that run, and a run does not author what judges it."
+  },
+  {
+   "id": "p1-boundary-closure",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "9f2058ebf071b2f6f4558f3f485f073ab2abf68d",
+    "eec82190f2101180e2b9f94260666d3aa801fcc3",
+    "139528189b1dcdde43312339719fc16d0f25f90e",
+    "d048013a095746751547a49b307971a4195d0b16"
+   ],
+   "why_not_the_product": "Closing the P1 boundary: the export's CI and sync records and the regenerated documents. Mechanical closure work on the instrument, outside the product."
+  },
+  {
+   "id": "p1-boundary-export-and-board",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "8578c37b8b45e3c4cbd38f77939568a46ebb4b02",
+    "be5b937e6f6b0111c3fd424ecc8ddfe8823e1a6a",
+    "d962f192852f0c61cf70590e1473d21f44f96a12",
+    "2c8bff00b8a794f66004993f75d1458c26f1f627"
+   ],
+   "why_not_the_product": "The P1 boundary's export records and regenerated board. Mechanical closure work on the instrument."
+  },
+  {
+   "id": "p1-boundary-final-export",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "fb814da5f6902aa44c2bd50335ca708ee8371db2",
+    "d25326182fe4e9ae46b1c0d074e25f76a73eebec",
+    "c62740e5f8d06ae2fb311a6ab00a34ab139235df"
+   ],
+   "why_not_the_product": "The final P1-boundary export: the board it carried, and the CI and sync records bound to it."
+  },
+  {
+   "id": "p1-boundary-closure-cycle",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "965309a069e84a311e0ea80356211838ba318f2d",
+    "3f2b0ce950ce801336efeb00bfa8fb0cbd2f4722",
+    "011a0c98ec690abd2e3a262e41055fb776916cf4"
+   ],
+   "why_not_the_product": "The closure cycle of the P1 boundary: regenerated documents, the rewritten succession capsule, and the export's CI and sync records. Mechanical; it adds no capability and decides nothing."
+  },
+  {
+   "id": "o206-export-ci-tolerance",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "64504fecb257aa017284cc879798e2e0c051a499",
+    "2887b571e93d47312a7509e08b28b4ea1866678b",
+    "fbb2e4372b7f78eee4ccab80dafb9801647dbccf"
+   ],
+   "why_not_the_product": "O206: the external-CI row's tolerance for the bookkeeping a closure itself rewrites, reviewed adversarially twice, and the export and CI records that bind it. Work on the instrument that judges the product."
+  },
+  {
+   "id": "p2-timers-and-capsule-fixpoints",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "6edf3e59a9c5d694b02d380dd8597e2fcef5518e",
+    "474cae3e596de31bbf3b279a2b94c4fbc1c40526",
+    "b7cd0bdf95e5384007d3dd5788c905fadfee0981"
+   ],
+   "why_not_the_product": "O209/O210 (the capsule's board projection and its tree check) and P2-04/05/06 (durable timers, the sentinel, the never-stuck invariant). The first two are the instrument that judges a handover; the third is runtime the product will use, built by the orchestrator because a run cannot arm the timers that would resume it."
+  },
+  {
+   "id": "p2-autonomy-contract",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "55f7f5fc1cfff4f6e2c8485336f9c5bfd20198e8",
+    "04e564ab2e10e03fb20caebae8f02b2c651cf017"
+   ],
+   "why_not_the_product": "The autonomy contract, its compiler and the drift accounting around it. Built by the orchestrator because it is the rulebook a run is judged against, and a run does not author the rules that govern it."
+  },
+  {
+   "id": "p2-24-governance-and-pm-boundary",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "ea755b8d11ab40e675da0944f3a9e09ef92ea598",
+    "c6ec8eb2945959c9ac98607ea07e685495749b97",
+    "d47b33c93b8e41198caee054d1bc120abb9e2a58"
+   ],
+   "why_not_the_product": "The governance wiring that makes a run obey its contract, the P2-26 spec handed to the product's own loop, and the PM boundary. The first is the instrument a run is judged by; the third is a schema the product will consume."
+  },
+  {
+   "id": "p2-26-product-written-orchestrator-merged",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "c81b1d32ea2329c2a4bd9f562068d710e7b4895e",
+    "2557798fe9976499259a048c09c50f422c97abca",
+    "82d35774d531273848d259be6473934c174a2f57"
+   ],
+   "why_not_the_product": "The honest category, and the reason it is not the stronger one. src/hoh/checklist.py and tests/test_checklist.py were WRITTEN BY THE PRODUCT: run 20260923t0816z-p226 from dogfood/p2-26/spec.md, 7 dispatches, iteration 1 rejected on a QA FAIL, iteration 2 accepted, evidence in dogfood/p2-26/20260923T0816Z/. But VERIHARNESS_RUN_ORCHESTRATOR_MERGED (O179) binds its claim to bytes -- the accepted candidate's tree_digest must equal the git tree of a claimed commit -- and these commits cannot satisfy that, because I closed the five gaps the product's own QA reported before merging (a blank evidence reference verified an item; the forgery remedy was opt-in; the re-deriving gate dropped waivers; a phase-scoped waiver could waive a release-blocking item; a phase of only non-blocking items wrongly blocked). The commit is therefore my merge of the product's work, not the product's bytes, and claiming otherwise would put a false entry in the one file whose purpose is not to carry one. Practice for the next self-hosted merge: commit the product's bytes verbatim first, so the digest binding can hold, and put the review fixes in a second commit."
+  },
+  {
+   "id": "p2-27-product-written",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "daf9b3b3008dc01037d6860bc05fb39640a5852f",
+    "558dd8a6dc7f0813773641f68a13abcaab8c8fad"
+   ],
+   "run_state": "dogfood/p2-27/20260923T1451Z/run-evidence/state.json",
+   "why_not_the_product": "src/hoh/supervisor.py and tests/test_supervisor.py were WRITTEN BY THE PRODUCT (run 20260923t1451z-p227 from dogfood/p2-27/spec.md, accepted in iteration 1, 4 dispatches, evidence in dogfood/p2-27/20260923T1451Z/) and committed verbatim in daf9b3b. The commits here are the orchestrator's: the spec, the review, the two gaps the product's own QA reported, the register and the ledger. The stronger VERIHARNESS_RUN_ORCHESTRATOR_MERGED category binds its claim to bytes -- the candidate's tree_digest must equal the git tree of a claimed commit -- and the run worked in a separate clone, so no commit in this history carries that tree. Next self-hosted run: work in a worktree of this repository so the binding is reachable."
+  },
+  {
+   "id": "p2-19-specs-and-o212-o213",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "6972b9bf0edc2f4790b89ab118f17ca700fbf24a",
+    "b8e743321452dae68f50d56230f1e36b9a615a1f",
+    "ff3ffd420af25655fbd3dd957f6e2e7cd31ca5bf"
+   ],
+   "why_not_the_product": "Orchestrator work, and named as such. 6972b9b closed the two gaps P2-27's own QA reported about itself. b8e7433 is the P2-19 and P2-31 specs -- written by me so the product could build from them, which is what a spec is. ff3ffd4 is O212 and O213: the self-hosted topology check and the no-delete policy, both of them guards over my own behaviour rather than product capability, so neither could sensibly have been built by a governed run."
+  },
+  {
+   "id": "p2-19-decision-exploration-plane",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "513935a760289991dc06b3787042e3c6ea8103b0"
+   ],
+   "run_state": "dogfood/p2-19/20260923T2130Z/run-evidence/state.json",
+   "candidate_id": "20260923t2130z-p219-i1",
+   "why_not_the_product": "The product wrote src/hoh/decisions.py and tests/test_decisions.py: run 20260923t2130z-p219 from dogfood/p2-19/spec.md, 4 dispatches, accepted in iteration 1, evidence in dogfood/p2-19/20260923T2130Z/. This is the stronger category and it holds here for a reason worth stating: the candidate's bytes were committed VERBATIM AND FIRST, so the accepted candidate's tree_digest 5ce9e4b04a26 is exactly the git tree of 513935a. Because the clone was pinned to the integration commit and the integration tree had not moved, the import was a fast-forward of the product's own commit -- its bytes, its authorship, its message, no new object. P2-26 and P2-27 could not claim this because review fixes were folded into the same commit; the practice changed, and O212 explains why a foreign clone was never the obstacle (a git tree is content-addressed). It stays ORCHESTRATOR_MERGED rather than VERIHARNESS_RUN because the run produced no ProjectState with a MERGED node: it was `hoh run` over a spec, and the merge decision was mine."
+  },
+  {
+   "id": "p2-31-digital-thread-projection",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "98aaa0a132595dcdaac587f64f05f023ed169dd2",
+    "0bb912c92b87851c029d889635dcd332e5c5044b"
+   ],
+   "run_state": "dogfood/p2-31/20260923T2130Z/run-evidence/state.json",
+   "candidate_id": "20260923t2130z-p231-i1",
+   "why_not_the_product": "The product wrote src/hoh/thread.py and tests/test_thread.py: run 20260923t2130z-p231 from dogfood/p2-31/spec.md, 4 dispatches, accepted in iteration 1, evidence in dogfood/p2-31/20260923T2130Z/. 98aaa0a is the product's own commit, whose tree 992c22380b76 is the accepted candidate's tree_digest; 0bb912c is my merge of it, claimed in the same entry because a merge commit is never tolerated as bookkeeping and the two belong to one act. Merged rather than cherry-picked precisely so the product's commit object enters this history with its tree intact -- a cherry-pick would have written a new tree over a different base and broken the binding. Verified with tools/self_hosted_topology.py verify-import before the merge. Not VERIHARNESS_RUN for the same reason as P2-19: no ProjectState node, and the merge decision was mine."
+  },
+  {
+   "id": "o204-o212-o213-repairs-and-review",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "aa596bd504aba1ac9c725f39674cf15e5171e4c5",
+    "b03f1c5f08f93a3427bfdef3509ff185839210c6",
+    "0d3561836654bbfd4586940f538081444f5d8ef9"
+   ],
+   "why_not_the_product": "Orchestrator work throughout. aa596bd is the attribution entries for the first pair of self-hosted runs plus the next two specs; b03f1c5 fixes the launcher, which failed its own policy gate on first live use; 0d35618 is the repair of the ten findings two independent reviewers raised against the product's P2-19 and P2-31 modules, plus O204 (one requirement may now cover several plan items, so the whole acceptance path is tracked). Review repairs are deliberately a separate commit from the product's bytes, which is what keeps the byte binding on those claimable."
+  },
+  {
+   "id": "p2-18-mcp-tool-gateway",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "7adc194e58d4205245319a9da2b130b219ae294d",
+    "d02c2f5a22512edc739402f4b940d721a80f9ddd"
+   ],
+   "run_state": "dogfood/p2-18/20260923T2205Z/run-evidence/state.json",
+   "candidate_id": "20260923t2205z-p218-i1",
+   "why_not_the_product": "The product wrote src/hoh/gateway.py and tests/test_gateway.py: run 20260923t2205z-p218 from dogfood/p2-18/spec.md, 4 dispatches, accepted in iteration 1, evidence in dogfood/p2-18/20260923T2205Z/. Bytes committed verbatim and first, so the accepted candidate's tree_digest dfe7e61681fe is the git tree of 7adc194, checked with tools/self_hosted_topology.py verify-import before this entry was written. The first run whose evidence carries a real no-delete policy claim (aa2b79665181). Not VERIHARNESS_RUN because the run produced no ProjectState with a MERGED node and the merge decision was mine. The merge commit d02c2f5 is claimed in the same entry because a merge is never tolerated as bookkeeping and the two are one act."
+  },
+  {
+   "id": "p2-18-findings-registration-and-next-specs",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "8687e810cc82dbde715be1aef58520db740fb6a3",
+    "628c63b5fb3df3fdfdb5b552097663d4373f3556",
+    "1e8fd5de1fb82d107c6160757c32e87c4e946d5c",
+    "20e75cbd4738d5c3392b58acea4b02e12f67877d"
+   ],
+   "why_not_the_product": "Orchestrator work. 8687e81 records O214 and O215 and repairs two gates I had masked by reading `tail` output instead of exit codes; 628c63b registers the probes for P2-18, P2-19 and P2-31 and carries the regenerated board; 1e8fd5de is the P2-21 and P2-13 specs; 20e75cb records an O215 hypothesis I checked and disproved. Specs, findings and registration are the orchestrator's side of the loop by construction -- a governed run builds from a spec, it does not write the one it is given."
+  },
+  {
+   "id": "o215-repair-and-o216-o217",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "0d14c82370742fb2a40c71a7bb0dd78e961a4965",
+    "86fcf703393d6c3611fd081e24da1bc59468a4e5",
+    "9fee263e4ded539e6c6da53e333559ba9512f514",
+    "b418ac772688af185ec881195470a70f16a5e93e",
+    "28b6f86631e316ba4d0a2dd13945ef2ce5702afb"
+   ],
+   "why_not_the_product": "Orchestrator work: the O211 spec and its correction from evidence, the v3 freeze drift accounting, and the O215 root-cause corrections. None of it is work a governed run could have done -- a spec, an accounting artifact and findings about the harness's own dispatch machinery are the orchestrator's side by construction."
+  },
+  {
+   "id": "p2-21-decision-graph-fsck",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "14c0367af1ecf2ac934006a5ab9d13ce3f8b5c2d",
+    "ba04e9d6d0ad73cb7e01ce5567e6432494745b1b"
+   ],
+   "run_state": "dogfood/p2-21/20260923T2245Z/run-evidence/state.json",
+   "candidate_id": "20260923t2245z-p221-i1",
+   "why_not_the_product": "The product wrote src/hoh/decisioncheck.py and tests/test_decisioncheck.py: run 20260923t2245z-p221 from dogfood/p2-21/spec.md, 4 dispatches, accepted in iteration 1, evidence in dogfood/p2-21/20260923T2245Z/. Bytes committed verbatim and first, so the accepted candidate's tree_digest is the git tree of the candidate commit, checked with verify-import before this entry. The merge commit is claimed in the same entry because a merge is never tolerated as bookkeeping. One orchestrator edit followed in a later commit and is attributed there: the identifier gate caught `und` as a German abbreviation of UNDERMINED in the product's test file, renamed to `undermined`. Not VERIHARNESS_RUN because the run produced no ProjectState with a MERGED node and the merge decision was mine."
+  },
+  {
+   "id": "o215-verified-specs-and-capsule",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "3f9b53452eeddbb603d596cf0803f86ddea34c9a",
+    "295aa78d8214b1779b9e66820a81e181474d9501",
+    "ed9e899e3ae293b1ab646c26bbed2c09ffcedd1e",
+    "9f74269f50524ce463278074a18c3962b3604061",
+    "f250ba4c1dfaa3cbc2c21a98501a3843b17dc222",
+    "4bb4d4f7679830bfb4a761e78b4a2c961cf2ebb3"
+   ],
+   "why_not_the_product": "Orchestrator work: the O215 pane-environment verification, the succession capsule written twice (the first pinned zero plan files because the plan root was unset), the v3 drift accounting for decisioncheck.py, and the P2-08, P2-12, P2-14 and P2-15 specs. The commit for P2-14 was amended once to restore a word the shell had substituted away; the tree was identical. The P2-14 spec's sha here is the amended one (9f74269); the pre-amend ef278c6 is unreachable and naming it would have pointed this ledger at a commit that no longer exists. 4bb4d4f is the P2-21 registration and the `und` rename in the product's test file."
+  },
+  {
+   "id": "p2-13-compact-task-state",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "99d862f37ef4693c3bf89fe24b4e196be1974655",
+    "8e25c700ed9335fb6b8c3a5e6adb1cc2947f3252",
+    "bebe57b4039d0c077ee07d7836854fa19ac26af2"
+   ],
+   "run_state": "dogfood/p2-13/20260923T2321Z/run-evidence/state.json",
+   "candidate_id": "20260923t2321z-p213b-i1",
+   "why_not_the_product": "The product wrote src/hoh/taskstate.py and tests/test_taskstate.py: run 20260923t2321z-p213b from dogfood/p2-13/spec.md, 4 dispatches, accepted in iteration 1, 44 tests. Bytes committed verbatim and first, so the accepted candidate's tree_digest 55210adc11a5 is the git tree of the candidate commit, checked with verify-import. The merge commit is claimed here too. This is also the run that confirms the O215 repair end to end -- the first attempt at the same spec blocked on it, and that evidence is preserved beside this one. bebe57b is my registration and evidence commit for the same act and is claimed here."
+  },
+  {
+   "id": "o211-resumption-decision-layer",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "9747bf9f5a5f1d63cd314db44a6f247f4b6ee1f9",
+    "8b21785c0192c9533b4d393d8787ff93d70777c4",
+    "b86db9786dcfba22aa0d77aa8b855b0a56ded148"
+   ],
+   "run_state": "dogfood/p2-resume/20260923T2321Z/run-evidence/state.json",
+   "candidate_id": "20260923t2321z-presume-i2",
+   "why_not_the_product": "The product wrote src/hoh/resumption.py and tests/test_resumption.py: run 20260923t2321z-presume from dogfood/p2-resume/spec.md, 7 dispatches, accepted in iteration 2 after its own QA rejected iteration 1 on K7. 48 tests. Bytes committed verbatim and first, so the accepted candidate's tree_digest 76176ba0a990 is the git tree of the candidate commit, verified before this entry. This is O211 work rather than a numbered P2 requirement, so it carries no probe: it supports the P2 exit's unattended test and is recorded in the ledger. O211 remains open -- nothing consumes the decision layer yet. b86db97 is my registration, evidence and ledger commit for the same act."
+  },
+  {
+   "id": "p2-15-program-logic-vs-activities",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "7a027685bc4f8013daab7e8a8f7fc339a891dcc2",
+    "9413175cbe358e6b45cba2778d3a1b03d9987d41",
+    "069cc4abb4e74910d6847f50edf9b9b314791552"
+   ],
+   "run_state": "dogfood/p2-15/20260923T2337Z/run-evidence/state.json",
+   "candidate_id": "20260923t2337z-p215-i1",
+   "why_not_the_product": "The product wrote src/hoh/programlogic.py and tests/test_programlogic.py: run 20260923t2337z-p215 from dogfood/p2-15/spec.md, accepted in iteration 1, 50 tests. Bytes verbatim, tree_digest d275ce00e3fb equal to the candidate commit's tree, verified. Checked independently rather than trusted: purity_problems() is clean on its own module and fires on a deliberately impure one. The merge commit is claimed here too. 069cc4a is my registration commit for the same act."
+  },
+  {
+   "id": "scratch-hygiene-and-board-regeneration",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "10708d025cffe3667ca41945d9d06559f5a3cde5",
+    "fe670635f8cde2675e2cb16c71ab78acc35b8783"
+   ],
+   "why_not_the_product": "Orchestrator work: moving the O211 evidence copy's pytest scratch out of this repository without deleting it, and the board regeneration that followed. Both are bookkeeping over the product's output rather than product capability."
+  },
+  {
+   "id": "p2-20-context-capsule",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "22a5b1d7a338e5ff759712fea0802d3c8724e185",
+    "0051b58708f7acbf72709e08331ecae2c1b84d55"
+   ],
+   "run_state": "dogfood/p2-20/20260923T2337Z/run-evidence/state.json",
+   "candidate_id": "20260923t2337z-p220b-i1",
+   "why_not_the_product": "The product wrote src/hoh/capsule.py and tests/test_capsule.py: run 20260923t2337z-p220b from dogfood/p2-20/spec.md, accepted in iteration 1, 40 tests. Bytes verbatim, tree_digest 4f3bd47d2b88 equal to the candidate commit's tree (22a5b1d7a338 is that commit's sha, not its tree -- a conflation I made in the first version of this entry and corrected before it could stand as a claim), verified. The third attempt at this spec; the first two blocked on O215 and their evidence is preserved. This run also produced O218 -- see the ledger."
+  },
+  {
+   "id": "p2-08-master-epoch",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "2161a1be73043c9f64e1ae338a1253894a2ce023",
+    "6ba1605119f2ab351f24ab57a2749e369245f724"
+   ],
+   "run_state": "dogfood/p2-08/20260923T2354Z/run-evidence/state.json",
+   "candidate_id": "20260923t2354z-p208-i1",
+   "why_not_the_product": "The product wrote src/hoh/epoch.py and tests/test_epoch.py: run 20260923t2354z-p208 from dogfood/p2-08/spec.md, accepted in iteration 1, 35 tests. Bytes verbatim, tree_digest 3946f4b4e39d equal to the candidate commit's tree (2161a1be7304 is that commit's sha, not its tree -- the same conflation, corrected here), verified. All five authority refusals were exercised here against a real store before this entry was written. The merge commit is claimed here too."
+  },
+  {
+   "id": "p2-12-durable-state-migrations",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "d11e8ab1e9d4a8ab32851c2f496ead56b9966b2a",
+    "a71f2cfce36d32a0660bfd2f764c321c8a03087f",
+    "22a65ee9b50132f3cbfe66a2396cf86e1de20e61"
+   ],
+   "run_state": "dogfood/p2-12/20260923T2354Z/run-evidence/state.json",
+   "candidate_id": "20260923t2354z-p212-i1",
+   "why_not_the_product": "The product wrote src/hoh/migrations.py and tests/test_migrations.py: run 20260923t2354z-p212 from dogfood/p2-12/spec.md, accepted in iteration 1, 38 tests. Bytes verbatim; the accepted candidate's tree_digest is 31eac6c657eb and verify-import confirmed it against the candidate commit before this entry. The merge commit is claimed here too. 22a65ee is my registration commit for the same act."
+  },
+  {
+   "id": "p2-registrations-and-board-at-29",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "8267e8433a59634d976250cc4d0c075f03122f5e",
+    "09fac0fd571353e70c9a4dd6eefaa8c47fcf421e",
+    "dfde1f8cae00db8c390bfcdabf74cee8eda835ef"
+   ],
+   "why_not_the_product": "Orchestrator work: the P2-20 registration with the O218 correction, the board regeneration to 29 of 32, and the P2-08 registration with the two conflated digests corrected. Registration, findings and board derivation are the orchestrator's side of the loop."
+  },
+  {
+   "id": "p2-14-context-rotation",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "bd74e894ef9ecb252c595fd9786b9b1a8d216916",
+    "283b4fc61b0e0538d4fee788d4c0c3162ee7387f"
+   ],
+   "run_state": "dogfood/p2-14/20260924T0008Z/run-evidence/state.json",
+   "candidate_id": "20260924t0008z-p214-i1",
+   "why_not_the_product": "The product wrote src/hoh/rotation.py and tests/test_rotation.py: run 20260924t0008z-p214 from dogfood/p2-14/spec.md, accepted in iteration 1, 27 tests. Bytes verbatim, verify-import confirmed the binding against the candidate commit. The last of the thirty-two P2 build items. The merge commit is claimed here too."
+  },
+  {
+   "id": "p2-27-supervisor-binding",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "bfe70852ae919d01789d0a25b739423bac023990",
+    "d5f2de838ded868aab23f11b2d5b313e19f7faf7",
+    "fed040117770cb256c0d48691cc8e3ef49affdb0"
+   ],
+   "run_state": "dogfood/p2-supervise/20260924T0008Z/run-evidence/state.json",
+   "candidate_id": "20260924t0008z-psuper-i1",
+   "why_not_the_product": "The product wrote tools/programme_supervisor.py and its tests: run 20260924t0008z-psuper from dogfood/p2-supervise/spec.md, accepted in iteration 1, 31 tests. Bytes verbatim, verify-import confirmed the binding. This is the binding that makes P2-27 a capability rather than a component with tests -- the same standard P2-26 was held at PARTIAL for -- and it is what the P2 gate's independent review is assembled by. The merge commit is claimed here too. fed04011 is the evidence-copy commit for the same act, which the attribution gate named when I claimed the entry before copying it."
+  },
+  {
+   "id": "p2-14-registration-and-o219",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "77455356d2e9496f30b1b54b993e029eef793819"
+   ],
+   "why_not_the_product": "My registration of P2-14 and the O219 entry: ten modules, two timestamp conventions, because none of my specs named the type. A finding about my own spec-writing is not something a governed run could have produced."
+  },
+  {
+   "id": "p2-gate-supervisor-review",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "ce972a46c333cdd7438b144429410163cac40941"
+   ],
+   "why_not_the_product": "The board at 32 of 32 and the claim that the checklist gate closes. Recorded as orchestrator work and immediately qualified by O220: the gate's own independent supervisor review returned PHASE_NOT_READY with fourteen findings, twelve of them about statuses I registered. The commit stands with the correction after it."
+  },
+  {
+   "id": "o220-supervisor-review-findings",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "4e11f7b648b61a88a6c2d2ed95488070a15fb8df"
+   ],
+   "why_not_the_product": "O220's findings themselves: the review the product's supervisor binding produced, recorded with my dispositions. Orchestrator work, not a product run -- the dispatch and the decisions are mine. It was missing from this file entirely, and `tools/attribution.py` excused it only because it was HEAD; a reviewer pointed out that committing anything on top of it would have turned a tolerated tip into an unexplained gap (O222/C7)."
+  },
+  {
+   "id": "o221-capability-status-correction",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "a6feda452dc77b3cc7e8b796930b46c262b32933"
+   ],
+   "why_not_the_product": "The twelve capability-status corrections and the consumption cap that derived them. Orchestrator work: I wrote the cap, and the eleven findings against how I wrote it came from independent reviewers afterwards (O222). Recorded now because it was excused only for being the tip, and this commit displaces it -- the hole a reviewer predicted in O226/C7 and the same one O226/C7 closed for 4e11f7b."
+  },
+  {
+   "id": "p2-gate-review-mechanism-rebuild",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "c24ac4a656bf8413bedfbd9206832d669cb326e5"
+   ],
+   "why_not_the_product": "The rebuilt P2 gate review mechanism (eight closed bypasses, the canonical brief, accumulated findings) and the reviews preserved with it. Orchestrator work on the gate that judges the product; written and reviewed by the driving session and independent reviewers, not dispatched through a run. Recorded by the next session (2026-09-25) because it was excused only for being the tip."
+  },
+  {
+   "id": "checkpoint-o232",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": false,
+   "commits": [
+    "9df1146b939ba19dcf9f010e3df44e5d8dcda545"
+   ],
+   "why_not_the_product": "A checkpoint before a reboot: ledger entry O232 and CHECKPOINT.md, with derived artefacts explicitly not regenerated. Documentation by the driving session; no product capability changed."
+  },
+  {
+   "id": "o233-governed-masters-and-fault-harness",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "96beddca9b3f82c8f6057d4afbfe7e89cb330014"
+   ],
+   "why_not_the_product": "Master authority, the O211 resume loop, the merge-identity and quota-kind product fixes, unit-drift readiness and the P2 fault harness, written by the driving session and gated by five rounds of two independent adversarial reviewers. Orchestrator work: the product did not build these through its own control plane. The harness replaces only the role agent and runs the product's own evaluate/merge paths."
+  },
+  {
+   "id": "final-review-minors",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "773d03cbed3d3ce6df2496ae34748ce8da676e81"
+   ],
+   "why_not_the_product": "The minors of the O233 final review round (IN_FLIGHT from launch, required moments, one exported head), written by the driving session and gated by two independent reviewers with re-checks."
+  },
+  {
+   "id": "durability-absolute-paths",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "274cc2710c75bb4af665ae51f88857c392e2f266"
+   ],
+   "why_not_the_product": "A harness bug found by the first evidence run (relative evidence path misplaced the git bundles); fixed by the driving session, reviewed by two independent agents. The failed run is preserved under dogfood/p2-durability/.archiv/."
+  },
+  {
+   "id": "o234-o235-registration-and-guard-repair",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "5af75ad10db79d6263a1a44bfc12263cfde2940a"
+   ],
+   "why_not_the_product": "Two things in one commit, both by the driving session. O234: registration of the P2 exit conditions and their evidence (register/audit work). O235: an emergency trust-boundary repair of hoh.runner's guard and the test boundary, which could not wait for a product run while the suite was executing real commands -- recorded as a bootstrap exception, reviewed by two Herdr agents over five rounds. Its independent product-path verification (run 20260925t1540z-pguard) was NOT accepted: it exposed a defect in this commit's own test (O236)."
+  },
+  {
+   "id": "durability-minors",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "9399eba41df0800ec8664281830655d08f9e2998",
+    "e446142381f20a4b53ee7593e59fa651cc227dd3"
+   ],
+   "run_state": "dogfood/durability-minors/20260925T1540Z/run-evidence/state.json",
+   "candidate_id": "20260925t1540z-pdurmin-i1",
+   "why_not_the_product": "The product wrote the changes to tools/durability_e2e.py and tests/test_durability_derive.py: run 20260925t1540z-pdurmin from dogfood/durability-minors/spec.md, 4 dispatches, accepted in iteration 1, evidence in dogfood/durability-minors/20260925T1540Z/. Bytes committed verbatim by the product in its pinned clone as 9399eba, whose tree cd3f4836 is the accepted candidate's tree_digest (verify-import sound). Not VERIHARNESS_RUN because the merge decision was mine; the merge commit e446142 is claimed in the same entry because the two are one act. Reviewed by two Herdr agents (release yes/yes)."
+  },
+  {
+   "id": "probe-keybind",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "78de67f447fa9650e9a48541763dbcb13a542b78",
+    "2ceb095d3f6052d821c93be8a8bd1422466f094e"
+   ],
+   "run_state": "dogfood/probe-keybind/20260925T1553Z/run-evidence/state.json",
+   "candidate_id": "20260925t1553z-pkeybind-i1",
+   "why_not_the_product": "The product wrote the key binding in tools/capability_matrix.py evidence_status and its tests: run 20260925t1553z-pkeybind from dogfood/probe-keybind/spec.md, 4 dispatches, accepted in iteration 1, evidence in dogfood/probe-keybind/20260925T1553Z/. Bytes committed verbatim by the product in its pinned clone; the accepted candidate's tree_digest 1e0103e9 is the git tree of the first commit named (verify-import sound). Not VERIHARNESS_RUN because the merge decision was mine; the merge commit is claimed in the same entry. Reviewed by two Herdr agents (release yes/yes)."
+  },
+  {
+   "id": "o236-wave1-integration",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "6db1c6418b8d012a2b10ce8c536ab218bb2a6009"
+   ],
+   "why_not_the_product": "Integration of the first parallel wave by the driving session: a one-line test fix in tests/test_runner.py found by the guard-union product run, the P2-11 register edit required by the merged key binding, attribution entries, preserved run evidence and review reports, the wave-2 specs and their revisions, ledger O236. Reviewed by two Herdr agents (integ-a yes; integ-b yes after three rounds)."
+  },
+  {
+   "id": "durability-controls",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "e6922c40f8c40bc8e76e385d5c430e2162365dac",
+    "7c85d8f99c3f640acbcf6066e3299225f3fd7ae0"
+   ],
+   "run_state": "dogfood/durability-controls/20260925T1645Z/run-evidence/state.json",
+   "candidate_id": "20260925t1645z-pdurctl-i1",
+   "why_not_the_product": "The product wrote the new control, RECORD_VERSION 4 and the dependency/umbrella tests in tools/durability_e2e.py and tests/test_durability_derive.py: run 20260925t1645z-pdurctl from dogfood/durability-controls/spec.md (with Revision 2), 4 dispatches, accepted in iteration 1, evidence in dogfood/durability-controls/20260925T1645Z/. Bytes committed verbatim by the product in its pinned clone; the accepted candidate's tree_digest fb20b2c9 is the git tree of the first commit named (verify-import sound). Not VERIHARNESS_RUN because the merge decision was mine; the merge commit is claimed in the same entry. Reviewed by two Herdr agents (release yes/yes)."
+  },
+  {
+   "id": "o238-storage-planning",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "cd5f5b67a931cd47c92f511f96361dc919371cf9"
+   ],
+   "why_not_the_product": "Programme amendment A1 (the storage lifecycle) entered by the driving session: tools/program_scope.py is the trust-boundary instrument that defines invented work and gained the pinned-amendment path; build_plan.py's pull-forward and IMPLEMENTED EARLY; regenerate.py's amendments step; union_gate.py's duration fix; the register's 24 requirements; programme records and derived documents. Reviewed by two Herdr agents over five rounds (splan-a, splan-b; reports in dogfood/storage-lifecycle/planning-review/)."
+  },
+  {
+   "id": "role-answers-allow",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "8c16609dcad30a3c37961d303c6815b758c1bb01",
+    "da90cd1f11edb4989695061a117a96bb24dd705f"
+   ],
+   "run_state": "dogfood/role-answers-allow/20260925T1916Z/run-evidence/state.json",
+   "candidate_id": "20260925t1916z-proleallow-i1",
+   "why_not_the_product": "The product wrote the scoped Edit allow rule for a role's own answers directory in src/hoh/approval_policy.py, the dispatcher call and the tests: run 20260925t1916z-proleallow from dogfood/role-answers-allow/spec.md (with Revision 2), accepted in iteration 1, evidence in dogfood/role-answers-allow/20260925T1916Z/. Bytes committed by the product in its pinned clone (verify-import: sound). Not VERIHARNESS_RUN because the merge decision was mine; the merge commit is claimed in the same entry. Reviewed by two Herdr agents on 2026-09-25 (release yes/yes)."
+  },
+  {
+   "id": "o239-wave1-specs",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "70e0e3ea7e9aed30dbdc7155f211cf27fedea79f"
+   ],
+   "why_not_the_product": "Integration records and process material by the driving session: proleallow's preserved evidence and attribution, the four wave-1 storage specs with their spec reviews, the registered run root in dogfood/launch_self_hosted.sh, ledger O239 and derived documents. Reviewed by two Herdr agents (integ1-a, integ1-b: release yes/yes in two rounds)."
+  },
+  {
+   "id": "o240-wave1-refused",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "8312382cdbee3fe68be17fe14080a2f028357a69"
+   ],
+   "why_not_the_product": "Records of the first wave-1 storage runs, all refused at integration: candidates preserved as verified bundles with run evidence and every review report; spec revisions turning each finding into a rule with a named test; wave-2 specs after their spec reviews; ledger O240. Reviewed by two Herdr agents (integ2-a, integ2-b: release yes/yes)."
+  },
+  {
+   "id": "storage-admission",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "97a3e556ec13680368f592bb0a0ee44b954ed970",
+    "a76cdfd2b4a4315125779b69239bea5d8f70c9fa"
+   ],
+   "run_state": "dogfood/storage-admission/20261001T1255Z/run-evidence/state.json",
+   "candidate_id": "20261001t1255z-sadmit2-i1",
+   "why_not_the_product": "The product wrote src/hoh/storage_pressure.py (storage states with hysteresis, admission by reservation, the reservation ledger) and its tests: run 20261001t1255z-sadmit2 from dogfood/storage-admission/spec.md (Revisions to 6, items 8-19), accepted in iteration 1, evidence in dogfood/storage-admission/20261001T1255Z/. Bytes committed by the import, merged by the orchestrator after two integration reviews (sadmit2-a, sadmit2-b: release yes/yes)."
+  },
+  {
+   "id": "o241-wave1-second",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "d0ef7b77f11024b5d03fab45be7207c7f63dba59"
+   ],
+   "why_not_the_product": "Integration records of the second wave-1 runs (evidence, bundles, spec revisions for the third runs, STORAGE-D spec), two one-line tool fixes (baseline_docs environment, identifier word list), ledger O241. Reviewed by two Herdr agents (integ3-a, integ3-b: release yes/yes, then two confirmation rounds)."
+  },
+  {
+   "id": "storage-registry",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "5dab317b33768f1130b04ef50d6ac63e61506822",
+    "0628f2b9fc2e7c80756b4dd5660c91bf3582bb74"
+   ],
+   "run_state": "dogfood/storage-registry/20261001T1644Z/run-evidence/state.json",
+   "candidate_id": "20261001t1644z-sreg3-i1",
+   "why_not_the_product": "The product wrote src/hoh/storage_registry.py (owned namespaces, ownership verdicts, session leases, registered roots) and its tests: run 20261001t1644z-sreg3 from dogfood/storage-registry/spec.md (Revisions to 9a), accepted in iteration 1, starting from the preserved second candidate; evidence in dogfood/storage-registry/20261001T1644Z/. Bytes committed by the import, merged by the orchestrator after two integration reviews (sreg3-a, sreg3-b: release yes/yes)."
+  },
+  {
+   "id": "durable-write",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "b1451b7a6cf0c95fe12aa7f83eaef630fa0e4139",
+    "b913b8a2c52a1012b84b30392ac6cb54a63cdd00"
+   ],
+   "run_state": "dogfood/durable-write/20261001T1644Z/run-evidence/state.json",
+   "candidate_id": "20261001t1644z-sdurw3-i2",
+   "why_not_the_product": "The product wrote src/hoh/durable_io.py (durable_write: free-space pre-check, own-temp abandon, directory fsync), its wiring into store.py and timers.py, and the tests: run 20261001t1644z-sdurw3 from dogfood/durable-write/spec.md (Revisions to 5), accepted in iteration 2, starting from the preserved sdurw2 candidate; evidence in dogfood/durable-write/20261001T1644Z/. Bytes committed by the import, merged by the orchestrator after two integration reviews (sdurw3-a, sdurw3-b: release yes/yes); the merge carries the reviewers' condition, P2-41 capped at PARTIAL by an equivalent in the register."
+  },
+  {
+   "id": "o242-wave1-third",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "2d44771b3208e101b91db82392d6306439eff267"
+   ],
+   "why_not_the_product": "Integration records of the third wave-1 runs and the start of wave 2 (evidence, bundles, archive-bundle Revisions 10-10b, host Revision 8, pre-launch confirmations), ledger O242. Reviewed by two Herdr agents (integ4-a, integ4-b: release yes/yes)."
+  },
+  {
+   "id": "storage-coordinator",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "76ec95e5491b5da0780bd05ccd27ee5dec9e2d7d",
+    "bf0331f600d3bcb4f1b82b5fc6e1d2027a93d858"
+   ],
+   "run_state": "dogfood/storage-coordinator/20261001T1726Z/run-evidence/state.json",
+   "candidate_id": "20261001t1726z-scoord-i1",
+   "why_not_the_product": "The product wrote src/hoh/storage_coordinator.py (global storage coordination: driver leases, arbitration, candidate-plan requests) and its tests: run 20261001t1726z-scoord from dogfood/storage-coordinator/spec.md, accepted in iteration 1; evidence in dogfood/storage-coordinator/20261001T1726Z/. Merged by the orchestrator after two integration reviews (scoord-a, scoord-b: release yes/yes)."
+  },
+  {
+   "id": "o243-amendments-a2-a3",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "0e8bf6c0f3b4c252deddfcf3123054957ec15eb5"
+   ],
+   "why_not_the_product": "Planning only: operator amendments A2 and A3 registered in the programme (directives verbatim, amendments, overlap records, seven requirements, a test update), ledger O243. tools/program_scope.py is the trust-boundary instrument for invented work. Reviewed by two Herdr agents (aplan-a, aplan-b: release yes/yes in round 3)."
+  },
+  {
+   "id": "archive-bundle",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "b89612c8cac6aaa4ffed0260f0416305ed96976b",
+    "db3b37df3e824ca201ff72c3a95220df4560b6be"
+   ],
+   "run_state": "dogfood/archive-bundle/20261001T1904Z/run-evidence/state.json",
+   "candidate_id": "20261001t1904z-sarch4-i1",
+   "why_not_the_product": "The product wrote src/hoh/archive_bundle.py (portable bundles, the verification contract, git payloads with computed worktree facts and a closed list of git commands) and its tests: run 20261001t1904z-sarch4 from dogfood/archive-bundle/spec.md (Revisions 6-10b), accepted in iteration 1, starting from the preserved third candidate; evidence in dogfood/archive-bundle/20261001T1904Z/. Merged by the orchestrator after two integration reviews (sarch4-a, sarch4-b: release yes/yes)."
+  },
+  {
+   "id": "o244-storage",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "ef184374d7f8835d2fd65b860e36da309a430a81"
+   ],
+   "why_not_the_product": "Integration records (coordinator and archive merges, spark root cause, host revisions, lease-tests spec), two one-line hygiene fixes, ledger O244. Reviewed by two Herdr agents (integ5-a, integ5-b: release yes/yes)."
+  },
+  {
+   "id": "archive-targets",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "5aec76131942efd4a8dd3e95f5f88ac05418a63c",
+    "b0c3a7f66c10f705cee51ab2d86f70475c7bce90"
+   ],
+   "run_state": "dogfood/archive-targets/20261001T2058Z/run-evidence/state.json",
+   "candidate_id": "20261001t2058z-starget-i3",
+   "why_not_the_product": "The product wrote src/hoh/archive_target.py and src/hoh/rehydration.py (registered archive targets, redundancy, receipt-gated rehydration) and the _inside() strengthening in tools/capability_matrix.py, with tests: run 20261001t2058z-starget, accepted in iteration 3; evidence in dogfood/archive-targets/20261001T2058Z/. Merged unchanged (six inert .archiv/ snapshots outside scope, recorded) after two integration reviews (starget-a, starget-b: release yes/yes)."
+  },
+  {
+   "id": "storage-host",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "024cdf68c02815672da2f68e483d3b7fd46edde1",
+    "9e4081d4e34df6a5158f37656cc6bdf7acfd5a6d"
+   ],
+   "run_state": "dogfood/storage-host/20261001T2232Z/run-evidence/state.json",
+   "candidate_id": "20261001t2232z-shost2-i1",
+   "why_not_the_product": "The product wrote src/hoh/storage_host.py (WSL and native Ubuntu observation, pre-restart inventory and post-restart checks) and docs/STORAGE_HOST_RUNBOOK.md, with tests: run 20261001t2232z-shost2 (second run, from the preserved first candidate), accepted in iteration 1; evidence in dogfood/storage-host/20261001T2232Z/. Merged after two integration reviews (shost2-a, shost2-b: release yes/yes)."
+  },
+  {
+   "id": "o245-storage",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "f39a5f4c5cde6f70bcc9501707e931c3ff55f4af"
+   ],
+   "why_not_the_product": "Integration records (archive-targets and host merges, the paused lease-tests run), lease-tests Revisions 3-3a, coordinator and targets follow-up specs, ledger O245. Reviewed by two Herdr agents (integ6-a, integ6-b: release yes/yes)."
+  },
+  {
+   "id": "archive-targets-followup",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "4aaf717c1599c6bf7b7b296ef4ff322228216964",
+    "1f60dc0af4e915d561b4b9dd8e367601c723478f"
+   ],
+   "run_state": "dogfood/archive-targets/20261002T0015Z/run-evidence/state.json",
+   "candidate_id": "20261002t0015z-starget2-i1",
+   "why_not_the_product": "The product wrote the archive-targets follow-up (redundancy on fresh health, unconfirmed identity as unknown, no sys.path mutation in the evidence-boundary helper) with tests: run 20261002t0015z-starget2, accepted in iteration 1. Merged after two integration reviews (starget2-a, starget2-b: release yes/yes)."
+  },
+  {
+   "id": "storage-coordinator-followup",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "03a37a2a257a3d373a3b3fdbe8be01db2708607e",
+    "209c15497e716534dbb8c5d92aa6375f0dd4490e"
+   ],
+   "run_state": "dogfood/storage-coordinator/20261002T0015Z/run-evidence/state.json",
+   "candidate_id": "20261002t0015z-scoord2-i1",
+   "why_not_the_product": "The product wrote the coordinator follow-up (liveness order, monotonic release, nested items, fair shares, PlanItem sequences) with tests: run 20261002t0015z-scoord2, accepted in iteration 1. Merged after two integration reviews (scoord2-a, scoord2-b: release yes/yes)."
+  },
+  {
+   "id": "lease-tests",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "511496302338a468abfee5f271266ee283b302ee",
+    "17744bf70e16efd469e993939fe23d0612372b3d"
+   ],
+   "run_state": "dogfood/lease-tests/20261002T0015Z/run-evidence/state.json",
+   "candidate_id": "20261002t0015z-slease2-i1",
+   "why_not_the_product": "The product rewrote the master-authority keepalive tests without wall-clock slack (tests only): run 20261002t0015z-slease2 from the preserved candidate of the paused first run, accepted in iteration 1. Merged after two integration reviews (slease2-a, slease2-b: release yes/yes)."
+  },
+  {
+   "id": "o246-storage",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "e42db17741e07426348a561c9e1ba96064690e53"
+   ],
+   "why_not_the_product": "Integration records of the three follow-up runs, the O245 addendum, park Revisions 10-10c, steward notes, one identifier word list change, ledger O246. Reviewed by two Herdr agents (integ7-a, integ7-b: release yes/yes)."
+  },
+  {
+   "id": "storage-park",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "f02c76dd4d3830dc5f30740662208efd7e3e3a90",
+    "1859557d0c3aee6dfa6e9bd24114add5d83f0035"
+   ],
+   "run_state": "dogfood/storage-park/20261002T0300Z/run-evidence/state.json",
+   "candidate_id": "20261002t0300z-spark2-i1",
+   "why_not_the_product": "The product wrote src/hoh/storage_park.py and the admission wiring in the controller, launcher, CLI, resume loop and sentinel (durable storage-pressure park and resume, the boot claim), the ops units and the tests: run 20261002t0300z-spark2 from the preserved iteration-3 candidate of run 20261001t1726z-spark, accepted in iteration 1; evidence in dogfood/storage-park/20261002T0300Z/. Merged after two integration reviews (spark2-a, spark2-b: release yes/yes)."
+  },
+  {
+   "id": "o247-storage",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "ac2386e00377750c709befdc2a16d3215ed652f8"
+   ],
+   "why_not_the_product": "Integration records of the park and resume merge (STORAGE-B3), steward spec Revision 7, two lint and identifier one-liners, ledger O247. Reviewed by two Herdr agents (integ8-a, integ8-b)."
+  },
+  {
+   "id": "o248-planning",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "b4c8667d0d4175bbeb76606a7da87c5f0da55100"
+   ],
+   "why_not_the_product": "Planning only: operator amendment A4 (visualization and review providers), requirements P10-15/P10-16, one test change, ledger O248. Reviewed by two Herdr agents (a4plan-a, a4plan-b: release yes/yes in rounds 2 and 3)."
+  },
+  {
+   "id": "storage-steward-pins",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "56e7d6e5566bf3312678b1c18ab6abd59f760175",
+    "1e4a33ae9dd39107d1d6b38884466b34cc614b16"
+   ],
+   "why_not_the_product": "Spec-only pin commits for the two STORAGE-D repair runs: steward spec Revisions 8 and 9 appended to the refused candidates (dual spec reviews sstew2spec-a/b, sstew3spec-a/b)."
+  },
+  {
+   "id": "storage-steward",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "df9fa309f7555089106e221f556ec6fd3783453a",
+    "41c32c440ed15c06fcbdf37b940badbbda8d59a5",
+    "babd7207ffee30e68b63d0f6c953f5a870a6f716",
+    "8c8c25e4547f3683d118bd835f5bb40bf15e2ad5"
+   ],
+   "run_state": "dogfood/storage-steward/20261002T1127Z/run-evidence/state.json",
+   "candidate_id": "20261002t1127z-sstew3-i1",
+   "why_not_the_product": "The product wrote src/hoh/storage_tiers.py, src/hoh/verified_relocation.py and src/hoh/storage_steward.py, the steward CLI and units, and their tests (STORAGE-D, P5-28/P5-29/P5-30) in three runs: sstew (df9fa309, refused at integration), repair runs sstew2 (41c32c44, refused) and sstew3 (babd7207, accepted and merged as 8c8c25e4). The orchestrator wrote the spec revisions, imported, reviewed and merged."
+  },
+  {
+   "id": "o237-record-and-specs",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "3f9ca00c1fffef0e3a1dbe539940249f3b3118ac"
+   ],
+   "why_not_the_product": "Record-side commit by the driving session: the durability evidence of 20260925T1712Z kept as the evidence of a product timing defect (raise withdrawn), register notes corrected by addition, preserved evidence and reviews of pdurctl and the refused pqagate candidate, wave-3 specs. Reviewed by two Herdr agents (specs over three rounds, record side yes/yes)."
+  },
+  {
+   "id": "timer-ceil",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "0c59ec5c9217049a387769d6fd0b3c98a353eaf9",
+    "0aa4d1f1e3415ad5cea547572e5f069b0236ccc3"
+   ],
+   "run_state": "dogfood/timer-ceil/20260925T1801Z/run-evidence/state.json",
+   "candidate_id": "20260925t1801z-ptimer-i2",
+   "why_not_the_product": "The product wrote the round-up in both _timer_form copies (src/hoh/launcher.py, src/hoh/resumeloop.py) and tests/test_timer_form.py: run 20260925t1801z-ptimer from dogfood/timer-ceil/spec.md (with Revision 2), accepted in iteration 2 (iteration 1 lost to the dispatcher's no-answer defect), evidence in dogfood/timer-ceil/20260925T1801Z/ with a note on what its baseline receipts do not show. Bytes committed verbatim by the product in its pinned clone; tree cf45c81 is the accepted candidate's tree_digest (verify-import sound). Merge decision mine; merge commit claimed here. Reviewed by two Herdr agents (A yes; B yes in round 3)."
+  },
+  {
+   "id": "p2-proof-class",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "755f077457b558e239539c84e285342a437b15f9",
+    "0555515965603c8470542b00dea334e97bf181f2"
+   ],
+   "run_state": "dogfood/p2-proof-class/20260925T1645Z/run-evidence/state.json",
+   "candidate_id": "20260925t1645z-pproof2-i3",
+   "why_not_the_product": "The product wrote src/hoh/proofclass.py and tests/test_proofclass.py: run 20260925t1645z-pproof2 from dogfood/p2-proof-class/spec.md with Revision 2 (after the first run, 20260925t1540z-pproof, was refused at integration), accepted in iteration 3, evidence in dogfood/p2-proof-class/20260925T1645Z/. Bytes committed verbatim by the product in its pinned clone; tree 7df7beb4 is the accepted candidate's tree_digest (verify-import sound). The candidate also carried four .archiv/ drafts of the developer's earlier iterations (outside the spec's scope); merged verbatim, then relocated to the run's evidence (developer-drafts/) by the driving session. Merge decision mine; merge commit claimed here. Reviewed by two Herdr agents (release yes/yes)."
+  },
+  {
+   "id": "o237-preserve",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "5411e067ae370eb92dd325c8b17eb6bde9571ea9"
+   ],
+   "why_not_the_product": "PRESERVE (not a verdict): the interrupted O237 working tree as found on 2026-09-30, committed unchanged as refs/preserve/o237-wip-20260930T133658Z and recovered in O250."
+  },
+  {
+   "id": "o249-storage",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "662a1fe5195a48e25398fb23186213e7e9037171"
+   ],
+   "why_not_the_product": "Integration records of the STORAGE-D merge (three runs), attribution, CLAIMS classifications, three hygiene changes, ledger O249. Reviewed by two Herdr agents (integ9-a, integ9-b: release yes/yes)."
+  },
+  {
+   "id": "o250-recovery",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "2b65fdf1885e9aa384539090f1ec2e4c26e2c9c6"
+   ],
+   "why_not_the_product": "Merge of the preserved O237 working tree with storage-lifecycle, preserved reviewer files, ledger O250. Reviewed by rec-a, rec-b (release yes/yes)."
+  },
+  {
+   "id": "follow-up-pins",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "929fbb2c07c496c5ec5ea2f0d6fccab85f653cda",
+    "9de1c8a225548e8dd22473095da33d25f6157e2d",
+    "4b1835b6057e358143f1fd7f93a388d8e22d32cc",
+    "fe00724daff02169cc922dbabb83a96fb335a0e9",
+    "ab0b7cae43f479616f464252739b8e13b64cf8a9",
+    "1cfb46d8c5cd84cbe620990b161c58f2aa8a783a"
+   ],
+   "why_not_the_product": "Spec-only pin commits of the product runs wnames, lprompt, harness2, lprompt2, sstew4b and sstew4c (each spec or revision dual-reviewed before the pin). The sstew4 pin d3e4b085 is not in this history (that run blocked and was never merged; it stays on branch sstew4)."
+  },
+  {
+   "id": "witness-names",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "376b9924b99461f6ea4c132f65b22e7276cd77cc",
+    "5f182d95164b3f6d57d2ad37577ceb2635622b4d"
+   ],
+   "run_state": "dogfood/witness-names/20261002T1503Z/run-evidence/state.json",
+   "candidate_id": "20261002t1503z-wnames-i1",
+   "why_not_the_product": "The product wrote the byte-safe witness digests (capability.py) and integrity snapshots (integrity.py) with their tests in run 20261002t1503z-wnames; the orchestrator wrote the spec, imported, reviewed and merged."
+  },
+  {
+   "id": "harness-initiated",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "509a9b3746f4679a5ab6a23894192d1a826e4b94",
+    "3f067e94d399bf488a14bad8ae81fb2d94f374d6",
+    "67bc9567281a71a4e1fd78000e63c6119f392a2f"
+   ],
+   "run_state": "dogfood/harness-initiated/20261002T1547Z/run-evidence/state.json",
+   "candidate_id": "20261002t1547z-harness2-i1",
+   "why_not_the_product": "The product extended the durability record's harness_initiated list (tools/durability_e2e.py) and its tests in runs harness (refused) and harness2 (merged); the orchestrator wrote the spec revisions, imported, reviewed and merged."
+  },
+  {
+   "id": "long-prompt",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "846851fa56c83aa493a30bd4c5ffd638b6cbc22a",
+    "cc8f546115dd7e012562ee05a8db808f3625c4ec",
+    "f846d02192982ace0b1776971b0ee3fd98cd3749"
+   ],
+   "run_state": "dogfood/long-prompt/20261002T1619Z/run-evidence/state.json",
+   "candidate_id": "20261002t1619z-lprompt2-i1",
+   "why_not_the_product": "The product moved long role prompts into leaf-safe prompt files with an in-memory binding (dispatchers.py, approval_policy.py) and tests in runs lprompt (refused) and lprompt2 (merged); the orchestrator wrote the spec revisions, imported, reviewed and merged."
+  },
+  {
+   "id": "storage-steward-followup",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "74827a3f0317f59fb344728a0bcf67c69dd2d055",
+    "93a09c8db7954464a03ec0fa47c5fec32b14117e",
+    "b8f87015ae381f15dc36c3df7acd727ce2e7ea27"
+   ],
+   "run_state": "dogfood/storage-steward/20261002T1917Z/run-evidence/state.json",
+   "candidate_id": "20261002t1917z-sstew4c-i1",
+   "why_not_the_product": "The product hardened STORAGE-D (journaled builds, atomic receipts, every-pass target leftovers, honest BUSY/FAILED, atomic DRIVER.json) in runs sstew4b (refused) and sstew4c (merged); sstew4 blocked before development. The orchestrator wrote Revisions 10-11, imported, reviewed and merged."
+  },
+  {
+   "id": "o251-records",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "eea44518e13fffd88ee3665b27cfca7aa3d7447b"
+   ],
+   "why_not_the_product": "Merge of storage-lifecycle at b8f87015 into the recovered line, the runs' evidence and reviews, attribution, ledger O251. Reviewed by o251-a, o251-b (release yes after corrections / yes)."
+  },
+  {
+   "id": "p2-wave1-pins",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "878fcbfa45388f82bbaf6fcfc6c2977711478657",
+    "ac5e13e45596fba404946775f3d3611349386a9c",
+    "44446497ba0076cf83413776d6705e049c8028b8",
+    "842f485910a067b90e770067387f30fad0fa78d9",
+    "979bdfc8603f1038144a104d71ce8ba066837d32",
+    "4b9036fc01d470f2998f3ec83075c0615b4e5174",
+    "3d1c40a5029f873c84fc372026be662deb82004a",
+    "d8375f6ba63731453ffe1cc767ab78eee581f357",
+    "4352d9997ffaa819301d37224ce3467f5914b6af",
+    "eafa452041026b341facd0c0413da609bd8e70b7",
+    "aa2676551238a5e21516dee623054a469ff1b245",
+    "8b41354867aa9c8128f78e20e8a46b33a80460ab",
+    "e553c6d21b7adf62f123641ac2d3d805358ef902",
+    "23443717ee8b93d7191da31a5018b740897c0efd",
+    "1042f83199ae1d0095917fba2e22b80ce639195e",
+    "5ef6e838bccf7257df89f224cf6ea2fbc0f2412a",
+    "936c700c76fdc9a562258ab5a492d4ff150bde2b",
+    "b7711c6d64c3b5a3748ed682b9b257baf1eb30cc",
+    "d1efe0a6f49e8582a964b2a50e4c7d0008573d37"
+   ],
+   "why_not_the_product": "Spec-only pin commits of the P2 wave-1 product runs (artsig, project-adopt, supdrift, drob, guard, supdrift2, pathlen, wmig, sfol, gbind, deny, kbr, wsur, ugt, pcon, dres/dres2, lgs, ecl, drt), each spec or revision dual-reviewed before its pin. 44446497 carries the cherry-picked psupdrift candidate ea4312d5 as its parent; 5ef6e838 is the pin of the blocked dres and of dres2. The pins of the unmerged qgg/qgg2 (fe1b46c5) and qaw/qaw2 (bfdc1490) are not in this history."
+  },
+  {
+   "id": "o252-records",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "e9e3e9044a6fcb908dbb45a5d2a8933aeb3a467d"
+   ],
+   "why_not_the_product": "First part of the O252 records: ledger O252, amendment A5 and its requirements, the register edits for P2-29/P2-30/P2-32/P2-41, CLAIMS classifications and the regenerated documents. Its completion (evidence, this attribution, the A5 test) is the next commit, attributed in the commit after it."
+  },
+  {
+   "id": "section-p-anchor",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "687104d244eaf272ab7cc2add9ddd2e9d2a77366"
+   ],
+   "why_not_the_product": "The Section-P adoption anchor for projects/veriharness (trust root ~/hoh, the operator's decision of O249) with its two reviews (anchor-a/b release yes/yes). Written by the orchestrator: the anchor is the operator-side input of the product's adopt-project path, which the product cannot write for itself."
+  },
+  {
+   "id": "artefactual-signature",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "9ed6748cbff314dce66987397810cf59cdfb8192",
+    "4193d9bc5710996662175e0b77dc5757c10e225b"
+   ],
+   "run_state": "dogfood/artefactual-signature/20261003T0025Z/run-evidence/state.json",
+   "candidate_id": "20261003t0025z-artsig-i1",
+   "why_not_the_product": "The product wrote it in run 20261003t0025z-artsig from dogfood/artefactual-signature/spec.md (accepted in iteration 1; import 9ed6748c bound to the accepted candidate, verify-import sound, its tree is the candidate's tree_digest); evidence in dogfood/artefactual-signature/20261003T0025Z/. The orchestrator wrote the spec, pinned it, imported, had two Herdr agents review it (release yes/yes) and merged (4193d9bc). Ledger O252."
+  },
+  {
+   "id": "guard-union",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "0822bc91c8abdb8e7d3a68bd3b38cb5f76489b6b",
+    "5e5ea35caeb10011c120a47eb0927e59e913c4ea"
+   ],
+   "run_state": "dogfood/guard-union/20261003T0129Z/run-evidence/state.json",
+   "candidate_id": "20261003t0129z-guard-i1",
+   "why_not_the_product": "The product wrote it in run 20261003t0129z-guard from dogfood/guard-union/spec.md (accepted in iteration 1; import 0822bc91 bound to the accepted candidate, verify-import sound, its tree is the candidate's tree_digest); evidence in dogfood/guard-union/20261003T0129Z/. The orchestrator wrote the spec, pinned it, imported, had two Herdr agents review it (release yes/yes) and merged (5e5ea35c). Ledger O252."
+  },
+  {
+   "id": "dispatch-robustness",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "74b8a66467e139956aaf2c5b8ce112bbb2346eaf",
+    "e981021167c97a5f080517b7787b1afa33ca48cd"
+   ],
+   "run_state": "dogfood/dispatch-robustness/20261003T0101Z/run-evidence/state.json",
+   "candidate_id": "20261003t0101z-drob-i2",
+   "why_not_the_product": "The product wrote it in run 20261003t0101z-drob from dogfood/dispatch-robustness/spec.md (accepted in iteration 2; import 74b8a664 bound to the accepted candidate, verify-import sound, its tree is the candidate's tree_digest); evidence in dogfood/dispatch-robustness/20261003T0101Z/. The orchestrator wrote the spec, pinned it, imported, had two Herdr agents review it (release yes/yes) and merged (e9810211). Ledger O252."
+  },
+  {
+   "id": "phase2-pathlen",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "4542bf1a6e72fd7aa854ce67fa4cabe8de3ef508",
+    "ae682694cc1c76c664b66ab0f9ee93d4975313cc"
+   ],
+   "run_state": "dogfood/phase2-pathlen/20261003T0234Z/run-evidence/state.json",
+   "candidate_id": "20261003t0234z-pathlen-i1",
+   "why_not_the_product": "The product wrote it in run 20261003t0234z-pathlen from dogfood/phase2-pathlen/spec.md (accepted in iteration 1; import 4542bf1a bound to the accepted candidate, verify-import sound, its tree is the candidate's tree_digest); evidence in dogfood/phase2-pathlen/20261003T0234Z/. The orchestrator wrote the spec, pinned it, imported, had two Herdr agents review it (release yes/yes) and merged (ae682694). Ledger O252."
+  },
+  {
+   "id": "project-adopt",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "fb1b2cb8d958c46cd1efc5475e2cc38d6060dfe6",
+    "d1de4a102ae915bf113d943f59993eb61e8ccd0a"
+   ],
+   "run_state": "dogfood/project-adopt/20261003T0032Z/run-evidence/state.json",
+   "candidate_id": "20261003t0032z-padopt-i3",
+   "why_not_the_product": "The product wrote it in run 20261003t0032z-padopt from dogfood/project-adopt/spec.md (accepted in iteration 3; import fb1b2cb8 bound to the accepted candidate, verify-import sound, its tree is the candidate's tree_digest); evidence in dogfood/project-adopt/20261003T0032Z/. The orchestrator wrote the spec, pinned it, imported, had two Herdr agents review it (release yes/yes) and merged (d1de4a10). Ledger O252."
+  },
+  {
+   "id": "supervisor-followups",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "2c1f6f4677ca4db65ce0ad426fcae0d7bdf535e1",
+    "015325a8313eec11193c4222de460cc5ac86f28b"
+   ],
+   "run_state": "dogfood/supervisor-followups/20261004T1439Z/run-evidence/state.json",
+   "candidate_id": "20261004t1439z-sfol-i1",
+   "why_not_the_product": "The product wrote it in run 20261004t1439z-sfol from dogfood/supervisor-followups/spec.md (accepted in iteration 1; import 2c1f6f46 bound to the accepted candidate, verify-import sound, its tree is the candidate's tree_digest); evidence in dogfood/supervisor-followups/20261004T1439Z/. The orchestrator wrote the spec, pinned it, imported, had two Herdr agents review it (release yes/yes) and merged (015325a8). Ledger O252."
+  },
+  {
+   "id": "writer-migration-h-a",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "c99a551228224173c5af78ebcc338e117e40207e",
+    "6351bca09610eec4ab853814284df9cee83eddc4"
+   ],
+   "run_state": "dogfood/writer-migration/20261004T1007Z/run-evidence/state.json",
+   "candidate_id": "20261004t1007z-wmig-i2",
+   "why_not_the_product": "The product wrote it in run 20261004t1007z-wmig from dogfood/writer-migration/spec.md (accepted in iteration 2; import c99a5512 bound to the accepted candidate, verify-import sound, its tree is the candidate's tree_digest); evidence in dogfood/writer-migration/20261004T1007Z/. The orchestrator wrote the spec, pinned it, imported, had two Herdr agents review it (release yes/yes) and merged (6351bca0). Ledger O252."
+  },
+  {
+   "id": "gate-binding",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "caea6d129ea2421001a706c0ed14e5d5f7ec9194",
+    "8ae6a2e438194704f136f0ab5cdbc464f295f8f2"
+   ],
+   "run_state": "dogfood/gate-binding/20261004T1454Z/run-evidence/state.json",
+   "candidate_id": "20261004t1454z-gbind-i1",
+   "why_not_the_product": "The product wrote it in run 20261004t1454z-gbind from dogfood/gate-binding/spec.md (accepted in iteration 1; import caea6d12 bound to the accepted candidate, verify-import sound, its tree is the candidate's tree_digest); evidence in dogfood/gate-binding/20261004T1454Z/. The orchestrator wrote the spec, pinned it, imported, had two Herdr agents review it (release yes/yes) and merged (8ae6a2e4). Ledger O252."
+  },
+  {
+   "id": "keybind-readiness",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "88b8ab6c0f31c7e5d604cd4a03ef0b35df101e5b",
+    "61bcb233d9d70dc15d3942a5e3d748370de6a18c"
+   ],
+   "run_state": "dogfood/keybind-readiness/20261004T1545Z/run-evidence/state.json",
+   "candidate_id": "20261004t1545z-kbr-i2",
+   "why_not_the_product": "The product wrote it in run 20261004t1545z-kbr from dogfood/keybind-readiness/spec.md (accepted in iteration 2; import 88b8ab6c bound to the accepted candidate, verify-import sound, its tree is the candidate's tree_digest); evidence in dogfood/keybind-readiness/20261004T1545Z/. The orchestrator wrote the spec, pinned it, imported, had two Herdr agents review it (release yes/yes) and merged (61bcb233). Ledger O252."
+  },
+  {
+   "id": "deny-rule",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "3cd1d89bc51bcbf40cc12e880a078bf22c052b0b",
+    "6ecccb0636fbd26e684f4288535be50284fca93e"
+   ],
+   "run_state": "dogfood/deny-rule/20261004T1527Z/run-evidence/state.json",
+   "candidate_id": "20261004t1527z-deny-i3",
+   "why_not_the_product": "The product wrote it in run 20261004t1527z-deny from dogfood/deny-rule/spec.md (accepted in iteration 3; import 3cd1d89b bound to the accepted candidate, verify-import sound, its tree is the candidate's tree_digest); evidence in dogfood/deny-rule/20261004T1527Z/. The orchestrator wrote the spec, pinned it, imported, had two Herdr agents review it (release yes/yes) and merged (6ecccb06). Ledger O252."
+  },
+  {
+   "id": "witness-surrogates",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "4d4d87f3a17bdc35b7a25ea59a014fe9d75ffed2",
+    "36b1a00104e7aa251d5891c284e278c077f727a1"
+   ],
+   "run_state": "dogfood/witness-surrogates/20261004T1547Z/run-evidence/state.json",
+   "candidate_id": "20261004t1547z-wsur-i1",
+   "why_not_the_product": "The product wrote it in run 20261004t1547z-wsur from dogfood/witness-surrogates/spec.md (accepted in iteration 1; import 4d4d87f3 bound to the accepted candidate, verify-import sound, its tree is the candidate's tree_digest); evidence in dogfood/witness-surrogates/20261004T1547Z/. The orchestrator wrote the spec, pinned it, imported, had two Herdr agents review it (release yes/yes) and merged (36b1a001). Ledger O252."
+  },
+  {
+   "id": "union-gate-timeout",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "db2e84570322863a4e7e7fb33fc7872c7bf1e11a",
+    "a49d1981c0344852868d0a59f1e25eb93fded5b7"
+   ],
+   "run_state": "dogfood/union-gate-timeout/20261004T2019Z/run-evidence/state.json",
+   "candidate_id": "20261004t2019z-ugt-i2",
+   "why_not_the_product": "The product wrote it in run 20261004t2019z-ugt from dogfood/union-gate-timeout/spec.md (accepted in iteration 2; import db2e8457 bound to the accepted candidate, verify-import sound, its tree is the candidate's tree_digest); evidence in dogfood/union-gate-timeout/20261004T2019Z/. The orchestrator wrote the spec, pinned it, imported, had two Herdr agents review it (release yes/yes) and merged (a49d1981). Ledger O252."
+  },
+  {
+   "id": "project-contract",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "7d4ee3a4c918beaa3eb8a0d2fa51e713f4ced70e",
+    "1c5e552545c914dc04ee3dd39281281758355e5e"
+   ],
+   "run_state": "dogfood/project-contract/20261004T2102Z/run-evidence/state.json",
+   "candidate_id": "20261004t2102z-pcon-i2",
+   "why_not_the_product": "The product wrote it in run 20261004t2102z-pcon from dogfood/project-contract/spec.md (accepted in iteration 2; import 7d4ee3a4 bound to the accepted candidate, verify-import sound, its tree is the candidate's tree_digest); evidence in dogfood/project-contract/20261004T2102Z/. The orchestrator wrote the spec, pinned it, imported, had two Herdr agents review it (release yes/yes) and merged (1c5e5525). Ledger O252."
+  },
+  {
+   "id": "legacy-scratch",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "ce26c5087bf27ce7ee817e371bf51a815c1a8a19",
+    "5795e8c4190fa94c447c98a7a16bc07614ec1359"
+   ],
+   "run_state": "dogfood/legacy-scratch/20261005T0123Z/run-evidence/state.json",
+   "candidate_id": "20261005t0123z-lgs-i3",
+   "why_not_the_product": "The product wrote it in run 20261005t0123z-lgs from dogfood/legacy-scratch/spec.md (accepted in iteration 3; import ce26c508 bound to the accepted candidate, verify-import sound, its tree is the candidate's tree_digest); evidence in dogfood/legacy-scratch/20261005T0123Z/. The orchestrator wrote the spec, pinned it, imported, had two Herdr agents review it (release yes/yes) and merged (5795e8c4). Ledger O252."
+  },
+  {
+   "id": "evidence-claim",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "b38b150ff60e5af93aaac2f49e753e2ac17d2179",
+    "5b7e5ec9df1c4712524b7b932982cd045eda13f1"
+   ],
+   "run_state": "dogfood/evidence-claim/20261005T0148Z/run-evidence/state.json",
+   "candidate_id": "20261005t0148z-ecl-i2",
+   "why_not_the_product": "The product wrote it in run 20261005t0148z-ecl from dogfood/evidence-claim/spec.md (accepted in iteration 2; import b38b150f bound to the accepted candidate, verify-import sound, its tree is the candidate's tree_digest); evidence in dogfood/evidence-claim/20261005T0148Z/. The orchestrator wrote the spec, pinned it, imported, had two Herdr agents review it (release yes/yes) and merged (5b7e5ec9). Ledger O252."
+  },
+  {
+   "id": "supervisor-drift-repair",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "9d0f3bc239a6185db20325528b91e7c1fea17c7a",
+    "7574dcffe7e2e0d5cc1fab93c76e6cde011bb19c"
+   ],
+   "run_state": "dogfood/supervisor-drift/20261003T0141Z/run-evidence/state.json",
+   "candidate_id": "20261003t0141z-supdrift2-i2",
+   "why_not_the_product": "The product wrote it in run 20261003t0141z-supdrift2 from dogfood/supervisor-drift/spec.md (accepted in iteration 2; import 9d0f3bc2 bound to the accepted candidate, verify-import sound, its tree is the candidate's tree_digest); evidence in dogfood/supervisor-drift/20261003T0141Z/. The orchestrator wrote the spec, pinned it, imported, had two Herdr agents review it (release yes/yes) and merged (7574dcff). Ledger O252."
+  },
+  {
+   "id": "dispatch-residue-tests",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "c8ef40fbeaab780e49e3b1ff549d529373d27e48",
+    "50b68994e3756813a447585115c5a770eed157d6"
+   ],
+   "run_state": "dogfood/dispatch-residue-tests/20261005T1102Z/run-evidence/state.json",
+   "candidate_id": "20261005t1102z-drt-i1",
+   "why_not_the_product": "The product wrote it in run 20261005t1102z-drt from dogfood/dispatch-residue-tests/spec.md (accepted in iteration 1; import c8ef40fb bound to the accepted candidate, verify-import sound, its tree is the candidate's tree_digest); evidence in dogfood/dispatch-residue-tests/20261005T1102Z/. The orchestrator wrote the spec, pinned it, imported, had two Herdr agents review it (release yes/yes) and merged (50b68994). Ledger O252."
+  },
+  {
+   "id": "supervisor-drift-first-run",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "ea4312d5b047cac54708f46f1a8707ce9df5c3a3",
+    "8aca08eae8e4cdff6790c5de00a2c79094019aa1"
+   ],
+   "run_state": "dogfood/supervisor-drift/20261003T0033Z/run-evidence/state.json",
+   "candidate_id": "20261003t0033z-supdrift-i1",
+   "why_not_the_product": "The product wrote 8aca08ea in run 20261003t0033z-supdrift (Revisions 5/5a, accepted in iteration 1, evidence in dogfood/supervisor-drift/20261003T0033Z/); it was refused at integration (supdrift-a/b release no/no) and is in this history only as the base of the repair run supdrift2's pin 4b9036fc. ea4312d5 is the product's earlier candidate of run 20260925t1916z-psupdrift (O237), cherry-picked with -x onto eea44518 by the orchestrator as the base of pin 44446497; its bytes are the product's, its tree is not bound to a run state here (the cherry-pick changed the base). Ledger O252."
+  },
+  {
+   "id": "dispatch-residue",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "114d55572ed2158496874f0725ad81618dcede1a"
+   ],
+   "run_state": "dogfood/dispatch-residue/20261005T0218Z/run-evidence/state.json",
+   "candidate_id": "20261005t0218z-dres2-i2",
+   "why_not_the_product": "The product wrote 114d5557 in run 20261005t0218z-dres2 from dogfood/dispatch-residue/spec.md (v5 + Revision 5a), accepted in iteration 2, evidence in dogfood/dispatch-residue/20261005T0218Z/. Refused at integration on its own (dres2-b F1/F2); the tests-only follow-up drt was pinned on it (d1efe0a6) and merged both as 50b68994 (entry dispatch-residue-tests). The first run, 20261005t0122z-dres, blocked on the role timeout and produced no candidate. Ledger O252."
+  },
+  {
+   "id": "o252-completion",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "83e1084d556cedf0d7671a03457c0a6c78d4352b"
+   ],
+   "why_not_the_product": "Second part of the O252 records: the run evidence, preserve policies and integration reviews of the nineteen accepted runs, the attribution entries, the A5 extension of tests/test_program_amendments.py. Its review answers (corrections by addition, later events, prompt storage, redaction) are the next commit, attributed in the commit after it."
+  },
+  {
+   "id": "section-p-legacy-roots-anchor",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "ec6d28dc9fe066e6702a78d7e616df416ee350b8"
+   ],
+   "why_not_the_product": "The Section-P legacy-roots anchor (schema, roots [], the survey's sha256; no root path), released by lrs-a/b in round 2; the operator-side input of the product's adopt-legacy path, which the product cannot write for itself."
+  },
+  {
+   "id": "o252-review-round-1",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "7417f3a25b054b8450ec3a4f4518c026ecd5a4bc"
+   ],
+   "why_not_the_product": "Third commit of the O252 records: the answer to the first integration review (o252-a, o252-b release no/no) -- corrections by addition, the events up to the 2026-10-05 22:16Z cut-off, Section P formally closed, role prompts stored as .txt, review briefs redacted. Its own final review (o252f-a/b, release yes/yes) is recorded in ledger O253."
+  },
+  {
+   "id": "o252-merge",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "542f47f4655fc01b6a35d0e7e4a04fe54a9946dd"
+   ],
+   "why_not_the_product": "Merge of the O252 records series (e9e3e904, 83e1084d, 7417f3a2) into the line after the stalled-submit merge (ad05fe19), after o252f-a/b released it yes/yes. Ledger O253."
+  },
+  {
+   "id": "p2-wave2-pins",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "b89b3d7493c7d6e4d689f534edeb101302644d99",
+    "35b2ce6ea985402b2248bd0fd9370fcee5afa5c4",
+    "6ffba548d3f981ebf90a3dec3c01b899c0469e7f"
+   ],
+   "why_not_the_product": "Spec-only pin commits of the three product runs merged after O252 (b89b3d74: stalled-submit v2.1 on 50b68994 for run sss; 35b2ce6e: stalled-submit-tests Revision 2.2 on the sss candidate 1c17aed5 for run sst; 6ffba548: qa-arena-write v7 with Revisions 7a-7e on 542f47f4 for run qaw8), each spec or revision dual-reviewed before its pin. b89b3d74 was committed without the Co-Authored-By trailer (orchestrator slip, ledger O253); the other two carry it. The pins of the runs of this period that produced no merge (qaw6 2b1a39d1, qaw7 b73e202a, et 698bfc08, et2 3ec7872f) are not in this history."
+  },
+  {
+   "id": "stalled-submit",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "1c17aed57a34bc5537d4c1b329ce9ef3cd2fd361"
+   ],
+   "run_state": "dogfood/stalled-submit/20261006T0544Z/run-evidence/state.json",
+   "candidate_id": "20261006t0544z-sss-i1",
+   "why_not_the_product": "The product wrote 1c17aed5 in run 20261006t0544z-sss from dogfood/stalled-submit/spec.md (v2.1; accepted in iteration 1, import 1c17aed5 bound to the accepted candidate, verify-import sound, its tree f77190ae is the candidate's tree_digest); evidence in dogfood/stalled-submit/20261006T0544Z/. Refused at integration on its own (sss-a release no: two test-binding gaps on the Enter boundary, B1 and B2; sss-b release yes); the tests-only follow-up stalled-submit-tests was pinned on it (35b2ce6e) and merged both as ad05fe19 (entry stalled-submit-tests). Ledger O253."
+  },
+  {
+   "id": "stalled-submit-tests",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "81a108d1b675e4e3e0da0e0af291337114e49e49",
+    "ad05fe1903e8bfd206b3608e58dd7c1110689365"
+   ],
+   "run_state": "dogfood/stalled-submit-tests/20261006T1057Z/run-evidence/state.json",
+   "candidate_id": "20261006t1057z-sst-i1-a1",
+   "why_not_the_product": "The product wrote 81a108d1 in run 20261006t1057z-sst from dogfood/stalled-submit-tests/spec.md (Revision 2.2, tests only; accepted in iteration 1, import 81a108d1 bound to the accepted candidate, verify-import sound, its tree 2eadd4e6 is the candidate's tree_digest); evidence in dogfood/stalled-submit-tests/20261006T1057Z/. The orchestrator wrote the spec, pinned it on the sss candidate, imported, had two Herdr agents review it (sst-a/b release yes/yes) and merged it together with the sss candidate (ad05fe19). Ledger O253."
+  },
+  {
+   "id": "qa-arena-write",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "f8b2606112da7627f47619015fe244313f760b1f",
+    "a455edc0f3ae9cd1465a4e3ee7e98fd4090cf3b0"
+   ],
+   "run_state": "dogfood/qa-arena-write/20261006T2124Z/run-evidence/state.json",
+   "candidate_id": "20261006t2124z-qaw8-i1-a1",
+   "why_not_the_product": "The product wrote f8b26061 in run 20261006t2124z-qaw8 from dogfood/qa-arena-write/spec.md (v7 with Revisions 7a-7e; accepted in iteration 1, import f8b26061 bound to the accepted candidate, verify-import sound, its tree d26e4e56 is the candidate's tree_digest); evidence in dogfood/qa-arena-write/20261006T2124Z/. The orchestrator wrote the spec, pinned it, imported, had two Herdr agents review it (qaw8-a/b release yes/yes) and merged (a455edc0). The strand's earlier runs (qaw, qaw2, qaw3, qaw4, qaw6: no candidate accepted; qaw5, qaw7: accepted and refused at integration) produced no commit in this history; each is listed in ledger O253 with its reason."
+  },
+  {
+   "id": "o253-records",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "8008f08bdf3f64b2cc72c2846f6754d239da63f5"
+   ],
+   "why_not_the_product": "The O253 records commit: the stalled-submit and stalled-submit-tests merges, the O252 merge and the qa-arena-write merge with the release-integrity gate, the operator's directives of 2026-10-06, the two inode cleanups, run evidence and attribution for three runs, and the P2-24 register addition. Written by the main session as the record of work already done; no run could have produced a document about the product's own history. Dual-reviewed (o253-a and o253-b, release yes/yes) and merged as eea12484 (entry o253-merge). A commit cannot name itself, so its attribution is this entry, written in O254."
+  },
+  {
+   "id": "o253-merge",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "eea1248432930d91db8a233faaeb10191ea82fbc"
+   ],
+   "why_not_the_product": "Merge of the O253 records commit (8008f08b) into the line after the P2-42 merge (b7899bc8), after o253-a/b released it yes/yes. Ledger O254."
+  },
+  {
+   "id": "p2-wave3-pins",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "34efa20e77219f284cec0589dd860d0dbb4e95bc"
+   ],
+   "why_not_the_product": "Spec-only pin commit of the product run merged after O253 (34efa20e: ephemeral-tmp spec v2.4, P2-42, on 542f47f4 for run et3), the spec dual-reviewed before its pin (narrow round et6-a/b on v2.4, release yes/yes, minors tracked) and carrying the Co-Authored-By trailer. The pins of the two earlier runs of the strand (et 698bfc08, et2 3ec7872f) are not in this history. Ledger O254."
+  },
+  {
+   "id": "ephemeral-tmp",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "f4e20683ea84eeadb70cdee4c62673e95aa2a83e",
+    "b7899bc8a7ed438deede9c392bed7db8de90b44b"
+   ],
+   "run_state": "dogfood/ephemeral-tmp/20261007T0106Z/run-evidence/state.json",
+   "candidate_id": "20261007t0106z-et3-i1-a1",
+   "why_not_the_product": "The product wrote f4e20683 in run 20261007t0106z-et3 from dogfood/ephemeral-tmp/spec.md (v2.4; accepted in iteration 1 at 2026-10-07T01:39:36Z, import f4e20683 bound to the accepted candidate, verify-import sound, its tree 9f6eb589 is the candidate's tree_digest); evidence in dogfood/ephemeral-tmp/20261007T0106Z/. The orchestrator wrote the spec, pinned it (34efa20e), imported, had two Herdr agents review it (et3-a/b release yes/yes) and merged (b7899bc8). The strand's earlier runs et (candidate 813f21e0) and et2 (51dbe3dc) were accepted and refused at integration (et-a and et-b no/no: the cleanup crossed a same-filesystem bind mount; et2-a no: a scratch vetted by an unsandboxed check stayed vetted across a sandboxed one) and produced no commit in this history; each is listed in ledger O254 with its reason."
+  },
+  {
+   "id": "o254-records",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "847b0606d6d4440d8c7b5437286b0c57f7f49dee"
+   ],
+   "why_not_the_product": "The O254 records commit: the P2-42 merge and its three runs, the O253 merge, the role-pane-lifecycle strand at the O253 cut-off, run evidence and attribution for the accepted ephemeral-tmp run, the P2-42 register edit and O253's review answered by addition. Written by the main session (a Sonnet 5.5 drafter under the orchestrator's brief) as the record of work already done; no run could have produced a document about the product's own history. Dual-reviewed (o254-a release no, one BLOCKING: the gate overclaim; o254b2 release yes) and answered by Revision 1, the commit after it (ledger O254). A commit cannot name itself, so its attribution is this entry, written in Revision 1."
+  },
+  {
+   "id": "p2-wave4-pins",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "545f70e56209a220af7f49945670ff0df5a6435c",
+    "0e39405fbed80e5dbda9aacbd9c80bd9d222443d",
+    "e11284ea8ca64eda6f1845e866af1f6000ebaa4c",
+    "52fded95c91e594c0e79944bc042943d164f6e79",
+    "7c2f60b70a3c4055d4a3f2080ee31e1e17475a79"
+   ],
+   "why_not_the_product": "Spec-only pin commits of the five product runs merged after O254: role-pane-lifecycle v2.4 (545f70e5, on a455edc0, run rpl), prompt-threshold Revision 4a with its reference test file (0e39405f, on eea12484, run ptt4), qaw-followup (e11284ea, on 33320bfc, run qfu4 and qfu5; files byte-identical to the first pin 0f37cb6f, which is not in this history), context-rollover Layer A Revision 2 (52fded95, on 295f118b, run crl) and rpl-tests Revision 1a (7c2f60b7, on the integration base 140de50b, run rplt). Each spec was dual-reviewed before its pin (ledger O255 and O254). The pin of a run is the orchestrator's act and carries the Co-Authored-By trailer."
+  },
+  {
+   "id": "prompt-threshold",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "ed1d7c7ad6ce4a842c81d960185e2ef7e2dd7f07",
+    "33320bfcf8241369b70e5ef9e4a97b6c4076e651"
+   ],
+   "run_state": "dogfood/prompt-threshold/20261007T1041Z/run-evidence/state.json",
+   "candidate_id": "20261007t1041z-ptt4-i1-a1",
+   "why_not_the_product": "The product moved every long or paste-unsafe role prompt onto the pointer file (dispatchers.py, three hunks; tests/test_dispatch_prompt_threshold.py) in run 20261007t1041z-ptt4 from dogfood/prompt-threshold/spec.md (Revision 4a; accepted in iteration 1 at 2026-10-07T10:52:11Z, import ed1d7c7a bound to the accepted candidate, verify-import sound; its tree is the candidate's tree_digest). The run used a declared one-time bootstrap harness (the eea12484 src plus only the dual-reviewed r4 dispatcher change; operator-delegated decision, ledger O254 item 3 and O255) because the inline prompts of the earlier runs could not be verified by the merged stalled-submit recovery; the candidate was written independently of the harness and the bootstrap is retired. The orchestrator wrote the spec, pinned it, imported, had two Herdr agents review it (ptt4int-a/b release yes/yes) and merged (33320bfc, merge-gate receipt in the merge message). Evidence in dogfood/prompt-threshold/20261007T1041Z/."
+  },
+  {
+   "id": "o254-revision-1",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "929ed73b33de5c5404890175a68deb64e4422edd"
+   ],
+   "why_not_the_product": "O254 Revision 1: the release gate corrected by addition after o254-a's BLOCKING finding, the review minors folded in, the events after the cut-off added. Written by the main session (a Sonnet 5.5 drafter under the orchestrator's brief) as the record of work already done; no run could have produced a document about the product's own history. Re-reviewed narrowly (o254r2-a and o254r2-b, release yes/yes) and merged as 295f118b (entry o254-merge). Ledger O255."
+  },
+  {
+   "id": "o254-merge",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "295f118b58e45f5771a9abac6542845a2594ba2a"
+   ],
+   "why_not_the_product": "Merge of the O254 records (847b0606, 929ed73b) into the line after the prompt-threshold merge (33320bfc), after o254r2-a and o254r2-b released it yes/yes and tools/merge_gate.py found MERGE_ELIGIBLE. Ledger O255."
+  },
+  {
+   "id": "qaw-followup",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "546872436952bc524f004f767e157bc9a3d33784",
+    "ab41589f6d581dbdf4c8ad4e4028c8b50e8dbd6b"
+   ],
+   "run_state": "dogfood/qaw-followup/20261007T1431Z/run-evidence/state.json",
+   "candidate_id": "20261007t1431z-qfu5-i1-a1",
+   "why_not_the_product": "The product closed the three release-integrity holes of qaw8-a for the replayed paths (a legacy BLOCKED state resumable to ACCEPTED, an open seal ignored by the acceptance record, a symlinked seals.jsonl, a forged sibling-arena plan line; controller.py, durable_io.py, resumeloop.py, storage_park.py, tools/acceptance_record.py, docs/LIMITATIONS.md, two test files) in run 20261007t1431z-qfu5 from dogfood/qaw-followup/spec.md (accepted in iteration 1 at 2026-10-07T14:51:25Z, import 54687243 bound to the accepted candidate, verify-import sound; its tree is the candidate's tree_digest). Its four earlier runs (qfu, qfu2, qfu3, qfu4) blocked at the first planner dispatch before any candidate; qfu4's evidence is in dogfood/qaw-followup/20261007T1138Z-qfu4-blocked/. The orchestrator wrote the spec, pinned it, imported, had two Herdr agents review it (qfuint-a/b release yes/yes) and merged (ab41589f). Evidence in dogfood/qaw-followup/20261007T1431Z/."
+  },
+  {
+   "id": "role-pane-lifecycle",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "edd9eba2390080a847a37513403938557c643335"
+   ],
+   "run_state": "dogfood/role-pane-lifecycle/20261007T0415Z/run-evidence/state.json",
+   "candidate_id": "20261007t0415z-rpl-i2-a1",
+   "why_not_the_product": "The product made HoH close its own unneeded role panes and end a role's processes before the freeze, never touching foreign panes or processes (pane_ledger.py, procs.py, dispatchers.py, controller.py, roles.py and a test file) in run 20261007t0415z-rpl from dogfood/role-pane-lifecycle/spec.md (v2.4; accepted in iteration 2 at 2026-10-07T06:45:10Z, the first iteration lost to the account usage limit; import edd9eba2 bound to the accepted candidate). Its integration review (rplint-a/b) said release NO for the tests only, the production code correct; it was merged together with the tests-only follow-up (entry rpl-tests, merge caa732db). Evidence in dogfood/role-pane-lifecycle/20261007T0415Z/."
+  },
+  {
+   "id": "rpl-tests-base",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": false,
+   "commits": [
+    "140de50b3efc7f3e4a8925192b23249a5d038e65"
+   ],
+   "why_not_the_product": "The integration base of the rpl-tests run: the orchestrator's commit-tree of the clean merge-tree of phase-b-productization ab41589f and refs/imports/rpl (edd9eba2), so that the tests-only follow-up could be written and reviewed against the code it tests. It contains no content of its own: its tree is the merge-tree's, and the branch it was cut for was never advanced. Not development work. Ledger O255."
+  },
+  {
+   "id": "rpl-tests",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "8ddf24b07848f883bc3e95f3ae2bda713d308de2",
+    "caa732db52aa8134835e30594011e8a7e4780460"
+   ],
+   "run_state": "dogfood/rpl-tests/20261007T1538Z/run-evidence/state.json",
+   "candidate_id": "20261007t1538z-rplt-i1-a1",
+   "why_not_the_product": "The product rewrote tests/test_role_pane_lifecycle.py (the two BLOCKING findings of rplint-a/b: K8 red in NONE, the O2 ownership rule unenforced) and parked the old file in .archiv/ in run 20261007t1538z-rplt from dogfood/rpl-tests/spec.md (Revision 1a; accepted in iteration 1 at 2026-10-07T15:46:55Z, import 8ddf24b0 bound to the accepted candidate; its tree is the candidate's tree_digest). The merge caa732db brings the follow-up together with role-pane-lifecycle (entry role-pane-lifecycle). The orchestrator wrote the spec, pinned it, imported, had two Herdr agents review it (rpltint-a/b release yes/yes) and merged. Evidence in dogfood/rpl-tests/20261007T1538Z/."
+  },
+  {
+   "id": "context-rollover",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "3888e698b222ccaafc0ff82c11fdc20aabedc77c",
+    "601168fe4890e556397caa2850e04ae48cac0f77"
+   ],
+   "run_state": "dogfood/context-rollover/20261007T1442Z/run-evidence/state.json",
+   "candidate_id": "20261007t1442z-crl-i1-a1",
+   "why_not_the_product": "The product wrote Layer A of verified orchestrator succession (succession_capsule.py, rollover.py, handoff(expires_in=) in succession.py, four commands in cli.py, two test files) in run 20261007t1442z-crl from dogfood/context-rollover/spec.md (Revision 2; accepted in iteration 1 at 2026-10-07T16:15:32Z, import 3888e698 bound to the accepted candidate, verify-import sound; its tree is the candidate's tree_digest). The orchestrator wrote the spec from the operator's request of 2026-10-07 11:05Z and the adviser text, pinned it, imported, had two Herdr agents review it (crlint-a/b release yes/yes) and merged (601168fe). Not evidence for any P2 row before its live canary (merge message). Evidence in dogfood/context-rollover/20261007T1442Z/."
+  },
+  {
+   "id": "o255-records",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "e0a8cab61fac942e6be26289e07fe7378b3693f1"
+   ],
+   "why_not_the_product": "The O255 records commit: the five release-strand merges (prompt-threshold, the O254 records, qaw-followup, role-pane-lifecycle with rpl-tests, context-rollover Layer A), the blocked qfu4 and the orchestrator's pre-protocol context rotation, run evidence and attribution for the five accepted runs and the blocked one, the P2-20 hold and the P2-24 correction by addition. Written by the main session (a Sonnet 5.5 drafter under the orchestrator's brief) as the record of work already done; no run could have produced a document about the product's own history. A commit cannot name itself, so its attribution is this entry, written in the next commit (ledger O255)."
+  },
+  {
+   "id": "o255-board",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "559d398fcf834e96fb14d8c772726388ebc68950"
+   ],
+   "why_not_the_product": "The second commit of O255: the derived documents and the board regenerated on the O255 records commit, the attribution entry for that commit, and the ledger's additions (the eighth quota loss read from a committed run state, the rpl candidate counted among the refusals, the board paragraph, the drafting slips). Written by the main session (a Sonnet 5.5 drafter under the orchestrator's brief) as the record of work already done; no run could have produced a document about the product's own history. A commit cannot name itself, so its attribution is this entry, written in the ledger-only commit at the end of the documentation checkpoint (ledger O255)."
+  },
+  {
+   "id": "v030-docs-checkpoint",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "ce1e8135741cf1d292645a91e5e2251c2e8c9e30"
+   ],
+   "why_not_the_product": "The documentation checkpoint of the v0.3.0a1 pre-release, written by a documentation subagent for the main session outside any run and redone on the O255 line: the release notes, the generated changelog section, the README and LIMITATIONS status wording, the second position paper with its figures table and audit, the dated errata of the v0.1.0 paper set, the version and the OPERATIONS section for context rollover, and two tools (tools/docs_numbers.py, tools/changelog_from_release_notes.py) with their tests and one board row. The prose could not go through a product run: it is the account of what the product's runs did and failed to do, and the wording of what a release claims is the operator's and the orchestrating session's decision, not a run's. The two tools and the board row are a different matter -- they could have been specified and run through the product, and were written directly; that is a cost, not a neutral fact. The commit states the integrity gate as met for the replayed paths with the strand's own residual, after the qaw-followup merge ab41589f."
+  },
+  {
+   "id": "v030-docs-checkpoint-records",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": false,
+   "commits": [
+    "75214e3100dde7042523a6d1603e4c994965487c",
+    "a5350f79e637c3cc1d1f92894d361460be7d9434"
+   ],
+   "why_not_the_product": "The generated records of the documentation checkpoint: the claims bindings and the re-derived export manifest (generated by a script from the committed prose), and the readiness board regenerated on that tree. Outside any run by construction: a run cannot write the board that certifies it, nor the claims ledger of the documents about it. Neither commit is development work; the board is provisional until the entries of the next commit exist."
+  },
+  {
+   "id": "o255-release-merge",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "dde12972953302aae531b2013667f8a347e1785d"
+   ],
+   "why_not_the_product": "Merge of the v0.3.0a1 release checkpoint (60144d65: the O255 records and the documentation checkpoint redone on them) into the line, kept as its own merge so that the reviewed commits stay bound, after relrev-a and relrev-b released it yes/yes (0 BLOCKING) and tools/merge_gate.py found MERGE_ELIGIBLE (receipt in the merge message). Ledger O256. The O256 commit that follows is the tip and is attributed in the next one."
+  }
+ ]
 }

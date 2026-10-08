@@ -58,7 +58,8 @@ class Row:
     notes_: list[str] = field(default_factory=list)
 
 
-def _run(*args: str, cwd: Path = HOH, timeout: int = 1800) -> tuple[int, str]:
+def _run(*args: str, cwd: Path = HOH, timeout: int = 1800,
+         stdin: str | None = None) -> tuple[int, str]:
     # The caller's PATH is kept. A reduced one is right for a *check command*
     # -- that is `runner.py`'s job and its reasons -- and wrong here: this
     # tool runs the project's own development tools, and pinning them to
@@ -66,8 +67,11 @@ def _run(*args: str, cwd: Path = HOH, timeout: int = 1800) -> tuple[int, str]:
     # exactly where the CI finds it.
     import os
 
+    # `stdin` exists for the one row whose subject reads a payload rather than
+    # arguments: a PreToolUse hook is handed JSON on standard input, and asking
+    # it anything else would test a different code path than the one that runs.
     p = subprocess.run(args, cwd=str(cwd), capture_output=True, text=True,
-                       timeout=timeout, check=False,
+                       timeout=timeout, check=False, input=stdin,
                        env={**os.environ, "HERDR_ENV": "1",
                             "PYTHONPATH": str(HOH / "src")})
     return p.returncode, (p.stdout + p.stderr).strip()
@@ -111,13 +115,43 @@ def row_claims() -> Row:
     return Row("claims", PASS if rc == 0 else FAIL, last_[:80], command)
 
 
+#: The board's budget for the whole union gate. It must exceed the sum of the
+#: gate's own command budgets (300 + 60 + 600 + 1800 + 600 = 3360 s), or this
+#: budget fires first and the gate never gets to say which command ran out.
+UNION_GATE_TIMEOUT_S = 3600
+
+
 def row_union() -> Row:
     command = "python3 tools/union_gate.py"
-    rc, out = _py("tools/union_gate.py")
-    red = [z for z in out.splitlines() if "FAIL" in z]
-    return Row("union_invariants", PASS if rc == 0 and not red else FAIL,
-                 "U1-U5 pass" if not red else "; ".join(z[:60] for z in red),
-                 command)
+    try:
+        rc, out = _py("tools/union_gate.py", timeout=UNION_GATE_TIMEOUT_S)
+    except subprocess.TimeoutExpired:
+        # One fixed text, no `why_text`: a line that appears on the board only
+        # while the gate times out is re-anchored by _catch_up_ledger and stays
+        # behind as a stale entry after the gate recovers (ugspec-a, finding 3).
+        return Row("union_invariants", NOT_RUN,
+                   f"union_gate.py: TIMEOUT (budget {UNION_GATE_TIMEOUT_S} s)",
+                   command)
+    lines = out.splitlines()
+    # Only an invariant's own status counts. A SKIPPED reason that quotes a
+    # tool's `FAILED`, or a NOT_RUN mentioned mid-line, is not that status.
+    red = [z for z in lines if re.match(r"U[1-5]: FAIL\b", z)]
+    not_run = [z for z in lines if re.match(r"U[1-5]: NOT_RUN\b", z)]
+    if red:
+        state = FAIL
+    elif not_run:
+        state = NOT_RUN
+    elif rc != 0:
+        state = FAIL
+    else:
+        state = PASS
+    if red or not_run:
+        value_ = "; ".join(z[:60] for z in red + not_run)
+    elif rc != 0:
+        value_ = f"union_gate.py exited {rc} with no FAIL or NOT_RUN line"
+    else:
+        value_ = "U1-U5 pass"
+    return Row("union_invariants", state, value_, command)
 
 
 def row_meta() -> Row:
@@ -182,6 +216,775 @@ def row_succession() -> Row:
         "the capsule is not wrong about the past when it drifts -- it is "
         "stale about the present, and a successor reading it would be too")
 
+
+def row_preserve() -> Row:
+    """Is this repository's no-delete policy present *and* deciding anything?
+
+    O213. The rule "preserve, version, archive -- never delete" was enforced for
+    every role in a run and for nobody outside one, which is where it broke: the
+    orchestrator removed a parked duplicate of a run's evidence and the
+    machine-global denylist allowed it, correctly, by its own design rule.
+
+    Two questions, because either one alone is satisfiable without the other. Is
+    the policy complete in this tree (`preserve.py digest` over all three files)?
+    And does the wiring in front of a command actually refuse? The second is
+    asked by handing `preserve_hook.py` the payload shape the harness really
+    sends, once for a path that must be refused and once for cleanup that must
+    stay free -- a row that only checked the file would stay green while the hook
+    was unwired, which is the whole failure mode this replaces.
+    """
+    command = ("python3 tools/preserve.py digest && "
+               "python3 tools/preserve_hook.py  # effective decision")
+    rc, out = _py("tools/preserve.py", "digest")
+    if rc != 0:
+        last = [z for z in out.strip().splitlines() if z.strip()]
+        return Row("preserve", FAIL,
+                   (last[-1].strip()[:90] if last else "policy incomplete"),
+                   command,
+                   "a run cannot claim the no-delete invariant under a policy "
+                   "that is not in its tree")
+
+    protected = json.dumps({"tool_input": {"command":
+                            "rm -rf dogfood/p2-19"}})
+    ordinary = json.dumps({"tool_input": {"command": "rm -rf build"}})
+    blocked, _ = _run(sys.executable, "tools/preserve_hook.py", stdin=protected)
+    allowed, _ = _run(sys.executable, "tools/preserve_hook.py", stdin=ordinary)
+    if blocked != 2:
+        return Row("preserve", FAIL,
+                   f"the hook let a protected path through (exit {blocked})",
+                   command,
+                   "a policy nothing consults is a document, not a guard")
+    if allowed != 0:
+        return Row("preserve", FAIL,
+                   f"the hook blocked ordinary cleanup (exit {allowed})",
+                   command,
+                   "a guard that blocks everything is a guard that gets "
+                   "switched off, taking the cases that matter with it")
+    return Row("preserve", PASS,
+               "policy complete; protected path refused, cleanup free",
+               command,
+               "project- and evidence-owned state must not be destroyable by "
+               "an autonomous run, and the refusal must name the safe operation")
+
+
+def row_self_hosted_topology() -> Row:
+    """Does the O177 guard still refuse the arrangement it exists to refuse?
+
+    A live self-test rather than a configuration read. The question is put to the
+    instrument in the one form always available in a source checkout: this tree,
+    checked against itself. A development worktree belonging to the same
+    repository as the integration tree is exactly the falsified topology, so the
+    only correct answer is a refusal -- and this row is PASS when the check says
+    no.
+
+    Stated that way round on purpose. A row that asserted "the tool runs" would
+    stay green if the comparison inside it were inverted, which is the defect
+    that would matter: it was proposed, in this programme, that runs move back
+    into worktrees of the live repository.
+    """
+    here = str(HOH)
+    command = ("python3 tools/self_hosted_topology.py check --repo . "
+               "--pin $(git rev-parse HEAD) --integration .  # must refuse")
+    _, head = _run("git", "rev-parse", "HEAD")
+    rc, out = _py("tools/self_hosted_topology.py", "check", "--repo", here,
+                  "--pin", head.strip(), "--integration", here)
+    if rc == 0:
+        return Row("self-hosted-topology", FAIL,
+                   "the guard accepted a run in the integration repository",
+                   command,
+                   "O177: a commit in the integration tree moves history under "
+                   "the run, and the witness cannot tell that from the agent")
+    if "O177" not in out:
+        return Row("self-hosted-topology", FAIL,
+                   "refused, but not for the O177 reason: " + out.strip()[:70],
+                   command,
+                   "a refusal for the wrong reason would pass this row while "
+                   "the topology check itself was broken")
+    return Row("self-hosted-topology", PASS,
+               "the same-repository topology is refused, naming O177",
+               command,
+               "isolation is not traded for an attribution category; a "
+               "byte-identical import binds the claim either way")
+
+
+def row_unit_drift() -> Row:
+    """Does the automation installed on this machine match what the repo owns?
+
+    #37. The installed `hoh-fortsetzen.service` called a verb renamed a week
+    earlier and failed on every tick for 18 days; the journal said so and no
+    board did. This row asks `tools/unit_drift.py`, which only reads unit files
+    and `systemctl --user show` -- it never installs, enables or reloads, since
+    switching on an automation is the operator's action, not a check's.
+
+    Not installing any unit passes only in the supervised mode; when an open
+    project registers a driver (unattended mode) the continuation unit must be
+    installed, canonical and healthy (`unit_drift.operating_mode`). An installed `hoh-*` unit that is obsolete, drifted, calls a verb
+    the CLI no longer has, or is failing is blocking: installed automation that
+    silently does nothing is the failure this row exists to make loud.
+    """
+    command = "python3 tools/unit_drift.py --expect auto"
+    rc, out = _py("tools/unit_drift.py", "--expect", "auto", "--json")
+    try:
+        rep = json.loads(out[out.index("{"):])
+    except (ValueError, json.JSONDecodeError):
+        return Row("unit-drift", NOT_RUN, _one_cell(out, 90) or "no output",
+                   command, "a check that produced no report is not a pass")
+    failing = rep.get("failing") or []
+    if rc == 1:
+        codes = sorted({f["code"] for f in failing})
+        units = sorted({f["unit"] for f in failing})
+        return Row("unit-drift", FAIL,
+                   f"{', '.join(codes)} on {', '.join(units)}"[:120], command,
+                   "an installed unit that fails on every tick is automation "
+                   "the operator believes is running; reinstalling it from "
+                   "ops/ is the operator's action, not this check's")
+    if rc == 2:
+        return Row("unit-drift", NOT_RUN,
+                   "systemd user state unreadable for an installed unit",
+                   command, "a unit whose state cannot be read is not healthy")
+    installed = rep.get("installed") or []
+    mode = rep.get("mode", "supervised")
+    return Row("unit-drift", PASS,
+               (f"{mode}: installed units match ops/ and are healthy" if installed
+                else f"{mode}: no hoh-* unit installed, and none is required"),
+               command,
+               "the repository's unit is the canonical one; an installed "
+               "copy is judged against it, never the other way round")
+
+
+DURABILITY_DIR = "dogfood/p2-durability"
+DURABILITY_RECORD = "P2_DURABILITY_ACCEPTANCE.json"
+
+
+def row_durability() -> Row:
+    """Do the P2 exit conditions hold under faults, re-derived from raw evidence?
+
+    `tools/durability_e2e.py` runs governed masters as real processes, kills
+    them from outside, rolls them over, lets them go stale, parks a node on a
+    usage limit and lets a periodic tick continue it. This row does not run
+    that (it takes minutes and real processes); it re-derives the committed
+    acceptance record from the newest preserved evidence and reads it. A
+    record that no longer equals its derivation, a negative control the
+    instrument failed to catch, or an unsatisfied requirement is a FAIL.
+    """
+    base = HOH / DURABILITY_DIR
+    record = base / DURABILITY_RECORD
+    # The evidence the register's probe names, so this row and the capability
+    # matrix judge the same directory (review B2); the newest one only when no
+    # probe names any.
+    named = None
+    try:
+        reg = json.loads((HOH / "program/v3_3/REQUIREMENTS.json").read_text())
+        pairs = {(pr.get("evidence_dir"), pr.get("path"))
+                 for q in reg.get("requirements", [])
+                 for pr in [q.get("probe") or {}]
+                 if pr.get("deriver") == "durability_e2e.py"}
+    except (OSError, ValueError):
+        pairs = set()
+    if len(pairs) > 1:
+        return Row("durability", FAIL,
+                   f"the register's durability probes name {len(pairs)} different records",
+                   "tools/readiness.py row_durability",
+                   "one set of evidence per programme state, or the row and the matrix "
+                   "can disagree")
+    if pairs:
+        evid, path = next(iter(pairs))
+        e, r = (HOH / str(evid)).resolve(), (HOH / str(path)).resolve()
+        if not (e.is_relative_to(HOH.resolve()) and r.is_relative_to(HOH.resolve())):
+            return Row("durability", FAIL, "a durability probe points outside the tree",
+                       "tools/readiness.py row_durability",
+                       "evidence must travel with the tree it is about")
+        named = (e, r)
+    if named is not None:
+        # The register names the evidence: judge exactly that, never a
+        # fallback -- a missing named directory is a failure, not a reason to
+        # look at some other one (review B3, 11).
+        if not named[0].is_dir() or not named[1].is_file():
+            return Row("durability", FAIL,
+                       "the register names durability evidence that is not in the tree",
+                       f"python3 tools/durability_e2e.py derive --evidence {named[0]} ...",
+                       "a probe pointing at nothing proves nothing")
+        record = named[1]
+    runs = ([named[0]] if named is not None else
+            sorted((d for d in base.glob("*") if d.is_dir() and STAMP.match(d.name)),
+                   key=lambda d: _stamp_key(d)) if base.is_dir() else [])
+    command = (f"python3 tools/durability_e2e.py derive --evidence {DURABILITY_DIR}/<newest> "
+               f"--out {DURABILITY_DIR}/{DURABILITY_RECORD} --check")
+    if not runs or not record.is_file():
+        return Row("durability", NOT_RUN, "no preserved durability evidence", command,
+                   "the P2 exit conditions are not shown by a test that did not run")
+    rc, out = _py("tools/durability_e2e.py", "derive", "--evidence", str(runs[-1]),
+                  "--out", str(record), "--check")
+    if rc != 0:
+        return Row("durability", FAIL, "record does not re-derive from its evidence",
+                   command, "a hand-edited or stale record is not evidence")
+    data = json.loads(record.read_text(encoding="utf-8"))
+    stressors = data.get("stressors", {})
+    summary = " ".join(f"{k}={v}" for k, v in sorted(stressors.items()))
+    if data.get("evidence_dirty"):
+        return Row("durability", FAIL, "evidence was taken on a dirty tree", command,
+                   "evidence not bound to a commit binds to nothing")
+    sys.path.insert(0, str(HERE))
+    from durability_e2e import stale_paths  # noqa: PLC0415
+
+    changed = stale_paths(data.get("evidence_head"))
+    if changed is None or changed:
+        return Row("durability", FAIL,
+                   ("evidence commit unknown here" if changed is None else
+                    "stale: changed since the evidence: " + ", ".join(changed[:4]))[:120],
+                   command, "evidence about code that has since changed is about other code")
+    failed = sorted(n for n, s in (data.get("scenarios") or {}).items()
+                    if s.get("status") == "FAIL")
+    if failed:
+        return Row("durability", FAIL, "failed scenarios: " + ", ".join(failed), command,
+                   "a scenario that failed is a finding even where no requirement "
+                   "rests on it alone")
+    if not data.get("instrument_falsifiable"):
+        return Row("durability", FAIL, "a negative control was not caught", command,
+                   "an instrument that passes a known-bad control proves nothing")
+    if not data.get("requirement_satisfied"):
+        return Row("durability", FAIL, summary[:120], command,
+                   "at least one P2 exit condition is not satisfied by the evidence")
+    return Row("durability", PASS, summary[:120], command,
+               "every registered exit condition re-derives from preserved raw evidence; "
+               "a stressor marked NOT_RUN is named, not counted")
+
+
+def _one_line(exc: BaseException, limit: int = 160) -> str:
+    """One bounded line from an exception, for a value that lands in a table cell.
+
+    A pydantic `ValidationError` is multi-line, and `docs/READINESS.md` interpolates
+    a row's value straight into markdown: the unbounded version broke the table,
+    left a row with no closing pipe and three stray lines in the table body, and
+    failed the ledger's own "no claim begins mid-sentence" test.
+    """
+    # O226/F-7: whitespace was collapsed and the pipe was not, and the test that
+    # claimed the cell was safe passed only because that particular error happened to
+    # contain none. A key named `a | b` in a refused record is enough.
+    text = " ".join(str(exc).split()).replace("|", "/")
+    return f"{type(exc).__name__}: {text}"[:limit]
+
+
+def _one_cell(text: str, limit: int = 400) -> str:
+    """One markdown-table-safe cell: no newline, no pipe, bounded.
+
+    Applied to the whole detail and not only to an exception message, because
+    O225/C6 was not really about pydantic -- it was about this row interpolating
+    text it had not bounded into a table that a reader treats as a status board.
+    """
+    return " ".join(str(text).split()).replace("|", "/")[:limit]
+
+
+#: Where a P2 review's preserved artefacts live. The gate finds them here, **by its
+#: own rule**, and never by asking the record where to look. O227/G2 and F-H1: the
+#: previous version resolved `HOH / rec.findings_source`, and the record supplied that
+#: field -- so a record could name a file in `/tmp`, a path outside the repository via
+#: `..` or an absolute path, or (the sharpest form) **itself**, since a record is a
+#: JSON object with a `findings` key. Every binding added across five rounds had been
+#: another field of the document being checked, which is the same defect as reading
+#: `complete` out of it.
+REVIEW_DIR = "dogfood/p2-gate"
+RETURNED_FINDINGS = "findings.json"
+PRESERVED_CAPSULE = "capsule-p2.json"
+
+#: A review directory's name must be a UTC stamp. O228/J4: the rule was "newest by
+#: name" with no shape required, and ASCII puts every lowercase name after every
+#: timestamp -- so `zzzz`, `draft`, `notes` or `staging` won, permanently shadowing a
+#: genuine review, and a *draft* of the next review won the moment it held both files.
+#: The stamp is also what makes "an older directory is history" true rather than
+#: assumed.
+#: Four or six digits after the `T`: this tree uses both (`20260924T0030Z` for review
+#: directories, `...T084449Z` for versioned files), and a pattern that accepted only one
+#: of them rejected the programme's own preserved review -- which would have been a
+#: fourth "gate that can never close", caught here by running it.
+STAMP = re.compile(r"^\d{8}T\d{4}(?:\d{2})?Z$")
+
+
+def _is_inside(candidate: Path, root: Path) -> bool:
+    """A directory of `root` that really is one. (O229/L1)
+
+    `Path.is_dir()` follows symlinks, so `ln -s /tmp/anything dogfood/p2-gate/<stamp>`
+    gave the gate a review that lives outside the repository -- nothing preserved in the
+    tree at all, one symlink in `git status`, and a cell naming a directory that looks
+    like every other review. The whole point of locating the review by the gate's own
+    rule was that *"a record could name a file in /tmp, a path outside the repository via
+    `..`, or an absolute path"*; the record no longer can, and the filesystem could.
+    """
+    try:
+        if candidate.is_symlink() or not candidate.is_dir():
+            return False
+        return candidate.resolve().is_relative_to(root.resolve())
+    except OSError:
+        return False
+
+
+def _review_root(hoh: Path) -> Path | None:
+    """`hoh / REVIEW_DIR` when it resolves inside `hoh`, else None. (T-PSD4)
+
+    `_is_inside` checks each review directory against the review root, so a symlinked
+    `dogfood/p2-gate` (or `dogfood`) leading out of the repository made every directory
+    under it look in-tree, and the gate read a foreign review and its findings. The
+    root is checked against the repository first, as `programme_supervisor` does.
+    Unresolvable is outside.
+    """
+    root = hoh / REVIEW_DIR
+    try:
+        return root if root.resolve().is_relative_to(hoh.resolve()) else None
+    except (OSError, ValueError, RuntimeError):
+        return None
+
+
+def _stamp_key(directory: Path) -> tuple:
+    """Order review directories by time rather than by ASCII. (O229/L8)"""
+    return _stamp_key_of(directory.name)
+
+
+def _stamp_key_of(name: str) -> tuple:
+    head, _, tail = str(name).partition("T")
+    digits = "".join(c for c in tail if c.isdigit())
+    return (head, (digits + "00")[:6])
+
+
+def _canonical_review(hoh: Path) -> tuple[Path | None, list[str]]:
+    """The review the gate will read, chosen by the gate: the newest stamped
+    directory under `REVIEW_DIR` that holds both preserved artefacts.
+
+    Newest, because a review is retaken rather than amended -- so a later stamped
+    directory is a later review, and an older one is history. Nothing the record says
+    influences this choice.
+
+    T-PSD1: two newest directories at the same parsed time (`T1015Z`, `T101500Z`) are
+    ambiguous, and the gate says so instead of letting `iterdir` order pick one -- the
+    rule `drift_baseline_for` applies to the same tie. T-PSD4: a review root that
+    resolves outside the repository holds no review of it.
+    """
+    root = _review_root(hoh)
+    if root is None:
+        return None, [f"{REVIEW_DIR} resolves outside the repository, so no review "
+                      "under it is this tree's"]
+    if not root.is_dir():
+        return None, [f"{REVIEW_DIR} does not exist, so no review has been preserved"]
+    holds_both = [d for d in root.iterdir()
+                  if _is_inside(d, root) and (d / RETURNED_FINDINGS).is_file()
+                  and (d / PRESERVED_CAPSULE).is_file()]
+    stamped = sorted((d for d in holds_both if STAMP.match(d.name)),
+                     key=_stamp_key)
+    if not stamped:
+        unstamped = sorted(d.name for d in holds_both)
+        extra = (f" (ignoring {', '.join(unstamped)}, whose name is not a UTC stamp)"
+                 if unstamped else "")
+        return None, [f"no directory under {REVIEW_DIR} holds both "
+                      f"{RETURNED_FINDINGS} and {PRESERVED_CAPSULE} under a UTC-stamped "
+                      f"name, so there is no preserved review for the gate to read"
+                      + extra]
+    tied = sorted(d.name for d in stamped if _stamp_key(d) == _stamp_key(stamped[-1]))
+    if len(tied) > 1:
+        return None, [f"ambiguous review: {' and '.join(tied)} are the newest under "
+                      f"{REVIEW_DIR} at the same time, so the gate cannot tell which "
+                      "one is current"]
+    return stamped[-1], []
+
+
+def _preserved_reviews(ps) -> list[tuple[str, list]]:
+    """Every preserved review, as `(stamp, findings)`. (O229/L2)
+
+    The previous design asked only the *newest earlier* review what was open, and a
+    reviewer showed that made the finding history one review deep: any single review that
+    honestly returned `[]` erased every earlier finding from every later brief,
+    permanently -- no adversary required. It also used a *different* predicate here than
+    `_canonical_review` used, requiring only `findings.json`, so a directory holding
+    nothing but an empty findings file was invisible as a review and decisive as history.
+
+    One predicate now, over every stamped in-tree review, and the accumulation in
+    `ps.resolution_state` is order-independent: an added directory can raise or resolve,
+    and cannot forget.
+    """
+    root = _review_root(HOH)
+    if root is None or not root.is_dir():
+        return []
+    out: list[tuple[str, list]] = []
+    for d in sorted((d for d in root.iterdir()
+                     if _is_inside(d, root) and STAMP.match(d.name)
+                     and (d / RETURNED_FINDINGS).is_file()),
+                    key=_stamp_key):
+        try:
+            raw = json.loads((d / RETURNED_FINDINGS).read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        returned = raw.get("findings", []) if isinstance(raw, dict) else raw
+        out.append((d.name, [f for f in returned if isinstance(f, dict)]))
+    return out
+
+
+def _canonical_brief(ps, *, register, matrix, snapshot=None, previous=None, before=None):
+    """The one brief this gate accepts, from the tool that the CLI also calls.
+
+    O229/L7 and M2: this used to be a private helper here while `main()` built something
+    else, so the artefact the gate demanded could not be produced by any command -- the
+    fourth gate that could never close, and the one that made an honest review
+    unpreservable. `programme_supervisor.canonical_brief` is now the single derivation and
+    `--canonical-brief` prints it, so the gate and the operator call the same code.
+
+    `snapshot` and `previous` are accepted and ignored; they were parameters of the
+    carry-forward design that O229/L2 retired, and the signature is kept so a caller that
+    still passes them is not broken silently.
+
+    `before` is the stamp of the review under check: the brief's drift baseline is the
+    most recent preserved review strictly before it, so a review is never its own
+    baseline. `None` means before now, which is what the operator's CLI builds.
+
+    `repo` is this gate's own `HOH` (patched in tests), passed rather than derived, so
+    the brief digests the tree the gate inspects.
+    """
+    return ps.canonical_brief(register=register, matrix=matrix, phase="P2",
+                              review_root=HOH / REVIEW_DIR, before=before, repo=HOH)
+
+
+def _capsule_binding_problems(rec, ps, *, register, matrix, snapshot) -> list[str]:
+    """Is the record bound to the brief a supervisor was actually given? (O227/G10)
+
+    The previous version rebuilt the capsule from the *live* state and compared the
+    record's `capsule_digest` against that. It always agreed, for a reason that took
+    five rounds to see: the record had been re-recorded, and re-recording stamps the
+    live digest. So the check proved that the record was recent, which is a fact about
+    the recorder, and reported it as a fact about what was reviewed.
+
+    Measured on this tree: the preserved `capsule-p2.json` digests to `dcb933de...`;
+    every version of the record from v8 on claims `47b6671f...`, which is exactly what
+    a rebuild produces now. **The record was bound to a brief no supervisor ever saw.**
+
+    So the capsule digest is now compared against the *preserved file*, and staleness
+    is a separate question answered by comparing that file against a rebuild. Two
+    distinct facts that the single check had been conflating:
+
+    * *is this record about the preserved brief?* -- provenance;
+    * *is the preserved brief still about this board?* -- currency.
+    """
+    directory, problems = _canonical_review(HOH)
+    if problems:
+        return problems
+    path = directory / PRESERVED_CAPSULE
+    shown = f"{REVIEW_DIR}/{directory.name}/{PRESERVED_CAPSULE}"
+    try:
+        preserved = ps.ProgrammeCapsule.model_validate(
+            json.loads(path.read_text(encoding="utf-8")))
+    except Exception as exc:  # noqa: BLE001 - an unreadable brief is a failed binding
+        return [f"{shown} cannot be read as a capsule: {_one_line(exc)}"]
+
+    # O228/J1, J2, J8 and S1, which are four spellings of one mistake: the previous
+    # version *read* the brief's coverage (`selection.left_out`), and never read its
+    # phase at all. Both are fields the brief supplies, and `Selection`'s only validator
+    # checks its own arithmetic -- so a one-item brief that says `considered=1,
+    # included=1, left_out=0` was accepted as a whole-phase brief, and a brief for *P1*
+    # closed P2. That is the defect O227 claims to have retired, one layer out: trust
+    # moved from the decisions onto the brief, and the brief is written by the same party.
+    #
+    # So the gate does not ask the brief what it covers. **It derives the brief it
+    # would accept** and compares digests. There is exactly one canonical brief for a
+    # given board, and everything the previous version read off the document -- phase,
+    # coverage, limits, the seal it was cut from -- is fixed by the derivation instead:
+    #
+    #   * a brief for another phase digests differently;
+    #   * a narrow brief digests differently, whatever its selection claims;
+    #   * a brief cut from an older board digests differently, which is currency;
+    #   * `--max-evidence 1` (O228/J8, zero summaries under an honest `left_out == 0`)
+    #     digests differently;
+    #   * and a phase larger than the CLI's default `--max-items 50` cannot produce a
+    #     brief the gate refuses for leaving items out, because the derivation sizes
+    #     itself to the phase (O228/S1 -- eighteen items of headroom on P2 today, and a
+    #     fourth "gate that can never close" waiting at fifty-one).
+    try:
+        canonical = _canonical_brief(ps, register=register, matrix=matrix,
+                                     before=directory.name)
+    except Exception as exc:  # noqa: BLE001 - an underivable brief is not a pass
+        return [*problems, f"the canonical P2 brief could not be derived: "
+                f"{_one_line(exc)}"]
+    canonical_digest = ps.capsule_digest(canonical)
+    preserved_digest = ps.capsule_digest(preserved)
+    if preserved_digest != canonical_digest:
+        problems.append(
+            f"{shown} is not the brief this gate would put to a supervisor for P2 on "
+            f"this board (preserved {preserved_digest[:12]}..., canonical "
+            f"{canonical_digest[:12]}...): either it is about another phase or another "
+            "board, or it does not cover the phase")
+    if rec.capsule_digest != preserved_digest:
+        problems.append(
+            f"the record's capsule digest is not the digest of {shown}: the review is "
+            "not bound to the brief that was preserved for it")
+    return problems
+
+
+def _findings_binding_problems(rec, ps) -> list[str]:
+    """Is the record about the findings a supervisor actually returned? (O226/E2)
+
+    The record used to bind itself to the supervisor's *input* -- the capsule -- and to
+    nothing on the way out, so the findings were editable after the fact: handing
+    `--findings` the real fourteen with the nine blocking ones deleted produced
+    `complete (5 findings)`, under the genuine review's own id, and the board passed it.
+
+    So the record now names the file it was given and a digest over the set as
+    returned, and this re-reads that file and re-digests it. A forgery now has to alter
+    two separately preserved artefacts consistently, and any mismatch is named here.
+
+    What this does **not** establish, said plainly because the sentence matters more
+    than the check: that the findings came from an independent supervisor at all. That
+    is a property of the dispatch, not of any file, and no amount of digesting can
+    recover it. A review of P2 that genuinely found nothing is indistinguishable at
+    this layer from `echo '[]' > findings.json`, and the only thing standing between
+    them is that the second one has to be written by someone willing to write it.
+    """
+    directory, problems = _canonical_review(HOH)
+    if problems:
+        return problems
+    if not rec.findings_digest:
+        return ["the record carries no findings digest, so nothing binds it to what "
+                "the supervisor returned (O226/E2)"]
+    # The record's own `findings_source` is still compared -- a record that claims to
+    # be about some other file is worth reporting -- but it is never *followed*.
+    claimed = str(rec.findings_source or "")
+    canonical = f"{REVIEW_DIR}/{directory.name}/{RETURNED_FINDINGS}"
+    if claimed and claimed != canonical:
+        problems.append(f"the record names {claimed} as its findings source; the gate "
+                        f"reads {canonical}, which is the newest preserved review")
+    source = directory / RETURNED_FINDINGS
+    try:
+        raw = json.loads(source.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        return [*problems, f"{canonical} cannot be read: {_one_line(exc)}"]
+    returned = raw.get("findings", []) if isinstance(raw, dict) else raw
+    if not isinstance(returned, list) or any(
+            not isinstance(f, dict) for f in returned):
+        return [*problems, f"{canonical} does not hold a list of finding objects, so "
+                "the gate cannot tell what was returned (O227/G1)"]
+    try:
+        if ps.findings_digest(returned) != rec.findings_digest:
+            return [*problems, f"the findings in {canonical} no longer digest to what "
+                    "the record was written from: one of the two has been edited"]
+    except TypeError as exc:
+        return [*problems, f"{canonical} cannot be digested: {_one_line(exc)}"]
+    # Every finding that came back has to be *accounted for* -- recorded as a finding
+    # or named as a validation failure. This is the half that closes O226/E1 rather
+    # than merely making it harder: emptying `validation_failures` by hand leaves the
+    # record with no findings to re-validate, so re-validation alone catches nothing,
+    # and the row read `complete: true` off a record that had silently dropped a
+    # finding the product had refused. The digest proves the returned set is intact;
+    # this proves the record says something about all of it.
+    accounted = ({f.finding_id for f in rec.findings}
+                 | {f.finding_id for f in rec.validation_failures})
+    came_back = {str(f.get("finding_id") or "").strip()
+                 for f in returned if isinstance(f, dict)}
+    unaccounted = sorted(came_back - accounted)
+    if unaccounted:
+        return ["the record accounts for neither a finding nor a validation failure "
+                f"named {', '.join(unaccounted)}, although the supervisor returned "
+                "them: a dropped finding is not a decided one"]
+    invented = sorted(accounted - came_back)
+    if invented:
+        return [*problems, f"the record names finding(s) the supervisor did not return: "
+                f"{', '.join(invented)}"]
+    # O228/J6: `problems` may already hold the source-mismatch report, and the previous
+    # version returned a bare `[]` here -- so a record naming any file at all was
+    # reported as "current, about P2" in exactly the case a reader would want to know.
+    # "Reported but never followed" was half true: never followed, and never reported.
+    return problems
+
+
+def row_programme_supervisor() -> Row:
+    """Is the P2 gate's independent review present, about P2, honest and *current*?
+
+    The gate closes on three things and `row_programme_checklist` answers two. This
+    answers the third, and there are four ways to fail it, three of which a reviewer
+    demonstrated against the first version of this row:
+
+    1. **No review.** NOT_RUN, which is honest and is not a pass: O220's review found
+       fourteen findings and the first thing it established is that a missing review
+       is not a satisfied condition.
+    2. **A forged record.** The first version read `complete` and `blocking_findings`
+       straight out of the file body. `programme_supervisor.load_record` exists to
+       recompute exactly those fields and refuse a stored value that disagrees -- and
+       this row imported the module containing that guard and then read the raw bytes
+       anyway. A reviewer set `"complete": true` by hand: the loader refused the file
+       and the board printed PASS on it. The row now asks the loader, and a record the
+       product refuses is a FAIL naming the refusal.
+    3. **A review of some other phase.** The row checked currency and nothing else, so
+       `--phase P1 --findings empty.json` written to this path closed P2's condition
+       with a review that had looked at no P2 item at all. The record carries its
+       phase and its capsule digest; both are now checked, the capsule against one
+       rebuilt from the live register and matrix, so the review must be about *this*
+       phase and *this* state.
+    4. **A stale review.** A review performed against an earlier snapshot seal or
+       matrix digest is a review of a different programme; `stale_against` answers it.
+    """
+    record = HOH / "dogfood/p2-gate/REVIEW.json"
+    command = ("python3 tools/programme_supervisor.py --phase P2 --findings PATH "
+               "--decisions PATH --out dogfood/p2-gate/REVIEW.json")
+    why = ("the P2 gate needs a *current, honest* independent supervisor review of "
+           "*P2*: every finding other than a severity-consistent NO_ACTION holds the "
+           "phase open and no decision settles one (O229/G), a record whose stored "
+           "verdict disagrees with its own findings is not evidence, and the brief the "
+           "review was performed on must be the one this gate derives for this board")
+    if not record.is_file():
+        return Row("programme_supervisor", NOT_RUN,
+                   "no review record; the gate's third condition is unanswered",
+                   command,
+                   "a missing independent review is not a satisfied condition, "
+                   "which is what O220 established on its first run")
+    register_path = HOH / "program/v3_3/REQUIREMENTS.json"
+    matrix_path = HOH / "program/v3_3/VERIHARNESS_CAPABILITY_MATRIX.json"
+    if not register_path.is_file() or not matrix_path.is_file():
+        # An unevaluable row is NOT_RUN, as this file's own header says. The first
+        # version reported FAIL here, which reads as "the review is bad" when what
+        # happened is that the question could not be asked.
+        return Row("programme_supervisor", NOT_RUN,
+                   "the register or the capability matrix is not in this tree, so "
+                   "currency cannot be established", command, why)
+    try:
+        body = json.loads(record.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        return Row("programme_supervisor", FAIL, f"unreadable: {_one_line(exc)}",
+                   command, "a review nobody can read cannot be current")
+
+    try:
+        import importlib.util as _il
+        # From this file's own directory, not from `HOH`: `programme_supervisor` is
+        # a sibling gate in this checkout, while `HOH` is the tree being inspected.
+        # Conflating them meant the row could not be exercised against a constructed
+        # tree at all, which is why it had no test.
+        _spec = _il.spec_from_file_location(
+            "programme_supervisor",
+            Path(__file__).resolve().parent / "programme_supervisor.py")
+        _ps = _il.module_from_spec(_spec)
+        sys.modules["programme_supervisor"] = _ps
+        _spec.loader.exec_module(_ps)
+    except Exception as exc:  # noqa: BLE001 - an unanswerable question is not a pass
+        return Row("programme_supervisor", NOT_RUN,
+                   f"the review tool could not be loaded: {_one_line(exc)}",
+                   command, why)
+
+    # The state the review claims to be about has to be built before the record can be
+    # checked against it -- O226/E1: `validation_failures` is an input to `complete`
+    # and is the one input a record can *carry* rather than earn, so a hand-emptied
+    # array loaded clean and published PASS. `load_record` can only recompute it with a
+    # snapshot, and this is where the snapshot comes from.
+    try:
+        register = json.loads(register_path.read_text(encoding="utf-8"))
+        matrix = json.loads(matrix_path.read_text(encoding="utf-8"))
+        snapshot, _ev, _items = _ps.reconciled(register, matrix)
+    except Exception as exc:  # noqa: BLE001 - an unanswerable question is not a pass
+        return Row("programme_supervisor", NOT_RUN,
+                   f"the programme's state could not be derived: {_one_line(exc)}",
+                   command, why)
+
+    # The honesty half. `load_record` recomputes every member of `COMPUTED_FIELDS`,
+    # refuses a stored value that disagrees, and -- with the snapshot -- puts the
+    # findings back through `supervisor.validate`, so a record cannot carry a finding
+    # about an item the snapshot it names does not contain.
+    try:
+        rec = _ps.load_record(body, snapshot=snapshot)
+    except Exception as exc:  # noqa: BLE001 - a refused record is a failed condition
+        return Row("programme_supervisor", FAIL,
+                   f"the review tool refuses its own record: {_one_line(exc)}",
+                   command, why)
+
+    # The identity half: which phase, against which capsule, and over which findings.
+    problems: list[str] = []
+    causes: list[str] = []
+    if rec.phase != "P2":
+        problems.append(f"the record reviews phase {rec.phase}, not P2")
+    problems += _findings_binding_problems(rec, _ps)
+
+    # O229/L2 and L4. The phase is held by what the preserved reviews *accumulate*, not by
+    # what the newest record says. A finding is raised by the review that returns it and
+    # is resolved only by a later review that looks again and finds nothing there -- so
+    # relabelling a finding in the review that raised it changes nothing, and adding a
+    # directory can raise or resolve but never forget. Both were bypasses: fourteen
+    # findings relabelled `NO_ACTION/low` published `0 blocking, complete` with their
+    # critical reasons still on disk, and a shim holding an empty findings file erased the
+    # history from every later brief.
+    still_open, resolved = _ps.resolution_state(_preserved_reviews(_ps))
+    if still_open:
+        problems.append(
+            f"{len(still_open)} finding(s) raised by a preserved review and resolved by "
+            f"none: {', '.join(sorted(still_open)[:6])}"
+            + (" ..." if len(still_open) > 6 else ""))
+    # O229/L4, and this is a disclosure rather than a defence, said plainly because the
+    # difference matters. A finding is settled by a later review that looks again and finds
+    # nothing there -- and at this layer "a later review found nothing" is indistinguishable
+    # from "someone wrote a file saying a later review found nothing". Every round of this
+    # sequence has rediscovered that, and it is not closable by any check over files:
+    # independence is a property of the dispatch.
+    #
+    # What *is* closable is doing it quietly. A mass resolution used to leave the board
+    # reading `0 blocking, complete` with the original critical reasons still on disk in
+    # the earlier review. The count is now on the face of the cell, on every outcome, so a
+    # reader sees that findings were resolved rather than never raised.
+    if resolved:
+        causes.append(f"{len(resolved)} previously-raised finding(s) resolved by a later "
+                      f"review: {', '.join(resolved[:6])}"
+                      + (" ..." if len(resolved) > 6 else ""))
+
+    # The currency half, and the second version of it. The first compared the matrix
+    # *file bytes* against `REVIEW.json`'s `matrix_digest`, which
+    # `programme_supervisor.matrix_digest()` computes over canonical JSON -- two
+    # different functions of two different inputs, which a reviewer showed can never
+    # agree for any matrix. It now asks the tool that already answers this question.
+    try:
+        problems += _ps.stale_against(rec, snapshot=snapshot,
+                                      matrix_digest=_ps.matrix_digest(matrix))
+        problems += _capsule_binding_problems(rec, _ps, register=register,
+                                              matrix=matrix, snapshot=snapshot)
+    except Exception as exc:  # noqa: BLE001 - an unanswerable question is not a pass
+        problems.append(f"currency could not be established: {_one_line(exc)}")
+
+    # O226/E7. The verdict was readable and the reason was not: a record every one of
+    # whose findings the product refused printed "0 finding(s), 0 undecided,
+    # INCOMPLETE" -- the right answer, with its cause missing -- and a finding held
+    # open by a thin rejection printed as though nobody had decided it. Both now say
+    # so, in the cell that C6 was about.
+    if rec.validation_failures:
+        causes.append(f"{len(rec.validation_failures)} finding(s) refused by validate: "
+                      + ", ".join(f.finding_id for f in rec.validation_failures))
+    if rec.thin_rejections:
+        causes.append("rejection below the bar for a phase-level finding: "
+                      + ", ".join(rec.thin_rejections))
+    if rec.applied_without_evidence:
+        causes.append("applied with no evidence reference: "
+                      + ", ".join(rec.applied_without_evidence))
+    # O228/K3: this said "undecided", which `blocking_findings` has not meant since
+    # O229/G -- it counts every finding that is not a finding of nothing, decided or
+    # not. A record with every finding applied and evidenced printed "1 undecided", and
+    # the wrong word went into `docs/READINESS.md` and `CLAIMS.md`.
+    #
+    # O228/J4: the cell now names the review the gate read, on every outcome. It used to
+    # name it only in failure messages, so four different directories -- including
+    # `zzzz` and a draft -- produced byte-identical PASS cells.
+    # O228/J5, and it is a composition gap rather than a forgery. Deleting 31 of the 32
+    # P2 requirements from the register produces an *honest* whole-phase brief over one
+    # item, an honest empty review of it, and -- before this -- a PASS. No hand-editing.
+    # The row that would notice is `row_program_scope`, which checks the register against
+    # the pinned plan and is NOT_RUN on this machine because the plan is not reachable.
+    # So the gate was resting on a register nothing vouched for, and the honest thing is
+    # to say so in the cell rather than to inherit the silence.
+    scope = row_program_scope()
+    if scope.state != PASS:
+        problems.append(
+            f"the register this brief was cut from is not vouched for: program_scope is "
+            f"{scope.state}, so the phase could hold fewer items than the plan requires")
+
+    reviewed = _canonical_review(HOH)[0]
+    # O229/L9: this published `problems[0]` and computed four. The unvouched register and
+    # the brief mismatch were dropped on the *failure* path -- the same shape as O228/J6's
+    # finding about the success path, reintroduced one level up in the entry that repaired
+    # J6. Every reason is published now; `_one_cell` bounds the result.
+    detail = (f"review {reviewed.name if reviewed else 'none'}: {len(rec.findings)} "
+              f"finding(s), {len(rec.blocking_findings)} blocking, "
+              f"{'complete' if rec.complete else 'INCOMPLETE'}"
+              + "".join(f"; {c}" for c in causes)
+              + ("".join(f"; {p}" for p in problems) if problems
+                 else "; current, about P2"))
+    good = rec.complete and not rec.blocking_findings and not problems
+    return Row("programme_supervisor", PASS if good else FAIL, _one_cell(detail),
+               command, why)
 
 def row_identifiers() -> Row:
     """Is the published code still readable to the people it is published to?
@@ -454,12 +1257,16 @@ def row_acceptance() -> Row:
     except (OSError, ValueError) as exc:
         return Row("acceptance", NOT_RUN, f"no readable register: {exc}", command,
                    "an acceptance is judged against the register")
-    probes = [(r["id"], r["probe"]) for r in register.get("requirements") or []
-              if (r.get("probe") or {}).get("kind") == "evidence"]
+    entries = [r for r in register.get("requirements") or []
+               if (r.get("probe") or {}).get("kind") == "evidence"]
+    probes = [(r["id"], r["probe"]) for r in entries]
     if not probes:
         return Row("acceptance", NOT_RUN, "no evidence-probed requirement in the register",
                    command, "nothing to judge")
-    results = {rid: cm.evidence_status(probe) for rid, probe in probes}
+    # Each probe is judged with the register entry that carries it, as the
+    # matrix's `classify` does: without it a P2-33 line keyed `P2-35` read
+    # PROVEN here while the matrix said NOT_DETERMINABLE (pkeybind review).
+    results = {r["id"]: cm.evidence_status(r["probe"], requirement=r) for r in entries}
     # Blocking only for evidence that is broken: a record that no longer
     # re-derives from its run, or one that cannot be read. A requirement that
     # is honestly not proven yet -- no record, or a record that re-derives and
@@ -502,6 +1309,32 @@ def row_acceptance() -> Row:
     return Row("acceptance", FAIL,
                "not yet proven: " + ", ".join(f"{rid} {st}" for rid, st in unproven.items()),
                command, why, advisory=True)
+
+
+def row_programme_checklist() -> Row:
+    """Do this programme's own phase gates come out of the product's reconciler?
+
+    P2-28's binding, and the answer to a question this project kept asking
+    itself: a component with tests is not a capability. `hoh.checklist` decides
+    nothing unless something consults it, so this row runs the binding that
+    makes the programme's own gates its verdict -- and an unsound checklist
+    makes the row red rather than producing a verdict nobody should trust.
+    """
+    command = "python3 tools/programme_checklist.py"
+    tool = HERE / "programme_checklist.py"
+    if not tool.is_file():
+        return Row("programme_checklist", NOT_RUN, "no binding in this tree", command,
+                   "a reconciler nothing consults is a component, not a capability")
+    rc, out = _py("tools/programme_checklist.py")
+    last = (out.strip().splitlines() or [""])[0][:110]
+    if rc == 3:
+        return Row("programme_checklist", NOT_RUN,
+                   "the register or the matrix is not in this tree", command,
+                   "the programme's checklist is derived from them")
+    return Row("programme_checklist", PASS if rc == 0 else FAIL, last or f"exit {rc}",
+               command,
+               "the gates this programme runs on are decided by hoh.checklist, so a "
+               "structurally unsound checklist stops the verdict instead of colouring it")
 
 
 def row_export_sync() -> Row:
@@ -1105,6 +1938,40 @@ def row_audit() -> Row:
         advisory=red == ["coverage"])
 
 
+def row_docs_consistency() -> Row:
+    """Do the published figures still come from the tools that derive them,
+    and is the changelog still generated from the release notes?
+
+    `paper/NUMBERS_V2.md` is rendered by `tools/docs_numbers.py` from the
+    repository's own tools and checked against the ledger entries its
+    historical rows rely on; the changelog section of the newest release is
+    generated from `RELEASE_NOTES.md` by `tools/changelog_from_release_notes.py`.
+    A table that is typed rather than derived, and a second hand-kept copy of
+    the release notes, are the two ways a published number drifts away from
+    what produced it. The row that reads this board (V13) is left out of the
+    check run here: a check the board runs must not depend on the board's own
+    verdict, or the verdict could not settle.
+
+    Without the git history or the ledger (an export) the first check cannot
+    answer, and the row is `NOT_RUN`, never a pass.
+    """
+    command = ("python3 tools/docs_numbers.py check --skip V13 && "
+               "python3 tools/changelog_from_release_notes.py check")
+    rc1, out1 = _py("tools/docs_numbers.py", "check", "--skip", "V13",
+                    timeout=900)
+    rc2, out2 = _py("tools/changelog_from_release_notes.py", "check")
+    if rc1 == 3:
+        return Row("docs_consistency", NOT_RUN,
+                   "needs the git history and the ledger", command,
+                   "the figure table is derived from the history and checked "
+                   "against ledger entries an export does not carry")
+    if rc1 == 0 and rc2 == 0:
+        return Row("docs_consistency", PASS,
+                   "figures re-derived; changelog generated", command)
+    worst = (out1 if rc1 != 0 else out2).splitlines() or ["?"]
+    return Row("docs_consistency", FAIL, worst[0][:70], command)
+
+
 #: Published files that every boundary closure rewrites, and that therefore
 #: cannot be part of what a CI result is asked to bind.
 #:
@@ -1303,17 +2170,24 @@ def row_list(quick: bool) -> list[Row]:
         row_export_sync(),
         row_succession(),
         row_identifiers(),
+        row_preserve(),
+        row_self_hosted_topology(),
+        row_unit_drift(),
+        row_durability(),
         row_preflight(),
         row_parallelism(),
         row_program_scope(),
         row_capability_matrix(),
         row_build_plan(),
         row_acceptance(),
+        row_programme_checklist(),
+        row_programme_supervisor(),
         row_baseline_docs(),
         row_install(quick),
         row_attribution(),
         row_evidence_index(),
         row_audit(),
+        row_docs_consistency(),
         row_ci(),
         row_routing(),
     ]

@@ -5,42 +5,49 @@ command that produced it, and the verdict is the conjunction of the
 rows rather than a judgement typed above them. A row this tool cannot
 evaluate is `NOT_RUN`, which is never a pass.
 
-Measured at `fbb2e43` on 2026-09-23.
+Measured at `75214e31` on 2026-10-07.
 
     TECHNICALLY_STABLE_READY = no
 
-Open, and each one blocking: tests, union_invariants, succession, external_ci.
+Open, and each one blocking: tests, lint, union_invariants, benchmark_v3_preregistration, benchmark_v3, export_sync, succession, identifiers, unit-drift, durability, program_scope, acceptance, programme_checklist, programme_supervisor, attribution, external_ci.
 
 | condition | state | measured | command |
 |---|---|---|---|
-| `tests` | FAIL | 1603 passed, 6 failed | `python3 -m pytest -q` |
-| `lint` | PASS | clean | `ruff check --select F,E9 src tests tools` |
+| `tests` | FAIL | 4980 passed, 5 failed | `python3 -m pytest -q` |
+| `lint` | FAIL | Found 15 errors. | `ruff check --select F,E9 src tests tools` |
 | `claims` | PASS | OK: all checks passed | `python3 tools/check_claims.py check all` |
-| `union_invariants` | FAIL | U5: FAIL: pytest: [31m[31m[1m1 failed[0m, [32m1608 pass | `python3 tools/union_gate.py` |
+| `union_invariants` | FAIL | U5: FAIL: pytest: 5 failed, 4980 passed, 6 skipped, 2 errors | `python3 tools/union_gate.py` |
 | `meta_evidence` | PASS | 5 metric(s) VERIFIED, closure GREEN | `python3 tools/meta_evidence.py --falsify` |
 | `planner_capability_boundary` | PASS | VERIFIED on run cfnfib8a, witness armed for 2 of 2 planner dispatch(es) | `read dogfood/planner-confinement/SUMMARY.json` |
 | `budget_enforcement` | PASS | VERIFIED; ceilings [9, 8, 4], product refused a dispatch at [8, 4]; 2 falsifier(s) all detected | `python3 tools/budget_evidence.py --out dogfood/budget-enforcement/BUDGET_EVIDENCE.json` |
 | `post_o143_closure` | PASS | VERIFIED; halt CLOSED; 18 of 18 declared dispatches (primary 9, repair 9); 1 repair node(s); 0 human decision(s) | `python3 tools/closure_e2e.py` |
 | `telemetry_on_real_dispatches` | PASS | 2 audit(s): fully validated on benchmark-v3-telemetry; no field gaps | `python3 tools/telemetry_audit.py --run-root PATH --run-id ID --out dogfood/<tree>/TELEMETRY_AUDIT.json` |
-| `benchmark_v3_preregistration` | PASS | DRIFTED, 51 file(s) frozen at d22fc1536f43 -- moved after the campaign, accounted for: pyproject.toml, src/hoh/amendment.py, src/hoh/approval.py, src/hoh/assurance.py | `python3 tools/prereg.py check --campaign v3` |
+| `benchmark_v3_preregistration` | FAIL | DRIFTED, 51 file(s) frozen at d22fc1536f43 -- moved: pyproject.toml, src/hoh/amendment.py, src/hoh/approval.py, src/hoh/assurance.py; src/hoh/archive_bundle.py drifted and is not named in the artifact; src/hoh/archive_target.py drifted and is not named in the artifact; src/hoh/capsule.py drifted and is not named in the artifact; src/hoh/durable_io.py drifted and is not named in the artifact; src/hoh/epoch.py drifted and is not named in the artifact; src/hoh/evidenceclaim.py drifted and is not named in the artifact; src/hoh/goalbook.py drifted and is not named in the artifact; src/hoh/legacy_scratch.py drifted and is not named in the artifact; src/hoh/migrations.py drifted and is not named in the artifact; src/hoh/pane_ledger.py drifted and is not named in the artifact; src/hoh/procs.py drifted and is not named in the artifact; src/hoh/programlogic.py drifted and is not named in the artifact; src/hoh/proofclass.py drifted and is not named in the artifact; src/hoh/rehydration.py drifted and is not named in the artifact; src/hoh/resumeloop.py drifted and is not named in the artifact; src/hoh/resumption.py drifted and is not named in the artifact; src/hoh/rollover.py drifted and is not named in the artifact; src/hoh/rotation.py drifted and is not named in the artifact; src/hoh/stages.py drifted and is not named in the artifact; src/hoh/storage_coordinator.py drifted and is not named in the artifact; src/hoh/storage_ephemeral.py drifted and is not named in the artifact; src/hoh/storage_host.py drifted and is not named in the artifact; src/hoh/storage_park.py drifted and is not named in the artifact; src/hoh/storage_pressure.py drifted and is not named in the artifact; src/hoh/storage_registry.py drifted and is not named in the artifact; src/hoh/storage_steward.py drifted and is not named in the artifact; src/hoh/storage_tiers.py drifted and is not named in the artifact; src/hoh/succession.py drifted and is not named in the artifact; src/hoh/succession_capsule.py drifted and is not named in the artifact; src/hoh/taskstate.py drifted and is not named in the artifact; src/hoh/verified_relocation.py drifted and is not named in the artifact; src/hoh/workspace.py drifted and is not named in the artifact | `python3 tools/prereg.py check --campaign v3` |
 | `benchmark_v2_historical` | FAIL (advisory) | HISTORICAL_COMPLETE; matched_budget_valid = NO; budget_rule violated: 2 cell(s) ran past the dispatch budget without being stopped | `python3 tools/repetition_plan.py --campaign v2` |
-| `benchmark_v3` | PASS | 15 of 15 cells; COMPLETE; matched_budget_valid = YES; freeze DRIFTED (post-campaign repair, accounted for) | `python3 tools/prereg.py check --campaign v3 && python3 tools/repetition_plan.py --campaign v3` |
+| `benchmark_v3` | FAIL | 15 of 15 cells; COMPLETE; matched_budget_valid = YES; freeze DRIFTED -- the instrument freeze is DRIFTED and the drift is not accounted for: src/hoh/archive_bundle.py drifted and is not named in the artifact; src/hoh/archive_target.py drifted and is not named in the artifact; src/hoh/capsule.py drifted and is not named in the artifact; src/hoh/durable_io.py drifted and is not named in the artifact; src/hoh/epoch.py drifted and is not named in the artifact; src/hoh/evidenceclaim.py drifted and is not named in the artifact; src/hoh/goalbook.py drifted and is not named in the artifact; src/hoh/legacy_scratch.py drifted and is not named in the artifact; src/hoh/migrations.py drifted and is not named in the artifact; src/hoh/pane_ledger.py drifted and is not named in the artifact; src/hoh/procs.py drifted and is not named in the artifact; src/hoh/programlogic.py drifted and is not named in the artifact; src/hoh/proofclass.py drifted and is not named in the artifact; src/hoh/rehydration.py drifted and is not named in the artifact; src/hoh/resumeloop.py drifted and is not named in the artifact; src/hoh/resumption.py drifted and is not named in the artifact; src/hoh/rollover.py drifted and is not named in the artifact; src/hoh/rotation.py drifted and is not named in the artifact; src/hoh/stages.py drifted and is not named in the artifact; src/hoh/storage_coordinator.py drifted and is not named in the artifact; src/hoh/storage_ephemeral.py drifted and is not named in the artifact; src/hoh/storage_host.py drifted and is not named in the artifact; src/hoh/storage_park.py drifted and is not named in the artifact; src/hoh/storage_pressure.py drifted and is not named in the artifact; src/hoh/storage_registry.py drifted and is not named in the artifact; src/hoh/storage_steward.py drifted and is not named in the artifact; src/hoh/storage_tiers.py drifted and is not named in the artifact; src/hoh/succession.py drifted and is not named in the artifact; src/hoh/succession_capsule.py drifted and is not named in the artifact; src/hoh/taskstate.py drifted and is not named in the artifact; src/hoh/verified_relocation.py drifted and is not named in the artifact; src/hoh/workspace.py drifted and is not named in the artifact | `python3 tools/prereg.py check --campaign v3 && python3 tools/repetition_plan.py --campaign v3` |
 | `export_manifest` | PASS | no leaks, 0 unacknowledged dangling reference(s), 12 acknowledged, 0 other problem(s) | `python3 tools/export_manifest.py check` |
-| `export_sync` | PASS | clean; 6 ours to write | `python3 tools/export_sync.py status` |
-| `succession` | FAIL | DRIFTED: 1 field(s) no longer describe this tree: board | `python3 tools/succession.py verify` |
-| `identifiers` | PASS | 0 file(s) still carry German identifiers | `python3 tools/identifiers.py check src tools tests` |
+| `export_sync` | NOT_RUN | STOP -- no export checkout. Set VERIHARNESS_EXPORT_CHECKOUT to the checkout that carries t | `python3 tools/export_sync.py status` |
+| `succession` | FAIL | DRIFTED: 2 field(s) no longer describe this tree: internal_commit, board | `python3 tools/succession.py verify` |
+| `identifiers` | FAIL | 4 file(s) still carry German identifiers | `python3 tools/identifiers.py check src tools tests` |
+| `preserve` | PASS | policy complete; protected path refused, cleanup free | `python3 tools/preserve.py digest && python3 tools/preserve_hook.py  # effective decision` |
+| `self-hosted-topology` | PASS | the same-repository topology is refused, naming O177 | `python3 tools/self_hosted_topology.py check --repo . --pin $(git rev-parse HEAD) --integration .  # must refuse` |
+| `unit-drift` | FAIL | OBSOLETE_UNIT, UNIT_FAILED, UNKNOWN_VERB on hoh-fortsetzen.service, hoh-fortsetzen.timer | `python3 tools/unit_drift.py --expect auto` |
+| `durability` | FAIL | record does not re-derive from its evidence | `python3 tools/durability_e2e.py derive --evidence dogfood/p2-durability/<newest> --out dogfood/p2-durability/P2_DURABILITY_ACCEPTANCE.json --check` |
 | `preflight` | PASS | profile demo: READY | `python3 tools/preflight.py --profile demo` |
 | `parallelism_baseline` | PASS | re-derives identically; project_native_parallelism = MISSING | `python3 tools/parallelism_baseline.py --out program/v3_3/VERIHARNESS_PARALLELISM_BASELINE.md` |
-| `program_scope` | PASS | COMPLETE: 0 problem(s) | `python3 tools/program_scope.py --check` |
-| `capability_matrix` | PASS | 28 proven, 148 missing, 8 partial -- re-derives identically | `python3 tools/capability_matrix.py --out program/v3_3/VERIHARNESS_CAPABILITY_MATRIX.json` |
-| `build_plan` | PASS | 156 open requirement(s) in 3 wave(s); 135 held behind a phase gate | `python3 tools/build_plan.py` |
-| `acceptance` | PASS | all proven: P1-16 | `python3 tools/acceptance_record.py --evidence <dir> --out <record> --check, for each evidence probe in the register, via tools/capability_matrix.py` |
+| `program_scope` | NOT_RUN | the pinned plan is not reachable; set $VERIHARNESS_PLAN_ROOT. The inventory is derived from it and n | `python3 tools/program_scope.py --check` |
+| `capability_matrix` | PASS | 53 proven, 151 missing, 17 partial -- re-derives identically | `python3 tools/capability_matrix.py --out program/v3_3/VERIHARNESS_CAPABILITY_MATRIX.json` |
+| `build_plan` | PASS | 174 open requirement(s) in 2 wave(s); 157 held behind a phase gate | `python3 tools/build_plan.py` |
+| `acceptance` | FAIL | P2-11: record dogfood/p2-durability/P2_DURABILITY_ACCEPTANCE.json [stressor:D; P2-33: record dogfood/p2-durability/P2_DURABILITY_ACCEPTANCE.json [P2-33]: sa; P2-34: record dogfood/p2-durability/P2_DURABILITY_ACCEPTANCE.json [P2-34]: sa; P2-35: record dogfood/p2-durability/P2_DURABILITY_ACCEPTANCE.json [P2-35]: sa; P2-36: record dogfood/p2-durability/P2_DURABILITY_ACCEPTANCE.json [P2-36]: sa; P2-37: record dogfood/p2-durability/P2_DURABILITY_ACCEPTANCE.json [P2-37]: sa | `python3 tools/acceptance_record.py --evidence <dir> --out <record> --check, for each evidence probe in the register, via tools/capability_matrix.py` |
+| `programme_checklist` | FAIL | 19 unresolved release-blocking finding(s); no phase closes over one: | `python3 tools/programme_checklist.py` |
+| `programme_supervisor` | FAIL | review 20260924T134525Z: 14 finding(s), 4 blocking, INCOMPLETE; 10 previously-raised finding(s) resolved by a later review: F12, F14, F3, F4, F5, F6 ...; 19 finding(s) raised by a preserved review and resolved by none: F1, F10, F11, F13, F2, F7 ...; snapshot seal changed: reviewed df37fe42a305..., now baaecfe0815f...; matrix digest changed: reviewed 75a6132cf327..., now 033f5d8f2185...; dogfood/p2 | `python3 tools/programme_supervisor.py --phase P2 --findings PATH --decisions PATH --out dogfood/p2-gate/REVIEW.json` |
 | `baseline_docs` | PASS | 3 document(s) re-render identically | `python3 tools/baseline_docs.py --out-dir program/v3_3` |
 | `clean_install` | PASS | 0 red step(s) | `python3 tools/clean_install_check.py` |
-| `attribution` | PASS | 1 of 22 nodes through the product | `python3 tools/attribution.py` |
+| `attribution` | FAIL | 1 of 141 nodes through the product | `python3 tools/attribution.py` |
 | `evidence_index` | PASS | EVIDENCE_INDEX.md matches the trees it describes | `python3 tools/evidence_index.py` |
 | `paper_audit` | PASS | 8 of 8 checks | `python3 tools/audit_refs.py <each check>` |
-| `external_ci` | FAIL | the recorded run tested a different export: 2 path(s) differ beyond this gate's own reports (tests/test_readiness.py, tools/readiness.py). Re-export, re-run CI, record it again. | `python3 tools/exact_head_ci.py --run-id ID --export-commit SHA` |
+| `docs_consistency` | PASS | figures re-derived; changelog generated | `python3 tools/docs_numbers.py check --skip V13 && python3 tools/changelog_from_release_notes.py check` |
+| `external_ci` | FAIL | the recorded run tested a different export: 201 path(s) differ beyond this gate's own reports (.claude/settings.json, ops/hoh-continue.service, ops/hoh-continue.timer). Re-export, re-run CI, record it again. | `python3 tools/exact_head_ci.py --run-id ID --export-commit SHA` |
 | `routing` | PASS | DEFERRED_ON_EVIDENCE | `read docs/ROUTING.md` |
 
 ## Why some rows are advisory
@@ -52,15 +59,21 @@ Open, and each one blocking: tests, union_invariants, succession, external_ci.
 * **`benchmark_v2_historical`** — historical and advisory: v2 is an immutable dataset, its matched budget was not matched during the runs, and no step available today changes that. A blocking row over it could never be satisfied, and a gate that cannot be satisfied puts pressure on re-interpreting the dataset -- the one thing freezing a protocol forbids. `benchmark_v3` carries the release question.
 * **`benchmark_v3`** — the campaign a release may rest on: pre-registered, run under an enforced budget, complete. A campaign that produced every result file while violating the protocol is FAIL here, because the files are not what is being asked about.
 * **`export_manifest`** — the dangling references are limitation 12e: published documents citing internal ones. Advisory, because none of them is a false claim -- what a reader loses is the ability to follow a citation.
-* **`export_sync`** — the export is one-directional and the public repository is not read-only: this row is what stops a copy from reverting work done there.
+* **`export_sync`** — a comparison that did not run is not a green one; the row says so rather than reporting the absence as safe.
 * **`succession`** — the capsule is not wrong about the past when it drifts -- it is stale about the present, and a successor reading it would be too.
 * **`identifiers`** — a published tool whose names are in another language is readable only to the people who wrote it.
+* **`preserve`** — project- and evidence-owned state must not be destroyable by an autonomous run, and the refusal must name the safe operation.
+* **`self-hosted-topology`** — isolation is not traded for an attribution category; a byte-identical import binds the claim either way.
+* **`unit-drift`** — an installed unit that fails on every tick is automation the operator believes is running; reinstalling it from ops/ is the operator's action, not this check's.
+* **`durability`** — a hand-edited or stale record is not evidence.
 * **`preflight`** — an environment that cannot run the work is not a product failure, and discovering it after the quota is spent is not a measurement.
 * **`parallelism_baseline`** — the baseline is the premise V3.3 was planned against, so it is checked rather than remembered.
-* **`program_scope`** — a register that is internally consistent can still be a quarter of the programme; only the plan can say it is not.
+* **`program_scope`** — the inventory is derived from the plan; without the plan nothing about completeness is claimed.
 * **`capability_matrix`** — the matrix is what the next phase is planned from, so it is checked rather than remembered.
 * **`build_plan`** — the build order is derived from the register, so it cannot drift from the statuses it is planned against.
 * **`acceptance`** — an end-to-end acceptance is evidence about one real run; a record that no longer matches that run is not evidence, and a requirement not yet proven is shown, not hidden.
+* **`programme_checklist`** — the gates this programme runs on are decided by hoh.checklist, so a structurally unsound checklist stops the verdict instead of colouring it.
+* **`programme_supervisor`** — the P2 gate needs a *current, honest* independent supervisor review of *P2*: every finding other than a severity-consistent NO_ACTION holds the phase open and no decision settles one (O229/G), a record whose stored verdict disagrees with its own findings is not evidence, and the brief the review was performed on must be the one this gate derives for this board.
 * **`baseline_docs`** — the baselines are summaries of measurements taken elsewhere, so the only thing that can go wrong is being old.
 * **`attribution`** — the ratio is not a gate -- it is reported so that nobody has to take the phase's own description of itself on trust.
 * **`paper_audit`** — `coverage` is red on a maintenance item paper/AUDIT.md itself flags and explains: paper/NUMBERS.md catalogues the 2 of a '2 of 3' ratio and not the 3. It is a documented, deliberately deferred operator item, not an unexamined failure.

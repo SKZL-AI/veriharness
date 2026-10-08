@@ -12,6 +12,130 @@ deterministic runner produced, not on a model's own report that its work is
 done. `docs/EVIDENCE_MODEL.md` makes the full case for why that distinction
 matters; this file is the map of the rest.
 
+## Where the project stands: release, pre-release, development, roadmap
+
+Four things are easy to run together here, and this repository keeps them
+apart on purpose.
+
+| Track | State | What it means for a reader |
+|---|---|---|
+| **Latest stable release** | `v0.1.0`, tagged 2026-09-14, on PyPI since 2026-09-15 | The only stable release. The campaign figures, the benchmark and the findings further down this file describe the work that produced it, and they stay as they were measured. |
+| **Pre-release** | `v0.3.0a1` -- **PRE-RELEASE**, an alpha and a research preview, **prepared, not yet cut** | Prepared at a documentation checkpoint, not at the end of a phase. Its integrity gate is met for the paths its reviewers replayed (the qaw-followup merge `ab41589f` closed the three findings that had held it; one residual is stated in `docs/LIMITATIONS.md`), and the cut waits for the operator's decision on the exact commit. Once cut, it is installed from the tagged source and is not published to PyPI: the distribution workflow of this repository accepts only the audited `v0.1.0`. `pyproject.toml` carries `0.3.0a1`. `RELEASE_NOTES.md` opens with its account; its open gates are listed as NOT_YET_PROVEN there and in `docs/LIMITATIONS.md`. |
+| **Current development** | Phase P2, *v0.3 Durable Program Runtime + Autonomy Contract Base* -- **IN PROGRESS** | Not closed. The pre-release is a snapshot of this line, and a clone of the default branch may be ahead of the tag. |
+| **Long-term roadmap** | Phases P0 to P12, v0.2 through v2.0 | A registered plan, not a promise. P1 was completed as an internal development milestone. No public v0.2 release was cut; the latest stable public release remains v0.1.0 while the development line continues through P2. Of the requirements registered for P3 to P12, 150 of 168 read MISSING `[V11b]`; ten of the 11 that read PROVEN are storage-lifecycle items that amendment A1 placed there and that were built early. |
+
+The board that says what holds today is `docs/READINESS.md`; at its last
+committed measurement it reads `TECHNICALLY_STABLE_READY = no`, and that holds
+for the pre-release too: `v0.3.0a1` is not a stable release and does not claim
+the board's conjunction. `docs/READINESS.md` is measured at commit `75214e31`, not
+at the commit that carries the pre-release: it is conservative (its `attribution` row
+and its `tests` row predate the entries and the run that now close them), and it is
+not regenerated at the cut, because regenerating it needs the network (the
+`clean_install` row and the union gate's wheel build call the package index).
+Figures below that carry a bracketed tag are listed,
+with their source and the command that regenerates them, in
+`paper/NUMBERS_V2.md`.
+
+## What changed after v0.1.0
+
+Stated against the development repository at the commit the checkpoint was
+prepared from. `paper/POSITION_PAPER_V2.md` gives the full account.
+
+* **HoH now builds HoH's own kernel.** The v0.1.0 statement further down --
+  no run wrote HoH's own logic -- is true of that campaign and stays in place.
+  Since 2026-09-23, product runs have written kernel modules under `src/hoh/`.
+  From 2026-09-25 on, every such run worked in an isolated clone pinned to one
+  commit, its accepted candidate was imported byte for byte, and two
+  independent integration reviewers released it before it was merged: 34 of
+  the 46 product-run merges between 2026-09-25 and 2026-10-07 change
+  `src/hoh/` `[V02]` `[V01]`.
+* **Acceptance is not merge.** A product run writes candidate bytes; the
+  product's own QA and receipts decide acceptance; independent integration
+  review decides whether accepted bytes may be merged; the orchestrating
+  session holds the merge authority; and a phase closes only when its gate,
+  derived from the capability register, says so. The invariant, in one line:
+  `candidate creation != product acceptance != integration acceptance != merge authority != phase closure`.
+  Each step has refused what the step before it passed: in the development
+  ledger's entries O236 to O254, 26 candidates the product had accepted were
+  refused at integration review `[V07t]`.
+* **A durable programme runtime (P2).** Durable timers, a sentinel and a
+  never-stuck check; session succession with a master epoch and a leader lease
+  (the lease is still partial); a resume loop that acts on due timers; an
+  autonomy contract; and a programme checklist whose phase gate an independent
+  supervisor review has to pass. 26 of P2's 43 registered requirements read
+  PROVEN `[V10c]` `[V10b]`, and P2 is **not** closed.
+* **The orchestrating session can be rolled over under a protocol (Layer A,
+  merged, not yet exercised live).** Four commands (`hoh project hold`,
+  `rollover`, `rollover-verify`, `rollover-accept`) freeze a capsule whose
+  entries are derived facts the successor must re-derive, the operator's
+  decisions kept verbatim and never answered by the machine, and advisory
+  context with no authority; a successor takes the master epoch only if
+  everything re-derives, and a stale predecessor is fenced. It has been tested
+  with fakes; no live succession has been run, so **no P2 row is proven by it**,
+  and the one handoff of 2026-10-07 (by hand, before the protocol existed) is
+  not that evidence. See `docs/OPERATIONS.md` and `docs/LIMITATIONS.md`.
+* **HoH closes its own role panes and ends a role's processes before the
+  freeze (merged).** The role-pane lifecycle never touches a foreign pane or
+  process, and refuses to close a pane whose role left marked processes outside
+  it; its first live use closed the planner and developer panes at turn end and,
+  for the QA pane, refused the release because two marked processes had escaped
+  it (named, never signalled); the QA pane was gone without anyone closing it by hand.
+* **Every long role prompt goes through a pointer file (merged).** A prompt
+  above 8 KiB, or one holding a character an input box treats specially, is
+  written to a file and the agent gets a short pointer, so the stalled-submit
+  recovery can verify what is in the box for every prompt. The first prompt
+  into a fresh pane still stalls; only its recovery works for every prompt.
+* **A storage lifecycle, after a real storage incident.** An ownership
+  registry, admission by reservation, a durable park and resume under storage
+  pressure, disk-full-safe durable writes (partial), verified archive bundles,
+  registered ephemeral temporary roots, and `VERIFIED_RELOCATION` -- the one
+  operation in VeriHarness that may remove a local copy of project data, and
+  only after the archive holding it has been verified. Its first real
+  self-dogfood ran on the project itself: the project was adopted, the survey
+  of legacy reviewer scratch found 0 of 188 roots eligible `[V33]`, and the
+  steward's real pass observed only and reclaimed nothing.
+* **Failures the product found in itself.** A capability witness that crashed
+  on a file name that is not UTF-8; role prompts longer than one command-line
+  argument may be (`MAX_ARG_STRLEN`); an operator-side relaxation that
+  silently weakened the shipped command guard; a dispatcher that read an agent
+  ending its turn, while its own background job still ran, as finished; a QA
+  role whose provider usage limit was booked as a rejected iteration, eight
+  times `[V26]`; a run held for a capability violation that could be reported
+  ACCEPTED, repaired by the reviewed qa-arena-write run for the states the
+  current build writes and, for the three paths that run's reviewer then proved
+  open (a legacy state, an open seal, a symlinked seal ledger) and a forged
+  sibling-arena plan line, by the qaw-followup run; and evidence that went
+  stale when the code it described changed.
+  What was repaired, how, and what is still open is in `docs/LIMITATIONS.md`.
+
+**What is not true yet, stated as plainly as the rest.** P2 is open. Its exit
+conditions P2-33 to P2-37 were once proven on end-to-end durability evidence,
+and that evidence went stale when the code changed; they read
+IMPLEMENTED_NOT_PROVEN until it is taken again. P2-11, crash and reboot
+recovery, has never been proven: a real reboot (stressor DS2) has not been
+run. Disk-full-safe writes cover only part of the writers (P2-41, PARTIAL).
+**The pre-release's integrity gate is met for the paths its reviewers
+replayed, and not claimed beyond them**: the qaw-followup merge closed the
+legacy-state, open-seal, symlinked-ledger and sibling-plan paths, each replayed
+by both integration reviewers on the merged tree, and the strand states one
+residual itself -- a role pane that has read the run's `arena_secret` and
+copies iteration and attempt. **The repair of the quota misclassification is
+not merged**: at this pre-release a provider usage limit that stops a QA role
+is still booked as a rejected iteration, and the repair (failure-classes, the
+core of amendment A5's P2 item P2-43) reads MISSING `[V40]`. **The first prompt
+after an agent starts can still be typed and not submitted**; dispatch
+recovers from it for every prompt, which is not a fix of the race, and the
+recovery refuses (fails closed) when Claude Code word-wraps the pointer line in
+a narrow pane: a 79-column pane blocked one run before any candidate, and the
+readiness fix is the next P2 strand. A role's own background task is now ended
+before the freeze by the merged role-pane lifecycle, which has had one live use
+and carries tracked minor survivors. **Context rollover is built and not
+exercised**: no live succession has run, the draining state is recorded and not
+enforced, and five follow-up items are open (and nine guard rules have no test that kills their removal). The storage steward has not reclaimed anything of
+VeriHarness's own data. The exact-head external CI, the benchmark freeze and
+the programme supervisor's review of P2 all read red on the board. The full
+list is *Current open limitations* at the top of `docs/LIMITATIONS.md`.
+
 ## What this actually is
 
 A specification goes in. A planner role turns it into a development plan
@@ -55,6 +179,11 @@ cd veriharness
 python -m pip install -e .
 ```
 
+An editable checkout of the default branch is development code. Once the tag
+`v0.3.0a1` is cut, checking it out before installing gives the pre-release (see
+*Where the project stands* above); `pip install hoh==0.1.0` is the only package published
+to PyPI.
+
 ## Running it: two commands, on purpose
 
 ```sh
@@ -73,6 +202,17 @@ intercepts agent work, watches for something worth planning, and starts
 spending quota on it. Nothing happens until something explicitly calls
 `hoh start` and then `hoh run`, naming a specific repository, a specific
 specification, and a specific run.
+
+*Added after v0.1.0, so that the paragraph above is not over-read.* The
+repository now ships optional systemd user units under `ops/`: a supervised
+quota resume, an unattended continuation, a storage-pressure resume and a
+per-project storage-steward pass. Nothing in the package installs or enables
+them; that is the operator's act. They act only on runs and projects that
+already exist -- the unattended continuation drives on a project that
+registered a driver, after a quota wait or after its previous master died --
+and none of them creates a run or a project. Implicit *start* of new work is
+still refused; implicit *continuation* of delegated work is now available, by
+an operator's explicit choice. `ops/README.md` describes each unit.
 
 That is a statement about *implicit* automation, not about automation as
 such -- and the distinction matters, because this project's own development
@@ -115,6 +255,14 @@ split. A different deployment can delegate more, or less.
 | Agentic main orchestrator | Specifications, when to run, what to merge, global gates, repair work, closure | The campaign below |
 | VeriHarness / HoH verification kernel | One run: plan → develop → independent QA → evidence → accept/reject → replan | 65 runs |
 | Herdr runtime | Sessions, panes, worktrees, restore | Every run |
+
+*The "Exercised here" column describes the v0.1.0 campaign.* The
+package itself also carries a control plane, `src/hoh/orchestrator.py`, which
+decides run order, global gates and repair nodes for a project; it was added
+on 2026-09-11, before the tag, and it is what the benchmark's arm C and the
+closure test exercise. The agentic orchestrator described next is a separate,
+higher layer that drives the package from outside, and it still holds the
+merge authority. `docs/ARCHITECTURE.md` records the correction.
 
 The orchestrator is not hidden inside `src/hoh/`. It is a deployment layer
 that drives HoH through the same CLI and Herdr interfaces anyone else would.
@@ -214,6 +362,15 @@ accounting, and this README does not claim otherwise. All of it is a
 considerably weaker claim than "the system repaired itself", and that is the
 point of stating it this way.
 
+**After v0.1.0 this changed, and the paragraph above stays as the record of
+the campaign it describes.** From 2026-09-23 on, product runs wrote kernel
+logic under `src/hoh/` -- the programme checklist was the first -- and from
+2026-09-25 on every such candidate came from an isolated clone pinned to one
+commit and passed two independent integration reviewers before the
+orchestrating session merged it. Core fixes written directly by the
+orchestrating session still exist and are attributed as such. *What changed
+after v0.1.0* above and `paper/POSITION_PAPER_V2.md` give the account.
+
 ## Measured against a plain agent: the matched-budget benchmark
 
 For most of this project's life `docs/LIMITATIONS.md` limit 2 said there was
@@ -263,6 +420,13 @@ pre-registered, commit-bound, complete at 45/45, matched-budget-valid, and
 reproducible from the raw cell files by a second, independently written
 aggregation that never imports the reporter. It does **not** mean the harness
 performed better.
+
+*At the current development head, the readiness row reads `FAIL`, and the
+reason is not the campaign.* Code under the campaign's freeze changed after
+the campaign, and the drift accounting does not yet name all of it. The row still
+reads the campaign as complete and matched-budget-valid; what fails is the
+accounting for the code that moved since. Until that accounting is written,
+the sentence above describes the board at v0.1.0, not the board today.
 
 The positive path is measured separately, because a ceiling that refuses too
 early is indistinguishable from one that refuses correctly if you only ever
@@ -395,6 +559,9 @@ of prose can.
 | `docs/HERDR_INTEGRATION.md` | The Herdr plugin, its actions, and three properties of Herdr's plugin interface measured against a real Herdr 0.8.0 |
 | `docs/OPERATIONS.md` | Prerequisites, the usual operational path, intervening in a running loop, the file layout, troubleshooting |
 | `docs/LIMITATIONS.md` | What is not proven yet, stated specifically and without hedging |
+| `docs/READINESS.md` | The board: every release condition, its state at the last measurement, and the command that re-derives it |
+| `paper/POSITION_PAPER_V2.md` | The development after v0.1.0 -- durable programme state, HoH building its own kernel, storage safety, and the failures found on the way. Ships with the pre-release, with its own figures (`paper/NUMBERS_V2.md`) and audit (`paper/AUDIT_V2.md`) |
+| `CHANGELOG.md` | User-visible changes by version; the `0.3.0a1` section is generated from `RELEASE_NOTES.md` by `tools/changelog_from_release_notes.py` |
 
 Read `docs/LIMITATIONS.md` before deciding this is production-ready for
 anything you care about. It names, among other things, that the guard around

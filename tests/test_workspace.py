@@ -156,3 +156,86 @@ def test_the_binding_would_have_described_the_outer_repo(repo: Path):
     assert head_commit(sub) == outer.commit
     # And that is exactly why the subdirectory is refused now.
     assert not is_git_repo(sub)
+
+
+def _anchor(repo: Path, candidate_id: str) -> str:
+    """The tree `refs/hoh/candidates/<id>` holds, or "" when there is none."""
+    return subprocess.run(
+        ["git", "-C", str(repo), "rev-parse", "--verify", "--quiet",
+         f"refs/hoh/candidates/{candidate_id}"],
+        capture_output=True, text=True).stdout.strip()
+
+
+def test_an_anchor_never_moves(repo: Path):
+    """Catches (run qaw4) an anchor moved to another tree under the same
+    candidate id: `git update-ref` overwrote it, and the integrity guard --
+    refs never move -- failed the run. A second tree under an id already
+    anchored leaves the anchor as it is (`anchor` returns None). Control: the
+    same tree under the same id is the anchor (its name is returned), and
+    another id anchors the new tree."""
+    from hoh.workspace import anchor
+
+    first = snapshot(repo, "c1")
+    assert _anchor(repo, "c1") == first.tree_digest
+    assert anchor(repo, first) == "refs/hoh/candidates/c1"
+
+    (repo / "a.py").write_text("print('two')\n", encoding="utf-8")
+    moved = snapshot(repo, "c1")
+    assert moved.tree_digest != first.tree_digest
+    assert anchor(repo, moved) is None
+    assert _anchor(repo, "c1") == first.tree_digest
+    other = snapshot(repo, "c2")
+    assert _anchor(repo, "c2") == other.tree_digest != first.tree_digest
+
+
+def test_unchanged_leaves_the_anchor_alone(repo: Path):
+    """Catches `unchanged()` -- a comparison -- re-anchoring the candidate's id
+    at the tree it compares: a source changed during QA moved the anchor of
+    the frozen candidate to the change, a ref move the integrity guard fails.
+    Control: an untouched tree is unchanged, and the anchor holds the bound
+    tree throughout."""
+    bound = snapshot(repo, "c1")
+    assert unchanged(repo, bound)
+    assert _anchor(repo, "c1") == bound.tree_digest
+    (repo / "a.py").write_text("print('tampered')\n", encoding="utf-8")
+    assert not unchanged(repo, bound)
+    assert _anchor(repo, "c1") == bound.tree_digest
+
+
+def test_a_racing_create_does_not_move_the_anchor(repo: Path, monkeypatch):
+    """Catches `update-ref <ref> <tree>` without the empty old value: the ref
+    is read first, but another create can land between that read and the
+    `update-ref`, and then the call moved the anchor (the very failure of run
+    qaw4) instead of being refused. The create is atomic only through git's
+    refusal of an existing ref. Here the ref appears (at another tree) between
+    the two calls: `anchor` returns None and the ref still holds the racing
+    tree. Control: the same candidate id without the race is created, and its
+    name is returned."""
+    import types
+
+    from hoh import workspace
+
+    first = snapshot(repo, "c1")
+    (repo / "a.py").write_text("print('two')\n", encoding="utf-8")
+    second = snapshot(repo, "c2")
+    assert second.tree_digest != first.tree_digest
+
+    calm = second.model_copy(update={"candidate_id": "calm"})
+    assert workspace.anchor(repo, calm) == "refs/hoh/candidates/calm"
+    assert _anchor(repo, "calm") == second.tree_digest
+
+    real = subprocess.run
+    raced = []
+
+    def interpose(args, **kwargs):
+        if "update-ref" in args:
+            raced.append(real(["git", "-C", str(repo), "update-ref",
+                               "refs/hoh/candidates/race", first.tree_digest],
+                              check=True, capture_output=True))
+        return real(args, **kwargs)
+
+    monkeypatch.setattr(workspace, "subprocess", types.SimpleNamespace(run=interpose))
+    racing = second.model_copy(update={"candidate_id": "race"})
+    assert workspace.anchor(repo, racing) is None
+    assert len(raced) == 1
+    assert _anchor(repo, "race") == first.tree_digest

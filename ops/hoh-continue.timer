@@ -1,0 +1,15 @@
+[Unit]
+Description=Continue governed HoH projects unattended
+Documentation=file://%h/hoh/docs/OPERATIONS.md
+
+[Timer]
+# Soon after boot: a reboot is exactly when a master died without saying so
+# (DS2), and recovery should not wait a full interval.
+OnBootSec=2min
+OnUnitActiveSec=5min
+Persistent=true
+AccuracySec=30s
+RandomizedDelaySec=30
+
+[Install]
+WantedBy=timers.target

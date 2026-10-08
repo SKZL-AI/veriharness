@@ -290,3 +290,145 @@ def test_every_capability_item_has_exactly_one_disposition():
             assert row["requirement"], row
         else:
             assert row["disposition"].startswith("non-capability"), row
+
+
+# --- O204: one requirement covering several plan items ----------------------
+
+def _scope_with_path() -> dict:
+    """A plan whose P1 carries a three-step acceptance path, like the real one."""
+    return {
+        "plan_sha256": "planhash",
+        "phases": [{"phase": "P0", "items": ["P0.build.zero"]},
+                   {"phase": "P1", "items": ["P1.build.alpha", "P1.path.one",
+                                             "P1.path.two", "P1.path.three"]}],
+        "items": [
+            {"id": "P0.build.zero", "phase": "P0", "kind": "build_verify",
+             "capability": True, "section": "s", "text": "zero"},
+            {"id": "P1.build.alpha", "phase": "P1", "kind": "build_verify",
+             "capability": True, "section": "s", "text": "alpha"},
+            {"id": "P1.path.one", "phase": "P1", "kind": "acceptance_path",
+             "capability": False, "section": "s", "text": "fresh clone"},
+            {"id": "P1.path.two", "phase": "P1", "kind": "acceptance_path",
+             "capability": False, "section": "s", "text": "doctor"},
+            {"id": "P1.path.three", "phase": "P1", "kind": "acceptance_path",
+             "capability": False, "section": "s", "text": "run a programme"},
+        ],
+    }
+
+
+def _covering(**over) -> dict:
+    base = {"id": "P1-16", "target_phase": "P1",
+            "authoritative_item": "P1.path.one",
+            "also_covers": ["P1.path.two", "P1.path.three"],
+            "also_covers_why": {"P1.path.two": "the same run's captured doctor step",
+                                "P1.path.three": "the same run's accepted programme"}}
+    base.update(over)
+    return base
+
+
+def test_one_requirement_may_cover_the_whole_acceptance_path(tmp_path):
+    """O204. The path is a sequence proven end to end or not at all; the register
+    could name one item per requirement, so two thirds of it was tracked by
+    nothing."""
+    scope = _scope_with_path()
+    register = {"requirements": [
+        {"id": "P0-01", "target_phase": "P0",
+         "authoritative_item": "P0.build.zero"},
+        {"id": "P1-01", "target_phase": "P1",
+         "authoritative_item": "P1.build.alpha"},
+        _covering()]}
+    assert ps.completeness(scope, register, "planhash") == []
+    rows = {r["item"]: r["disposition"] for r in ps.dispositions(scope, register)}
+    for item in ("P1.path.one", "P1.path.two", "P1.path.three"):
+        assert "tracked by P1-16" in rows[item], item
+
+
+def test_a_covered_item_still_may_not_be_claimed_twice(tmp_path):
+    """The negative control that matters most: extending the register must not
+    weaken the rule that one plan item has one owner."""
+    scope = _scope_with_path()
+    register = {"requirements": [
+        {"id": "P0-01", "target_phase": "P0",
+         "authoritative_item": "P0.build.zero"},
+        {"id": "P1-01", "target_phase": "P1",
+         "authoritative_item": "P1.build.alpha"},
+        _covering(),
+        {"id": "P1-17", "target_phase": "P1",
+         "authoritative_item": "P1.path.two"}]}
+    problems = ps.completeness(scope, register, "planhash")
+    assert any("P1.path.two is claimed by 2 requirements" in p for p in problems)
+
+
+def test_a_claim_without_a_reason_is_refused(tmp_path):
+    """A requirement that could absorb plan items by listing their ids would let
+    the register grow coverage it never proved."""
+    scope = _scope_with_path()
+    register = {"requirements": [
+        {"id": "P0-01", "target_phase": "P0",
+         "authoritative_item": "P0.build.zero"},
+        {"id": "P1-01", "target_phase": "P1",
+         "authoritative_item": "P1.build.alpha"},
+        _covering(also_covers_why={"P1.path.two": "  "})]}
+    problems = ps.completeness(scope, register, "planhash")
+    assert any("carries no reason in also_covers_why" in p for p in problems)
+
+
+def test_an_unknown_or_out_of_phase_covered_item_is_refused(tmp_path):
+    scope = _scope_with_path()
+    register = {"requirements": [
+        {"id": "P0-01", "target_phase": "P0",
+         "authoritative_item": "P0.build.zero"},
+        {"id": "P1-01", "target_phase": "P1",
+         "authoritative_item": "P1.build.alpha"},
+        _covering(also_covers=["P1.path.two", "P1.nope", "P0.build.zero"],
+                  also_covers_why={"P1.path.two": "ok", "P1.nope": "ok",
+                                   "P0.build.zero": "ok"})]}
+    problems = ps.completeness(scope, register, "planhash")
+    assert any("also_covers 'P1.nope' is not an item" in p for p in problems)
+    assert any("also_covers 'P0.build.zero' is in P0, not P1" in p
+               for p in problems)
+
+
+def test_repeating_the_primary_item_is_refused(tmp_path):
+    """Listing it twice would make one item look doubly covered."""
+    scope = _scope_with_path()
+    register = {"requirements": [
+        {"id": "P0-01", "target_phase": "P0",
+         "authoritative_item": "P0.build.zero"},
+        {"id": "P1-01", "target_phase": "P1",
+         "authoritative_item": "P1.build.alpha"},
+        _covering(also_covers=["P1.path.one"],
+                  also_covers_why={"P1.path.one": "ok"})]}
+    problems = ps.completeness(scope, register, "planhash")
+    assert any("repeats its own authoritative_item" in p for p in problems)
+
+
+def test_an_explanation_for_something_not_claimed_is_refused(tmp_path):
+    """Drift in the other direction: a reason left behind after the claim was
+    removed reads as coverage that is not there."""
+    scope = _scope_with_path()
+    register = {"requirements": [
+        {"id": "P0-01", "target_phase": "P0",
+         "authoritative_item": "P0.build.zero"},
+        {"id": "P1-01", "target_phase": "P1",
+         "authoritative_item": "P1.build.alpha"},
+        _covering(also_covers=["P1.path.two"],
+                  also_covers_why={"P1.path.two": "ok", "P1.path.three": "stale"})]}
+    problems = ps.completeness(scope, register, "planhash")
+    assert any("explains 'P1.path.three', which is not in also_covers" in p
+               for p in problems)
+
+
+def test_the_real_register_covers_the_real_acceptance_path():
+    """The live case O204 was about, read out of the shipped register."""
+    import json as _json
+    from pathlib import Path as _Path
+    root = _Path(__file__).resolve().parent.parent
+    register = _json.loads(
+        (root / "program/v3_3/REQUIREMENTS.json").read_text(encoding="utf-8"))
+    p116 = [r for r in register["requirements"] if r["id"] == "P1-16"][0]
+    assert p116["authoritative_item"] == "P1.product-requirement.fresh-clone"
+    assert set(p116["also_covers"]) == {
+        "P1.product-requirement.doctor",
+        "P1.product-requirement.run-small-verified-program"}
+    assert all(v.strip() for v in p116["also_covers_why"].values())

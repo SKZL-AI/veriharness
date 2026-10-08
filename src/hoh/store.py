@@ -30,6 +30,8 @@ import fcntl
 import json
 import os
 import re
+import stat
+import time
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -37,6 +39,7 @@ from typing import Iterator
 
 from pydantic import BaseModel, ValidationError
 
+from . import durable_io
 from .contracts import AcceptanceCheck, RunState, digest
 from .evidence import EvidenceBundle
 
@@ -79,19 +82,14 @@ def _atomic_write(path: Path, payload: str) -> None:
 
     Without the directory fsync the rename can be missing after a power
     failure even though the data is there. That is exactly the gap A06 checks.
+    A full disk fails the call with `durable_io.DiskFullError` and leaves the
+    old file in place.
     """
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name(f".{path.name}.tmp.{os.getpid()}")
-    with open(tmp, "w", encoding="utf-8") as fh:
-        fh.write(payload)
-        fh.flush()
-        os.fsync(fh.fileno())
-    os.replace(tmp, path)
-    dir_fd = os.open(path.parent, os.O_RDONLY)
-    try:
-        os.fsync(dir_fd)
-    finally:
-        os.close(dir_fd)
+    # `durable_io.durable_write` does all of it -- free-space pre-check, temp
+    # beside the target, fsync, replace, directory fsync -- and on a failure
+    # leaves the target untouched (P2-41).
+    durable_io.durable_write(path, payload, mode=0o644)
 
 
 class RunStore:
@@ -147,6 +145,96 @@ class RunStore:
                 fcntl.flock(fh.fileno(), fcntl.LOCK_UN)
             finally:
                 fh.close()
+
+    # -- The running process -------------------------------------------- #
+
+    @property
+    def process_path(self) -> Path:
+        return self.dir / "process.json"
+
+    @property
+    def process_lock_path(self) -> Path:
+        return self.dir / ".process.lock"
+
+    @contextmanager
+    def process_marker(self) -> Iterator[None]:
+        """Hold, for the whole of a `hoh run`, the claim that this process
+        executes the run.
+
+        The run lock is held per iteration only, so between iterations a run
+        still being executed looks unlocked (review B3, C). This holds a second,
+        exclusive lock -- `.process.lock` -- for the run's whole lifetime, and
+        writes `process.json` naming the process. The kernel releases the lock
+        when the process dies, however it dies, so "is the run still being
+        executed" is answered by the lock, not by pids that can be reused or
+        belong to another namespace (review A4, S1/S2). A second `hoh run` of
+        the same run is refused instead of erasing the first one's marker
+        (review A4, G2). Only the holder rewrites the marker, and it is never
+        deleted: an orderly end marks it ended.
+        """
+        from .succession import boot_id
+
+        self.ensure()
+        fd = os.open(str(self.process_lock_path), os.O_CREAT | os.O_RDWR, 0o644)
+        try:
+            # A read-only probe (`running_process`) holds the lock shared for a
+            # few microseconds; a run starting in that instant must not be
+            # refused as though another run executed it (review A5, M1).
+            for attempt in range(20):
+                try:
+                    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    break
+                except OSError as exc:
+                    if attempt == 19:
+                        current = self._marker() or {}
+                        # The marker may still name a process that crashed; the
+                        # lock holder is only known to be *some* live process
+                        # until it has rewritten the marker (review A6, 1).
+                        who = (f"another process (the marker names pid {current['pid']}, "
+                               f"since {current.get('since', '?')})"
+                               if current.get("state") == "running" else "another process")
+                        raise LockBusy(
+                            f"Run {self.run_id} is already being executed by {who}"
+                        ) from exc
+                    time.sleep(0.01)
+            base = {"pid": os.getpid(), "boot_id": boot_id(), "since": _stamp()}
+            _atomic_write(self.process_path,
+                          json.dumps({**base, "state": "running"}) + "\n")
+            try:
+                yield
+            finally:
+                _atomic_write(self.process_path, json.dumps(
+                    {**base, "state": "ended", "ended": _stamp()}) + "\n")
+        finally:
+            os.close(fd)                      # releases the lock
+
+    def _marker(self) -> dict | None:
+        try:
+            return json.loads(self.process_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return None
+
+    def running_process(self) -> dict | None:
+        """The marker of the process still executing this run, or None.
+
+        Asked of the lock, not of the marker's pid: if `.process.lock` is held
+        exclusively, some live process executes the run. The probe takes the
+        lock shared and non-blocking and lets go at once; it never writes."""
+        if not self.process_lock_path.exists():
+            return None
+        try:
+            fd = os.open(str(self.process_lock_path), os.O_RDONLY)
+        except OSError:
+            return None
+        try:
+            try:
+                fcntl.flock(fd, fcntl.LOCK_SH | fcntl.LOCK_NB)
+            except OSError:
+                return self._marker() or {"pid": "?", "since": "?"}
+            fcntl.flock(fd, fcntl.LOCK_UN)
+            return None
+        finally:
+            os.close(fd)
 
     # -- Versioning instead of deleting ------------------------------------ #
 
@@ -208,8 +296,18 @@ class RunStore:
                 "the creation. Nothing is overwritten."
             ) from None
         except OSError:
-            with open(parked, "xb") as fh:      # x = exclusive, never overwrite
-                fh.write(path.read_bytes())
+            # A copy published under a name that must not exist (P2-41b W14):
+            # whole or not at all, never over an existing file, the source's
+            # mode. Without hard links this link fails too and the write is
+            # refused -- fail closed, the state stays as it is.
+            try:
+                durable_io.durable_create(parked, path.read_bytes(),
+                                          mode=stat.S_IMODE(path.stat().st_mode))
+            except FileExistsError:
+                raise StoreError(
+                    f"Parked state {parked.name} appeared between the check and "
+                    "the creation. Nothing is overwritten."
+                ) from None
         return parked
 
     # -- State -------------------------------------------------------------- #
@@ -392,18 +490,36 @@ class RunStore:
         arenas are reproducible from the candidate bindings at any time
         (`git archive`), and they are the large part.
         """
+        import io
         import tarfile
 
         out_dir = Path(dest) if dest else self.root / "backups"
         out_dir.mkdir(parents=True, exist_ok=True)
-        path = out_dir / f"{self.run_id}-{_stamp()}.tar.gz"
+        stamp = _stamp()
 
-        with tarfile.open(path, "w:gz") as tar:
+        # Built in memory, published whole under a fresh name (P2-41b W15):
+        # never a half archive at the final name, never over an earlier
+        # backup. A second backup in the same second gets the next suffix,
+        # before `.tar.gz`.
+        buf = io.BytesIO()
+        with tarfile.open(fileobj=buf, mode="w:gz") as tar:
             for entry in sorted(self.dir.iterdir()):
                 if entry.name in ("arena", "attic", ".lock"):
                     continue
                 tar.add(entry, arcname=f"{self.run_id}/{entry.name}")
-        return path
+        data = buf.getvalue()
+        for n in range(1000):
+            suffix = f"-{n:03d}" if n else ""
+            path = out_dir / f"{self.run_id}-{stamp}{suffix}.tar.gz"
+            try:
+                durable_io.durable_create(path, data, mode=None)
+                return path
+            except FileExistsError:
+                continue
+        raise StoreError(
+            f"No free backup name for {self.run_id} at {stamp} in {out_dir} -- "
+            "1000 taken. Nothing is overwritten."
+        )
 
     def restore(self, archive: Path | str, *, overwrite: bool = False) -> Path:
         """Restores a backed-up run.

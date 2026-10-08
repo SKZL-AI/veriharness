@@ -331,6 +331,9 @@ def test_every_gate_shaped_tool_has_a_row():
         "readiness",                 # this tool itself
         "confinement_evidence",      # a measurement; its SUMMARY is the row
         "telemetry_audit",           # a measurement; its report is the row
+        "durability_fixture",        # a fixture durability_e2e drives; that is the row
+        "evidence_claims",           # an interface over claim files handed to it (P2-32);
+                                     # it judges no state of this repository, so no row
     }
     source = inspect.getsource(rd.row_list) + "".join(
         inspect.getsource(getattr(rd, n)) for n in dir(rd)
@@ -991,3 +994,31 @@ def test_every_tolerated_report_is_actually_in_the_export():
     missing = sorted(p for p in rd.EXPORT_REPORTS if p not in exported)
     assert missing == [], (
         f"tolerated but never compared, so the entry does nothing: {missing}")
+
+
+def test_the_docs_consistency_row_never_passes_without_both_checks(monkeypatch):
+    """The row runs two checks. The first cannot answer without the history and
+    the ledger (exit 3, an environment gap), and that is `NOT_RUN`; either red
+    is `FAIL`; only both green is `PASS`. It leaves out the row that reads the
+    board, because a check the board runs must not depend on the board."""
+    calls = []
+
+    def fake(results):
+        def py(*args, **kw):
+            calls.append(args)
+            return results.pop(0)
+        return py
+
+    monkeypatch.setattr(rd, "_py", fake([(0, "OK"), (0, "OK")]))
+    assert rd.row_docs_consistency().state == rd.PASS
+    assert calls[0][:4] == ("tools/docs_numbers.py", "check", "--skip", "V13")
+    monkeypatch.setattr(rd, "_py", fake([(3, "environment gap: no ledger")]
+                                        + [(0, "OK")]))
+    assert rd.row_docs_consistency().state == rd.NOT_RUN
+    monkeypatch.setattr(rd, "_py", fake([(1, "V01: a figure moved"), (0, "OK")]))
+    row = rd.row_docs_consistency()
+    assert row.state == rd.FAIL and "V01" in row.value_
+    monkeypatch.setattr(rd, "_py", fake([(0, "OK"), (1, "the generated section "
+                                                      "differs")]))
+    assert rd.row_docs_consistency().state == rd.FAIL
+

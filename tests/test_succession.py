@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -66,7 +67,7 @@ def test_each_field_is_actually_re_derived(tmp_path):
     baseline = {f: v for f, v, _ in su.check(capsule, None)}
 
     cases = [
-        ("board", lambda k: k["board"].update({"verdict": MUTATED})),
+        ("board", lambda k: k["board"].update({"verdict_excluding_self": MUTATED})),
         ("sync", lambda k: k["sync"].update({"public_commit": "0" * 40})),
         ("release",
          lambda k: k["release_invariants"].update({"tag_object": "0" * 40})),
@@ -294,9 +295,171 @@ def test_the_verifier_exits_three_states_not_two(tmp_path):
 
     capsule = json.loads(out.read_text())
     drifted = tmp_path / "drift.json"
-    capsule["board"]["verdict"] = MUTATED
+    capsule["board"]["verdict_excluding_self"] = MUTATED
     drifted.write_text(json.dumps(capsule))
     assert run(drifted) == 1
 
     missing = tmp_path / "does-not-exist.json"
     assert run(missing) == 2
+
+
+def _board_text(open_line: str | None, word: str = "no") -> str:
+    """A board as `readiness.py` writes one, with the open-rows line chosen."""
+    return ("# Readiness\n\nMeasured at `abc1234` on 2026-09-23.\n\n"
+            f"    TECHNICALLY_STABLE_READY = {word}\n\n"
+            + (f"{open_line}\n" if open_line else "")
+            + "\n| condition | state |\n")
+
+
+def test_o209_the_projection_leaves_out_only_the_row_that_measures_the_capsule():
+    """The pair had no fixpoint while it did not.
+
+    Writing the capsule is what turns the `succession` row green, which removes
+    it from the board's open list -- the very field the capsule had just
+    recorded. So the next render made the row red again, and the one after that
+    green: four closure cycles oscillated between those two states, with
+    `verify` reporting VERIFIED about a board that still listed `succession`.
+
+    Asserted on board *text*, not on the live board: once the board is green
+    the live case passes for the trivial reason and stops exercising the
+    projection at all -- which a reviewer pointed out about the first version
+    of this test.
+    """
+    only_itself = su._board_from(_board_text("Open, and each one blocking: succession."))
+    assert only_itself["open_rows_excluding_self"] == []
+    assert only_itself["verdict_excluding_self"] == "yes"
+    assert only_itself["excludes"] == ["succession"]
+
+
+def test_a_board_red_for_another_reason_is_recorded_as_red():
+    """Dropping one self-referential row must not turn the field into a stub."""
+    with_others = su._board_from(
+        _board_text("Open, and each one blocking: tests, succession, export_manifest."))
+    assert with_others["open_rows_excluding_self"] == ["tests", "export_manifest"]
+    assert with_others["verdict_excluding_self"] == "no"
+
+
+def test_a_board_this_cannot_read_is_not_recorded_as_green():
+    """A reviewer's blocker: deriving "yes" from an empty list made a board with
+    no open-rows line -- truncated, hand-edited or reworded -- read as green,
+    where copying the word kept it red. Fail-closed is the only acceptable
+    direction for a field a successor trusts."""
+    assert su._board_from(_board_text(None))["verdict_excluding_self"] == "no"
+    assert su._board_from(_board_text(None, word="yes"))["verdict_excluding_self"] == "yes"
+    assert su._board_from("no board at all")["verdict_excluding_self"] is None
+    assert su._board_from(_board_text("Still open: succession."))[
+        "verdict_excluding_self"] == "no"
+
+
+def test_the_excluded_row_is_a_row_the_board_actually_has():
+    """A rename would restore the oscillation with nothing failing, so the
+    coupling is pinned -- the shape that worked for EXPORT_REPORTS."""
+    import importlib.util
+    import inspect
+
+    spec = importlib.util.spec_from_file_location("readiness_probe",
+                                                  ROOT / "tools" / "readiness.py")
+    rd = importlib.util.module_from_spec(spec)
+    sys.modules["readiness_probe"] = rd      # Row is a dataclass: it resolves
+    spec.loader.exec_module(rd)              # its own module by name at runtime
+    names: set[str] = set()
+    for name in dir(rd):
+        attr = getattr(rd, name, None)
+        if name.startswith("row_") and callable(attr):
+            names.update(re.findall(r'Row\(\s*"([a-z_0-9]+)"', inspect.getsource(attr)))
+    assert su.SELF_ROWS <= names, (
+        f"{sorted(su.SELF_ROWS - names)} is excluded from the capsule's board "
+        "projection but is not a readiness row; a rename would restore the "
+        "oscillation silently")
+
+
+def test_the_capsule_says_which_rows_its_verdict_leaves_out(tmp_path):
+    """Two reviewers, independently: the field no longer means what
+    TECHNICALLY_STABLE_READY means, so the capsule a successor reads has to say
+    so itself rather than leaving it to a comment in this tool."""
+    capsule = _capsule(tmp_path)
+    assert capsule["board"]["excludes"] == ["succession"]
+    assert "verdict" not in capsule["board"], (
+        "a key named `verdict` would be read as the board's own word")
+    assert set(capsule["board"]) == {
+        "reference_commit", "excludes", "verdict_excluding_self",
+        "open_rows_excluding_self"}
+
+
+def test_a_board_without_a_verdict_word_is_not_derived_green():
+    """A board that lost its `TECHNICALLY_STABLE_READY` line while keeping the
+    open-rows line below it -- a hand edit, since truncation takes the lower
+    line first -- must not come out green just because the only open row
+    measures this capsule."""
+    text = ("Measured at `abc1234` on 2026-09-23.\n\n"
+            "Open, and each one blocking: succession.\n")
+    assert su._board_from(text)["verdict_excluding_self"] is None
+
+
+def test_a_junk_row_name_stays_red():
+    """Fail-closed on anything the projection cannot recognise: an empty or
+    unexpected row name is not `succession`, so it counts as open."""
+    empty = su._board_from(_board_text("Open, and each one blocking: ."))
+    assert empty["verdict_excluding_self"] == "no"
+    spaced = su._board_from(_board_text("Open, and each one blocking:   succession ."))
+    assert spaced["open_rows_excluding_self"] == [] and (
+        spaced["verdict_excluding_self"] == "yes"), spaced
+
+
+def test_o210_a_capsule_claiming_a_clean_tree_drifts_in_a_dirty_one(tmp_path):
+    """Recorded since the first capsule and never re-derived. A reviewer
+    demonstrated it the expensive way: all seven fields VERIFIED in a tree with
+    a modified source file and three untracked modules, because
+    `internal_commit` compares commits and nothing compared bytes.
+
+    Compared, not required: a capsule written mid-closure records a dirty tree
+    honestly. What must not verify is a capsule that claims a clean one.
+    """
+    capsule = _capsule(tmp_path)
+    assert "internal_tree_clean" in capsule
+    assert _verdict(capsule, "tree")[0] in (su.OK, su.DRIFT)
+
+    claims_clean = dict(capsule, internal_tree_clean=True)
+    dirty_now = su._git("status", "--porcelain") != ""
+    if not dirty_now:
+        import pytest as _pytest
+
+        _pytest.skip("this tree is clean, so the claim is not a lie here")
+    assert _verdict(claims_clean, "tree")[0] == su.DRIFT
+    assert "recorded a clean tree" in _verdict(claims_clean, "tree")[1]
+
+    missing = {k: v for k, v in capsule.items() if k != "internal_tree_clean"}
+    assert _verdict(missing, "tree")[0] == su.GAP
+
+
+def test_no_other_readiness_row_measures_this_capsule():
+    """A reviewer caught the claim, not the code: pinning that the excluded
+    name is a real row says nothing about a *future* row that also measures the
+    capsule -- `capsule_freshness` would sit outside SELF_ROWS and the
+    oscillation would return with every test green. So the coupling is asserted
+    from the other side too: only the rows named in SELF_ROWS may reach for this
+    tool or the capsule's path.
+    """
+    import importlib.util
+    import inspect
+
+    spec = importlib.util.spec_from_file_location("readiness_probe2",
+                                                  ROOT / "tools" / "readiness.py")
+    rd = importlib.util.module_from_spec(spec)
+    sys.modules["readiness_probe2"] = rd
+    spec.loader.exec_module(rd)
+    for name in dir(rd):
+        attr = getattr(rd, name, None)
+        if not name.startswith("row_") or not callable(attr):
+            continue
+        source = inspect.getsource(attr)
+        # The *tool* or the capsule path, not the word: `row_list` names every
+        # row, `succession` among them, and that is not a measurement of the
+        # capsule.
+        if "succession.py" not in source and "SUCCESSION.json" not in source:
+            continue
+        rows = set(re.findall(r'Row\(\s*"([a-z_0-9]+)"', source))
+        assert rows & su.SELF_ROWS, (
+            f"{name} reaches for the capsule but emits {sorted(rows)}, none of "
+            f"which is excluded from the capsule's board projection; the "
+            "oscillation O209 fixed would come back")

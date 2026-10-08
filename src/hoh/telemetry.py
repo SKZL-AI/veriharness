@@ -33,13 +33,12 @@ from this data, in the open.
 
 from __future__ import annotations
 
-import os
-import tempfile
 from pathlib import Path
 
 from pydantic import Field
 
 from .contracts import Strict, utcnow
+from .durable_io import durable_append, durable_write
 from .taxonomy import FailureClass, disposition
 
 TELEMETRY_SCHEMA_VERSION = 1
@@ -246,10 +245,13 @@ class TelemetryLog:
     def append(self, record: DispatchRecord) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         text_line = record.model_dump_json() + "\n"
-        with open(self.path, "a", encoding="utf-8") as fh:
-            fh.write(text_line)
-            fh.flush()
-            os.fsync(fh.fileno())
+        # P2-41b W6: one complete line, one O_APPEND write, file and directory
+        # fsynced; a full disk is `DiskFullError` with earlier lines intact,
+        # and a torn tail left by an earlier failed append is terminated
+        # first. Concurrent appenders never interleave inside a record, but a
+        # record racing a torn fragment can still be glued onto it -- the
+        # reader skips that line, as it skipped a truncated one before.
+        durable_append(self.path, text_line)
 
     def read(self) -> list[DispatchRecord]:
         if not self.path.exists():
@@ -275,21 +277,14 @@ class TelemetryLog:
 
         Concurrent appenders interleave, which is fine for storage and awkward
         for reading. This does not drop, merge or edit anything -- it is a sort
-        -- and it writes through a temporary file in the same directory so a
-        crash leaves either the old log or the new one.
+        -- and it writes through `durable_io.durable_write` (P2-41b W5), so a
+        crash or a full disk leaves either the old log or the new one, and no
+        temp file and no `.partial` behind. 0o600, the mode the earlier
+        `mkstemp` temp gave the log.
         """
         sentence = sorted(self.read(), key=lambda r: (r.started_at, r.run_id, r.role))
-        fd, tmp = tempfile.mkstemp(dir=str(self.path.parent), prefix=".telemetry-")
-        try:
-            with os.fdopen(fd, "w", encoding="utf-8") as fh:
-                for r in sentence:
-                    fh.write(r.model_dump_json() + "\n")
-                fh.flush()
-                os.fsync(fh.fileno())
-            os.replace(tmp, self.path)
-        except Exception:
-            Path(tmp).replace(self.path.with_name(self.path.name + ".partial"))
-            raise
+        durable_write(self.path, "".join(r.model_dump_json() + "\n" for r in sentence),
+                      mode=0o600)
 
 
 def record_from_role(

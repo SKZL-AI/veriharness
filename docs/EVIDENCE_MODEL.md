@@ -15,6 +15,10 @@ traceback possible: the candidate binding, the receipt, the four evidence
 categories, and why a `PASS` receipt is still not, by itself, enough to
 accept a run.
 
+*The section at the end, "Since v0.1.0", corrects one statement below by
+addition and describes what the evidence model gained and what it still does
+not decide.*
+
 ## Candidate binding: "which state, exactly, was checked?"
 
 `src/hoh/contracts.py`'s `Candidate` binds a verification to exactly the
@@ -123,3 +127,48 @@ logged as a disarm attempt (`Controller._disarm_attempts`) rather than
 applied. Sharpening a check is still possible -- under a *new* `check_id`,
 so the discrimination logic in the previous section applies to it -- but
 silently weakening one is not.
+
+## Since v0.1.0
+
+Added for the v0.3.0a1 pre-release; the sections above stay as written.
+
+**A correction.** The receipt section says the fields of a `Receipt` "come
+into existence inside `runner.run_check` and nowhere else". The controller
+also constructs two receipts, both for a check refused before execution (a
+refused baseline command and a guard refusal), with exit code 126 and
+`runner_ok=False`. The design principle holds -- a model never produces a
+receipt -- but `run_check` is not the only constructor.
+
+**What a QA gap does not decide.** `INSUFFICIENT` above includes "an open gap
+QA reported outside the checked criteria". That is the evidence status. It is
+**not** an input to acceptance: `RoleResult.accepted()` reads only the
+criteria's verdicts and the discrimination flag, so a gap QA itself records as
+blocking does not stop an acceptance. The product accepted candidates over a
+QA-recorded defect more than once, and integration review refused them. A gate
+for this was specified and refused at integration twice; it is not merged.
+
+**Artefactual discrimination, widened.** A criterion that is red on the
+predecessor only because its own file is missing does not demonstrate an
+increment. The detector now also recognises pytest's exit-4 messages that say
+nothing was executed, case-insensitively and only at exit 4, so a real failure
+that merely prints such a line at another exit code is not reclassified. It
+still names the weakness rather than subtracting it from acceptance.
+
+**Proof classes.** A requirement in the capability register carries a declared
+proof class -- what evidence would settle it -- justified against the plan's
+own words and machine-checked (`src/hoh/proofclass.py`). One `PROVEN` flag
+had been doing the work of five claims (built, unit-tested, integrated,
+behaviourally proven, phase-gate satisfied); the classes keep them apart.
+
+**Evidence that goes stale.** An acceptance record for a requirement is
+evidence about one real run at one commit. The capability matrix re-derives
+each record on every run and refuses it as `STALE` when any file under the
+record's relevant paths changed after the evidence commit, or when it was
+taken on a dirty tree. P2's durability record went stale in exactly this way
+after later changes to `src/hoh/`; the requirements it carried fell back to
+IMPLEMENTED_NOT_PROVEN rather than keeping a status the code had moved past.
+
+**Acceptance is one step of five.** Candidate bytes, acceptance, integration
+review, merge and phase closure are decided by different authorities;
+`docs/ARCHITECTURE.md` has the table. A receipt-backed acceptance is necessary
+for a merge and is not sufficient for one.

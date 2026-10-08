@@ -34,7 +34,7 @@ def _req(probe: dict, **kw) -> dict:
     base = {"id": "X-01", "name": "x", "domain": "d", "target_phase": "P1",
             "core_required_1_0": True, "product_required_1_0": False,
             "autonomy_required": False, "optional_provider": False,
-            "ui_only": False, "probe": probe}
+            "ui_only": False, "authoritative_item": "X.item", "probe": probe}
     base.update(kw)
     return base
 
@@ -174,3 +174,141 @@ def test_this_tree_is_the_baseline_the_plan_was_written_against():
     # reconciled with the plan (O196); the plan files it under P5.
     assert by_id["P5-17"] == cm.PROVEN, "the truthful isolation report is"
     assert by_id["P1-07"] == cm.PROVEN, "the sandbox"
+
+
+# --------------------------------------------------------------------------- #
+# Evidence probes that speak for part of a record (P2 exit-includes)
+# --------------------------------------------------------------------------- #
+
+def _record(tmp_path, monkeypatch, data, *, rederives=True, changed=(), dirty=False):
+    import subprocess
+    import types
+
+    ev = ROOT / "dogfood"                    # any in-tree directory will do
+    rec = tmp_path / "record.json"
+    data = {"evidence_head": "abc", "evidence_dirty": dirty, **data}
+    rec.write_text(json.dumps(data))
+    monkeypatch.setattr(cm, "_inside", lambda p: rec if p == "R" else ev)
+    monkeypatch.setattr(cm.subprocess, "run", lambda *a, **k: subprocess.CompletedProcess(
+        a, 0 if rederives else 1, "", ""))
+    fake = types.ModuleType("durability_e2e")
+    fake.stale_paths = lambda head: list(changed)
+    monkeypatch.setitem(sys.modules, "durability_e2e", fake)
+
+
+def _probe(**kw):
+    return {"kind": "evidence", "path": "R", "evidence_dir": "E",
+            "deriver": "durability_e2e.py", **kw}
+
+
+def test_a_keyed_probe_reads_only_its_requirement(tmp_path, monkeypatch):
+    _record(tmp_path, monkeypatch, {"requirements": {"P2-33": {"satisfied": True},
+                                                     "P2-34": {"satisfied": False}}})
+    assert cm.evidence_status(_probe(key="P2-33"))[0] == cm.PROVEN
+    assert cm.evidence_status(_probe(key="P2-34"))[0] == cm.IMPLEMENTED_NOT_PROVEN
+    assert cm.evidence_status(_probe(key="P2-99"))[0] == cm.IMPLEMENTED_NOT_PROVEN
+
+
+def test_a_stressor_probe_needs_pass_not_not_run(tmp_path, monkeypatch):
+    _record(tmp_path, monkeypatch, {"stressors": {"DS1": "PASS", "DS2": "NOT_RUN"}})
+    assert cm.evidence_status(_probe(key="stressor:DS1"))[0] == cm.PROVEN
+    assert cm.evidence_status(_probe(key="stressor:DS2"))[0] == cm.IMPLEMENTED_NOT_PROVEN
+
+
+def test_stale_dirty_or_underivable_evidence_is_not_proof(tmp_path, monkeypatch):
+    good = {"requirements": {"P2-33": {"satisfied": True}}}
+    for kw in ({"changed": ["src/hoh/succession.py"]}, {"dirty": True},
+               {"rederives": False}):
+        _record(tmp_path, monkeypatch, good, **kw)
+        status, note = cm.evidence_status(_probe(key="P2-33"))
+        assert status == cm.IMPLEMENTED_NOT_PROVEN, (kw, note)
+
+
+def test_an_unlisted_deriver_is_refused(tmp_path, monkeypatch):
+    _record(tmp_path, monkeypatch, {"requirement_satisfied": True})
+    assert cm.evidence_status(_probe(deriver="arbitrary_tool.py"))[0] == cm.NOT_DETERMINABLE
+
+
+# --------------------------------------------------------------------------- #
+# The key is bound to the requirement that carries the probe
+# --------------------------------------------------------------------------- #
+
+_P2_33 = "P2.exit-includes.unattended-test"
+_P2_35 = "P2.exit-includes.controller-session-replacement"
+
+
+def _p2_record(tmp_path, monkeypatch):
+    _record(tmp_path, monkeypatch, {"requirements": {
+        "P2-33": {"authoritative_item": _P2_33, "satisfied": True},
+        "P2-35": {"authoritative_item": _P2_35, "satisfied": True}}})
+
+
+def test_a_key_names_another_requirement_is_refused(tmp_path, monkeypatch):
+    _p2_record(tmp_path, monkeypatch)
+    req = _req({}, id="P2-33", authoritative_item=_P2_33)
+    status, note = cm.evidence_status(_probe(key="P2-33"), requirement=req)
+    assert status == cm.PROVEN, note
+    status, note = cm.evidence_status(_probe(key="P2-35"), requirement=req)
+    assert status == cm.NOT_DETERMINABLE, note
+    assert "P2-35" in note and "P2-33" in note, note
+    assert _P2_33 in note and _P2_35 in note, note
+
+
+def test_a_key_names_another_requirement_unless_the_record_names_its_item(
+        tmp_path, monkeypatch):
+    """A record entry that is missing, or names no item, cannot be bound."""
+    _record(tmp_path, monkeypatch, {"requirements": {
+        "P2-33": {"satisfied": True}, "P2-34": "not an object"}})
+    req = _req({}, id="P2-33", authoritative_item=_P2_33)
+    for key in ("P2-33", "P2-34", "P2-99"):
+        status, note = cm.evidence_status(_probe(key=key), requirement=req)
+        assert status == cm.NOT_DETERMINABLE, (key, note)
+    # ... and neither does a register entry that names no item of its own.
+    _p2_record(tmp_path, monkeypatch)
+    bare = {k: v for k, v in req.items() if k != "authoritative_item"}
+    assert cm.evidence_status(_probe(key="P2-33"),
+                              requirement=bare)[0] == cm.NOT_DETERMINABLE
+
+
+def test_classify_forwards_the_entry_so_a_key_names_another_is_refused(
+        tmp_path, monkeypatch):
+    _p2_record(tmp_path, monkeypatch)
+    right = cm.classify(_req(_probe(key="P2-33"), id="P2-33",
+                             authoritative_item=_P2_33), {}, None, None)
+    wrong = cm.classify(_req(_probe(key="P2-35"), id="P2-33",
+                             authoritative_item=_P2_33), {}, None, None)
+    assert right["status"] == cm.PROVEN, right
+    assert wrong["status"] == cm.NOT_DETERMINABLE, wrong
+
+
+def test_a_stressor_key_needs_a_matching_stressor_for(tmp_path, monkeypatch):
+    _record(tmp_path, monkeypatch, {"stressors": {"DS1": "PASS"}})
+    req = _req({}, id="P2-11", authoritative_item="P2.build-verify.crash-reboot-recovery")
+    status, note = cm.evidence_status(
+        _probe(key="stressor:DS1", stressor_for="P2-11"), requirement=req)
+    assert status == cm.PROVEN, note
+    status, note = cm.evidence_status(_probe(key="stressor:DS1"), requirement=req)
+    assert status == cm.NOT_DETERMINABLE, note
+    assert "stressor:DS1" in note and "P2-11" in note and "stressor_for" in note, note
+    status, note = cm.evidence_status(
+        _probe(key="stressor:DS1", stressor_for="P2-35"), requirement=req)
+    assert status == cm.NOT_DETERMINABLE, note
+    assert "stressor:DS1" in note and "P2-11" in note and "P2-35" in note, note
+
+
+def test_a_keyless_durability_probe_is_refused(tmp_path, monkeypatch):
+    _record(tmp_path, monkeypatch, {"requirement_satisfied": True})
+    req = _req({}, id="P2-33", authoritative_item=_P2_33)
+    for kw in ({}, {"requirement": req}):
+        status, note = cm.evidence_status(_probe(), **kw)
+        assert status == cm.NOT_DETERMINABLE, (kw, note)
+        assert "several requirements" in note, note
+
+
+def test_a_keyless_default_deriver_probe_reads_as_before(tmp_path, monkeypatch):
+    """P1-16: the default deriver, no key, the top-level flag -- unchanged."""
+    _record(tmp_path, monkeypatch, {"requirement_satisfied": True})
+    probe = {k: v for k, v in _probe().items() if k != "deriver"}
+    req = _req(probe, id="P1-16", authoritative_item="P1.product-requirement.fresh-clone")
+    assert cm.evidence_status(probe)[0] == cm.PROVEN
+    assert cm.evidence_status(probe, requirement=req)[0] == cm.PROVEN

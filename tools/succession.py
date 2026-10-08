@@ -13,6 +13,12 @@ it: green means the ground under the handover has not moved, red names what
 moved, and an environment gap names what cannot be checked from where it is
 standing -- which is its own answer and never a pass.
 
+The board field is a *projection*, not a copy: it leaves out the readiness row
+that measures this capsule, and names what it left out, because a row whose
+state writing the capsule changes cannot also be a fact the capsule records
+(O209). So `verdict_excluding_self` answers "is anything else open", which is
+the question a successor has, and never claims to be the board's own word.
+
 What the capsule deliberately does **not** carry: narrative, plans for the
 work, or advice. Those belong in the plan the capsule points at. This file
 answers one question -- is the state described here the state that exists --
@@ -43,6 +49,14 @@ CAPSULE = HOH / "dogfood/succession/SUCCESSION.json"
 #: environment or given on the command line; absent, the plan fields become an
 #: environment gap rather than an assumption.
 PLAN_ENV = "VERIHARNESS_PLAN_ROOT"
+
+#: Readiness rows that measure this capsule, and are therefore left out of the
+#: board projection recorded here (O209). A row that reports whether the
+#: capsule matches the tree cannot also be a fact the capsule records: writing
+#: the capsule is what turns it green, which changes the record, which turns it
+#: red again. `tests/test_succession.py` pins that this name is a row the board
+#: actually has, so a rename cannot quietly restore the oscillation.
+SELF_ROWS = frozenset({"succession"})
 
 #: Verdicts a single field can carry. Three, not two: a field that cannot be
 #: checked from here is not a failure of the capsule and not a pass either.
@@ -99,15 +113,60 @@ def _board() -> dict:
     path = HOH / "docs/READINESS.md"
     if not path.is_file():
         return {}
-    text = path.read_text(encoding="utf-8")
+    return _board_from(path.read_text(encoding="utf-8"))
+
+
+def _board_from(text: str) -> dict:
+    """The same, from the board's text, so the parsing can be tested."""
     m = re.search(r"Measured at `([0-9a-f]+)`", text)
     v = re.search(r"TECHNICALLY_STABLE_READY = (\w+)", text)
     open_rows = re.search(r"^Open, and each one blocking: (.+)$", text, re.M)
+    rows = ([s.strip().rstrip(".").strip() for s in open_rows.group(1).split(",")]
+            if open_rows else [])
+    rows_other_than_this = [r for r in rows if r not in SELF_ROWS]
+    # Fail-closed on a board this cannot read. Deriving "yes" from an empty
+    # list meant a board whose open-rows line was missing, truncated or
+    # reworded read as green -- strictly weaker than the old behaviour, which
+    # copied the word `no` and stayed red. A reviewer demonstrated it. So
+    # "yes" is derived only when the board already says yes, or when its word
+    # was readable, rows were actually parsed, and the only open one measures
+    # this capsule. A board that lost the verdict line while keeping the one
+    # below it -- a hand edit -- would otherwise still read as green.
+    said = v.group(1) if v else None
+    if said == "yes" or (said and rows and not rows_other_than_this):
+        verdict = "yes"
+    else:
+        verdict = said
     return {
         "reference_commit": m.group(1) if m else None,
-        "verdict": v.group(1) if v else None,
-        "open_rows": ([s.strip().rstrip(".") for s in open_rows.group(1).split(",")]
-                      if open_rows else []),
+        #: Which rows this projection leaves out, in the capsule itself, so a
+        #: reader does not have to find this code to know that the verdict is
+        #: not `TECHNICALLY_STABLE_READY`.
+        "excludes": sorted(SELF_ROWS),
+        # Derived from the rows that are not about this capsule, for the same
+        # reason (O209): the board's own verdict word flips with the
+        # `succession` row, so recording it verbatim made the capsule and the
+        # board unable to agree -- `no` while the row was red, `yes` once
+        # writing the capsule turned it green, and red again at the next
+        # render. This says what a successor needs: is anything *else* open.
+        # Not the board's word verbatim: that would drift again the moment it
+        # flips, which is the defect this whole field exists to stop.
+        "verdict_excluding_self": verdict,
+        # Every row except the one that measures this capsule. O209: with
+        # `succession` included, the pair had no fixpoint. Writing the capsule
+        # is what turns that row green, which removes it from the board's open
+        # list, which changes the very field the capsule just recorded -- so
+        # the next render turned the row red again, and the one after that
+        # green. Four closure cycles oscillated between those two states, and
+        # `regenerate` cannot reach a fixpoint across them either.
+        #
+        # Dropping it removes a self-reference, not a check. That a capsule
+        # describes this tree is what `verify` answers field by field, and the
+        # board's own row reports that answer; the capsule restating it proved
+        # nothing and made the two unable to agree. Every other row stays, so a
+        # capsule written while `tests` or `export_manifest` was red still says
+        # so.
+        "open_rows_excluding_self": rows_other_than_this,
     }
 
 
@@ -216,8 +275,10 @@ def write_capsule(plan_root: Path | None, out: Path) -> int:
     out.write_text(json.dumps(capsule, indent=2, ensure_ascii=False) + "\n")
     print(f"wrote {out.relative_to(HOH) if out.is_relative_to(HOH) else out}")
     print(f"  internal commit    {capsule['internal_commit'][:12]}")
-    print(f"  board verdict      {capsule['board'].get('verdict')} "
-          f"at {str(capsule['board'].get('reference_commit'))[:12]}")
+    board = capsule["board"]
+    print(f"  board              {board.get('verdict_excluding_self')} at "
+          f"{str(board.get('reference_commit'))[:12]}, excluding "
+          f"{', '.join(board.get('excludes') or []) or 'nothing'}")
     print(f"  public commit      {str(capsule['sync'].get('public_commit'))[:12]}")
     print(f"  open findings      {len(capsule['open_findings'])}")
     print(f"  plan files pinned  {len(capsule['plan'].get('files') or {})}")
@@ -278,6 +339,31 @@ def check(capsule: dict, plan_root: Path | None) -> list[tuple[str, str, str]]:
             rows.append(("internal_commit", DRIFT,
                          f"HEAD has moved {n or '?'} commit(s) past "
                          f"{commit[:12]}; the capsule is behind"))
+
+    # O210. Recorded since the first capsule and never re-derived, which a
+    # reviewer demonstrated the expensive way: `verify` reported all seven
+    # fields VERIFIED in a tree with a modified source file and three untracked
+    # new modules. No other field covers working-tree content -- `internal_commit`
+    # compares commits, not bytes -- so a successor could trust a green capsule
+    # while reading a tree that differs from every commit in it.
+    #
+    # Compared, not required: a capsule written during a closure records a dirty
+    # tree (its own file is uncommitted), and that is honest. What must not
+    # happen is a capsule recording `true` verifying where the tree has since
+    # moved.
+    recorded_clean = capsule.get("internal_tree_clean")
+    now_clean = _git("status", "--porcelain") == ""
+    if recorded_clean is None:
+        rows.append(("tree", GAP, "the capsule does not say whether the tree was clean"))
+    elif bool(recorded_clean) == now_clean:
+        rows.append(("tree", OK, "clean" if now_clean else
+                     "dirty, as it was when the capsule was written"))
+    else:
+        changed = [ln for ln in _git("status", "--porcelain").splitlines()][:4]
+        rows.append(("tree", DRIFT,
+                     f"the capsule recorded a {'clean' if recorded_clean else 'dirty'} "
+                     f"tree and this one is {'clean' if now_clean else 'dirty'}"
+                     + (f": {', '.join(changed)}" if changed else "")))
 
     for field, now, name in (("board", _board(), "board"),
                              ("sync", _sync(), "sync"),

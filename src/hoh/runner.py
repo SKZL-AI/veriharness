@@ -54,6 +54,7 @@ import re
 import resource
 import signal
 import socket
+import stat
 import subprocess
 import threading
 import time
@@ -71,11 +72,28 @@ from .contracts import (
     utcnow,
 )
 
-#: Pattern files, searched in this order.
+#: Pattern files. The guard applies the **union** of the shipped policy and
+#: the operator's patterns (2026-09-25):
 #:
-#: 1. The operator. The canonical version on this machine wins, so that a
-#:    sharpened pattern takes effect everywhere immediately and is not
-#:    overruled by an older shipped copy.
+#: * the shipped copy (package, else repository layout) is always applied and
+#:   must exist -- it is the product's own policy for model-generated
+#:   commands, versioned with the code;
+#: * the operator's copy under `~/.agents/hooks/` is applied *in addition*,
+#:   so a sharpened pattern still takes effect everywhere immediately.
+#:
+#: Until 2026-09-25 the first file found won, operator first. That was built
+#: for sharpening and never considered the other direction: when the operator
+#: relaxed a machine-wide rule for their own sessions (nvidia-smi, fully
+#: released that day), the product's guard silently lost the pattern, the
+#: suite's refusal tests executed `nvidia-smi -l 1` for real and left two
+#: orphaned loops running. A machine-local relaxation must not weaken what the
+#: product lets model-generated commands do; changing that is a product change
+#: in `policy/`, visible in the diff.
+#:
+#: Search history kept for the record:
+#:
+#: 1. The operator. Previously "the canonical version on this machine wins";
+#:    now additive only (see above).
 #: 2. The **package**. Until 2026-09-07 this step was missing, and that made
 #:    an installed version unusable: `parent.parent.parent / "policy"` points
 #:    at `<venv>/lib/python3.13/policy` for a wheel -- and nothing is there.
@@ -90,17 +108,36 @@ _REPO_PATTERNS = Path(__file__).resolve().parent.parent.parent / "policy"
 
 
 def _pattern_search_path() -> tuple[Path, ...]:
-    return (_HOME_PATTERNS, _PACKAGE_PATTERNS, _REPO_PATTERNS)
+    """Where the *shipped* policy is looked for. The operator's directory is
+    not listed: it can add patterns but cannot stand in for a missing shipped
+    file, so naming it here would invite the wrong repair."""
+    return (_PACKAGE_PATTERNS, _REPO_PATTERNS)
 
 
 def _pattern_file(name: str) -> Path:
-    for base in _pattern_search_path():
+    """The shipped copy of a pattern file (package, else repository layout)."""
+    for base in (_PACKAGE_PATTERNS, _REPO_PATTERNS):
         candidate = base / name
         if candidate.exists():
             return candidate
     #: No hit: return the place the file belongs to, so that the error message
     #: points at the package and not at some accidental path.
     return _PACKAGE_PATTERNS / name
+
+
+def _operator_pattern_file(name: str) -> Path | None:
+    """The operator's additional copy, when there is one.
+
+    Returned whenever the path exists -- or is a symlink, even a dangling one:
+    a broken operator file is refused loudly by the loader (fails closed)
+    rather than skipped. Duplicates of shipped patterns are dropped *after*
+    loading (see `assert_command_allowed`), not by comparing files first: a
+    file comparison followed by a second read is a race in which an operator
+    addition can be dropped for one call."""
+    candidate = _HOME_PATTERNS / name
+    if not candidate.exists() and not candidate.is_symlink():
+        return None
+    return candidate
 
 
 DEFAULT_TIMEOUT = 600
@@ -200,7 +237,15 @@ def _load_patterns(
     """
     out: list[tuple[str, re.Pattern[str]]] = []
     broken: list[tuple[str, str]] = []
-    for line in path.read_text(encoding="utf-8").splitlines():
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
+        # Unreadable, a directory, not UTF-8: none of its rules can be applied.
+        # Reported as one broken entry so the caller fails closed with a
+        # PolicyUnavailable naming the file, rather than a raw OSError that
+        # the controller does not treat as a guard outcome.
+        return out, [("<file unreadable>", f"{type(exc).__name__}: {exc}")]
+    for line in text.splitlines():
         line = line.strip()
         if not line or line.startswith("#"):
             continue
@@ -343,7 +388,13 @@ def assert_command_allowed(command: str) -> None:
         ("house rule", _pattern_file("house-rules-patterns.txt")),
         ("denylist", _pattern_file("dangerous-patterns.txt")),
     ]
+    # The shipped policy must exist; the operator's copies are added to it.
     missing = [str(p) for _, p in sources if not p.exists()]
+    for source, name in (("house rule (operator)", "house-rules-patterns.txt"),
+                         ("denylist (operator)", "dangerous-patterns.txt")):
+        extra = _operator_pattern_file(name)
+        if extra is not None:
+            sources.append((source, extra))
     if missing:
         searched = ", ".join(str(b) for b in _pattern_search_path())
         raise PolicyUnavailable(
@@ -362,15 +413,21 @@ def assert_command_allowed(command: str) -> None:
     # no better claim to being trusted.
     loaded: list[tuple[str, str, re.Pattern[str]]] = []
     unusable: list[str] = []
+    seen: set[str] = set()
     for source, path in sources:
         patterns, broken = _load_patterns(path)
-        loaded.extend((source, pattern, rx) for pattern, rx in patterns)
+        # Shipped sources come first, so a pattern the operator's copy repeats
+        # is attributed to the shipped policy and matched once.
+        loaded.extend((source, pattern, rx) for pattern, rx in patterns
+                      if pattern not in seen)
+        seen.update(pattern for pattern, _ in patterns)
         unusable.extend(
             f"{path.name}: {line!r} ({source}) -- {error}" for line, error in broken
         )
     if unusable:
         raise PolicyUnavailable(
-            "Guard pattern files contain lines that do not compile: "
+            "Guard pattern files cannot be loaded completely (an unreadable file, "
+            "or lines that do not compile): "
             + "; ".join(unusable)
             + " -- a partially loaded guard protects less than it states,"
             " so no model-generated command is run until this is fixed."
@@ -477,6 +534,22 @@ ARTEFACTUAL_SIGNATURES = (
     "collected 0 items",
 )
 
+#: pytest's exit-4 ("usage error") ways of saying nothing executed, matched
+#: case-insensitively and **only at exit 4**. pytest 9 prints
+#: `ERROR: file or directory not found: <path>` for a missing file and
+#: `ERROR: not found: <node id>` for a missing test; in a read-only rootdir its
+#: cache warning replaces the `no tests ran` summary, so the exact list above
+#: misses both. Lower-casing at every exit code would turn a real failure whose
+#: test merely prints one of these lines (exit 1) or a module that prints one
+#: before raising (exit 2) into an artefactual one; hence the exit-4 bound.
+#: The exact list above still applies at every exit code, exit 4 included.
+ARTEFACTUAL_SIGNATURES_EXIT_4 = (
+    "error: file or directory not found",
+    "error: not found:",
+    "no tests ran",
+    "collected 0 items",
+)
+
 
 def artefactual_reason(exit_code: int, transcript: str) -> str:
     """Why a red baseline may not demonstrate an increment, or "".
@@ -509,6 +582,16 @@ def artefactual_reason(exit_code: int, transcript: str) -> str:
                 "output): it is red because the candidate's own file is not "
                 "there yet, not because the behaviour is absent"
             )
+    if exit_code == 4:
+        lowered = output_.lower()
+        for sig in ARTEFACTUAL_SIGNATURES_EXIT_4:
+            if sig in lowered:
+                return (
+                    f"the baseline did not execute the criterion ({sig!r}, "
+                    "case-insensitive, in its output at exit 4): it is red "
+                    "because the candidate's own file is not there yet, not "
+                    "because the behaviour is absent"
+                )
     return ""
 
 
@@ -765,11 +848,84 @@ def _fresh_scratch(scratch: Path) -> Path:
 #: the situation the parking exists for.
 _OWN_SCRATCHES: dict[str, int] = {}
 
+# Caller-supplied scratch directories (`run_check(scratch=)`) this process vetted for the
+# UNSANDBOXED regime, by what the directory is -- (st_dev, st_ino) -- not by any name it was
+# reached by (a symlinked parent, a `..`, a bind mount are all the same directory).
+_VETTED_CALLER_SCRATCHES: set[tuple[int, int]] = set()
 
-def _env(workdir: Path, extra: dict[str, str] | None) -> dict[str, str]:
+
+def _caller_scratch(scratch: "str | Path", workdir: Path, *, fresh_each_use: bool) -> Path:
+    """The directory a caller supplies as the check's `HOME` and `TMPDIR`
+    (a registered ephemeral workspace, `hoh.storage_ephemeral`).
+
+    It gets **the guard `_fresh_scratch` gives the runner's own scratch**, not
+    less: a pre-planted `usercustomize.py` in `$HOME` runs before the command's
+    first line (a reviewer demonstrated it), so what the runner cannot create
+    itself it must vouch for. Refused with a `ValueError`, before anything
+    runs, unless the path is an absolute, existing, real directory (not a
+    symlink) that neither holds nor lies inside the arena, is owned by the
+    effective uid, has no group or other permission bits (0700 or tighter),
+    and is **empty** the first time this process uses it unsandboxed. A directory
+    this process vetted for the unsandboxed regime before (the same directory,
+    by device and inode, whatever name reached it) may be non-empty again there, where the checks of one candidate share
+    a scratch as they do on the pin; under a sandbox (`fresh_each_use`) it must be
+    empty at **every** use -- one workspace per check, as
+    `.hoh-scratch-<receipt>` was -- and **any sandboxed use, even one that is
+    refused, takes the vet away** (an unsandboxed use must then find it empty
+    again): what a sandboxed check wrote is never accepted later by an
+    unsandboxed one, in whatever order the regimes alternate. A sandboxed use
+    never vets.
+    The runner never parks, renames or removes what a caller names."""
+    path = Path(scratch)
+    if not path.is_absolute():
+        raise ValueError(f"scratch must be an absolute path, got {os.fspath(scratch)!r}")
+    try:
+        info = os.lstat(path)
+    except OSError as exc:
+        raise ValueError(f"scratch {path} cannot be used: {exc}") from exc
+    # What was vetted is the directory, not a name for it.
+    ident = (info.st_dev, info.st_ino)
+    if fresh_each_use:
+        # ANY sandboxed use takes the vet away -- before anything can refuse or run: what a
+        # sandboxed check wrote must never be accepted later by an unsandboxed one, whatever
+        # the order of the uses (NONE, STRICT, NONE as much as STRICT, NONE).
+        _VETTED_CALLER_SCRATCHES.discard(ident)
+    if not stat.S_ISDIR(info.st_mode):
+        raise ValueError(f"scratch {path} is not a real directory")
+    # realpath, not abspath: a scratch reached through a symlinked parent that lies
+    # inside the arena is inside the arena (and the other way round)
+    here, there = Path(os.path.realpath(workdir)), Path(os.path.realpath(path))
+    if there == here or here.is_relative_to(there) or there.is_relative_to(here):
+        raise ValueError(f"scratch {path} and the arena {workdir} must be separate trees")
+    if info.st_uid != os.geteuid():
+        raise ValueError(f"scratch {path} is not owned by this user (uid {info.st_uid})")
+    if stat.S_IMODE(info.st_mode) & 0o077:
+        raise ValueError(f"scratch {path} has group or other permissions "
+                         f"({stat.S_IMODE(info.st_mode):o}); it must be 0700 or tighter")
+    if fresh_each_use or ident not in _VETTED_CALLER_SCRATCHES:
+        try:
+            with os.scandir(path) as listing:
+                first = next(listing, None)
+        except OSError as exc:
+            raise ValueError(f"scratch {path} cannot be listed: {exc}") from exc
+        if first is not None:
+            raise ValueError(f"scratch {path} is not empty ({first.name!r}): a file planted "
+                             f"before the check would run as its $HOME"
+                             + ("; under a sandbox each check needs its own workspace"
+                                if fresh_each_use else ""))
+    if not fresh_each_use:
+        # Vetted for the unsandboxed regime only: what a sandboxed check wrote
+        # must never be accepted later by an unsandboxed one.
+        _VETTED_CALLER_SCRATCHES.add(ident)
+    return path
+
+
+def _env(workdir: Path, extra: dict[str, str] | None,
+         scratch: "Path | None" = None) -> dict[str, str]:
     env = {k: os.environ[k] for k in ENV_ALLOWLIST if k in os.environ}
     env.setdefault("PATH", "/usr/local/bin:/usr/bin:/bin")
-    scratch = _scratch_dir(workdir)
+    if scratch is None:
+        scratch = _scratch_dir(workdir)
     env["HOME"] = str(scratch)
     env["TMPDIR"] = str(scratch)
     env["PYTHONDONTWRITEBYTECODE"] = "1"
@@ -839,6 +995,7 @@ def run_check(
     receipt_suffix: str = "",
     isolation: "sandbox_mod.Isolation | None" = None,
     sandbox: "sandbox_mod.SandboxBackend | None" = None,
+    scratch: "str | Path | None" = None,
 ) -> tuple[Receipt, str]:
     """Runs a check and returns (Receipt, transcript text).
 
@@ -866,6 +1023,17 @@ def run_check(
     A sandboxed run is not merely a differently-spawned process, and the
     receipt says which it was: `note` records the isolation applied, so a
     receipt read six months later does not have to be guessed at.
+
+    **Scratch.** Without `scratch` the check's `HOME` and `TMPDIR` are a sibling
+    of the arena (`.scratch`, or `.hoh-scratch-<receipt>` under STRICT) that
+    nothing ever removes. With `scratch` -- the path of a registered ephemeral
+    workspace (`hoh.storage_ephemeral`, P2-42) -- both regimes use exactly that
+    directory, so what a check writes is owned, leased and cleaned like the rest
+    of the project's temporary state. It is held to the guard of the runner's own
+    scratch (`_caller_scratch`: a real directory outside the arena, owned by the
+    caller's uid, 0700, empty when first used -- and under STRICT empty at every
+    use) and is refused with a `ValueError` before anything runs otherwise; it is
+    never parked, and the runner never removes it.
     """
     from .sandbox import (
         Isolation as _Isolation,
@@ -895,6 +1063,9 @@ def run_check(
     assert_stays_in_arena(check.command)
 
     workdir = Path(cwd or candidate.repo_path)
+    caller_scratch = (_caller_scratch(scratch, workdir,
+                                      fresh_each_use=isolation is not _Isolation.NONE)
+                      if scratch is not None else None)
     resolved_command = check.command.replace(ARENA_PLACEHOLDER, str(workdir))
     # `receipt_suffix` separates evidence that belongs to the same iteration
     # and the same criterion but measures different states: the candidate run
@@ -1025,7 +1196,8 @@ def run_check(
                 # command's first line, under a receipt that says "verified
                 # from inside". The strongest-looking receipt was the
                 # vulnerable one.
-                scratch = _fresh_scratch(sink.parent / f".hoh-scratch-{receipt_id}")
+                scratch = (caller_scratch if caller_scratch is not None
+                           else _fresh_scratch(sink.parent / f".hoh-scratch-{receipt_id}"))
                 # The proof travels out over a pipe this process holds. It used
                 # to be a file in the scratch directory -- which is
                 # bind-mounted read-write and is also the check's $HOME and
@@ -1144,7 +1316,7 @@ def run_check(
                 proc = subprocess.Popen(
                     ["/bin/bash", "-c", resolved_command],  # no -l: no login profile
                     cwd=workdir,
-                    env=_env(workdir, env),
+                    env=_env(workdir, env, caller_scratch),
                     stdout=fh,
                     stderr=subprocess.STDOUT,
                     stdin=subprocess.DEVNULL,

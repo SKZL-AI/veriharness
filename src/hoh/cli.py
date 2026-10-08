@@ -14,9 +14,10 @@ import argparse
 import json
 import os
 import sys
+from contextlib import contextmanager
 from pathlib import Path
 
-from . import stages
+from . import pane_ledger, stages
 from .contracts import Budgets, Condition, Role, Stage
 from .controller import Controller, new_run_id
 from .store import LockBusy, RunStore, StoreError, list_runs
@@ -196,53 +197,442 @@ def cmd_goal(args) -> int:
 
 
 def cmd_resume_quota(args) -> int:
-    """Resumes runs that are stuck on the usage quota.
+    """Resumes branches that are waiting on the usage quota once the wait is over.
 
     The counter-design to "HoH sleeps by itself": a controller that holds the
     lock while sleeping for hours is indistinguishable from a hung one.
-    Instead the run stays visibly blocked and carries the reason in
-    machine-readable form; this command picks it up once the wait is over.
-    Callable by hand, from cron or as a Herdr plugin action.
+    Instead the branch stays visibly blocked, a durable timer records when it
+    may retry, and this command -- by hand, from the systemd timer in `ops/`,
+    or as a Herdr action -- consumes the due timers (`hoh.resumeloop`).
 
-    Only `blocked_kind='usage_limit'` is resumed. Every other block has a
-    cause a human has to clear -- stepping over it automatically would be
-    exactly the silent widening of permissions the rest of this is built
-    against.
+    Only `blocked_kind='usage_limit'` is resumed. A branch parked by the
+    autonomy contract, a question collected for the digest, or a capability
+    violation is reported and left alone: each of those has an owner who is
+    not a timer. With `--drive`, a project whose branch was resumed is driven
+    on by a new governed master (a new epoch), if it registered a driver.
     """
-    from . import quota
+    from .resumeloop import recover_projects, resume_projects, resume_runs
 
-    ids = [args.run_id] if args.run_id else list(list_runs(args.root))
-    report = []
-    for rid in ids:
-        store = RunStore(args.root, rid)
+    # Each phase on its own: a failure in one is reported and the others still
+    # run -- the systemd unit is the only thing keeping a quota wait moving
+    # (review A4, G4).
+    def phase(fn, *a, **k):
         try:
-            with store.lock():
-                st = store.read_state()
-                if st.condition is not Condition.BLOCKED or st.blocked_kind != "usage_limit":
-                    continue
-                if st.resume_attempts >= quota.MAX_RESUME_ATTEMPTS:
-                    report.append({
-                        "run_id": rid, "action": "given_up",
-                        "reason": f"{st.resume_attempts} unsuccessful resume attempts -- "
-                                  "an automatic retry without a limit costs money "
-                                  "without making progress. 'hoh unblock' is the "
-                                  "captain's decision.",
-                    })
-                    continue
-                if not quota.is_due(st.retry_after):
-                    report.append({"run_id": rid, "action": "waiting",
-                                   "earliest": st.retry_after})
-                    continue
-                st.resume_attempts += 1
-                stages.unblock(st, f"quota retry {st.resume_attempts}")
-                store.write_state(st)
-                report.append({"run_id": rid, "action": "resumed",
-                               "attempt": st.resume_attempts,
-                               "next_step": f"hoh --root {args.root} run {rid}"})
-        except (LockBusy, StoreError) as exc:
-            report.append({"run_id": rid, "action": "skipped", "reason": str(exc)[:120]})
+            return fn(*a, **k)
+        except Exception as exc:                          # noqa: BLE001 - reported
+            return [{"scope": fn.__name__, "action": "skipped",
+                     "why": f"{type(exc).__name__}: {exc}"[:200]}]
+    runs = phase(resume_runs, args.root, only=args.run_id)
+    projects = [] if args.run_id else phase(resume_projects, args.root, drive=args.drive)
+    if args.recover and not args.run_id:
+        projects += phase(recover_projects, args.root)
+    _print({"checked": len({r.get("target") for r in runs}), "results": runs,
+            "projects": projects})
+    return 0
 
-    _print({"checked": len(ids), "results": report})
+
+# --------------------------------------------------------------------------- #
+# Storage admission wiring (STORAGE-B3, P2-40)
+# --------------------------------------------------------------------------- #
+
+#: Refusal texts of `hoh run`; `hoh.launcher.STORAGE_REFUSED` matches them.
+STORAGE_NOT_INITIALISED = ("storage state root is not initialised: run "
+                           "`hoh storage init --root {root}` or pass --storage-root")
+WSL_NO_HOST_PATHS = "WSL: configure host_paths (e.g. the Windows volume mount)"
+WSL_NO_VHDX_VOLUME = "WSL: the VHDX volume is not observed"
+STORAGE_UNAVAILABLE = "storage admission unavailable"
+
+
+def resolve_storage_root(option: str | None) -> Path:
+    """`--storage-root`, else `$HOH_STATE_ROOT`, else
+    `${XDG_STATE_HOME:-~/.local/state}/veriharness`. Only resolved -- never
+    created here."""
+    if option:
+        return Path(option).expanduser()
+    env = os.environ.get("HOH_STATE_ROOT")
+    if env:
+        return Path(env).expanduser()
+    xdg = os.environ.get("XDG_STATE_HOME") or str(Path.home() / ".local" / "state")
+    return Path(xdg).expanduser() / "veriharness"
+
+
+class StorageRefused(Exception):
+    """`hoh run` / `hoh resume-storage` will not start: the message says why."""
+
+
+def _same_path(a: str, b: str) -> bool:
+    return os.path.normpath(os.path.expanduser(a)) == os.path.normpath(os.path.expanduser(b))
+
+
+def storage_admission_for(option: str | None, *, claim: bool = True):
+    """The admission a host entry point uses, built from the resolved state
+    root -- or `StorageRefused` with the operator-facing reason.
+
+    Refused: a root without the registry's `OWNER.json` (never created here:
+    no second ledger is invented); on WSL, a policy without `host_paths`, or
+    a missing `storage-host.json` / a `wsl_host_volume` not among
+    `host_paths`; a policy file, ledger or boot claim that cannot be used
+    ("storage admission unavailable"). The boot is claimed before the first
+    admission (`claim_boot`).
+
+    WSL or native is decided by the merged host adapter
+    (`storage_host.detect_host_profile`, looked up on the module so tests
+    inject it there); a profile `unknown` is refused, never read as native.
+    On WSL the admission observes the host through the WSL adapter built with
+    `HostConfig(windows_mount=<wsl_host_volume>)`; on a native host as
+    STORAGE-B2 builds it from the policy.
+    """
+    from . import storage_host
+    from .storage_pressure import (GuestObserver, StorageAdmission, StoragePolicy,
+                                   StoragePolicyError)
+
+    root = resolve_storage_root(option)
+    if not (root / "OWNER.json").is_file():
+        raise StorageRefused(STORAGE_NOT_INITIALISED.format(root=root))
+    policy_file = root / "storage-policy.json"
+    try:
+        policy = StoragePolicy.load(policy_file) if policy_file.is_file() else StoragePolicy()
+    except StoragePolicyError as exc:
+        raise StorageRefused(f"{STORAGE_UNAVAILABLE}: {exc}") from exc
+    try:
+        profile = storage_host.detect_host_profile()
+    except Exception:                                     # noqa: BLE001 - fail closed
+        profile = storage_host.PROFILE_UNKNOWN
+    if profile not in (storage_host.PROFILE_WSL2, storage_host.PROFILE_NATIVE):
+        raise StorageRefused(f"{STORAGE_UNAVAILABLE}: host profile unknown ({profile!r})")
+    observer = None
+    if profile == storage_host.PROFILE_WSL2:
+        if not policy.host_paths:
+            raise StorageRefused(WSL_NO_HOST_PATHS)
+        host_file = root / "storage-host.json"
+        try:
+            host = json.loads(host_file.read_text(encoding="utf-8"))
+            volume = host["wsl_host_volume"]
+            if not isinstance(volume, str) or not volume:
+                raise ValueError("wsl_host_volume must be a non-empty path")
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            raise StorageRefused(f"{WSL_NO_VHDX_VOLUME}: {host_file}: {exc}") from exc
+        if not any(_same_path(volume, p) for p in policy.host_paths):
+            raise StorageRefused(f"{WSL_NO_VHDX_VOLUME}: wsl_host_volume {volume} is not "
+                                 f"among host_paths {list(policy.host_paths)}")
+        try:
+            adapter = storage_host.adapter_for_profile(
+                profile, storage_host.HostConfig(
+                    windows_mount=os.path.normpath(os.path.expanduser(volume))))
+        except (ValueError, storage_host.StorageHostError) as exc:
+            raise StorageRefused(f"{WSL_NO_VHDX_VOLUME}: {host_file}: {exc}") from exc
+        observer = GuestObserver(root, adapter.host_observer(policy))
+    try:
+        admission = StorageAdmission.for_state_root(root, policy, observer)
+        if claim:
+            admission.claim_boot()
+    except Exception as exc:                              # noqa: BLE001 - fail closed
+        raise StorageRefused(f"{STORAGE_UNAVAILABLE}: {type(exc).__name__}: {exc}") from exc
+    return admission, root
+
+
+def cmd_resume_storage(args) -> int:
+    """Resumes runs and project nodes parked on storage pressure (STORAGE-B3).
+
+    Owns only `blocked_kind='storage_pressure'`; a quota wait is left to
+    `hoh resume-quota`. A due STORAGE_RECHECK timer resumes its branch only
+    when the state is better than CRITICAL and a role run would be admitted
+    now; otherwise a new timer is armed and the branch stays parked. The boot
+    is claimed first. Nothing is cleaned, ever.
+    """
+    from .resumeloop import resume_storage
+
+    try:
+        admission, root = storage_admission_for(args.storage_root, claim=False)
+    except StorageRefused as exc:
+        print(str(exc), file=sys.stderr)
+        _print({"checked": 0, "results": [{"scope": "storage", "action": "refused",
+                                           "verdict": "NEEDS_YOU", "why": str(exc)}]})
+        return 2
+    try:
+        results = resume_storage(args.root, admission=admission, only=args.run_id)
+    except Exception as exc:                              # noqa: BLE001 - reported
+        results = [{"scope": "resume_storage", "action": "skipped",
+                    "why": f"{type(exc).__name__}: {exc}"[:200]}]
+    _print({"storage_root": str(root),
+            "checked": len({r.get("target") for r in results}), "results": results})
+    return 0
+
+
+def cmd_storage(args) -> int:
+    """`hoh storage init --root PATH`: initialise a storage state root (the
+    registry's `OWNER.json`, written before any child)."""
+    from .storage_registry import StorageRegistry
+
+    try:
+        record = StorageRegistry(Path(args.storage_root_path).expanduser()).init()
+    except Exception as exc:                              # noqa: BLE001 - reported
+        print(f"storage init refused: {exc}", file=sys.stderr)
+        return 2
+    _print({"storage_root": str(Path(args.storage_root_path).expanduser()), "owner": record})
+    return 0
+
+
+def cmd_storage_adopt_project(args) -> int:
+    """`hoh storage adopt-project --project P --project-root PATH --anchor
+    COMMIT:FILE --storage-root PATH`: adopt the existing project directory
+    `<storage root>/projects/<P>/` through the adoption anchor committed in
+    the trust root (`StorageRegistry.adopt_project`, the only call made).
+
+    A one-time operator act: `--storage-root` is required and has no
+    fallback to `$HOH_STATE_ROOT` or the XDG default, the state root is never
+    initialised here, and no storage admission is needed (a few hundred
+    bytes are written). Exit 0 with `{"storage_root", "project"}` printed;
+    exit 2 with `storage adopt-project refused: <message>` on stderr."""
+    import re
+
+    from .storage_registry import StorageOwnershipError, StorageRegistry
+
+    commit, sep, file = args.anchor.partition(":")
+    if not sep or not re.fullmatch(r"[0-9a-f]{7,64}", commit):
+        print(f"storage adopt-project refused: --anchor {args.anchor!r} is not COMMIT:FILE "
+              f"with a hex commit id", file=sys.stderr)
+        return 2
+    root = Path(args.storage_root).expanduser()
+    try:
+        record = StorageRegistry(root).adopt_project(
+            args.project, args.project_root, {"commit": commit, "file": file})
+    except (StorageOwnershipError, OSError) as exc:
+        print(f"storage adopt-project refused: {exc}", file=sys.stderr)
+        return 2
+    _print({"storage_root": str(root), "project": record})
+    return 0
+
+
+def cmd_storage_survey_legacy(args) -> int:
+    """`hoh storage survey-legacy --project P --reviews DIR --out FILE
+    --storage-root PATH`: draft a legacy-roots anchor for the reviewer dirs
+    in DIR (read-only; writes only the new file FILE). Exit 0 with a summary
+    printed; exit 2 with `storage survey-legacy refused: <message>`."""
+    from .legacy_scratch import survey, write_survey
+    from .storage_registry import StorageOwnershipError, StorageRegistry
+
+    root = Path(args.storage_root).expanduser()
+    try:
+        record = survey(args.reviews, registry=StorageRegistry(root), project_id=args.project)
+        out = write_survey(args.out, record)
+    except (StorageOwnershipError, OSError) as exc:
+        print(f"storage survey-legacy refused: {exc}", file=sys.stderr)
+        return 2
+    _print({"storage_root": str(root), "out": str(out), "roots": len(record["roots"]),
+            "refused": len(record["refused"])})
+    return 0
+
+
+def cmd_storage_adopt_legacy(args) -> int:
+    """`hoh storage adopt-legacy --project P --anchor COMMIT:FILE
+    --storage-root PATH`: register the legacy roots a committed anchor lists
+    (`legacy_scratch.adopt`). Exit 0 when every root is REGISTERED, 2 when
+    any is refused (each outcome printed) or the anchor is unusable."""
+    import re
+
+    from .legacy_scratch import REFUSED, adopt
+    from .storage_registry import StorageOwnershipError, StorageRegistry
+
+    commit, sep, file = args.anchor.partition(":")
+    if not sep or not re.fullmatch(r"[0-9a-f]{7,64}", commit):
+        print(f"storage adopt-legacy refused: --anchor {args.anchor!r} is not COMMIT:FILE "
+              f"with a hex commit id", file=sys.stderr)
+        return 2
+    root = Path(args.storage_root).expanduser()
+    try:
+        outcomes = adopt({"commit": commit, "file": file}, registry=StorageRegistry(root),
+                         project_id=args.project)
+    except (StorageOwnershipError, OSError) as exc:
+        print(f"storage adopt-legacy refused: {exc}", file=sys.stderr)
+        return 2
+    _print({"storage_root": str(root), "outcomes": outcomes})
+    return 2 if any(o["status"] == REFUSED for o in outcomes) or not outcomes else 0
+
+
+STEWARD_POLICY_FILE = "steward-policy.json"
+ARCHIVE_TARGETS_FILE = "archive-targets.json"
+TARGET_IDENTITY_FILE = "VH_TARGET.json"
+
+
+def _steward_policy(root: Path, project_id: str):
+    """The project's steward policy from ``<state_root>/steward-policy.json``
+    (``{"projects": {"<p>": {...StewardPolicy fields}}}``), or None when the
+    project has none (no steward, no event -- B3's library-use convention)."""
+    from .storage_steward import StewardPolicy
+
+    path = root / STEWARD_POLICY_FILE
+    if not path.is_file():
+        return None
+    try:
+        record = json.loads(path.read_text(encoding="utf-8"))
+        entry = record["projects"][project_id]
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+    if not isinstance(entry, dict):
+        return None
+    try:
+        return StewardPolicy(**entry)
+    except TypeError:
+        return None
+
+
+def _hook_steward(root: Path, project_id: str, admission):
+    """The recording-only steward `hoh run` gives its controller, or None."""
+    from .storage_registry import StorageRegistry
+    from .storage_steward import StorageSteward
+
+    policy = _steward_policy(root, project_id)
+    if policy is None:
+        return None
+    try:
+        registry = StorageRegistry(root)
+        if registry._project_record(project_id) is None:
+            return None
+        return StorageSteward(project_id, registry, admission, None, policy)
+    except Exception:                                     # noqa: BLE001 - no steward
+        return None
+
+
+def _file_identity_probe(root: Path):
+    """Interim identity probe until STORAGE-F's observer exists: the mapping
+    in ``<target root>/VH_TARGET.json`` (written by the operator when the
+    target was set up). Unreadable: None (identity not confirmed)."""
+    try:
+        record = json.loads((Path(root) / TARGET_IDENTITY_FILE).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return record if isinstance(record, dict) else None
+
+
+def _archive_targets(root: Path, registry, session_id: str) -> tuple[list, list[str]]:
+    """The archive targets of ``<state_root>/archive-targets.json`` (a list of
+    ``{target_id, root, failure_domain, expected_identity}``) and the problems
+    that keep the file from being read whole (STORAGE-D Revision 10 item 6):
+    the file present but unreadable or not JSON, not a list, an entry that is
+    not a mapping, a ``root`` that is not an absolute path (checked before
+    `ArchiveTarget` would make it absolute against the cwd), an entry
+    `ArchiveTarget` refuses (with its reason), two entries with one
+    ``target_id``. Nothing is skipped silently: while any problem is listed
+    the relocation refuses every item. An absent file is no targets and no
+    problem. Health is ``unknown`` until STORAGE-F observes it.
+
+    The file cannot block the steward (Revision 11 item 3): it is opened
+    ``O_RDONLY | O_NONBLOCK | O_NOFOLLOW``, must be a regular file by
+    ``fstat`` (``S_ISREG``) and is read through that descriptor -- a FIFO, a
+    symlink (``ELOOP``), a directory or any other type is a problem, never
+    waited on or followed."""
+    import stat as _stat
+
+    from . import archive_target as at
+
+    path = root / ARCHIVE_TARGETS_FILE
+    if not os.path.lexists(path):
+        return [], []
+    try:
+        fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW | os.O_CLOEXEC)
+    except OSError as exc:
+        return [], [(f"{ARCHIVE_TARGETS_FILE} cannot be opened as a regular file "
+                     f"(no link followed): {type(exc).__name__}: {exc}")]
+    try:
+        info = os.fstat(fd)
+        if not _stat.S_ISREG(info.st_mode):
+            return [], [(f"{ARCHIVE_TARGETS_FILE} is not a regular file "
+                         f"(mode {_stat.filemode(info.st_mode)}); not read")]
+        chunks = []
+        while True:
+            chunk = os.read(fd, 1 << 16)
+            if not chunk:
+                break
+            chunks.append(chunk)
+        entries = json.loads(b"".join(chunks).decode("utf-8"))
+    except (OSError, ValueError) as exc:
+        return [], [f"{ARCHIVE_TARGETS_FILE} cannot be read as JSON: "
+                    f"{type(exc).__name__}: {exc}"]
+    finally:
+        os.close(fd)
+    if not isinstance(entries, list):
+        return [], [f"{ARCHIVE_TARGETS_FILE} is not a list but {type(entries).__name__}"]
+    targets = []
+    problems: list[str] = []
+    seen: set[str] = set()
+    for n, entry in enumerate(entries):
+        if not isinstance(entry, dict):
+            problems.append(f"entry {n} is not a mapping but {type(entry).__name__}")
+            continue
+        configured = entry.get("root")
+        if not isinstance(configured, str) or not os.path.isabs(configured):
+            problems.append(f"entry {n}: root {configured!r} is not an absolute path")
+            continue
+        try:
+            target = at.ArchiveTarget({
+                **entry, "identity_probe": _file_identity_probe,
+                "health_probe": lambda _root: at.UNKNOWN,
+                "registry": registry, "session_id": session_id})
+        except Exception as exc:                          # noqa: BLE001 - a problem, said
+            problems.append(f"entry {n} refused: {getattr(exc, 'reason', None) or 'refused'}: "
+                            f"{exc}")
+            continue
+        if target.target_id in seen:
+            problems.append(f"entry {n}: target_id {target.target_id!r} is listed twice")
+            continue
+        seen.add(target.target_id)
+        targets.append(target)
+    return targets, problems
+
+
+def cmd_storage_steward(args) -> int:
+    """`hoh storage steward --project P --once [--plan-only]`: exactly one
+    optimisation pass of the project's storage steward (STORAGE-D, directive
+    section P), with its report printed. ``--once`` is required and emits
+    the ``periodic`` event (the ops timer runs it so); without it the command
+    refuses with exit 2 -- the timer is the only scheduler. ``--plan-only``
+    plans and reports but never executes. Nothing outside the project's
+    registered namespace is touched; the only removing operation is
+    VERIFIED_RELOCATION."""
+    from .archive_target import RedundancyLedger
+    from .storage_registry import StorageRegistry
+    from .storage_steward import StewardPolicy, StorageSteward
+    from .succession import boot_id
+    from .verified_relocation import VerifiedRelocation
+
+    if not getattr(args, "once", False):
+        print("storage steward refused: --once is required -- the "
+              "hoh-storage-steward@<project>.timer is the only scheduler (no daemon, no loop); "
+              "run `hoh storage steward --project P --once` for one pass", file=sys.stderr)
+        return 2
+    project_id = args.project
+    try:
+        admission, root = storage_admission_for(getattr(args, "storage_root", None))
+    except StorageRefused as exc:
+        print(f"NEEDS_YOU: {exc}", file=sys.stderr)
+        return 2
+    registry = StorageRegistry(root)
+    if registry._project_record(project_id) is None:
+        print(f"storage steward refused: project {project_id!r} is not registered",
+              file=sys.stderr)
+        return 2
+    try:
+        lease = registry.open_session(project_id, "steward", pid=os.getpid(), boot_id=boot_id())
+        receipts = registry.scratch_dir(project_id, "steward", "receipts")
+    except Exception as exc:                              # noqa: BLE001 - reported
+        print(f"storage steward refused: {exc}", file=sys.stderr)
+        return 2
+    try:
+        targets, target_problems = _archive_targets(root, registry, "steward")
+        relocation = VerifiedRelocation(registry, targets,
+                                        RedundancyLedger(receipts / "redundancy.jsonl"),
+                                        receipts, admission=admission,
+                                        target_problems=target_problems)
+        policy = _steward_policy(root, project_id) or StewardPolicy()
+        steward = StorageSteward(project_id, registry, admission, relocation, policy)
+        report = steward.run_once(plan_only=args.plan_only, events=("periodic",))
+    finally:
+        try:
+            registry.close_session(project_id, "steward", lease)
+        except Exception as exc:                          # noqa: BLE001 - said
+            print(f"closing the steward session failed: {exc}", file=sys.stderr)
+    _print({"storage_root": str(root), "steward": report})
     return 0
 
 
@@ -387,6 +777,7 @@ def cmd_status(args) -> int:
             "last_progress": state.updated_at,
             "receipts": len(store.receipts()),
             "usage_bytes": store.usage_bytes(),
+            "panes": pane_ledger.summary(store.dir),
             "recent_events": recent,
         }
     )
@@ -459,13 +850,48 @@ def cmd_resume(args) -> int:
     try:
         with store.lock():
             state = store.read_state()
+            if stages.violation_unresolved(state):
+                reason = (state.blocked_reason or state.stop_reason or "").splitlines()
+                first = reason[0][:300] if reason else ""
+                if state.condition is Condition.PAUSED:
+                    # `hoh pause` accepts a BLOCKED run and keeps the kind, so a
+                    # held PAUSED run needs a way back. It goes to BLOCKED, with
+                    # no reconciliation: that could only re-block the run and
+                    # rewrite a reason that names the violation. Only a
+                    # person's `hoh unblock` lifts the hold.
+                    stages.resume(state)
+                    store.write_state(state)
+                    print(f"Run {args.run_id} resumed into BLOCKED: it is still held "
+                          f"by a capability violation: {first}\n"
+                          f"Only 'hoh unblock {args.run_id} --reason \"...\"' lifts that.")
+                    return 0
+                # Every other condition, with or without --force: nothing is
+                # written. `stages.unblock` would clear a hold that only a
+                # person who has looked may clear.
+                if state.condition is Condition.BLOCKED:
+                    way = (f"'hoh resume' does not lift that. After investigating: "
+                           f"hoh unblock {args.run_id} --reason \"...\"")
+                else:
+                    way = ("'hoh unblock' lifts a BLOCKED run only, so the run stays "
+                           "held and nothing of it is merged or delivered.")
+                print(f"Run {args.run_id} is {state.condition.value} and held by a "
+                      f"capability violation: {first}\n{way}", file=sys.stderr)
+                return 2
             findings = _reconcile(state)
 
             unclear = [b for b in findings if b[1] == "block"]
             if unclear and not args.force:
-                stages.block(
+                from .governance import ContractRefused, bind, block_under_contract
+
+                try:
+                    resume_governor = bind(store.dir)
+                except ContractRefused as exc:
+                    print(f"autonomy contract refused: {exc}", file=sys.stderr)
+                    return 2
+                block_under_contract(
                     state,
                     "resume unclear: " + "; ".join(f"{b[0]} {b[2]}" for b in unclear),
+                    resume_governor,
                 )
                 store.write_state(state)
                 print(
@@ -549,6 +975,27 @@ def cmd_unblock(args) -> int:
     try:
         with store.lock():
             state = store.read_state()
+            # R2: a branch the contract parked is cleared by a person, and the
+            # contract log is where a weeks-long run is reviewed. The delivery
+            # override was recorded; this one used to leave no trace there.
+            parked_by = state.blocked_kind
+            if parked_by in ("parked_by_contract", "collected_for_digest",
+                             "contract_abort", "contract_stop"):
+                from .autonomy import Handling, Routing
+                from .governance import ContractRefused, bind, record_override
+
+                try:
+                    governor = bind(store.dir)
+                except ContractRefused as exc:
+                    print(f"autonomy contract refused: {exc}", file=sys.stderr)
+                    return 2
+                record_override(
+                    governor,
+                    routing=Routing(decision=state.blocked_reason or "blocked",
+                                    kind="decision", handling=Handling.PARK_BRANCH,
+                                    delegable=False, why=f"cleared by hoh unblock "
+                                                         f"({parked_by})"),
+                    by="hoh unblock", what=args.reason)
             stages.unblock(state, args.reason)
             store.write_state(state)
     except (StoreError, LockBusy, stages.TransitionError) as exc:
@@ -730,10 +1177,172 @@ def _waiting_for_approval(exc: BaseException) -> bool:
     question of type. The word "blocked" stays as a second trail -- it is
     Herdr's own status value and does not change with the language of the
     source.
-    """
-    from .controller import WaitingForApproval
 
-    return isinstance(exc, WaitingForApproval) or "blocked" in str(exc)
+    A `PaneNotClean` keeps the tabs open too, by type: the dispatcher refused
+    to prompt into a pane it could not prove free, and the pane is what the
+    operator has to look at.
+    """
+    from .controller import PaneNotClean, WaitingForApproval
+
+    return (isinstance(exc, (WaitingForApproval, PaneNotClean))
+            or "blocked" in str(exc))
+
+
+def _kept_open_notice(exc: BaseException) -> str:
+    """What the operator is told when the role tabs stay open."""
+    from .controller import PaneNotClean
+
+    if isinstance(exc, PaneNotClean):
+        return ("The role tabs stay open so the pane can be inspected; nothing "
+                "in it was sent. After that: hoh unblock <run-id> and hoh run. "
+                "The resumed run checks the pane before any prompt and replaces "
+                "a restored pane whose input box is not provably empty by a "
+                "fresh agent.")
+    return ("The role tabs stay open so that the approval can be granted "
+            "in the pane. After that: hoh unblock <run-id> and hoh run.")
+
+
+def _compare_kept_seals(controller) -> list:
+    """Compare the seals that stay in place, and report a touch; never raises.
+
+    A seal that stays (tabs kept open, a tab not confirmed closed, a close or
+    a release that failed) is compared at the end of this `hoh run` instead of
+    at some later verification that may never come. A touch blocks the run
+    (`Controller.compare_open_seals`); the arenas are returned so the run
+    exits 1.
+    """
+    try:
+        result = controller.compare_open_seals()
+    except Exception as exc:
+        print(f"candidate arena seals could not be compared: {exc}", file=sys.stderr)
+        return []
+    if result.get("refused"):
+        print(f"candidate arena seals refused: {result['refused']}", file=sys.stderr)
+    touched = list(result.get("touched") or [])
+    if touched:
+        print("CAPABILITY VIOLATION: a sealed candidate arena was touched while "
+              "its seal stayed in place: " + ", ".join(touched), file=sys.stderr)
+    return touched
+
+
+def _close_own_and_release(dispatcher, controller) -> tuple[list, list]:
+    """Close this run's own tabs, then lift the QA seals -- in that order only.
+
+    A sealed candidate arena is unsealed only once no pane that could write
+    into it may still be open: `close_own()` returned, and nothing it closed
+    is left unconfirmed. A failed close releases nothing; a release that
+    fails is reported, never raised. Returns the closed tabs and the arenas
+    found touched. In the three cases where the seals stay in place (the close
+    raised, a tab is not confirmed closed, the release raised) they are still
+    compared (`_compare_kept_seals`), so a touch fails this run.
+    """
+    try:
+        closed = dispatcher.close_own()
+    except Exception:
+        return [], _compare_kept_seals(controller)
+    unconfirmed = getattr(dispatcher, "unconfirmed", ()) or ()
+    if unconfirmed:
+        print(f"The candidate arena seals stay: tabs not confirmed closed: "
+              f"{list(unconfirmed)}", file=sys.stderr)
+        return closed, _compare_kept_seals(controller)
+    try:
+        result = controller.release_open_seals()
+    except Exception as exc:
+        print(f"candidate arenas could not be unsealed: {exc}", file=sys.stderr)
+        return closed, _compare_kept_seals(controller)
+    if result.get("refused"):
+        print(f"candidate arenas not unsealed: {result['refused']}", file=sys.stderr)
+    if result.get("kept"):
+        print("The candidate arena seals stay: the QA agent is still present: "
+              + ", ".join(result["kept"]), file=sys.stderr)
+    touched = list(result.get("touched") or [])
+    if touched:
+        print("CAPABILITY VIOLATION: a sealed candidate arena was touched before "
+              "the QA pane closed: " + ", ".join(touched), file=sys.stderr)
+    return closed, touched
+
+
+def _prune(store) -> dict:
+    """Apply the retention limit under the run lock; nothing on any failure."""
+    try:
+        with store.lock():
+            return store.prune()
+    except Exception:
+        return {}
+
+
+def _end_of_run(store, dispatcher, controller, waiting_for_approval: bool,
+                run_id: str) -> tuple[list, dict, list]:
+    """Close and release first, then prune.
+
+    The prune runs last, so it never meets an arena that is about to be
+    unsealed -- and can file away one that just was.
+    """
+    # Clear away our own tabs -- otherwise they would be left standing after
+    # every run and clutter up the multiplexer the captain works in.
+    #
+    # Unless a role is still sitting at an unanswered permission dialog. The
+    # dogfood run found this on itself on 2026-09-08: the exception route
+    # already kept the tabs open for that case, but `_verify` turns exactly
+    # that exception into an *outage* -- correctly, because an unanswered QA is
+    # a missing verdict and not a failed run. So the blocked dialog took the
+    # normal route, and this line closed the one window in which it could have
+    # been answered. The protection guarded one route while the traffic took
+    # the other.
+    closed_tabs: list = []
+    touched: list = []
+    if waiting_for_approval:
+        print(
+            "The role tabs stay open: a role is waiting for an approval in "
+            "its pane. Answer it there, then: hoh unblock "
+            f"{run_id} --reason \"...\" (only if BLOCKED) and hoh run "
+            f"{run_id}.",
+            file=sys.stderr,
+        )
+        # The tabs stay open, so the seals stay: compare them now.
+        touched = _compare_kept_seals(controller)
+    elif hasattr(dispatcher, "close_own"):
+        closed_tabs, touched = _close_own_and_release(dispatcher, controller)
+    # Apply the retention limit (§7): parked intermediate states and old
+    # arenas move to attic/, receipts and evidence never do.
+    pruned = _prune(store)
+    return closed_tabs, pruned, touched
+
+
+def _finish_run(store, dispatcher, controller, state, *, waiting_for_approval: bool,
+                run_id: str, ran: int) -> tuple[dict, int]:
+    """The end of `hoh run`: close, release, prune, and report what is on disk.
+
+    The state is re-read after the release, because the release may have
+    blocked the run: printing the in-memory state would report an ACTIVE run
+    that is in fact blocked by a capability violation. A touch found at the
+    release makes the exit code 1.
+    """
+    closed_tabs, pruned, touched = _end_of_run(
+        store, dispatcher, controller, waiting_for_approval, run_id)
+    try:
+        state = store.read_state()
+    except Exception as exc:
+        print(f"the run state could not be re-read, reporting the last one "
+              f"in memory: {exc}", file=sys.stderr)
+    payload = {
+        "iterations_run": ran,
+        "closed_tabs": closed_tabs,
+        "unconfirmed_open": getattr(dispatcher, "unconfirmed", []),
+        "cost": state.cost_disclosure(),
+        "rotated": pruned,
+        "stage": state.stage.value,
+        "condition": state.condition.value,
+        "accepted_candidate": state.last_accepted_candidate.candidate_id
+        if state.last_accepted_candidate
+        else None,
+        "endpoints": {
+            r.value: dispatcher.endpoint_evidence(r) for r in Role
+        },
+    }
+    if touched:
+        payload["capability_violation"] = touched
+    return payload, (1 if touched else 0)
 
 
 def _integrity_close(store, before) -> bool:
@@ -773,6 +1382,23 @@ def _integrity_close(store, before) -> bool:
 
 
 def cmd_run(args) -> int:
+    """`hoh run`, with a process marker around the whole of it (review B3, C):
+    a replacement master can tell a run still being executed between two
+    iterations -- when its lock is free -- from one whose process is gone."""
+    store = RunStore(args.root, args.run_id)
+    if not store.state_exists():
+        return _cmd_run(args)
+    try:
+        with store.process_marker():
+            return _cmd_run(args)
+    except LockBusy as exc:
+        if "already being executed" not in str(exc):
+            raise
+        print(str(exc), file=sys.stderr)
+        return 2
+
+
+def _cmd_run(args) -> int:
     """Runs iterations. The operator path that was missing until now.
 
     Without this command `hoh start` created a run that stayed in NEW:
@@ -788,6 +1414,33 @@ def cmd_run(args) -> int:
     except StoreError as exc:
         print(str(exc), file=sys.stderr)
         return 2
+
+    # STORAGE-B3: storage admission is real wiring, decided before anything
+    # else is written or dispatched -- an uninitialised root, WSL without the
+    # host volume or an unusable ledger refuses the start (fail closed, never
+    # skipped), and the boot is claimed before the first admission.
+    try:
+        storage_admission, storage_root = storage_admission_for(
+            getattr(args, "storage_root", None))
+    except StorageRefused as exc:
+        unpersisted = ""
+        if str(exc).startswith(STORAGE_UNAVAILABLE):
+            try:
+                from .storage_park import stop_needs_you
+
+                with store.lock():
+                    fresh = store.read_state()
+                    stop_needs_you(fresh, store, str(exc)[:400])
+            except Exception as persist_exc:              # noqa: BLE001 - said, not swallowed
+                # The run could not record its own stop. Said on the same line,
+                # which still names the refusal, so the launcher's mapping to
+                # STORAGE_UNAVAILABLE holds and a person sees both facts.
+                unpersisted = (f" (the NEEDS_YOU state could not be persisted: "
+                               f"{type(persist_exc).__name__}: {persist_exc})")
+        print(f"NEEDS_YOU: {exc}{unpersisted}", file=sys.stderr)
+        return 2
+    _print({"storage_admission": {"state_root": str(storage_root),
+                                  "ledger": str(storage_admission.ledger)}})
 
     profile = {
         Role.PLANNER: args.planner,
@@ -825,6 +1478,38 @@ def cmd_run(args) -> int:
         _print({"approval_policy": {"mode": policy.mode, "digest": policy.digest,
                                     "denied": len(policy.deny),
                                     "source": policy.source}})
+    # P2-24. Pinned once and read back on every later call: a resumed run obeys
+    # the contract it began under, and a different one offered later is refused
+    # rather than adopted.
+    governor = None
+    if True:  # noqa: SIM108 - kept as a block so the imports stay local
+        from .governance import ContractRefused, bind
+
+        offered = None
+        if getattr(args, "autonomy", None):
+            from .autonomy import AutonomyContract
+
+            try:
+                offered = AutonomyContract.model_validate_json(
+                    Path(args.autonomy).expanduser().read_text(encoding="utf-8"))
+            except (OSError, ValueError) as exc:
+                print(f"autonomy contract refused: {exc}", file=sys.stderr)
+                return 2
+        try:
+            governor = bind(store.dir, contract=offered,
+                            program_epoch=getattr(args, "program_epoch", None))
+        except ContractRefused as exc:
+            print(f"autonomy contract refused: {exc}", file=sys.stderr)
+            return 2
+        if governor is not None:
+            asked = getattr(args, "program_epoch", None)
+            if asked is not None and governor.contract.program_epoch != asked:
+                print(f"--program-epoch {asked} ignored: this run is pinned at epoch "
+                      f"{governor.contract.program_epoch}", file=sys.stderr)
+            approval_dir.mkdir(parents=True, exist_ok=True)
+            (approval_dir / "autonomy.json").write_text(
+                json.dumps(governor.evidence(), indent=2) + "\n", encoding="utf-8")
+            _print({"autonomy_contract": governor.evidence()})
     if getattr(args, "trust_worktree", False):
         from .trust import TrustRefused, trust_run_worktree
         try:
@@ -916,7 +1601,10 @@ def cmd_run(args) -> int:
             json.dumps(integrity_before, indent=2) + "\n", encoding="utf-8")
 
     controller = Controller(
-        store, dispatcher, spec_path=state.spec_path, isolation=isolation
+        store, dispatcher, spec_path=state.spec_path, isolation=isolation,
+        storage_admission=storage_admission,
+        steward=_hook_steward(storage_root, state.project_name or state.run_id,
+                              storage_admission),
     )
 
     ran = 0
@@ -931,8 +1619,27 @@ def cmd_run(args) -> int:
             # Handoff §8: end bounded and visibly, not with a traceback.
             with store.lock():
                 fresh = store.read_state()
-                stages.block(fresh, f"iteration aborted: {exc}")
+                # P2-24: what a block means is the contract's decision, not a
+                # constant. Without one this is exactly the old behaviour.
+                from .governance import ContractRefused, bind, block_under_contract
+
+                try:
+                    governor = bind(store.dir)
+                except ContractRefused as contract_exc:
+                    # The block is written whatever the contract file says: a
+                    # handler whose job is to end bounded must not be the place
+                    # a contract problem surfaces.
+                    print(f"autonomy contract unreadable, blocking without it: "
+                          f"{contract_exc}", file=sys.stderr)
+                    governor = None
+                routing = block_under_contract(
+                    fresh, f"iteration aborted: {exc}", governor)
                 store.write_state(fresh)
+                if routing is not None:
+                    _print({"autonomy": {"handling": routing.handling.value,
+                                         "kind": routing.kind,
+                                         "blocks_branch": routing.blocks_branch,
+                                         "why": routing.why}})
             print(f"Iteration aborted and run blocked: {exc}", file=sys.stderr)
             # HoH does **not** clear away a pending dialog. The error path used
             # to close its own tabs even when an agent was waiting for an
@@ -941,16 +1648,9 @@ def cmd_run(args) -> int:
             # no longer determinable.
             waiting = _waiting_for_approval(exc)
             if waiting:
-                print(
-                    "The role tabs stay open so that the approval can be granted "
-                    "in the pane. After that: hoh unblock <run-id> and hoh run.",
-                    file=sys.stderr,
-                )
+                print(_kept_open_notice(exc), file=sys.stderr)
             elif hasattr(dispatcher, "close_own"):
-                try:
-                    dispatcher.close_own()
-                except Exception:
-                    pass
+                _close_own_and_release(dispatcher, controller)
             _integrity_close(store, integrity_before)
             return 1
 
@@ -985,58 +1685,14 @@ def cmd_run(args) -> int:
     if not _integrity_close(store, integrity_before):
         return 3
 
-    # Apply the retention limit (§7): parked intermediate states and old
-    # arenas move to attic/, receipts and evidence never do.
-    try:
-        with store.lock():
-            pruned = store.prune()
-    except Exception:
-        pruned = {}
-
     # Clear away our own tabs -- otherwise they would be left standing after
-    # every run and clutter up the multiplexer the captain works in.
-    #
-    # Unless a role is still sitting at an unanswered permission dialog. The
-    # dogfood run found this on itself on 2026-09-08: the exception route
-    # already kept the tabs open for that case, but `_verify` turns exactly
-    # that exception into an *outage* -- correctly, because an unanswered QA
-    # is a missing verdict and not a failed run. So the blocked dialog took
-    # the normal route, and this line closed the one window in which it could
-    # have been answered. The protection guarded one route while the traffic
-    # took the other.
-    closed_tabs = []
-    if waiting_for_approval:
-        print(
-            "The role tabs stay open: a role is waiting for an approval in "
-            "its pane. Answer it there, then: hoh unblock "
-            f"{args.run_id} --reason \"...\" (only if BLOCKED) and hoh run "
-            f"{args.run_id}.",
-            file=sys.stderr,
-        )
-    elif hasattr(dispatcher, "close_own"):
-        try:
-            closed_tabs = dispatcher.close_own()
-        except Exception:
-            closed_tabs = []
-
-    _print(
-        {
-            "iterations_run": ran,
-            "closed_tabs": closed_tabs,
-            "unconfirmed_open": getattr(dispatcher, "unconfirmed", []),
-            "cost": state.cost_disclosure(),
-            "rotated": pruned,
-            "stage": state.stage.value,
-            "condition": state.condition.value,
-            "accepted_candidate": state.last_accepted_candidate.candidate_id
-            if state.last_accepted_candidate
-            else None,
-            "endpoints": {
-                r.value: dispatcher.endpoint_evidence(r) for r in Role
-            },
-        }
-    )
-    return 0
+    # every run and clutter up the multiplexer the captain works in. Then lift
+    # the QA seals, then prune (`_end_of_run`), and report the state on disk.
+    payload, rc = _finish_run(store, dispatcher, controller, state,
+                              waiting_for_approval=waiting_for_approval,
+                              run_id=args.run_id, ran=ran)
+    _print(payload)
+    return rc
 
 
 def cmd_deliver(args) -> int:
@@ -1051,6 +1707,17 @@ def cmd_deliver(args) -> int:
     try:
         with store.lock():
             state = store.read_state()
+            if stages.violation_unresolved(state):
+                # The first check, before the stage, the open seals, the contract
+                # and any git operation: whatever the condition, a pause or a
+                # cancel keeps the hold, and only a person's `hoh unblock` lifts
+                # it (run qaw7: a held run was fast-forwarded).
+                reason = (state.blocked_reason or state.stop_reason or "").splitlines()
+                print("Delivery refused: the run is held by a capability violation "
+                      f"({state.condition.value}): {reason[0][:300] if reason else ''}\n"
+                      f"After investigating: hoh unblock {args.run_id} --reason \"...\"",
+                      file=sys.stderr)
+                return 2
             if state.stage is not Stage.CHECKPOINTED:
                 print(
                     f"Stage is {state.stage.value}. Only an accepted "
@@ -1058,7 +1725,54 @@ def cmd_deliver(args) -> int:
                     file=sys.stderr,
                 )
                 return 2
+            from .controller import open_seal_arenas
 
+            still_open = open_seal_arenas(store.dir)
+            if still_open:
+                # A sealed arena has not been compared and released yet: its
+                # touch, if any, is not known. A later `hoh run` that closes
+                # the tabs releases it.
+                print("Delivery refused: a candidate arena sealed for QA is still "
+                      f"open: {', '.join(still_open)}. A later 'hoh run' that "
+                      "closes the tabs releases it.", file=sys.stderr)
+                return 2
+
+            from .governance import (
+                ContractRefused, bind, forbidden_outright, may_release, record_override,
+            )
+
+            try:
+                governor = bind(store.dir)
+            except ContractRefused as exc:
+                print(f"autonomy contract refused: {exc}", file=sys.stderr)
+                return 2
+            routing = may_release(governor, what=f"deliver {args.run_id} into {args.into}",
+                                  mode=state.delivery_mode)
+            if routing is not None and routing.blocks_branch:
+                # The contract is consulted whether or not a human passed
+                # --approve. A reviewer measured the previous shape: with
+                # --approve the contract was skipped, without it delivery
+                # already refused anyway, so the gate could not change a single
+                # outcome -- correct code that decided nothing.
+                if forbidden_outright(routing) or not args.approve:
+                    print(f"Delivery refused by the run's autonomy contract "
+                          f"({routing.handling.value}): {routing.why}", file=sys.stderr)
+                    _print({"autonomy": {"handling": routing.handling.value,
+                                         "kind": routing.kind, "why": routing.why,
+                                         "overridable": not forbidden_outright(routing),
+                                         "contract": governor.contract.digest()}})
+                    return 2
+                # A human overrode a gate the contract has. Allowed, and
+                # recorded as an override -- the log used to say "parked" while
+                # the release happened.
+                record_override(governor, routing=routing, by="--approve",
+                                what=f"deliver {args.run_id} into {args.into}")
+                state.note(f"autonomy: --approve overrode {routing.handling.value} "
+                           f"for {routing.kind}")
+                # Written now: a later DeliveryRefused returns without saving,
+                # and the override belongs in the state whether or not the
+                # delivery went on to succeed.
+                store.write_state(state)
             try:
                 result = deliver(
                     repo=state.repo_path,
@@ -1180,6 +1894,95 @@ def cmd_report(args) -> int:
     return 0
 
 
+def cmd_timers(args) -> int:
+    """What this root is waiting for, and what is late.
+
+    A programme that waits is not a programme that has stopped, and the
+    difference has to be readable without attaching to anything: every wait is
+    a row here, with what it is for and when it is due.
+    """
+    from .sentinel import stuck_timers
+    from .timers import TimerStore
+
+    store = TimerStore(args.root)
+    try:
+        timers = store.read()
+    except Exception as exc:                      # noqa: BLE001 - reported, not raised
+        print(f"the timer store under {args.root} is not readable: {exc}", file=sys.stderr)
+        return 2
+    if not timers:
+        print(f"no timers under {args.root}")
+        return 0
+    for t in timers:
+        print(f"{t.timer_id}  {t.status.value:8}  due {t.due_at}  {t.kind.value}"
+              + (f"  run={t.run_id}" if t.run_id else "")
+              + (f"  {t.reason}" if t.reason else ""))
+    late = stuck_timers(timers)
+    for s_ in late:
+        print(f"LATE: {s_}", file=sys.stderr)
+    return 1 if late else 0
+
+
+def cmd_sentinel(args) -> int:
+    """What is due now, and what should happen about it.
+
+    Proposals, not actions: this command is the replaceable wake-up -- a cron,
+    a plugin or the next session can be what runs it -- and acting on a
+    proposal is the controller's business, because that is where the lock and
+    the policy are.
+    """
+    from .sentinel import sweep
+    from .timers import TimerStore
+
+    out = sweep(TimerStore(args.root), program_epoch=args.program_epoch,
+                session_epoch=args.session_epoch)
+    _print({
+        "at": out.at,
+        "due": [{"timer": p.timer.timer_id, "kind": p.timer.kind.value,
+                 "run_id": p.timer.run_id, "action": p.action, "why": p.why}
+                for p in out.due],
+        "refused": [{"timer": t.timer_id, "why": why} for t, why in out.refused],
+        "defects": out.defects,
+    })
+    return 0
+
+
+def cmd_stuck(args) -> int:
+    """The never-stuck invariant, measured over every run under this root.
+
+    Every non-terminal object must have a next action, a retry time or a named
+    human owner. One with none of the three is a control-plane defect, and this
+    is the command that finds it instead of waiting for somebody to notice that
+    nothing has moved.
+    """
+    from .projectstore import ProjectStore, list_projects
+    from .sentinel import stuck_nodes, stuck_run, stuck_timers
+    from .timers import TimerStore
+
+    try:
+        timers = TimerStore(args.root).read()
+    except Exception:                             # noqa: BLE001 - absent or unreadable
+        timers = []
+    found = list(stuck_timers(timers))
+    for rid in list_runs(args.root):
+        try:
+            state = RunStore(args.root, rid).read_state()
+        except StoreError as exc:
+            print(f"{rid}  UNREADABLE: {exc}", file=sys.stderr)
+            continue
+        found += stuck_run(state, timers=timers)
+    for project in list_projects(args.root):
+        try:
+            found += stuck_nodes(ProjectStore(args.root, project).read_state(), timers=timers)
+        except StoreError as exc:
+            print(f"{project}  UNREADABLE: {exc}", file=sys.stderr)
+    for defect in found:
+        print(str(defect))
+    if not found:
+        print("nothing is stuck: every non-terminal object has a way out")
+    return 1 if found else 0
+
+
 def cmd_list(args) -> int:
     runs = list_runs(args.root)
     if not runs:
@@ -1200,15 +2003,17 @@ def cmd_list(args) -> int:
 
 
 def cmd_project(args) -> int:
-    """Inspect the orchestration layer above a single run.
+    """The orchestration layer above a single run.
 
-    Deliberately read-only for now. Driving a project needs a `RunLauncher`
-    bound to real Herdr dispatch, and shipping a command that *looks* like it
-    orchestrates while executing nothing would be worse than not shipping it:
-    the thing this project keeps finding is claims that outrun what was
-    measured. `status` and `resume` answer the question a returning session
-    actually has -- what does this state say to do next -- and they answer it
-    from the persisted file alone.
+    `status` and `resume` answer the question a returning session actually has
+    -- what does this state say to do next -- from the persisted file alone.
+    `drive` makes the calling session the governed master and runs the
+    controller; it refuses unless the project registers a driver
+    (`driver.json`), because a command that *looks* like it orchestrates while
+    guessing how to launch runs would be worse than none. `handoff` and
+    `authority` are master rollover and its read-only report. On a governed
+    project, `unblock` and `record-action` need the current master's session
+    and epoch (AC7).
     """
     from .projectstore import (
         ProjectStore, list_projects, record_external_action, resume_decision, unblock,
@@ -1242,13 +2047,63 @@ def cmd_project(args) -> int:
         print(f"UNREADABLE: {exc}", file=sys.stderr)
         return 3
 
+    if args.project_cmd == "authority":
+        from .succession import status as authority_status
+
+        print(json.dumps(authority_status(store.dir), indent=2))
+        return 0
+
+    if args.project_cmd == "drive":
+        return _project_drive(args, store, st)
+
+    if args.project_cmd == "hold":
+        return _project_hold(args, store, st)
+
+    if args.project_cmd == "rollover":
+        return _project_rollover(args, store, st)
+
+    if args.project_cmd == "rollover-verify":
+        return _project_rollover_verify(args, store, st)
+
+    if args.project_cmd == "rollover-accept":
+        return _project_rollover_accept(args, store, st)
+
+    if args.project_cmd == "handoff":
+        authority, refusal = _claimed_master(args, store)
+        if refusal:
+            print(f"refused: {refusal}", file=sys.stderr)
+            return 5
+        from .succession import LeaseError, StaleMaster
+
+        try:
+            lease = authority.handoff(args.to, reason=args.reason)
+        except (LeaseError, StaleMaster) as exc:
+            print(f"refused: {exc}", file=sys.stderr)
+            return 5
+        print(f"epoch {lease.master_epoch} handed over by {lease.leader_session_id} "
+              f"to {lease.successor}; {args.session} may no longer write")
+        return 0
+
+    # An authoritative command on a governed project needs authority: the
+    # live master's own credential, or -- when no master is alive -- an
+    # operator epoch of its own (review A, P5: otherwise an orderly-halted
+    # governed project had no way out of BLOCKED through the CLI at all).
+    command_authority, operator = None, False
+    if args.project_cmd in ("record-action", "unblock"):
+        command_authority, operator, refusal = _command_authority(args, store)
+        if refusal:
+            print(f"refused: {refusal}", file=sys.stderr)
+            return 5
+
     if args.project_cmd == "record-action":
         try:
-            st = record_external_action(
-                store, actor=args.actor, reason=args.reason,
-                repo_path=st.repo_path, node=args.node,
-                head_before=args.head_before or "",
-            )
+            with _authority_section(store, command_authority, operator,
+                                    "record-action"):
+                st = record_external_action(
+                    store, actor=args.actor, reason=args.reason,
+                    repo_path=st.repo_path, node=args.node,
+                    head_before=args.head_before or "", authority=command_authority,
+                )
         except StoreError as exc:
             print(f"refused: {exc}", file=sys.stderr)
             return 4
@@ -1259,7 +2114,8 @@ def cmd_project(args) -> int:
 
     if args.project_cmd == "unblock":
         try:
-            st = unblock(store, args.node, args.reason)
+            with _authority_section(store, command_authority, operator, "unblock"):
+                st = unblock(store, args.node, args.reason, authority=command_authority)
         except StoreError as exc:
             print(f"refused: {exc}", file=sys.stderr)
             return 4
@@ -1312,6 +2168,464 @@ def cmd_project(args) -> int:
             print(f"    {r.action_id} {r.actor}: {r.head_before or '?'} -> "
                   f"{r.head_after or '?'}{moved_}  {r.reason[:60]}")
     return 0
+
+
+def cmd_project_contract(args) -> int:
+    """The PM boundary (P2-29, P2-30), read-only.
+
+    `check` validates an imported contract and prints its digest over content;
+    `impact` describes what an amendment would change and never applies it;
+    `owner` answers who decides a class of state from the ownership table, and
+    refuses a class nobody owns; `conflicts` lists where an external DONE meets
+    no verdict here. Nothing is written: no run root, no project store, no file.
+
+    A contract without `effective_at` is refused rather than checked. The
+    module's default for it is the moment of reading, so its digest would be a
+    timestamp presented as an identity.
+    """
+    from pydantic import ValidationError
+
+    from .projectcontract import (
+        OWNERSHIP, ProjectContract, UnknownState, authority_for, conflicts, impact_of,
+    )
+
+    def load(path: str) -> ProjectContract:
+        contract = ProjectContract.model_validate_json(
+            Path(path).read_text(encoding="utf-8"))
+        if "effective_at" not in contract.model_fields_set:
+            raise ValueError(
+                f"{path} does not state effective_at; its default is the time of "
+                f"reading, so the digest would change on every check")
+        return contract
+
+    def summary(contract: ProjectContract) -> dict:
+        return {"project_contract_id": contract.project_contract_id,
+                "version": contract.version,
+                "source_system": contract.source_system,
+                "source_revision": contract.source_revision,
+                "digest": contract.digest(),
+                "work_packages": [w.work_package_id for w in contract.work_packages],
+                "milestones": sorted(contract.milestones)}
+
+    def internal_statuses(raw: str | None, contract: ProjectContract) -> dict[str, str]:
+        # No map is an empty map: absence of a verdict here is not agreement.
+        if raw is None:
+            return {}
+        try:
+            statuses = json.loads(raw)
+        except ValueError as exc:
+            raise ValueError(f"--internal is not JSON: {exc}") from exc
+        if not isinstance(statuses, dict) or not all(
+                isinstance(k, str) and isinstance(v, str) for k, v in statuses.items()):
+            raise ValueError("--internal must be a JSON object of work package id to "
+                             "status string")
+        unknown = sorted(set(statuses) - {w.work_package_id for w in contract.work_packages})
+        if unknown:
+            raise ValueError(f"--internal names work packages this contract does not "
+                             f"contain: {unknown}")
+        return statuses
+
+    try:
+        if args.contract_cmd == "schema":
+            out, rc = ProjectContract.model_json_schema(), 0
+        elif args.contract_cmd == "check":
+            out, rc = summary(load(args.file)), 0
+        elif args.contract_cmd == "impact":
+            previous, proposed = load(args.file), load(args.proposed)
+            impact = impact_of(previous, proposed)
+            if proposed.version <= previous.version and proposed.digest() != previous.digest():
+                raise ValueError(
+                    f"an amendment goes forward: version {previous.version} -> "
+                    f"{proposed.version} with different content would rewrite a version "
+                    f"that has already been imported")
+            # Only the two files are inputs: evidence, work in flight, the autonomy
+            # contract and the release state are not, so those fields are defaults
+            # and say nothing.
+            out, rc = {"previous": summary(previous), "proposed": summary(proposed),
+                       "impact": impact.model_dump(mode="json"),
+                       "disturbs_anything": impact.disturbs_anything,
+                       "not_evaluated": ["evidence_invalidated", "active_work_affected",
+                                         "beyond_autonomy", "release_affected"]}, 0
+        elif args.contract_cmd == "owner":
+            if args.state_class is None:
+                out = {name: authority.value for name, authority in OWNERSHIP.items()}
+            else:
+                out = {"state_class": args.state_class,
+                       "authority": authority_for(args.state_class).value}
+            rc = 0
+        else:  # conflicts
+            contract = load(args.file)
+            found = conflicts(contract, internal=internal_statuses(args.internal, contract))
+            out = {"project_contract_id": contract.project_contract_id,
+                   "digest": contract.digest(),
+                   "conflicts": [c.model_dump(mode="json") | {"statement": str(c)}
+                                 for c in found]}
+            rc = 1 if found else 0
+    except ValidationError as exc:
+        errors = exc.errors()
+        message = "; ".join(
+            f"{'.'.join(str(p) for p in e['loc']) or 'contract'}: {e['msg']}"
+            for e in errors[:3])
+        if len(errors) > 3:
+            message += f"; and {len(errors) - 3} more"
+        print(f"contract refused: {message}", file=sys.stderr)
+        return 2
+    except UnknownState as exc:
+        print(f"contract refused: {exc.args[0]}", file=sys.stderr)
+        return 2
+    except (OSError, ValueError) as exc:     # UnicodeDecodeError is a ValueError
+        print(f"contract refused: {exc}", file=sys.stderr)
+        return 2
+    print(json.dumps(out, indent=2))
+    return rc
+
+
+def _read_token(args) -> str | None:
+    if getattr(args, "token", None):
+        return args.token.strip()
+    path = getattr(args, "token_file", None)
+    if path:
+        try:
+            return Path(path).expanduser().read_text(encoding="utf-8").strip()
+        except OSError:
+            return None
+    return None
+
+
+def _claimed_master(args, store):
+    """(authority, None) when the caller proves it is the live master holding
+    `--epoch`, else (None, why).
+
+    AC7: an old session epoch issues no authoritative command. Knowing the
+    session id and epoch is not proof -- `hoh project authority` prints both --
+    so the token handed out when that epoch was acquired is required too.
+    """
+    from .orchestrator import write_lock
+    from .succession import LeaseError, MasterAuthority
+
+    token = _read_token(args)
+    if not args.session or args.epoch is None or not token:
+        return None, ("acting as a master needs --session, --epoch and its token "
+                      "(--token or --token-file, as written by `project drive "
+                      "--token-out`)")
+    try:
+        authority = MasterAuthority(store.dir, args.session,
+                                    serialize=lambda: write_lock(store))
+    except LeaseError as exc:
+        return None, str(exc)
+    authority.present(epoch=int(args.epoch), token=token)
+    problems = authority.problems()
+    if problems:
+        return None, "stale master: " + "; ".join(problems)
+    return authority, None
+
+
+def _command_authority(args, store):
+    """(authority, is_operator_epoch, refusal) for unblock / record-action.
+
+    * An ungoverned project with no credential: the old behaviour.
+    * A credential given: it must be the live master's (`_claimed_master`).
+    * Governed, no credential, and a master is alive: refused -- act through
+      that master or have it hand over.
+    * Governed, no credential, no master alive (released, lost, none): the
+      command acquires an epoch of its own (reason OPERATOR), acts under it,
+      and releases it.
+    """
+    from .orchestrator import write_lock
+    from .succession import LeaseError, LeaseHeld, MasterAuthority, Reason, utc_now
+
+    governed = (store.dir / "epochs.json").is_file()
+    if args.session or args.epoch is not None or _read_token(args):
+        authority, refusal = _claimed_master(args, store)
+        return authority, False, refusal
+    if not governed:
+        return None, False, None
+    probe = MasterAuthority(store.dir, "cli-probe")
+    try:
+        holder, why = probe.holder_state(probe.read_lease(), utc_now())
+    except LeaseError as exc:
+        return None, False, str(exc)
+    if holder == "LIVE":
+        return None, False, (f"a live master holds this project ({why}); act with its "
+                             "--session/--epoch/--token, or have it hand over")
+    authority = MasterAuthority(store.dir, f"operator-{os.getpid()}",
+                                serialize=lambda: write_lock(store))
+    try:
+        authority.acquire(program_generation=store.read_state().program_generation,
+                          reason=Reason.OPERATOR,
+                          note=f"operator command {args.project_cmd}: {args.reason}")
+    except (LeaseHeld, LeaseError, LockBusy) as exc:
+        return None, False, str(exc)
+    return authority, True, None
+
+
+@contextmanager
+def _authority_section(store, authority, operator: bool, what: str):
+    """The program lock around a stamped command write (review A, S2), and the
+    release of an operator epoch afterwards."""
+    from .orchestrator import write_lock
+
+    if authority is None:
+        yield
+        return
+    try:
+        with write_lock(store):
+            authority.check()
+            yield
+    finally:
+        if operator:
+            try:
+                authority.release(reason=f"operator command {what} done")
+            except Exception:                          # noqa: BLE001 - best effort
+                pass
+
+
+def _program_lock_free(store) -> bool:
+    """Is the program's write lock free right now? A rotation starts only at a
+    safe point: while a write is in flight it is recorded as pending instead."""
+    try:
+        with store.lock():
+            return True
+    except LockBusy:
+        return False
+
+
+def _project_hold(args, store, st) -> int:
+    """Become the governed master and *stay* one: renew the lease until it is
+    fenced, released, or the session's own process is gone.
+
+    A lease is judged by its holder's pid, and a conversation is not a
+    long-lived process: acquired by a short command it reads LOST once that
+    command has exited. This is the bootstrap of the first generation (acquire
+    without driving) and what a session runs in the background to keep its
+    program. A live holder elsewhere refuses it.
+    """
+    from .orchestrator import write_lock
+    from .rollover import RolloverError, hand_token_over, hold_lease
+    from .succession import LeaseError, LeaseHeld, MasterAuthority
+
+    try:
+        authority = MasterAuthority(store.dir, args.session, ttl_seconds=args.ttl,
+                                    serialize=lambda: write_lock(store))
+        epoch = authority.acquire(program_generation=st.program_generation,
+                                  note=args.note or "")
+        hand_token_over(authority, args.token_out)      # gives the lease back on failure
+    except (LeaseHeld, LeaseError, LockBusy, RolloverError) as exc:
+        print(f"refused: {exc}", file=sys.stderr)
+        return 5
+    _print({"project_id": st.project_id, "held": True, "session": args.session,
+            "epoch": epoch.epoch, "epoch_reason": epoch.reason.value,
+            "token_out": args.token_out})
+    sys.stdout.flush()
+    result = hold_lease(authority, interval=args.interval, watch_pid=args.watch_pid,
+                        hold_for=args.hold_for)
+    _print({"project_id": st.project_id, "ended": result.reason,
+            "renewals": result.renewals, "released": result.released})
+    return 0
+
+
+def _rollover_default_input(store, st, args, model: str | None) -> dict:
+    """The capsule's author input when none is given: the project's own state
+    file, the run set and the repository's HEAD -- three facts the product
+    derives itself."""
+    return {
+        "successor_model": model or "",
+        "derive": [
+            {"entry_id": "project-state", "section": "REGISTER", "deriver": "file_digest",
+             "params": {"path": str(store.state_path)}},
+            {"entry_id": "run-set", "section": "RUNS", "deriver": "run_set",
+             "params": {"runs_root": str(Path(args.root).expanduser())}},
+            {"entry_id": "repo-head", "section": "CANDIDATES", "deriver": "ref_state",
+             "params": {"repo": st.repo_path, "ref": "HEAD"}},
+        ],
+    }
+
+
+def _project_rollover(args, store, st) -> int:
+    """The master rolls the orchestrator session over to a fresh one.
+
+    Exit 0: done (the successor holds the next epoch) or nothing was due;
+    5: the rotation did not happen and this session stays (or is again) the
+    master, or the command was refused; 6: another session is master; 7: no
+    safe point yet, recorded as pending. See `hoh.rollover.run_rollover`.
+    """
+    from .rollover import (
+        HerdrLauncher, Outcome, RolloverError, TriggerError, evaluate_trigger,
+        hand_token_over, run_rollover,
+    )
+    from .succession_capsule import CapsuleInput, LocalObserver
+
+    authority, refusal = _claimed_master(args, store)
+    if refusal:
+        print(f"refused: {refusal}", file=sys.stderr)
+        return 5
+    try:
+        if args.input:
+            data = json.loads(Path(args.input).expanduser().read_text(encoding="utf-8"))
+            if args.model:
+                data["successor_model"] = args.model
+        else:
+            data = _rollover_default_input(store, st, args, args.model)
+        if not data.get("successor_model"):
+            print("refused: the successor's model is not chosen here; give --model "
+                  "(or `successor_model` in --input)", file=sys.stderr)
+            return 2
+        inp = CapsuleInput.model_validate(data)
+    except (OSError, ValueError) as exc:
+        print(f"refused: the capsule input is not usable: {exc}", file=sys.stderr)
+        return 2
+
+    trigger = None
+    if args.transcript:
+        def trigger():
+            return evaluate_trigger(args.transcript, threshold=args.threshold)
+
+    successor = args.successor or new_run_id("succ")
+    try:
+        result = run_rollover(
+            authority, store.dir, inp=inp, observer=LocalObserver(),
+            launcher=HerdrLauncher(), root=str(store.root), repo=st.repo_path,
+            project_id=st.project_id, successor_session=successor, trigger=trigger,
+            safe=lambda: _program_lock_free(store), generation=st.program_generation,
+            ack_timeout_s=args.ack_timeout, takeover_s=args.takeover, poll_s=args.poll)
+    except (TriggerError, RolloverError) as exc:
+        print(f"refused: {exc}", file=sys.stderr)
+        return 2
+    if result.outcome is Outcome.RECLAIMED and args.token_out:
+        try:
+            hand_token_over(authority, args.token_out)
+        except RolloverError as exc:
+            print(f"refused: {exc}", file=sys.stderr)
+            return 5
+    _print(result.as_dict())
+    if result.outcome in (Outcome.COMPLETE, Outcome.NOT_TRIGGERED):
+        return 0
+    if result.outcome is Outcome.DEFERRED:
+        return 7
+    if result.outcome is Outcome.SUPERSEDED:
+        return 6
+    return 5
+
+
+def _project_rollover_verify(args, store, st) -> int:
+    """Read-only: re-derive a capsule and print every difference. Exit 0, or 5
+    on any difference."""
+    from .succession import MasterAuthority
+    from .succession_capsule import CapsuleError, LocalObserver, load_capsule, verify_capsule
+
+    try:
+        cap = load_capsule(args.capsule)
+    except CapsuleError as exc:
+        print(f"refused: {exc}", file=sys.stderr)
+        return 5
+    if cap.project_id != st.project_id:
+        print(f"refused: the capsule is for project {cap.project_id!r}, not "
+              f"{st.project_id!r}", file=sys.stderr)
+        return 5
+    ver = verify_capsule(cap, probe=MasterAuthority(store.dir, args.session),
+                         observer=LocalObserver(), session=args.session,
+                         pointer_digest=args.digest, handover=args.handover,
+                         project_generation=st.program_generation)
+    _print(ver.as_dict())
+    return 0 if ver.ok else 5
+
+
+def _project_rollover_accept(args, store, st) -> int:
+    """The successor: verify, acknowledge, wait for the handover, derive
+    everything again, take the lease, then hold it. Exit 5 on any refusal --
+    nothing is taken."""
+    from .orchestrator import write_lock
+    from .rollover import RolloverError, Successor, hold_lease
+    from .succession import LeaseError, MasterAuthority
+    from .succession_capsule import CapsuleError, LocalObserver, load_capsule
+
+    try:
+        cap = load_capsule(args.capsule)
+        if cap.project_id != st.project_id:
+            raise RolloverError(f"the capsule is for project {cap.project_id!r}, not "
+                                f"{st.project_id!r}")
+        authority = MasterAuthority(store.dir, args.session, ttl_seconds=args.ttl,
+                                    serialize=lambda: write_lock(store))
+        successor = Successor(
+            authority, args.capsule, observer=LocalObserver(), pointer_digest=args.digest,
+            project_generation=lambda: store.read_state().program_generation,
+            poll_s=args.poll, wait_s=args.wait)
+        took = successor.accept(token_out=args.token_out)
+    except (RolloverError, CapsuleError, LeaseError, LockBusy, StoreError) as exc:
+        print(f"refused: {exc}", file=sys.stderr)
+        return 5
+    print(f"took over: session {took.session} holds epoch {took.epoch} of project "
+          f"{st.project_id}; receipt {took.receipt_file}")
+    sys.stdout.flush()
+    if args.no_hold:
+        return 0
+    result = hold_lease(took.authority, interval=args.interval, watch_pid=args.watch_pid,
+                        hold_for=args.hold_for)
+    print(f"hold ended: {result.reason} after {result.renewals} renewals")
+    return 0
+
+
+def _project_drive(args, store, st) -> int:
+    """Become the governed master of a project and drive it (P2-07/08/09).
+
+    Whoever calls this -- a Claude Code or Codex session, a Herdr pane, the
+    resume loop -- *becomes* the master by acquiring the lease, which begins a
+    new epoch. Being the master is that registered status, not the kind of
+    process. A live holder elsewhere refuses the acquisition; a holder that
+    was killed, rebooted away or let its lease lapse is replaced (RECOVERY),
+    and a named successor takes a handed-over lease (SUCCESSION).
+    """
+    from .orchestrator import HaltClass, write_lock
+    from .resumeloop import drive_governed, load_driver
+    from .succession import LeaseError, LeaseHeld, MasterAuthority
+
+    factory = load_driver(store.dir)
+    if factory is None:
+        print(f"refused: project {st.project_id} registers no driver "
+              f"({store.dir / 'driver.json'}); nothing here guesses how to "
+              "launch its runs", file=sys.stderr)
+        return 4
+    try:
+        authority = MasterAuthority(store.dir, args.session, ttl_seconds=args.ttl,
+                                    serialize=lambda: write_lock(store))
+        epoch = authority.acquire(program_generation=st.program_generation,
+                                  note=args.note or "")
+        if args.token_out:
+            # The token is this epoch's credential for commands issued on the
+            # master's behalf (handoff, unblock); written owner-only, and only
+            # when asked for. A file that already exists is forced to 0600
+            # before the token goes in (review A2, N4).
+            try:
+                out = Path(args.token_out).expanduser()
+                fd = os.open(str(out), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+                os.fchmod(fd, 0o600)
+                with os.fdopen(fd, "w", encoding="utf-8") as fh:
+                    fh.write(authority.token or "")
+            except OSError as exc:
+                # Acquired and then failed: give the lease back, or it reads
+                # LOST and the continuation unit would drive a project whose
+                # command failed.
+                try:
+                    authority.release(reason=f"--token-out failed: {exc}")
+                except Exception:                  # noqa: BLE001 - best effort
+                    pass
+                print(f"refused: cannot write the token to {args.token_out}: {exc}",
+                      file=sys.stderr)
+                return 5
+    except LeaseHeld as exc:
+        print(f"refused: {exc}", file=sys.stderr)
+        return 5
+    except (LeaseError, LockBusy) as exc:
+        print(f"refused: {exc}", file=sys.stderr)
+        return 5
+    result = drive_governed(store, authority, factory, max_rounds=args.max_rounds)
+    _print({"project_id": st.project_id, "master": args.session,
+            "epoch": epoch.epoch, "epoch_reason": epoch.reason.value,
+            "halt": result.halt.value, "reason": result.reason,
+            "steps": [f"{s.kind}:{s.node or ''}" for s in result.steps]})
+    if result.halt is HaltClass.CLOSED:
+        return 0
+    return 6 if result.halt is HaltClass.SUPERSEDED else 1
 
 
 # --------------------------------------------------------------------------- #
@@ -1396,11 +2710,22 @@ def build_parser() -> argparse.ArgumentParser:
                         "(P1-09); e.g. policy/role_approval.default.json. Without "
                         "it a role inherits the operator's interactive defaults "
                         "and every unapproved action stops the run for a human.")
+    r.add_argument("--autonomy", metavar="PATH",
+                   help="the autonomy contract this run is governed by. Pinned to the "
+                        "run on first use; a resumed run obeys the contract it began "
+                        "under, and a different one offered later is refused.")
+    r.add_argument("--program-epoch", type=int, default=None,
+                   help="the programme epoch the contract is pinned to")
     r.add_argument("--trust-worktree", action="store_true",
                    help="pre-grant folder trust for this run's own development "
                         "worktree -- only a linked worktree Herdr created, below "
                         "its worktree root -- so the developer does not stop at "
                         "the trust dialog. Recorded in the run directory.")
+    r.add_argument("--storage-root", metavar="PATH", default=None,
+                   help="the storage state root (STORAGE-B3): its ledger admits or "
+                        "refuses every role dispatch. Default: $HOH_STATE_ROOT, else "
+                        "${XDG_STATE_HOME:-~/.local/state}/veriharness. Must be "
+                        "initialised (`hoh storage init --root PATH`); never created here.")
     r.set_defaults(func=cmd_run)
 
     for name, fn, help_ in (
@@ -1479,8 +2804,68 @@ def build_parser() -> argparse.ArgumentParser:
         help="Resume runs stuck on the usage quota once the wait is over",
     )
     fs.add_argument("run_id", nargs="?", default=None,
-                    help="without an argument: check every run")
+                    help="without an argument: check every run and project")
+    fs.add_argument("--drive", action="store_true",
+                    help="drive a resumed project on, as a new governed master, "
+                         "when it registers a driver")
+    fs.add_argument("--recover", action="store_true",
+                    help="also replace the master of a project whose lease holder "
+                         "died (killed, rebooted away, lease expired), with a new "
+                         "governed epoch; a released lease or a live holder is left alone")
     fs.set_defaults(func=cmd_resume_quota)
+
+    rsg = sub.add_parser(
+        "resume-storage",
+        help="Resume runs parked on storage pressure once a role run would be admitted",
+    )
+    rsg.add_argument("run_id", nargs="?", default=None,
+                     help="without an argument: check every run and project")
+    rsg.add_argument("--storage-root", metavar="PATH", default=None,
+                     help="the storage state root (same resolution as `hoh run`)")
+    rsg.set_defaults(func=cmd_resume_storage)
+
+    sg = sub.add_parser("storage", help="The storage state root (STORAGE-A/B)")
+    sgs = sg.add_subparsers(dest="storage_cmd", required=True)
+    sgi = sgs.add_parser("init", help="Initialise a storage state root (writes OWNER.json)")
+    sgi.add_argument("--root", dest="storage_root_path", required=True, metavar="PATH")
+    sg.set_defaults(func=cmd_storage, run_id=None)
+    sgw = sgs.add_parser("steward", help="One optimisation pass of a project's storage "
+                                         "steward (STORAGE-D); prints its report")
+    sgw.add_argument("--project", required=True, metavar="P")
+    sgw.add_argument("--once", action="store_true",
+                     help="required: exactly one pass with the periodic event (what the ops "
+                          "timer runs); the timer is the only scheduler")
+    sgw.add_argument("--plan-only", action="store_true",
+                     help="plan and report, never execute VERIFIED_RELOCATION")
+    sgw.add_argument("--storage-root", metavar="PATH", default=None,
+                     help="the storage state root (same resolution as `hoh run`)")
+    sgw.set_defaults(func=cmd_storage_steward)
+    sga = sgs.add_parser("adopt-project",
+                         help="Adopt an existing project directory through an adoption anchor "
+                              "committed in the trust root (a one-time operator act)")
+    sga.add_argument("--project", required=True, metavar="P")
+    sga.add_argument("--project-root", required=True, metavar="PATH",
+                     help="the trust-root repository the anchor is committed in")
+    sga.add_argument("--anchor", required=True, metavar="COMMIT:FILE",
+                     help="the adoption anchor: a commit (an ancestor of HEAD) and a file")
+    sga.add_argument("--storage-root", required=True, metavar="PATH",
+                     help="the storage state root, named explicitly (no fallback)")
+    sga.set_defaults(func=cmd_storage_adopt_project)
+    sgl = sgs.add_parser("survey-legacy",
+                         help="Draft a legacy-roots anchor for legacy reviewer dirs (read-only)")
+    sgl.add_argument("--project", required=True, metavar="P")
+    sgl.add_argument("--reviews", required=True, metavar="DIR")
+    sgl.add_argument("--out", required=True, metavar="FILE", help="a new file; never replaced")
+    sgl.add_argument("--storage-root", required=True, metavar="PATH",
+                     help="the storage state root, named explicitly (no fallback)")
+    sgl.set_defaults(func=cmd_storage_survey_legacy)
+    sgr = sgs.add_parser("adopt-legacy",
+                         help="Register the legacy roots a committed legacy-roots anchor lists")
+    sgr.add_argument("--project", required=True, metavar="P")
+    sgr.add_argument("--anchor", required=True, metavar="COMMIT:FILE")
+    sgr.add_argument("--storage-root", required=True, metavar="PATH",
+                     help="the storage state root, named explicitly (no fallback)")
+    sgr.set_defaults(func=cmd_storage_adopt_legacy)
 
     dl = sub.add_parser("deliver", help="Deliver an accepted checkpoint")
     dl.add_argument("run_id")
@@ -1504,6 +2889,19 @@ def build_parser() -> argparse.ArgumentParser:
     c = sub.add_parser("list", help="All runs")
     c.set_defaults(func=cmd_list, run_id=None)
 
+    t = sub.add_parser("timers", help="Durable waits under this root")
+    t.set_defaults(func=cmd_timers, run_id=None)
+
+    se = sub.add_parser("sentinel", help="What is due now, and what it asks for")
+    se.add_argument("--program-epoch", type=int, default=None,
+                    help="refuse timers armed under a different program epoch")
+    se.add_argument("--session-epoch", type=int, default=None,
+                    help="refuse timers armed by a superseded session")
+    se.set_defaults(func=cmd_sentinel, run_id=None)
+
+    st = sub.add_parser("stuck", help="Non-terminal objects with no way out")
+    st.set_defaults(func=cmd_stuck, run_id=None)
+
     pr = sub.add_parser(
         "project",
         help="The orchestration layer above a run: which runs happen at all",
@@ -1524,6 +2922,14 @@ def build_parser() -> argparse.ArgumentParser:
     ub.add_argument("node")
     ub.add_argument("--reason", required=True,
                     help="why it is safe to proceed -- becomes a decision record")
+    for cmd_parser in (ub,):
+        cmd_parser.add_argument("--session", default=None,
+                                help="the current master's session id (governed projects)")
+        cmd_parser.add_argument("--epoch", type=int, default=None,
+                                help="the current master's epoch (governed projects)")
+        cmd_parser.add_argument("--token", default=None, help="the current master's token")
+        cmd_parser.add_argument("--token-file", default=None,
+                                help="file holding the current master's token")
     ra = ps.add_parser(
         "record-action",
         help="Record a repository change made outside the loop, so closure can be traced",
@@ -1533,11 +2939,153 @@ def build_parser() -> argparse.ArgumentParser:
                     help="'human', 'operator', or the tool that made the change")
     ra.add_argument("--reason", required=True, help="why it was made")
     ra.add_argument("--node", default=None, help="the node it relates to, if any")
+    ra.add_argument("--session", default=None,
+                    help="the current master's session id (governed projects)")
+    ra.add_argument("--epoch", type=int, default=None,
+                    help="the current master's epoch (governed projects)")
+    ra.add_argument("--token", default=None, help="the current master's token")
+    ra.add_argument("--token-file", default=None, help="file holding that token")
     ra.add_argument("--head-before", default="",
                     help="the repository head before the change -- it cannot be "
                          "measured afterwards, so it has to be supplied")
+    au = ps.add_parser("authority", help="Who holds the project: lease and epoch chain")
+    au.add_argument("project_id")
+    dr = ps.add_parser(
+        "drive",
+        help="Become the governed master (new epoch) and drive the project",
+    )
+    dr.add_argument("project_id")
+    dr.add_argument("--session", required=True,
+                    help="this session's id; it becomes the master's identity")
+    dr.add_argument("--ttl", type=int, default=1800, help="lease length in seconds")
+    dr.add_argument("--max-rounds", type=int, default=40)
+    dr.add_argument("--note", default="", help="recorded on the epoch")
+    dr.add_argument("--token-out", default=None,
+                    help="write this epoch's token (owner-only) for commands issued "
+                         "on the master's behalf")
+    ho = ps.add_parser(
+        "handoff",
+        help="Hand the lease to a named successor (master rollover)",
+    )
+    ho.add_argument("project_id")
+    ho.add_argument("--session", required=True, help="the current master's session id")
+    ho.add_argument("--epoch", type=int, required=True, help="the current master's epoch")
+    ho.add_argument("--to", required=True, help="the successor's session id")
+    ho.add_argument("--reason", required=True, help="why the rollover happens")
+    ho.add_argument("--token", default=None,
+                    help="the current master's token (visible in the process list; "
+                         "prefer --token-file)")
+    ho.add_argument("--token-file", default=None, help="file holding that token")
+    hd = ps.add_parser(
+        "hold",
+        help="Become the governed master and stay one: renew the lease until fenced "
+             "(the first generation's bootstrap; run it in the background)",
+    )
+    hd.add_argument("project_id")
+    hd.add_argument("--session", required=True, help="this session's id")
+    hd.add_argument("--ttl", type=int, default=1800, help="lease length in seconds")
+    hd.add_argument("--note", default="", help="recorded on the epoch")
+    hd.add_argument("--token-out", default=None,
+                    help="write this epoch's token (owner-only); if that fails the "
+                         "lease is given back")
+    hd.add_argument("--watch-pid", type=int, default=None,
+                    help="release the lease once this process (the session's) is gone")
+    hd.add_argument("--hold-for", type=float, default=None,
+                    help="release the lease after this many seconds")
+    hd.add_argument("--interval", type=float, default=None,
+                    help="seconds between renewals (default: a third of the ttl)")
+    ro = ps.add_parser(
+        "rollover",
+        help="Roll the orchestrator session over: freeze a capsule, start a successor "
+             "with a pointer, hand over once it re-derived the capsule",
+    )
+    ro.add_argument("project_id")
+    ro.add_argument("--session", required=True, help="the current master's session id")
+    ro.add_argument("--epoch", type=int, required=True, help="the current master's epoch")
+    ro.add_argument("--token", default=None,
+                    help="the current master's token (visible in the process list; "
+                         "prefer --token-file)")
+    ro.add_argument("--token-file", default=None, help="file holding that token")
+    ro.add_argument("--successor", default=None, help="the successor's session id")
+    ro.add_argument("--model", default=None, help="the successor session's model")
+    ro.add_argument("--input", default=None,
+                    help="JSON file: what to derive, the operator's decisions, advisory "
+                         "context (default: the project state, the run set, HEAD)")
+    ro.add_argument("--transcript", default=None,
+                    help="only rotate if this transcript's last request is over the "
+                         "threshold")
+    ro.add_argument("--threshold", type=int, default=250_000,
+                    help="context tokens at which --transcript fires")
+    ro.add_argument("--ack-timeout", type=int, default=600,
+                    help="seconds the successor has to acknowledge")
+    ro.add_argument("--takeover", type=int, default=300,
+                    help="seconds the handover stands before this session takes it back")
+    ro.add_argument("--poll", type=float, default=1.0, help="seconds between polls")
+    ro.add_argument("--token-out", default=None,
+                    help="write the new token here if the handover lapses and this "
+                         "session takes the program back")
+    rv = ps.add_parser(
+        "rollover-verify",
+        help="Read-only: re-derive a succession capsule and print every difference",
+    )
+    rv.add_argument("project_id")
+    rv.add_argument("--capsule", required=True, help="the capsule file")
+    rv.add_argument("--session", required=True, help="the verifying session's id")
+    rv.add_argument("--digest", default=None, help="the capsule digest the pointer named")
+    rv.add_argument("--handover", action="store_true",
+                    help="verify as the successor after the handover")
+    ra2 = ps.add_parser(
+        "rollover-accept",
+        help="The successor: verify, acknowledge, take the handover only if everything "
+             "re-derives, then hold the lease",
+    )
+    ra2.add_argument("project_id")
+    ra2.add_argument("--capsule", required=True, help="the capsule file")
+    ra2.add_argument("--session", required=True, help="this (the successor's) session id")
+    ra2.add_argument("--digest", required=True, help="the capsule digest the pointer named")
+    ra2.add_argument("--ttl", type=int, default=1800, help="lease length in seconds")
+    ra2.add_argument("--token-out", default=None,
+                     help="write the new epoch's token (owner-only); if that fails the "
+                          "lease is given back")
+    ra2.add_argument("--no-hold", action="store_true",
+                     help="return after taking over instead of holding the lease")
+    ra2.add_argument("--watch-pid", type=int, default=None,
+                     help="release the lease once this process (the session's) is gone")
+    ra2.add_argument("--hold-for", type=float, default=None,
+                     help="release the lease after this many seconds")
+    ra2.add_argument("--interval", type=float, default=None,
+                     help="seconds between renewals (default: a third of the ttl)")
+    ra2.add_argument("--poll", type=float, default=1.0,
+                     help="seconds between polls for the handover")
+    ra2.add_argument("--wait", type=float, default=900.0,
+                     help="seconds to wait for the handover before giving up")
+    pc = ps.add_parser(
+        "contract",
+        help="The PM boundary, read-only: check an imported contract, describe an "
+             "amendment, ask who owns a state class, list unverified external DONEs",
+    )
+    pcs = pc.add_subparsers(dest="contract_cmd", required=True)
+    pcs.add_parser("schema", help="The contract's JSON schema")
+    pck = pcs.add_parser("check", help="Validate a contract file and print its digest")
+    pck.add_argument("file")
+    pci = pcs.add_parser("impact",
+                         help="Describe what a proposed version would change; applies nothing")
+    pci.add_argument("file", help="the imported version")
+    pci.add_argument("proposed", help="the proposed next version")
+    pco = pcs.add_parser("owner", help="Who decides a class of state (all of them without one)")
+    pco.add_argument("state_class", nargs="?", default=None)
+    pcf = pcs.add_parser("conflicts",
+                         help="External DONEs with no verified verdict here (exit 1 if any)")
+    pcf.add_argument("file")
+    pcf.add_argument("--internal", default=None,
+                     help="JSON object of work package id to this product's status; "
+                          "without it, no package has a verdict here")
+    # Overrides the group's func, so cmd_project never sees `contract` and no
+    # project store is opened.
+    pc.set_defaults(func=cmd_project_contract)
     pr.set_defaults(func=cmd_project, run_id=None, project_id=None, node=None,
-                    reason=None, actor=None, head_before=None)
+                    reason=None, actor=None, head_before=None, session=None,
+                    epoch=None, token=None, token_file=None)
 
     return p
 

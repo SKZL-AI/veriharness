@@ -27,6 +27,19 @@ from .evidence import EvidenceBundle
 MAX_PRIORITIES = 3
 """Paper A.2, /planning-policy: at most three reachable priorities."""
 
+FOREGROUND = (
+    "Run long commands in the foreground and wait for them to finish. Start no "
+    "background task, monitor or timer: your session ends when your turn ends, "
+    "and whatever is still running then is cut off."
+)
+"""Every role: HoH closes the role's pane when its turn ends (`pane_ledger`,
+`HerdrDispatcher.release_role`), and what the role left running is ended."""
+
+DEVELOPER_FREEZE = (
+    "The end of your turn freezes the candidate; nothing you do after it counts."
+)
+"""The developer only: the freeze follows its turn directly."""
+
 
 class RoleOutputError(ValueError):
     """The role output does not satisfy the contract. Exactly one repair attempt."""
@@ -175,13 +188,15 @@ def planner_prompt(
     # rules and the output contract had to be processed afresh on every role
     # run. Handoff §12 demands precisely the opposite: do not write changing
     # run metadata ahead of the reusable prefix.
-    return f"""/role/project-planner
+    return f"""[role/project-planner]
 You are the project planner of an iterative development run. This is a pure
 planning invocation: implement nothing, edit nothing, test nothing. You may
 **read** the project directory in order to ground the plan in the actual
 project -- you may not write there.
 
 /planning-policy
+Do not end your turn while work you started in the background is still running; wait for it.
+{FOREGROUND}
 Blockers and regressions before product extensions. Choose at most
 {MAX_PRIORITIES} reachable priorities. Turn each one into a concrete
 implementation target and an **observable** validation condition. No broad
@@ -283,12 +298,13 @@ project with a smaller fresh start.
     preserve = "\n".join(f"  - {p}" for p in plan.preserve) or "  (nothing recorded)"
 
     # K1: stable contract first, run metadata last (see planner_prompt).
-    return f"""/role/developer
+    return f"""[role/developer]
 You are the developer of this run. You are the **only** writer to the artifact:
 the planner and QA may read it and execute it, but not change it. Work
 exclusively in the working tree named below.
 
 /development-policy
+{FOREGROUND} {DEVELOPER_FREEZE}
 Repair build and runtime blockers first, then the targets in the order given.
 Use the native tools of your harness. Work baseline-change-retest: establish
 the current state of the target path before the change, and run the same path
@@ -350,13 +366,15 @@ def qa_prompt(
     )
 
     # K1: stable contract first, run metadata last (see planner_prompt).
-    return f"""/role/qa-tester
+    return f"""[role/qa-tester]
 You are the QA tester of this run. You assess a **frozen, read-only**
 candidate. You have not seen the developer's working dialogue and you are not
 meant to reconstruct it -- your assessment follows observations, not the
 developer's report of being finished.
 
 /assessment-policy
+Do not end your turn while work you started in the background is still running; wait for it.
+{FOREGROUND}
 Derive checkable statements from the requirements and the validation goals.
 Observe the candidate from the outside (inputs and outputs, behaviour) and from
 the inside (source, configuration, logs) where that is necessary. A criterion
@@ -364,11 +382,15 @@ counts as verified only when candidate-bound evidence supports the required
 behaviour. Visible defects, regressions, unmet requirements and **insufficient
 evidence** are recorded as a gap, not inferred as a success.
 An infrastructure error (timeout, tool not startable) is never PASS.
+If a verdict rests on work you did in an earlier iteration or attempt of this run (this same session), say so in that verdict's `note`.
 
 /restrictions
-Change nothing about the candidate. Your own test artifacts, builds, logs and
-caches belong in a separate scratch directory. Do not read hidden tests,
-benchmark values or private evaluator files.
+Change nothing about the candidate. It is read-only on disk for your
+dispatch, and it is witnessed: any write into it -- even one you undo, a
+`chmod` and back, or a file created and moved out again -- is recorded as a
+capability violation that blocks the run. Your own test artifacts, builds,
+logs and caches belong in a separate scratch directory. Do not read hidden
+tests, benchmark values or private evaluator files.
 
 {_HOUSE_RULES_POINTER}
 

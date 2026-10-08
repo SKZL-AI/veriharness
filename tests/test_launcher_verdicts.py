@@ -777,3 +777,225 @@ def test_a_spent_shared_budget_is_refused_as_a_budget_not_as_a_broken_start(
     assert starter.remaining_budget() == 0
     with pytest.raises(BudgetExhausted, match="9/9"):
         starter.budget_argumente()
+
+
+def test_a_run_held_by_another_live_process_is_in_flight_not_undetermined(tmp_path):
+    """Finding #9 on the real path: `_run_cli` gives a role run no session of
+    its own, so a SIGKILLed master leaves it running with the run's lock. The
+    replacement must see a run in flight -- a known state to wait for -- not an
+    unclassifiable one that halts the project AMBIGUOUS."""
+    import subprocess
+    import sys
+    import time
+    from pathlib import Path
+
+    from hoh.contracts import RunState
+    from hoh.launcher import HohRunLauncher
+    from hoh.orchestrator import RunVerdict
+    from hoh.project import TaskNode
+    from hoh.store import RunStore
+
+    root = tmp_path / "root"
+    RunStore(root, "r1").write_state(RunState(
+        run_id="r1", repo_path=str(tmp_path), project_name="p", spec_path="/x/s.md",
+        spec_digest="a" * 16, policy_digest="b" * 16, profile_digest="c" * 16))
+    ready = tmp_path / "ready"
+    holder = subprocess.Popen([sys.executable, "-c", (
+        "import sys, time, pathlib\n"
+        f"sys.path.insert(0, {str(Path(__file__).resolve().parent.parent / 'src')!r})\n"
+        "from hoh.store import RunStore\n"
+        f"with RunStore({str(root)!r}, 'r1').lock():\n"
+        f"    pathlib.Path({str(ready)!r}).write_text('x')\n"
+        "    time.sleep(30)\n")])
+    try:
+        for _ in range(200):
+            if ready.exists():
+                break
+            time.sleep(0.05)
+        out = HohRunLauncher(root, tmp_path).evaluate(TaskNode(id="n", run_id="r1"))
+        assert out.verdict is RunVerdict.IN_FLIGHT, out
+    finally:
+        holder.kill()
+        holder.wait()
+
+
+def test_the_quota_kind_stages_writes_is_a_provider_wait(starter, tmp_path):
+    """`stages.block` writes blocked_kind='usage_limit' for an exhausted quota;
+    the launcher must read that as a provider wait, with its retry time, not as
+    an unclassified block (which halted real projects AMBIGUOUS)."""
+    from hoh import stages
+
+    st = verdict_state(tmp_path, stage=Stage.VERIFYING)
+    stages.block(st, "usage limit reached; resets in 2h")
+    assert st.blocked_kind == "usage_limit"
+    result = starter._verdict(st, None, Empty())
+    assert result.verdict is RunVerdict.PROVIDER_UNAVAILABLE
+    assert result.retry_after and result.retry_after.endswith("Z")
+
+
+def _marker_run(tmp_path, rid="r1"):
+    from hoh.contracts import RunState
+    from hoh.store import RunStore
+
+    store = RunStore(tmp_path / "root", rid)
+    store.write_state(RunState(
+        run_id=rid, repo_path=str(tmp_path), project_name="p", spec_path="/x/s.md",
+        spec_digest="a" * 16, policy_digest="b" * 16, profile_digest="c" * 16))
+    return store
+
+
+def test_a_run_between_iterations_is_in_flight_by_its_process_marker(tmp_path):
+    """Review B3, C: `hoh run` holds the lock per iteration only. Between two
+    iterations the lock is free, yet the run's process lives -- the marker
+    says so, and evaluate must not take a verdict from a run in progress."""
+    import subprocess
+    import sys
+    import time
+    from pathlib import Path
+
+    from hoh.launcher import HohRunLauncher
+    from hoh.orchestrator import RunVerdict
+    from hoh.project import TaskNode
+
+    store = _marker_run(tmp_path)
+    ready = tmp_path / "ready"
+    holder = subprocess.Popen([sys.executable, "-c", (
+        "import sys, time, pathlib\n"
+        f"sys.path.insert(0, {str(Path(__file__).resolve().parent.parent / 'src')!r})\n"
+        "from hoh.store import RunStore\n"
+        f"with RunStore({str(store.root)!r}, 'r1').process_marker():\n"
+        f"    pathlib.Path({str(ready)!r}).write_text('x')\n"
+        "    time.sleep(30)\n")])
+    try:
+        for _ in range(200):
+            if ready.exists():
+                break
+            time.sleep(0.05)
+        out = HohRunLauncher(store.root, tmp_path).evaluate(TaskNode(id="n", run_id="r1"))
+        assert out.verdict is RunVerdict.IN_FLIGHT, out
+    finally:
+        holder.kill()
+        holder.wait()
+    # the process is gone: the marker still says "running", and is not believed
+    out = HohRunLauncher(store.root, tmp_path).evaluate(TaskNode(id="n", run_id="r1"))
+    assert out.verdict is not RunVerdict.IN_FLIGHT
+
+
+def test_an_ended_marker_is_not_in_flight(tmp_path):
+    import json
+
+    store = _marker_run(tmp_path)
+    with store.process_marker():
+        assert store.running_process() is not None
+    assert store.running_process() is None
+    assert json.loads(store.process_path.read_text())["state"] == "ended"
+
+
+def test_an_unreadable_lock_is_undetermined_not_in_flight(tmp_path):
+    """Review A3, F2: only a busy lock is a live controller."""
+    import os
+
+    from hoh.launcher import HohRunLauncher
+    from hoh.orchestrator import RunVerdict
+    from hoh.project import TaskNode
+
+    store = _marker_run(tmp_path)
+    store.lock_path.write_text("")
+    os.chmod(store.lock_path, 0)
+    try:
+        if os.access(store.lock_path, os.R_OK):          # running as root: cannot test
+            return
+        out = HohRunLauncher(store.root, tmp_path).evaluate(TaskNode(id="n", run_id="r1"))
+        assert out.verdict is RunVerdict.UNDETERMINED, out
+    finally:
+        os.chmod(store.lock_path, 0o644)
+
+
+def test_a4_g2_a_second_run_process_cannot_erase_the_first_ones_marker(tmp_path):
+    import subprocess
+    import sys
+    import time
+    from pathlib import Path
+
+    from hoh.store import LockBusy
+
+    store = _marker_run(tmp_path)
+    ready = tmp_path / "ready"
+    holder = subprocess.Popen([sys.executable, "-c", (
+        "import sys, time, pathlib\n"
+        f"sys.path.insert(0, {str(Path(__file__).resolve().parent.parent / 'src')!r})\n"
+        "from hoh.store import RunStore\n"
+        f"with RunStore({str(store.root)!r}, 'r1').process_marker():\n"
+        f"    pathlib.Path({str(ready)!r}).write_text('x')\n"
+        "    time.sleep(30)\n")])
+    try:
+        for _ in range(200):
+            if ready.exists():
+                break
+            time.sleep(0.05)
+        before = store.process_path.read_text()
+        with pytest.raises(LockBusy):
+            with store.process_marker():
+                pass
+        assert store.process_path.read_text() == before       # untouched
+        assert store.running_process() is not None
+    finally:
+        holder.kill()
+        holder.wait()
+    assert store.running_process() is None                   # the kernel let go
+
+
+def test_a4_g3_a_merge_timeout_that_leaves_changes_says_so(tmp_path, monkeypatch):
+    import subprocess
+
+    from hoh.launcher import HohRunLauncher
+    from hoh.orchestrator import MergeFailure, RunOutcome, RunVerdict
+    from hoh.project import TaskNode
+
+    def g(*a):
+        return subprocess.run(["git", "-C", str(repo), *a], capture_output=True,
+                              text=True, check=True, env={
+                                  "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@l",
+                                  "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@l",
+                                  "PATH": "/usr/bin:/bin"}).stdout.strip()
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    g("init", "-q", "-b", "main")
+    (repo / "a").write_text("a\n")
+    g("add", "a")
+    g("commit", "-q", "-m", "base")
+    g("checkout", "-q", "-b", "hoh-n1")
+    (repo / "b").write_text("b\n")
+    g("add", "b")
+    g("commit", "-q", "-m", "cand")
+    sha, tree = g("rev-parse", "HEAD"), g("rev-parse", "HEAD^{tree}")
+    g("checkout", "-q", "main")
+    ln = HohRunLauncher(tmp_path / "root", repo, mainline="main")
+    real = ln._git
+
+    def fake(*args, **kw):
+        if args[:2] == ("merge", "--no-ff"):
+            g("read-tree", "-m", "HEAD", sha)            # staged, then "killed"
+            return subprocess.CompletedProcess(args, 124, "", "git timed out after 1 s")
+        return real(*args, **kw)
+    monkeypatch.setattr(ln, "_git", fake)
+    m = ln.merge(TaskNode(id="n1"), RunOutcome(RunVerdict.ACCEPTED, "x", candidate=sha,
+                                               candidate_tree=tree))
+    assert not m.landed and m.failure is MergeFailure.UNKNOWN
+    assert "a person must inspect" in m.detail
+
+
+def test_a_dispatch_refused_because_the_run_is_executing_is_in_flight(tmp_path, monkeypatch):
+    """Review A5 M1: `hoh run` exits 2 when another process executes the run;
+    that is a run in flight, not a rejection spending a retry."""
+    from hoh.launcher import Dispatch, HohRunLauncher
+    from hoh.orchestrator import RunVerdict
+    from hoh.project import TaskNode
+
+    store = _marker_run(tmp_path)
+    ln = HohRunLauncher(store.root, tmp_path)
+    monkeypatch.setattr(ln, "_run_cli", lambda argv: Dispatch(
+        2, "", "Run r1 is already being executed by another process"))
+    monkeypatch.setattr(ln, "accepted_baseline", lambda node: None)
+    out = ln.launch(TaskNode(id="n", run_id="r1"))
+    assert out.verdict is RunVerdict.IN_FLIGHT, out

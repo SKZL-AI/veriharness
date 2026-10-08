@@ -252,7 +252,7 @@ def test_A3_unstartable_process_is_never_pass(tmp_path: Path):
 def test_A3_guard_refusal_never_turns_green(tmp_path, repo, spec):
     d = FakeDispatcher(
         repo=repo,
-        plan_json=lambda s: plan_for(s, command="nvidia-smi -l 1"),
+        plan_json=lambda s: plan_for(s, command="nvidia-smi"),
         qa_json=qa_pass,
     )
     ctrl, state, _ = build(tmp_path, repo, spec, d)
@@ -333,7 +333,7 @@ def test_A5_loopoutcome_reports_the_iteration_that_was_worked(tmp_path, repo, sp
     ctrl, state, _ = build(tmp_path, repo, spec, d)
     out = ctrl.run_iteration(state)
     assert out.iteration == 1
-    assert out.candidate_id == "r1-i1"
+    assert out.candidate_id == "r1-i1-a1"
 
 
 def test_A5_three_rejections_reach_the_progress_limit(tmp_path, repo, spec):
@@ -2194,7 +2194,7 @@ def test_qa_outage_does_not_count_as_a_failed_attempt():
 # --------------------------------------------------------------------------- #
 
 
-def test_block_reads_the_dialog(monkeypatch):
+def test_block_reads_the_dialog(monkeypatch, tmp_path):
     """On `blocked` the visible dialog has to go into the message.
 
     Twice an A02 run came to a halt at an approval, and both times it was
@@ -2205,7 +2205,9 @@ def test_block_reads_the_dialog(monkeypatch):
     from hoh.controller import DispatchError
 
     d = object.__new__(dispatchers.HerdrDispatcher)
-    d.answers_dir = Path("/tmp")
+    # The test's own directory, never the host's /tmp: the dispatcher may
+    # open and write there, and a STRICT sandbox has no /tmp at all.
+    d.answers_dir = tmp_path
     d.profiles = {}
     d.endpoints = {}
     d.role_cwd = {}
@@ -2245,7 +2247,7 @@ def test_block_reads_the_dialog(monkeypatch):
     assert "not readable" in str(exc2.value)
 
 
-def test_dispatch_failure_carries_the_pane_view(monkeypatch):
+def test_dispatch_failure_carries_the_pane_view(monkeypatch, tmp_path):
     """A timeout takes the pane content with it too, not just a block.
 
     "timed out waiting for agent status" says nothing by itself: behind it
@@ -2257,7 +2259,9 @@ def test_dispatch_failure_carries_the_pane_view(monkeypatch):
     from hoh.controller import DispatchError
 
     d = object.__new__(dispatchers.HerdrDispatcher)
-    d.answers_dir = Path("/tmp")
+    # The test's own directory, never the host's /tmp: the dispatcher may
+    # open and write there, and a STRICT sandbox has no /tmp at all.
+    d.answers_dir = tmp_path
     d.profiles = {}
     d.endpoints = {}
     d.role_cwd = {}
@@ -2469,13 +2473,16 @@ def test_working_agent_is_not_overwritten(tmp_path, monkeypatch):
 
 
 def test_dead_restored_agent_is_cleaned_up(tmp_path, monkeypatch):
-    """`unknown` proves no liveness -- our own dead tab gets cleaned up.
+    """`unknown` proves no liveness -- our own dead pane gets cleaned up.
 
     Continuation of finding 11: after the hard reset Herdr had restored the
     pane and the name binding, but the agent process inside it was dead. The
     start failed on `agent_name_taken`, the prompting afterwards on
     `agent_not_ready`, and the pane was empty. Reuse on suspicion leads into
-    this dead end; the way out is to clean up **our own** tab and start fresh.
+    this dead end; the way out is to clean up **our own** pane and start fresh.
+
+    The dead agent's **pane** is closed, never its tab: what else sits in that
+    tab (a pane the operator opened next to it) is not ours to close.
     """
     from hoh import herdr as herdr_mod
 
@@ -2483,15 +2490,20 @@ def test_dead_restored_agent_is_cleaned_up(tmp_path, monkeypatch):
     st = make_state(run_id="a02", iteration=6)
     name = d._agent_name(Role.PLANNER, st)
 
-    monkeypatch.setattr(herdr_mod, "snapshot", lambda: {"agents": [{
-        "name": name, "pane_id": "wW:p11", "workspace_id": "wW", "tab_id": "wW:tV",
-        "agent": "claude", "agent_status": "unknown", "cwd": str(d.store_dir),
-    }]})
+    monkeypatch.setattr(herdr_mod, "snapshot", lambda: {
+        "agents": [{
+            "name": name, "pane_id": "wW:p11", "workspace_id": "wW", "tab_id": "wW:tV",
+            "agent": "claude", "agent_status": "unknown", "cwd": str(d.store_dir),
+        }],
+        "panes": [{"pane_id": "wW:p11", "tab_id": "wW:tV", "workspace_id": "wW",
+                   "cwd": str(d.store_dir)}],
+        "tabs": [{"tab_id": "wW:tV", "pane_count": 1}],
+    })
 
-    closed: list[str] = []
+    closed: list[list[str]] = []
     monkeypatch.setattr(
         d, "_cli",
-        lambda args, purpose: closed.append(args[-1]) or {"result": {}},
+        lambda args, purpose: closed.append(list(args[1:])) or {"result": {}},
         raising=False,
     )
     started: list[str] = []
@@ -2499,7 +2511,7 @@ def test_dead_restored_agent_is_cleaned_up(tmp_path, monkeypatch):
     monkeypatch.setattr(d, "_start_agent", lambda n, k, p, extra=None: started.append(n), raising=False)
 
     assert d._ensure_agent(Role.PLANNER, st) == name
-    assert closed == ["wW:tV"], "our own dead tab gets closed"
+    assert closed == [["pane", "close", "wW:p11"]], "the dead agent's pane, never its tab"
     assert started == [name], "afterwards a fresh start happens"
 
 

@@ -154,7 +154,8 @@ def _evidence(root: Path) -> Path:
     _write(ev / "spec.as-cloned.md", SPEC)
     run = ev / "run-evidence" / RUN
     _write(run / "state.json", {
-        "run_id": RUN, "stage": "CHECKPOINTED", "resume_attempts": 0, "amendments_seen": 0,
+        "run_id": RUN, "stage": "CHECKPOINTED", "condition": "ACTIVE", "blocked_kind": None,
+        "resume_attempts": 0, "amendments_seen": 0,
         "spec_path": f"{FRESH}/examples/minimal/spec.md", "repo_path": "/x/wt",
         "base_candidate": {"candidate_id": f"{RUN}-base", "commit": "c0ffee"},
         "spec_digest": hashlib.sha256(SPEC.encode()).hexdigest()[:16],
@@ -821,3 +822,69 @@ def test_the_run_must_stop_at_the_first_acceptance_as_documented(ev):
     a satisfied spec and can leave the run in PLANNING."""
     _step_edit(ev, "run", lambda r: r["argv"].remove("--until-accepted"))
     assert any("step run is not the command the README" in p for p in _problems(ev))
+
+
+# --------------------------------------------------------------------------- #
+# qa-arena-write, Revision 7a: a checkpoint held by a capability violation
+# --------------------------------------------------------------------------- #
+
+
+def _state_path(ev: Path) -> Path:
+    return ev / "run-evidence" / RUN / "state.json"
+
+
+def test_a_checkpoint_held_by_a_capability_violation_is_not_accepted(ev):
+    """A CHECKPOINTED run that a capability violation holds is not an
+    acceptance: with the sticky kind (BLOCKED), and in the legacy shape -- no
+    kind, a PAUSED run whose block reason names the violation. Control: the
+    unheld fixture raises no such problem."""
+    assert not [p for p in _problems(ev) if "capability violation" in p]
+
+    def kind(d):
+        d.update(condition="BLOCKED", blocked_kind="capability_violation",
+                 blocked_reason="iteration aborted: something else")
+    _edit_json(_state_path(ev), kind)
+    record = acc.derive(ev)
+    assert record["held_by_capability_violation"]["blocked_kind"] == "capability_violation"
+    assert any("held by a capability violation" in p for p in acc.satisfied(record))
+
+    def legacy(d):
+        d.update(condition="PAUSED", blocked_kind="collected_for_digest",
+                 blocked_reason="capability violation: qa: a frozen tree was touched")
+    _edit_json(_state_path(ev), legacy)
+    record = acc.derive(ev)
+    assert record["held_by_capability_violation"]["condition"] == "PAUSED"
+    assert any("held by a capability violation" in p for p in acc.satisfied(record))
+
+
+def test_an_unheld_run_re_derives_without_the_new_keys(ev):
+    """Committed records must keep re-deriving: an unheld run's record has
+    neither new key, and its key set is the committed P1-16 record's, minus
+    the two keys `main` adds."""
+    record = acc.derive(ev)
+    assert "held_by_capability_violation" not in record
+    assert "run_condition_unknown" not in record
+    committed = json.loads((ROOT / "dogfood" / "p1-16" / "P1_16_ACCEPTANCE.json")
+                           .read_text(encoding="utf-8"))
+    assert set(record) == set(committed) - {"unsatisfied", "requirement_satisfied"}, (
+        "the derived record's shape changed, so committed records stop re-deriving")
+
+
+def test_a_stale_record_of_a_held_run_no_longer_re_derives(ev, tmp_path):
+    """A record written before the run was held does not survive `--check`
+    once the evidence says the run is held."""
+    out = tmp_path / "record.json"
+    assert acc.main(["--evidence", str(ev), "--out", str(out)]) == 0
+    assert acc.main(["--evidence", str(ev), "--out", str(out), "--check"]) == 0
+    _edit_json(_state_path(ev), lambda d: d.update(
+        condition="BLOCKED", blocked_kind="capability_violation",
+        blocked_reason="capability violation: qa touched the arena"))
+    assert acc.main(["--evidence", str(ev), "--out", str(out), "--check"]) == 1
+
+
+def test_a_run_state_without_a_condition_is_unknown_not_accepted(ev):
+    """A missing `condition` cannot say the run is not held: unknown."""
+    _edit_json(_state_path(ev), lambda d: d.pop("condition"))
+    record = acc.derive(ev)
+    assert record["run_condition_unknown"] is True
+    assert any("records no condition" in p for p in acc.satisfied(record))

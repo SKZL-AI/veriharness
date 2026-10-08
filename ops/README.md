@@ -22,6 +22,28 @@ The bound against endless loops: after `MAX_RESUME_ATTEMPTS = 5` unsuccessful
 attempts the run stays blocked. An automatic retry without a bound costs money
 without making progress.
 
+## Two operating modes, two units
+
+| unit | mode | what it runs |
+|---|---|---|
+| `hoh-resume-quota.{service,timer}` | supervised | `hoh resume-quota`: a due `usage_limit` wait becomes resumable again; nothing is driven |
+| `hoh-continue.{service,timer}` | unattended | `hoh resume-quota --drive --recover`: the same, and a resumed project is **driven on** by a new governed master; a project whose master **died** (killed, rebooted away, lease expired) gets a new master (RECOVERY) |
+
+Both resume only `usage_limit` waits. A question collected for the digest, a
+contract park and a capability violation keep their owners, and a live master
+is never displaced -- only a lease whose holder is provably gone is recovered.
+A project takes part in driving only if it registers a driver
+(`<root>/projects/<id>/driver.json`).
+
+Which mode a machine is in is derived, not declared:
+`python3 tools/unit_drift.py` reports `unattended` when an open project under
+the HoH root registers a driver, and then requires `hoh-continue.*` installed,
+identical to `ops/`, its timer active and its service not failed. The check
+only reads; installing or enabling a unit is always the operator's action.
+
+The behaviour of `hoh-continue.service` is what `tools/durability_e2e.py`
+exercises: its tick is built from this unit's `ExecStart`.
+
 ## Setting it up (systemd, per user)
 
 ```sh

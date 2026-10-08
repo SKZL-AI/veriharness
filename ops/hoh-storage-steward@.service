@@ -1,0 +1,30 @@
+[Unit]
+Description=HoH: one storage-steward pass for project %i (STORAGE-D)
+Documentation=file://%h/hoh/docs/OPERATIONS.md
+
+[Service]
+Type=oneshot
+# The storage state root comes from one place, the operator's environment file:
+#   HOH_STATE_ROOT=/home/<user>/hoh-state     (initialised: hoh storage init --root ...)
+EnvironmentFile=%h/.config/hoh/storage.env
+# One instance per project (%i = the registered project id). `--once` emits the
+# `periodic` event; a forecast crossing the reserve found in the same pass emits
+# `forecast_crossing` as well, and the events the run hooks recorded
+# (admission_refused, terminal_transition) are consumed here. NORMAL observes
+# only, OPTIMIZE plans and reports, PRESSURE or worse plans and executes
+# VERIFIED_RELOCATION -- the only operation that ever frees a local copy, and
+# only for VERIFIED_DUPLICATE / REPRODUCIBLE_SCRATCH of this project's own
+# registered namespace. Foreign data is never listed, read, sized or touched.
+ExecStart=%h/hoh/plugin/bin/hoh storage steward --project %i --once --storage-root ${HOH_STATE_ROOT}
+Nice=10
+IOSchedulingClass=idle
+ProtectSystem=strict
+ProtectHome=read-only
+# Writable: the state root (its registered scratch and receipts) and the
+# canonical repository, whose only write is a refs/vh-retain/* ref. Archive
+# targets on /mnt need a drop-in with their own ReadWritePaths= line.
+ReadWritePaths=-%S/veriharness -%h/hoh-state -%h/hoh/.git
+PrivateTmp=true
+NoNewPrivileges=true
+# No [Install] section: the unit is started only by its timer
+# (hoh-storage-steward@<project>.timer, which keeps its own [Install]).

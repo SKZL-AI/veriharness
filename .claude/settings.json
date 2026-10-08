@@ -1,0 +1,18 @@
+{
+  "_what": "This repository's own destructive-operation policy, wired to the path the orchestrator's commands actually travel. The authority is tools/preserve.py in this tree, versioned with the capability that depends on it; nothing here modifies machine-global configuration, so no other repository, session or project is affected and this programme's correctness claims do not rest on what happens to be installed globally. The guard is a behavioural control and defence in depth -- it is not confinement, and confinement is not integrity evidence. The independent backstop stays src/hoh/integrity.py, which takes a pre/post inventory around every run.",
+  "_why": "On 2026-09-23 the orchestrator ran rm -rf on a parked duplicate of a run's evidence, judging the copy redundant. Nothing unique was lost, which is luck rather than a result. The machine-global denylist allowed it and was right to by its own design rule: it blocks the catastrophic and lets recoverable local deletion through, and a duplicate under a dated run directory is indistinguishable from node_modules to a regular expression. What was missing was a definition of project- and evidence-owned that a guard could read.",
+  "_effect": "A destructive command aimed at project- or evidence-owned state is refused, with the versioned-rename, archive and proven-dedupe operations named in the refusal. Ordinary cleanup (node_modules, build) stays free, replacement inside the owned scope stays free, and a command that cannot be lexed is refused only when it also names a program that destroys.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/tools/preserve_hook.py\""
+          }
+        ]
+      }
+    ]
+  }
+}

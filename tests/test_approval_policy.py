@@ -133,6 +133,213 @@ def test_a_policy_is_not_quietly_dropped_for_a_harness_that_cannot_take_it(tmp_p
 
 
 # --------------------------------------------------------------------------- #
+# The role's own answers directory (run 20260925t1645z-pguard2)
+# --------------------------------------------------------------------------- #
+#
+# A planner under `auto` asked for permission to write its own answer file and
+# the run blocked. The settings now carry one scoped rule for the answers
+# directory. These cases check the rule as written; whether a live session then
+# writes without a dialog is the operator's K5 check, not something a test here
+# can show.
+
+def _answers_expected(answers_dir) -> str:
+    """The rule spelled out independently of the module: `Edit(` plus the
+    resolved absolute path with one extra leading slash."""
+    return "Edit(/" + str(Path(answers_dir).resolve()) + "/**)"
+
+
+def _answers_read_expected(answers_dir) -> str:
+    """The Read rule spelled out the same way: `Read(` plus the resolved
+    absolute path with one extra leading slash."""
+    return "Read(/" + str(Path(answers_dir).resolve()) + "/**)"
+
+
+def _rule_root(rule: str) -> Path:
+    """The directory an `Edit(//<abs>/**)` or `Read(//<abs>/**)` rule grants,
+    for containment checks."""
+    kind = rule.split("(", 1)[0]
+    assert kind in ("Edit", "Read"), rule
+    assert rule.startswith(kind + "(//") and rule.endswith("/**)"), rule
+    return Path(rule[len(kind + "(/"):-len("/**)")])
+
+
+def _written(settings: Path) -> dict:
+    return json.loads(settings.read_text(encoding="utf-8"))["permissions"]
+
+
+def _policy_with(role: str, rules: list[str]):
+    doc = _doc()
+    doc["roles"][role]["allow"] = rules
+    return parse(doc)
+
+
+def test_answers_dir_grants_exactly_one_edit_rule_in_double_slash_form(tmp_path):
+    """Catches a missing rule, a `Write(` rule (not matched by file-write
+    checks), a single-slash path (read relative to the settings root), a
+    triple slash, or an extra rule beside the one intended."""
+    answers = tmp_path / "run" / "answers"
+    answers.mkdir(parents=True)
+    policy = _policy_with("planner", ["Bash(pytest:*)"])
+    settings, _ = policy.write_role_files(tmp_path / "run", "planner", answers_dir=answers)
+    allow = _written(settings)["allow"]
+    expected = "Edit(/" + str(answers.resolve()) + "/**)"
+    expected_read = "Read(/" + str(answers.resolve()) + "/**)"
+    assert allow == ["Bash(pytest:*)", expected, expected_read]
+    added = allow[1]
+    assert added.startswith("Edit(//") and not added.startswith("Edit(///")
+    added_read = allow[2]
+    assert added_read.startswith("Read(//") and not added_read.startswith("Read(///")
+    assert sum(r.startswith("Edit(") for r in allow) == 1
+    assert sum(r.startswith("Read(") for r in allow) == 1
+    assert not any(r.startswith("Write(") for r in allow)
+    # Negative control: the same call without answers_dir writes the policy's
+    # list and nothing else, as before this change.
+    settings, _ = policy.write_role_files(tmp_path / "run", "planner")
+    assert _written(settings)["allow"] == ["Bash(pytest:*)"]
+
+
+def test_answers_dir_relative_and_symlinked_paths_are_resolved(tmp_path, monkeypatch):
+    """Catches a rule written with the path as given: a relative path would be
+    read against the settings root, a symlink would name a directory other than
+    the one the session actually writes into."""
+    real = tmp_path / "real" / "answers"
+    real.mkdir(parents=True)
+    link = tmp_path / "link"
+    link.symlink_to(tmp_path / "real")
+    policy = load(DEFAULT)
+
+    monkeypatch.chdir(tmp_path)
+    settings, _ = policy.write_role_files(tmp_path / "run", "developer",
+                                          answers_dir=Path("real/answers"))
+    assert _written(settings)["allow"] == [_answers_expected(real),
+                                           _answers_read_expected(real)]
+    assert _rule_root(_written(settings)["allow"][0]).is_absolute()
+    assert _rule_root(_written(settings)["allow"][1]).is_absolute()
+
+    settings, _ = policy.write_role_files(tmp_path / "run", "developer",
+                                          answers_dir=link / "answers")
+    assert _written(settings)["allow"] == [_answers_expected(real),
+                                           _answers_read_expected(real)]
+    # Negative control: the unresolved spellings are not what was written.
+    written = json.dumps(_written(settings)["allow"])
+    assert str(link) not in written
+    assert "Edit(/real/answers/**)" not in written
+    assert "Read(/real/answers/**)" not in written
+
+
+def test_answers_dir_policy_rule_not_duplicated(tmp_path):
+    """Catches an unconditional append: a policy that already declares the
+    exact rule would list it twice. Also catches reordering of the policy's
+    own rules, which must keep coming first."""
+    answers = tmp_path / "answers"
+    answers.mkdir()
+    rule = _answers_expected(answers)
+    read = _answers_read_expected(answers)
+    own = ["Bash(pytest:*)", rule, read, "Edit(src/**)"]
+    policy = _policy_with("qa", own)
+    settings, _ = policy.write_role_files(tmp_path, "qa", answers_dir=answers)
+    allow = _written(settings)["allow"]
+    assert allow.count(rule) == 1
+    assert allow.count(read) == 1
+    assert allow == own
+    # A policy that declares only the Edit rule keeps it once and gets the
+    # Read rule appended once, after its own rules.
+    own = ["Bash(pytest:*)", rule, "Edit(src/**)"]
+    policy = _policy_with("qa", own)
+    settings, _ = policy.write_role_files(tmp_path, "qa", answers_dir=answers)
+    allow = _written(settings)["allow"]
+    assert allow.count(rule) == 1
+    assert allow == own + [read]
+    # Negative control: the same policy without the rules gets them appended
+    # once, after its own rules in their original order.
+    policy = _policy_with("qa", ["Bash(pytest:*)", "Edit(src/**)"])
+    settings, _ = policy.write_role_files(tmp_path, "qa", answers_dir=answers)
+    assert _written(settings)["allow"] == ["Bash(pytest:*)", "Edit(src/**)", rule, read]
+
+
+def test_answers_scoped_no_rule_matches_unscoped_or_leaves_the_directory(tmp_path):
+    """Catches a grant broader than the answers directory: an unscoped
+    `Edit`/`Write`, a Bash rule, or a path that reaches the run directory, a
+    sibling, or `answers/../x`."""
+    from hoh.approval_policy import _UNSCOPED
+    run = tmp_path / "run"
+    answers = run / "answers"
+    answers.mkdir(parents=True)
+    policy = load(DEFAULT)
+    settings, _ = policy.write_role_files(run, "developer", answers_dir=answers)
+    allow = _written(settings)["allow"]
+    assert allow, "the answers rule must be written"
+    assert sorted(r.split("(", 1)[0] for r in allow) == ["Edit", "Read"], allow
+    root = answers.resolve()
+    for rule in allow:
+        assert not _UNSCOPED.match(rule.strip()), rule
+        assert not rule.startswith("Bash"), rule
+        assert not rule.startswith("Write("), rule
+        granted = _rule_root(rule)
+        assert granted == root, rule
+    outside = [answers / ".." / "x", run / "answers2" / "f.json", run / "f.json",
+               tmp_path / "elsewhere"]
+    for path in outside:
+        target = Path(path).resolve()
+        assert not any(target.is_relative_to(_rule_root(r)) for r in allow), target
+    assert (answers / "i1-a0-developer.json").resolve().is_relative_to(root)
+    # Negative control: the checks above do fire on the grants they exclude.
+    assert _UNSCOPED.match("Edit") and _UNSCOPED.match("Write(*)")
+    assert (answers / ".." / "x").resolve().is_relative_to(_rule_root("Edit(/" + str(run.resolve()) + "/**)"))
+    assert (answers / ".." / "x").resolve().is_relative_to(_rule_root("Read(/" + str(run.resolve()) + "/**)"))
+    for unscoped in ("Read", "Read(**)", "Read(/**)"):
+        with pytest.raises(AssertionError):
+            _rule_root(unscoped)
+
+
+def test_deny_untouched_by_answers_dir(tmp_path):
+    """Catches any change to the deny list when the answers rule is added: a
+    dropped, reordered or rewritten deny rule would let the scoped allow reach
+    something the house rules forbid."""
+    answers = tmp_path / "answers"
+    answers.mkdir()
+    policy = load(DEFAULT)
+    expected = json.dumps(list(policy.deny))
+    with_dir, _ = policy.write_role_files(tmp_path / "a", "developer", answers_dir=answers)
+    without, _ = policy.write_role_files(tmp_path / "b", "developer")
+    assert json.dumps(_written(with_dir)["deny"]) == expected
+    assert json.dumps(_written(without)["deny"]) == expected
+    # Negative control: only the allow list differs between the two files.
+    assert _written(with_dir)["allow"] != _written(without)["allow"]
+    assert {k: v for k, v in _written(with_dir).items() if k != "allow"} == \
+        {k: v for k, v in _written(without).items() if k != "allow"}
+
+
+def test_dispatcher_passes_answers_dir(tmp_path):
+    """Catches a dispatcher that calls write_role_files without its
+    answers_dir: the role would start with no rule for its answer file."""
+    d = _base(tmp_path)
+    d.approval_policy = load(DEFAULT)
+    d._agent_args(Role.PLANNER)
+    settings = tmp_path / "run" / "approval" / f"{Role.PLANNER.value}.settings.json"
+    assert _written(settings)["allow"] == [_answers_expected(d.answers_dir),
+                                           _answers_read_expected(d.answers_dir)]
+    # Negative control: the same policy written without the keyword has no
+    # such rule, so the rules above can only have come from the dispatcher.
+    bare, _ = d.approval_policy.write_role_files(tmp_path / "bare", Role.PLANNER.value)
+    assert _answers_expected(d.answers_dir) not in _written(bare)["allow"]
+    assert _answers_read_expected(d.answers_dir) not in _written(bare)["allow"]
+
+
+def test_answers_dir_leaves_the_policy_evidence_unchanged(tmp_path):
+    """Catches the answers rule leaking into the policy's recorded evidence:
+    the run records what the policy declares; the settings file records the
+    added rule."""
+    policy = load(DEFAULT)
+    before = json.dumps(policy.evidence(), sort_keys=True)
+    policy.write_role_files(tmp_path, "planner", answers_dir=tmp_path / "answers")
+    assert json.dumps(policy.evidence(), sort_keys=True) == before
+    # Negative control: the settings file does carry the rule.
+    settings = tmp_path / "approval" / "planner.settings.json"
+    assert _answers_expected(tmp_path / "answers") in _written(settings)["allow"]
+
+
+# --------------------------------------------------------------------------- #
 # Pre-granted worktree trust
 # --------------------------------------------------------------------------- #
 

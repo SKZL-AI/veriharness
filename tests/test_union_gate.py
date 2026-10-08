@@ -27,7 +27,7 @@ sys.path.insert(0, str(REPO_ROOT / "tools"))
 
 import union_gate as ug  # noqa: E402
 
-_LINE_RE = re.compile(r"^U([1-5]): (PASS|FAIL|SKIPPED)(?::\s*(.+))?$")
+_LINE_RE = re.compile(r"^U([1-5]): (PASS|FAIL|SKIPPED|NOT_RUN)(?::\s*(.+))?$")
 _U4_LINE_RE = re.compile(r"^U4: (PASS|FAIL|SKIPPED)(?::\s*(.+))?$")
 
 
@@ -747,3 +747,45 @@ def test_require_appears_in_the_output(tmp_path, capsys):
     assert rc == 1
     assert "U3: SKIPPED" in output
     assert "required to run and did not" in output
+
+
+def test_the_pytest_failure_line_carries_no_duration():
+    """O238: the readiness board could not converge while tests failed, because
+    the union cell carried pytest's wall-clock time ("in 396.50s") and so
+    differed on every regeneration pass. The counts must stay; the time must go."""
+    line = "6 failed, 2884 passed, 5 skipped in 396.50s (0:06:36)"
+    assert ug._without_duration(line) == "6 failed, 2884 passed, 5 skipped"
+    assert ug._without_duration("1 failed in 0.87s") == "1 failed"
+    assert ug._without_duration("no output") == "no output"
+
+
+def test_only_a_pytest_summary_line_loses_its_duration():
+    """O238 review (splan-b M5): the first version stripped " in <n>s" from any
+    line, so an assertion message ending "... in 5s" lost real content. Only a
+    whole pytest summary line is rewritten."""
+    assert ug._without_duration("E assert 'x' in 5s") == "E assert 'x' in 5s"
+    assert ug._without_duration("== 2 failed, 1 passed in 3.10s ==") == "== 2 failed, 1 passed =="
+    assert ug._without_duration("6 failed, 2884 passed in 396.50s (0:06:36)") == "6 failed, 2884 passed"
+
+
+def test_check_u5_reports_the_failure_without_its_duration(tmp_path, monkeypatch):
+    """O238 review (splan-b M5): the earlier test called only the helper, so
+    reverting the call site in check_u5 stayed green. This goes through check_u5
+    with a failing pytest whose summary carries a duration."""
+    (tmp_path / "tests").mkdir()
+
+    class Proc:
+        returncode = 1
+        stdout = "F\n1 failed, 3 passed in 12.34s\n"
+        stderr = ""
+
+    monkeypatch.setattr(ug, "_run_bounded", lambda *a, **k: Proc())
+    result = ug.check_u5(tmp_path)
+    text = str(result.__dict__ if hasattr(result, "__dict__") else result)
+    assert "1 failed, 3 passed" in text
+    assert "12.34" not in text
+
+
+def test_no_tests_ran_loses_its_duration_too():
+    """O238 review round 2 (splan-b M5): pytest's exit-5 line kept its time."""
+    assert ug._without_duration("no tests ran in 0.01s") == "no tests ran"

@@ -339,7 +339,7 @@ def test_a_check_with_nvidia_smi_is_not_executed(tmp_path, repo, spec):
     """A plan must not get around the guards by way of a 'criterion'."""
     d = FakeDispatcher(
         repo=repo,
-        plan_json=lambda s: plan_for(s, command="nvidia-smi -l 1"),
+        plan_json=lambda s: plan_for(s, command="nvidia-smi"),
         qa_json=qa_pass,
     )
     ctrl, state, store = build(tmp_path, repo, spec, d)
@@ -628,3 +628,147 @@ def test_an_accepted_iteration_does_not_claim_a_pending_dialog(tmp_path, repo, s
     out = ctrl.run_iteration(state)
     assert out.accepted, out.reason
     assert not out.waiting_for_approval
+
+
+def test_a_pane_that_is_not_clean_blocks_the_run_instead_of_an_outage(tmp_path, repo, spec):
+    """Dispatch residue (run padopt, O252): QA's pane was not proven free to
+    take a prompt, so the dispatcher sent nothing and raised `PaneNotClean`.
+
+    Catches: `_verify` folding it into a QA outage like any `DispatchError`
+    -- the iteration closes "unverified", `close_own` closes the tabs with
+    the pane the operator has to inspect, and the next iteration meets the
+    same pane again. It is recorded and re-raised, so the run blocks once.
+    Control: a plain non-transient `DispatchError` stays an outage.
+    """
+    from hoh import controller
+
+    PaneNotClean = getattr(controller, "PaneNotClean", None)
+    assert PaneNotClean is not None, "no PaneNotClean in hoh.controller"
+
+    class Refusing(FakeDispatcher):
+        error = None
+
+        def dispatch(self, role, prompt, *, state):
+            if role is Role.QA:
+                self.calls.append(role)
+                raise self.error
+            return super().dispatch(role, prompt, state=state)
+
+    d = Refusing(repo=repo, plan_json=plan_for, qa_json=qa_pass)
+    d.error = PaneNotClean("qa dispatch not sent: its input box still holds text")
+    ctrl, state, _ = build(tmp_path / "residue", repo, spec, d)
+    with pytest.raises(PaneNotClean):
+        ctrl.run_iteration(state)
+    assert "qa not prompted, its pane is not proven free" in "\n".join(state.history)
+    assert d.calls.count(Role.QA) == 1
+
+    control = Refusing(repo=repo, plan_json=plan_for, qa_json=qa_pass)
+    control.error = DispatchError("qa dispatch not sent: its input box still holds text")
+    ctrl, state, _ = build(tmp_path / "control", repo, spec, control)
+    out = ctrl.run_iteration(state)
+    assert not out.accepted
+    assert "unverified" in out.reason
+
+
+def test_a_pane_that_is_not_clean_is_recorded_as_a_failed_qa_dispatch(tmp_path, repo, spec):
+    """Dispatch residue, Revision 5b (dres2-b F2).
+
+    Catches (MC2 of dres2-b): `_verify`'s `except PaneNotClean` clause
+    re-raising without `note_dispatch`, so the dispatch log has no QA line
+    for the dispatch that blocked the run -- the record of the work loses
+    exactly the failure the operator has to inspect. One QA record, outcome
+    failed, its detail naming the refusal and its class a failure class.
+    Control: a plain `DispatchError` (an outage) is recorded the same way, so
+    the log is read the same way in both.
+    """
+    from hoh import controller
+
+    PaneNotClean = getattr(controller, "PaneNotClean", None)
+    assert PaneNotClean is not None, "no PaneNotClean in hoh.controller"
+
+    class Refusing(FakeDispatcher):
+        error = None
+
+        def dispatch(self, role, prompt, *, state):
+            if role is Role.QA:
+                raise self.error
+            return super().dispatch(role, prompt, state=state)
+
+    def qa_records(root, error):
+        d = Refusing(repo=repo, plan_json=plan_for, qa_json=qa_pass)
+        d.error = error
+        ctrl, state, _ = build(root, repo, spec, d)
+        try:
+            ctrl.run_iteration(state)
+        except PaneNotClean:
+            pass
+        return [r for r in ctrl.telemetry().read() if r.role == "qa"]
+
+    records = qa_records(tmp_path / "residue",
+                         PaneNotClean("qa dispatch not sent: its input box still holds text"))
+    assert len(records) == 1, records
+    assert records[0].outcome == "failed"
+    assert "its input box still holds text" in records[0].detail
+    assert records[0].failure_class is not None
+
+    control = qa_records(tmp_path / "control",
+                         DispatchError("qa dispatch not sent: its input box still holds text"))
+    assert len(control) == 1 and control[0].outcome == "failed"
+
+
+def test_a_resumed_iteration_after_an_abort_keeps_every_anchor(tmp_path, repo, spec):
+    """Run qaw4 (2026-10-05): QA's dispatch aborted iteration 1 after its
+    candidate was frozen and anchored; the resumed run re-planned the same
+    iteration, the developer produced another tree, and the reused candidate
+    id moved its anchor -- `integrity.verify` (refs never move) failed the
+    run.
+
+    Catches a resumed attempt that is not its own candidate: it must carry
+    the attempt in its id (`r1-i1-a2`), get its own anchor, and leave the
+    first attempt's anchor where it was; the integrity guard of the resumed
+    invocation, which inventories the refs before it starts, finds no moved
+    ref. Control: an uninterrupted iteration is `r1-i1-a1`, anchored once.
+    """
+    import subprocess as sp
+
+    from hoh import controller, integrity
+
+    PaneNotClean = getattr(controller, "PaneNotClean")
+
+    def anchor(cid):
+        return sp.run(["git", "-C", str(repo), "rev-parse", "--verify", "--quiet",
+                       f"refs/hoh/candidates/{cid}"], capture_output=True,
+                      text=True).stdout.strip()
+
+    class AbortOnce(FakeDispatcher):
+        aborted = False
+
+        def dispatch(self, role, prompt, *, state):
+            if role is Role.QA and not self.aborted:
+                self.aborted = True
+                raise PaneNotClean("qa dispatch not sent: its input box still holds text")
+            return super().dispatch(role, prompt, state=state)
+
+    runs = []
+
+    def develop(r):
+        runs.append(1)
+        (r / FakeDispatcher.MARKER).write_text(f"attempt {len(runs)}\n", encoding="utf-8")
+
+    d = AbortOnce(repo=repo, plan_json=plan_for, qa_json=qa_pass, develop=develop)
+    ctrl, state, _ = build(tmp_path / "resumed", repo, spec, d)
+    with pytest.raises(PaneNotClean):
+        ctrl.run_iteration(state)
+    frozen = state.working_candidate
+    assert frozen.candidate_id == "r1-i1-a1"
+    assert anchor("r1-i1-a1") == frozen.tree_digest
+
+    before = integrity.snapshot(repo)          # the resumed `hoh run`'s inventory
+    out = ctrl.run_iteration(state)
+    assert out.accepted, out.reason
+    assert out.candidate_id == "r1-i1-a2"
+    resumed = state.last_accepted_candidate
+    assert resumed.tree_digest != frozen.tree_digest
+    assert anchor("r1-i1-a1") == frozen.tree_digest
+    assert anchor("r1-i1-a2") == resumed.tree_digest
+    assert [p for p in integrity.verify(before) if "ref" in p] == []

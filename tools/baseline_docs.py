@@ -55,6 +55,10 @@ def cli_surface() -> dict:
     p = subprocess.run([sys.executable, "-m", "hoh.cli", "--help"],
                        cwd=str(HOH), capture_output=True, text=True,
                        env={"PYTHONPATH": "src", "HERDR_ENV": "1",
+                            # O241: without this the child writes src/hoh/__pycache__
+                            # into whatever tree is measured -- a protected arena
+                            # included, which stopped run 20261001t1255z-sdurw2.
+                            "PYTHONDONTWRITEBYTECODE": "1",
                             "PATH": __import__("os").environ.get("PATH", "")})
     if p.returncode != 0:
         return {"commands": [], "source": NOT_MEASURED,

@@ -22,26 +22,43 @@ proven here, by inventory:
 A violation is reported path by path and fails the run. It is never repaired
 and then called valid: the run that deleted something is the run that is on
 record as having done it.
+
+Git's output is read as **bytes**, and every name, path or ref taken from it
+is converted with `os.fsdecode`. Git prints file names and ref names as the
+raw bytes they are, which need not be UTF-8; a strict text read raised on
+them and aborted the launch. `os.fsdecode` keeps such a byte as a surrogate
+escape, `json.dumps` writes it as a `\\udcXX` escape, `json.loads` restores
+it and `os.fsencode` gives back the original bytes -- nothing is replaced, so
+two names never collapse into one.
 """
 from __future__ import annotations
 
 import hashlib
+import os
 import subprocess
 from pathlib import Path
 
 
-def _git(repo: Path, *args: str) -> str:
-    p = subprocess.run(["git", "-C", str(repo), *args],
-                       capture_output=True, text=True)
+def _git(repo: Path, *args: str) -> bytes:
+    p = subprocess.run(["git", "-C", str(repo), *args], capture_output=True)
     if p.returncode != 0:
         raise RuntimeError(f"git {' '.join(args)} in {repo}: "
-                           f"{(p.stderr or p.stdout).strip()[:160]}")
+                           f"{os.fsdecode(p.stderr or p.stdout).strip()[:160]}")
     return p.stdout
+
+
+def _refs(repo: Path) -> dict[str, str]:
+    refs = {}
+    for line in _git(repo, "for-each-ref", "--format=%(refname) %(objectname)").splitlines():
+        name, _, sha = line.partition(b" ")
+        refs[os.fsdecode(name)] = os.fsdecode(sha)
+    return refs
 
 
 def _worktrees(repo: Path) -> list[dict]:
     out, current = [], {}
-    for line in _git(repo, "worktree", "list", "--porcelain").splitlines():
+    for raw in _git(repo, "worktree", "list", "--porcelain").splitlines():
+        line = os.fsdecode(raw)
         if not line.strip():
             if current:
                 out.append(current)
@@ -55,25 +72,28 @@ def _worktrees(repo: Path) -> list[dict]:
 
 
 def _tree_state(worktree: Path) -> str:
-    """HEAD, tracked content and status of one worktree, as one digest."""
+    """HEAD, tracked content and status of one worktree, as one digest.
+
+    `core.quotePath=true` is set for every listing of names, so a user's
+    `quotePath=false` -- which prints a non-UTF-8 name raw -- cannot change
+    the digest between the snapshot and the verification.
+    """
+    quoted = ("-c", "core.quotePath=true")
     h = hashlib.sha256()
-    for args in (("rev-parse", "HEAD"), ("ls-files", "-s"),
-                 ("status", "--porcelain", "--untracked-files=all")):
+    for args in (("rev-parse", "HEAD"), (*quoted, "ls-files", "-s"),
+                 (*quoted, "status", "--porcelain", "--untracked-files=all")):
         try:
-            h.update(_git(worktree, *args).encode())
+            h.update(_git(worktree, *args))
         except RuntimeError as exc:
-            h.update(f"<{exc}>".encode())
+            h.update(os.fsencode(f"<{exc}>"))
     return h.hexdigest()
 
 
 def snapshot(run_worktree: Path | str) -> dict:
     """The protected state around one run, taken before its roles start."""
     wt = Path(run_worktree).resolve()
-    branch = _git(wt, "rev-parse", "--abbrev-ref", "HEAD").strip()
-    refs = {}
-    for line in _git(wt, "for-each-ref", "--format=%(refname) %(objectname)").splitlines():
-        name, _, sha = line.partition(" ")
-        refs[name] = sha
+    branch = os.fsdecode(_git(wt, "rev-parse", "--abbrev-ref", "HEAD")).strip()
+    refs = _refs(wt)
     others = {}
     for w in _worktrees(wt):
         path = Path(w["worktree"]).resolve()
@@ -82,8 +102,8 @@ def snapshot(run_worktree: Path | str) -> dict:
     return {
         "run_worktree": str(wt),
         "run_branch": f"refs/heads/{branch}" if branch != "HEAD" else None,
-        "run_head": _git(wt, "rev-parse", "HEAD").strip(),
-        "tracked": sorted(_git(wt, "ls-files", "-z").split("\0")[:-1]),
+        "run_head": os.fsdecode(_git(wt, "rev-parse", "HEAD")).strip(),
+        "tracked": sorted(os.fsdecode(n) for n in _git(wt, "ls-files", "-z").split(b"\0")[:-1]),
         "refs": refs,
         "other_worktrees": others,
     }
@@ -108,10 +128,7 @@ def verify(before: dict) -> list[str]:
             problems.append(f"deleted: {wt / rel} existed before the run and is "
                             "neither present nor archived")
     try:
-        now_refs = {}
-        for line in _git(wt, "for-each-ref", "--format=%(refname) %(objectname)").splitlines():
-            name, _, sha = line.partition(" ")
-            now_refs[name] = sha
+        now_refs = _refs(wt)
     except RuntimeError as exc:
         return problems + [f"the repository cannot be read after the run: {exc}"]
     own = before.get("run_branch")
