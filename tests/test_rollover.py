@@ -24,7 +24,7 @@ from types import SimpleNamespace
 
 import pytest
 from test_succession_capsule import (
-    OPERATOR_TEXT, World, _git, _make_repo, entry, rewrite,
+    OPERATOR_TEXT, World, _git, _make_repo, entry, forge_capsule_id, rewrite,
 )
 
 from hoh import cli
@@ -38,11 +38,36 @@ from hoh.rollover import (
     RolloverLog, State, Successor, TokenOutError, TriggerError, evaluate_trigger,
     hold_lease, pointer_prompt, run_rollover,
 )
+from hoh.store import LockBusy
 from hoh.succession import LeaseError, LeaseHeld, MasterAuthority, StaleMaster
 from hoh.succession_capsule import (
     CapsuleInput, LocalObserver, ack_path, aborted_path, build_ack, capsule_path,
     freeze_capsule, load_capsule, receipt_path,
 )
+
+# --------------------------------------------------------------------------- #
+# the pointer's command, as the successor's shell would read it
+# --------------------------------------------------------------------------- #
+
+#: The tail the product appends to the pointer's command (`ro.SESSION_PID_EXPR`):
+#: a shell, not shlex, expands it.
+WATCH_TAIL = ' --watch-pid "${CLAUDE_PID:-$PPID}"'
+
+
+def pointer_command(prompt: str) -> str:
+    """The one command line of a pointer prompt (indented two spaces)."""
+    [line] = [ln for ln in prompt.splitlines() if ln.startswith("  ") and "rollover-accept" in ln]
+    return line.strip()
+
+
+def accept_argv(prompt: str, *, watch_pid: int = 4242) -> list[str]:
+    """The pointer's arguments from `--root` on, the shell's expansion of the
+    watch pid replaced by `watch_pid`: what `cli.build_parser()` is given."""
+    command = pointer_command(prompt)
+    assert command.endswith(WATCH_TAIL), command
+    argv = shlex.split(command.removesuffix(WATCH_TAIL)) + ["--watch-pid", str(watch_pid)]
+    return argv[argv.index("--root"):]
+
 
 # --------------------------------------------------------------------------- #
 # K1 -- the trigger
@@ -183,10 +208,10 @@ def test_an_unreadable_transcript_is_an_error_and_never_a_pass(tmp_path):
 def test_below_the_threshold_nothing_is_done(tmp_path):
     w = World(tmp_path)
     t = transcript(tmp_path, rec(inp=1000, cr=2000), name="small")
-    rot = Rotation(w)
-    result = rot.go(trigger=lambda: evaluate_trigger(t))
+    rotation = Rotation(w)
+    result = rotation.go(trigger=lambda: evaluate_trigger(t))
     assert result.outcome is Outcome.NOT_TRIGGERED and result.predecessor_is_master
-    assert not rot.launcher.started and not (w.dir / "rollover").exists()
+    assert not rotation.launcher.started and not (w.dir / "rollover").exists()
     assert w.pred.problems() == [] and RolloverLog(w.dir).events() == []
     big = transcript(tmp_path, rec(inp=1000, cr=300_000), name="big")
     again = Rotation(w).go(trigger=lambda: evaluate_trigger(big))
@@ -314,11 +339,11 @@ class _Actor:
     def __init__(self, succ: Successor) -> None:
         self.succ = succ
 
-    def acknowledge_into(self, rot: Rotation) -> None:
+    def acknowledge_into(self, rotation: Rotation) -> None:
         try:
-            _, rot.ack = self.succ.acknowledge()
+            _, rotation.ack = self.succ.acknowledge()
         except RolloverError as exc:
-            rot.errors.append(exc)
+            rotation.errors.append(exc)
 
     def take(self, ack, *, token_out):
         return self.succ.take(ack, token_out=token_out)
@@ -406,8 +431,8 @@ def test_the_states_follow_the_protocol_order_and_nothing_else(w):
 
 
 def test_a_the_role_moves_over_the_predecessor_is_fenced_and_the_receipt_binds_both(w):
-    rot = Rotation(w)
-    result = rot.go()
+    rotation = Rotation(w)
+    result = rotation.go()
     assert result.outcome is Outcome.COMPLETE, result.detail
     assert result.successor_epoch == 2 and not result.predecessor_is_master
     # F: the predecessor is fenced and must go idle
@@ -416,13 +441,13 @@ def test_a_the_role_moves_over_the_predecessor_is_fenced_and_the_receipt_binds_b
         w.pred.check()
     with pytest.raises(StaleMaster):
         w.pred.renew()
-    assert rot.succ_auth.problems() == []
+    assert rotation.succ_auth.problems() == []
     # exactly one epoch step, for SUCCESSION, held by the successor
     chain = EpochStore(w.dir).chain()
     assert [(e.epoch, e.master_id, e.reason) for e in chain] == [
         (1, "pred", Reason.INITIAL), (2, "succ", Reason.SUCCESSION)]
     # never two masters, at any tick
-    assert rot.max_masters <= 1 and rot.ticks > 0
+    assert rotation.max_masters <= 1 and rotation.ticks > 0
     # the log tells the protocol
     assert events(w) == ["draining", "frozen", "launched", "ack", "handoff", "complete",
                          "retired"]
@@ -432,7 +457,7 @@ def test_a_the_role_moves_over_the_predecessor_is_fenced_and_the_receipt_binds_b
     cap = load_capsule(capsule_path(w.dir, cid))
     ack = json.loads(ack_path(w.dir, cid).read_text())
     receipt = json.loads(receipt_path(w.dir, cid).read_text())
-    lease = rot.succ_auth.read_lease()
+    lease = rotation.succ_auth.read_lease()
     assert receipt["schema_version"] == "hoh-succession-receipt/1"
     assert receipt["capsule_digest"] == cap.capsule_digest == ack["capsule_digest"]
     assert receipt["ack_digest"] == ack["ack_digest"]
@@ -443,7 +468,7 @@ def test_a_the_role_moves_over_the_predecessor_is_fenced_and_the_receipt_binds_b
     assert receipt["receipt_digest"]
     # the successor lease is a different credential from the predecessor's
     assert lease.token_sha256 != cap.predecessor_token_sha256
-    assert not rot.launcher.stopped                            # the successor is left running
+    assert not rotation.launcher.stopped                            # the successor is left running
     assert (receipt_path(w.dir, cid).stat().st_mode & 0o777) == 0o600
     assert not aborted_path(w.dir, cid).exists()
 
@@ -451,10 +476,10 @@ def test_a_the_role_moves_over_the_predecessor_is_fenced_and_the_receipt_binds_b
 def test_the_successor_starts_with_a_pointer_outside_the_repository(w):
     repo = Path(w.repo)
     repo.mkdir()
-    rot = Rotation(w)
-    result = rot.go()
+    rotation = Rotation(w)
+    result = rotation.go()
     assert result.outcome is Outcome.COMPLETE
-    [launch] = rot.launcher.started
+    [launch] = rotation.launcher.started
     cap = load_capsule(capsule_path(w.dir, result.capsule_id))
     prompt = launch["prompt"]
     assert prompt.isascii() and len(prompt) < 2500
@@ -472,12 +497,13 @@ def test_the_successor_starts_with_a_pointer_outside_the_repository(w):
     assert launch["model"] == "claude-opus-5-5" == cap.successor_model
     assert launch["session_id"] == "succ"
     # the one command is the real one
-    [command] = [ln for ln in prompt.splitlines() if "rollover-accept" in ln and "hoh" in ln
-                 and ln.startswith("  ")]
-    argv = shlex.split(command)
-    assert argv[:2] == ["hoh", "--root"] and argv[2] == str(w.root)
-    parsed = cli.build_parser().parse_args(argv[1:])
+    argv = shlex.split(pointer_command(prompt).removesuffix(WATCH_TAIL))
+    n = len(ro.product_invocation())
+    assert argv[:n] == list(ro.product_invocation())          # no `hoh` on PATH is assumed
+    assert argv[n:n + 2] == ["--root", str(w.root)]
+    parsed = cli.build_parser().parse_args(accept_argv(prompt))
     assert parsed.project_cmd == "rollover-accept" and parsed.project_id == "p"
+    assert parsed.watch_pid == 4242                           # the lease follows the conversation
     assert parsed.capsule == str(capsule_path(w.dir, result.capsule_id))
     assert parsed.digest == cap.capsule_digest and parsed.session == "succ"
     assert parsed.token_out == str(launch["cwd"] / "master.token")
@@ -506,21 +532,21 @@ def test_o_a_successor_with_no_access_to_the_old_conversation_continues_from_dur
 
     monkeypatch.setattr(Successor, "acknowledge", watched(Successor.acknowledge))
     monkeypatch.setattr(Successor, "take", watched(Successor.take))
-    rot = Rotation(w)
-    result = rot.go()
+    rotation = Rotation(w)
+    result = rotation.go()
     assert result.outcome is Outcome.COMPLETE
     # the successor was built from a path, a digest and its own session id: nothing of the
     # predecessor's process, and nothing of a transcript
     assert read and not any(p.endswith(".jsonl") or "transcript" in p or p == str(decoy)
                             for p in read)
-    assert rot.succ is not None and rot.succ.authority is rot.succ_auth
-    assert rot.succ.authority is not w.pred
+    assert rotation.succ is not None and rotation.succ.authority is rotation.succ_auth
+    assert rotation.succ.authority is not w.pred
     cap = load_capsule(capsule_path(w.dir, result.capsule_id))
     assert "transcript" not in cap.model_dump_json().lower()
     # everything it needs to continue is in the capsule: the facts it re-derived, the open
     # decision, the register, the runs
     assert {e.entry_id for e in cap.entries} >= {"plan", "runs", "cand", "review", "d1"}
-    assert rot.succ_auth.problems() == [] and rot.taken is not None
+    assert rotation.succ_auth.problems() == [] and rotation.taken is not None
 
 
 # --------------------------------------------------------------------------- #
@@ -529,8 +555,8 @@ def test_o_a_successor_with_no_access_to_the_old_conversation_continues_from_dur
 
 
 def test_i_the_operators_open_decision_arrives_exactly_as_said_and_unanswered(w):
-    rot = Rotation(w)
-    result = rot.go()
+    rotation = Rotation(w)
+    result = rotation.go()
     assert result.outcome is Outcome.COMPLETE
     cap = load_capsule(capsule_path(w.dir, result.capsule_id))        # what the successor loads
     d = entry(cap, "d1")
@@ -551,21 +577,21 @@ def test_i_the_operators_open_decision_arrives_exactly_as_said_and_unanswered(w)
 # --------------------------------------------------------------------------- #
 
 
-def assert_still_master(w: World, rot: Rotation | None = None) -> None:
+def assert_still_master(w: World, rotation: Rotation | None = None) -> None:
     assert w.pred.problems() == []
     lease = w.pred.read_lease()
     assert lease is not None and not lease.released_at
     assert [e.master_id for e in EpochStore(w.dir).chain()] == ["pred"]
-    if rot is not None:
-        assert rot.max_masters <= 1
+    if rotation is not None:
+        assert rotation.max_masters <= 1
 
 
 def test_a_successor_that_does_not_start_leaves_the_predecessor_master(w):
-    rot = Rotation(w, launcher=FakeLauncher(fail="herdr is not running"))
-    result = rot.go()
+    rotation = Rotation(w, launcher=FakeLauncher(fail="herdr is not running"))
+    result = rotation.go()
     assert result.outcome is Outcome.LAUNCH_FAILED and result.predecessor_is_master
     assert "herdr is not running" in result.detail
-    assert_still_master(w, rot)
+    assert_still_master(w, rotation)
     assert events(w) == ["draining", "frozen", "abort"]
     assert RolloverLog(w.dir).state() is State.ACTIVE
     assert aborted_path(w.dir, result.capsule_id).exists()
@@ -575,19 +601,19 @@ def test_a_successor_that_does_not_start_leaves_the_predecessor_master(w):
 
 
 def test_g_a_successor_that_never_acknowledges_costs_nothing_and_is_refused_late(w):
-    rot = Rotation(w, acks=False)
-    result = rot.go()
+    rotation = Rotation(w, acks=False)
+    result = rotation.go()
     assert result.outcome is Outcome.NO_ACK and result.predecessor_is_master
-    cap = load_capsule(rot.capsule_file())
+    cap = load_capsule(rotation.capsule_file())
     assert w.clock() >= cap.ack_deadline                       # it waited the whole window
-    assert_still_master(w, rot)
-    assert rot.launcher.stopped == [LaunchHandle("agent-succ", "pane-1", "tab-1")]
+    assert_still_master(w, rotation)
+    assert rotation.launcher.stopped == [LaunchHandle("agent-succ", "pane-1", "tab-1")]
     assert aborted_path(w.dir, cap.capsule_id).exists()
     assert events(w) == ["draining", "frozen", "launched", "abort"]
     # the lease was renewed through the whole wait, and is still the predecessor's
-    assert all(rot.lease_live_at_each_tick)
+    assert all(rotation.lease_live_at_each_tick)
     # a late successor takes nothing and writes nothing
-    late = Successor(rot.succ_auth, rot.capsule_file(), observer=w.observer, sleep=lambda s: None)
+    late = Successor(rotation.succ_auth, rotation.capsule_file(), observer=w.observer, sleep=lambda s: None)
     before = w.snapshot()
     with pytest.raises(RolloverError, match="aborted"):
         late.accept()
@@ -597,19 +623,19 @@ def test_g_a_successor_that_never_acknowledges_costs_nothing_and_is_refused_late
 
 
 def test_c_a_head_that_moved_before_the_successor_looked_refuses_and_a_refreeze_works(w):
-    def move_head(rot):
-        rot.w.observer.head_sha = "b" * 40
+    def move_head(rotation):
+        rotation.w.observer.head_sha = "b" * 40
 
-    rot = Rotation(w, hooks={"launched": move_head})
-    result = rot.go()
+    rotation = Rotation(w, hooks={"launched": move_head})
+    result = rotation.go()
     assert result.outcome is Outcome.BAD_ACK and result.predecessor_is_master
-    cap = load_capsule(rot.capsule_file())
+    cap = load_capsule(rotation.capsule_file())
     assert w.clock() < cap.ack_deadline                        # the refusal was seen at once
     assert "did not verify" in result.detail and "head" in result.detail
     ack = json.loads(ack_path(w.dir, cap.capsule_id).read_text())
     assert ack["verified"] is False and ack["observed_head"] == "b" * 40
-    assert_still_master(w, rot)
-    assert rot.launcher.stopped and aborted_path(w.dir, cap.capsule_id).exists()
+    assert_still_master(w, rotation)
+    assert rotation.launcher.stopped and aborted_path(w.dir, cap.capsule_id).exists()
     # a re-freeze against the ground as it is now works
     second = Rotation(w).go()
     assert second.outcome is Outcome.COMPLETE and second.capsule_id != result.capsule_id
@@ -617,27 +643,27 @@ def test_c_a_head_that_moved_before_the_successor_looked_refuses_and_a_refreeze_
 
 
 def test_d_a_run_that_changed_between_freezing_and_looking_refuses_naming_the_run_set(w):
-    def change_run(rot):
-        rot.w.observer.runs[0]["attempt"] = 9
+    def change_run(rotation):
+        rotation.w.observer.runs[0]["attempt"] = 9
 
-    rot = Rotation(w, hooks={"launched": change_run})
-    result = rot.go()
+    rotation = Rotation(w, hooks={"launched": change_run})
+    result = rotation.go()
     assert result.outcome is Outcome.BAD_ACK and result.predecessor_is_master
     assert "runs" in result.detail and "run_set" in result.detail
-    assert_still_master(w, rot)
+    assert_still_master(w, rotation)
     ack = json.loads(ack_path(w.dir, result.capsule_id).read_text())
     assert ack["verified"] is False and any("runs" in m for m in ack["mismatches"])
 
 
-def forge_ack(rot: Rotation, change) -> None:
+def forge_ack(rotation: Rotation, change) -> None:
     """Write a self-consistent acknowledgement (right digest) that says something the
     frozen capsule does not: `change` maps the real verification to altered fields."""
-    cap = load_capsule(rot.capsule_file())
-    ver = rot.w.verify(cap)
+    cap = load_capsule(rotation.capsule_file())
+    ver = rotation.w.verify(cap)
     assert ver.ok
     bad = dataclasses.replace(ver, **change(ver))
-    ack = build_ack(cap, bad, at=rot.w.clock())
-    ack_path(rot.w.dir, cap.capsule_id).write_text(json.dumps(ack))
+    ack = build_ack(cap, bad, at=rotation.w.clock())
+    ack_path(rotation.w.dir, cap.capsule_id).write_text(json.dumps(ack))
 
 
 def test_an_ack_that_differs_from_what_was_frozen_is_refused(tmp_path):
@@ -648,18 +674,18 @@ def test_an_ack_that_differs_from_what_was_frozen_is_refused(tmp_path):
     }
     for name, change in variants.items():
         world = World(tmp_path / name)
-        rot = Rotation(world, acks=False,
+        rotation = Rotation(world, acks=False,
                        hooks={"launched": lambda r, change=change: forge_ack(r, change)})
-        result = rot.go()
+        result = rotation.go()
         assert result.outcome is Outcome.BAD_ACK, (name, result.detail)
-        assert_still_master(world, rot)
+        assert_still_master(world, rotation)
         assert aborted_path(world.dir, result.capsule_id).exists()
     # an acknowledgement that is not even JSON
     world = World(tmp_path / "junk")
-    rot = Rotation(world, acks=False, hooks={"launched": lambda r: ack_path(
+    rotation = Rotation(world, acks=False, hooks={"launched": lambda r: ack_path(
         r.w.dir, r.capsule_id()).write_text("{torn")})
-    assert rot.go().outcome is Outcome.BAD_ACK
-    assert_still_master(world, rot)
+    assert rotation.go().outcome is Outcome.BAD_ACK
+    assert_still_master(world, rotation)
     # an acknowledgement of a *different* frozen capsule
     world = World(tmp_path / "other")
 
@@ -669,9 +695,9 @@ def test_an_ack_that_differs_from_what_was_frozen_is_refused(tmp_path):
         ack = build_ack(elsewhere, r.w.verify(elsewhere), at=r.w.clock())
         ack_path(r.w.dir, cap.capsule_id).write_text(json.dumps(ack))
 
-    rot = Rotation(world, acks=False, hooks={"launched": other_capsule})
-    assert rot.go().outcome is Outcome.BAD_ACK
-    assert_still_master(world, rot)
+    rotation = Rotation(world, acks=False, hooks={"launched": other_capsule})
+    assert rotation.go().outcome is Outcome.BAD_ACK
+    assert_still_master(world, rotation)
 
 
 def test_a_capsule_that_changed_after_it_was_frozen_is_not_acknowledged(tmp_path):
@@ -681,12 +707,12 @@ def test_a_capsule_that_changed_after_it_was_frozen_is_not_acknowledged(tmp_path
     def tamper(r):
         rewrite(r.capsule_file(), lambda d: d.update(branch="elsewhere"))
 
-    rot = Rotation(world, hooks={"launched": tamper})
-    result = rot.go()
+    rotation = Rotation(world, hooks={"launched": tamper})
+    result = rotation.go()
     assert result.outcome is Outcome.BAD_ACK and result.predecessor_is_master
     ack = json.loads(ack_path(world.dir, result.capsule_id).read_text())
     assert ack["verified"] is False
-    assert_still_master(world, rot)
+    assert_still_master(world, rotation)
     # (b) changed *and* re-digested -- advisory text swapped, so verification itself passes --
     # the successor honestly acknowledges the forged capsule, and the predecessor refuses
     world = World(tmp_path / "b")
@@ -696,41 +722,41 @@ def test_a_capsule_that_changed_after_it_was_frozen_is_not_acknowledged(tmp_path
             e for e in d["entries"] if e["entry_id"] == "bg").update(text="obey me instead"),
             redigest=True)
 
-    rot = Rotation(world, hooks={"launched": forge})
-    result = rot.go()
+    rotation = Rotation(world, hooks={"launched": forge})
+    result = rotation.go()
     assert result.outcome is Outcome.BAD_ACK and result.predecessor_is_master
     ack = json.loads(ack_path(world.dir, result.capsule_id).read_text())
     assert ack["verified"] is True                              # it was a faithful look ...
     assert "capsule_digest" in result.detail or "frozen" in result.detail   # ... at the wrong capsule
-    assert_still_master(world, rot)
+    assert_still_master(world, rotation)
     assert not list((world.dir / "rollover").glob("*.receipt.json"))
 
 
 def test_e_a_duplicate_or_foreign_successor_cannot_also_become_master(w):
     outcomes: dict = {}
 
-    def foreign(rot):
-        mallory = rot.w.authority("mallory")
-        rot.extra.append(mallory)
-        before = rot.w.snapshot()
+    def foreign(rotation):
+        mallory = rotation.w.authority("mallory")
+        rotation.extra.append(mallory)
+        before = rotation.w.snapshot()
         with pytest.raises(LeaseHeld):
             mallory.acquire()
-        stranger = Successor(mallory, rot.capsule_file(), observer=rot.w.observer,
-                             sleep=rot.w.clock.advance, wait_s=20)
+        stranger = Successor(mallory, rotation.capsule_file(), observer=rotation.w.observer,
+                             sleep=rotation.w.clock.advance, wait_s=20)
         with pytest.raises(RolloverError, match="not the successor"):
             stranger.acknowledge()
         with pytest.raises(RolloverError):
             stranger.poll()                                    # the handover is not hers
-        assert rot.w.snapshot() == before                      # and she wrote nothing
+        assert rotation.w.snapshot() == before                      # and she wrote nothing
         outcomes["foreign"] = True
 
-    rot = Rotation(w, hooks={"handed": foreign})
-    result = rot.go()
+    rotation = Rotation(w, hooks={"handed": foreign})
+    result = rotation.go()
     assert result.outcome is Outcome.COMPLETE and outcomes == {"foreign": True}
     # a duplicate: the same session again, after the first took over
     twin_auth = w.authority("succ")
-    rot.extra.append(twin_auth)
-    twin = Successor(twin_auth, rot.capsule_file(), observer=w.observer,
+    rotation.extra.append(twin_auth)
+    twin = Successor(twin_auth, rotation.capsule_file(), observer=w.observer,
                      sleep=w.clock.advance, wait_s=20)
     with pytest.raises(RolloverError, match="one acknowledgement per capsule"):
         twin.acknowledge()
@@ -740,13 +766,13 @@ def test_e_a_duplicate_or_foreign_successor_cannot_also_become_master(w):
         twin.poll()
     assert [(e.epoch, e.master_id, e.reason) for e in EpochStore(w.dir).chain()] == [
         (1, "pred", Reason.INITIAL), (2, "succ", Reason.SUCCESSION)]
-    assert rot.succ_auth.problems() == [] and twin_auth.problems()
-    assert w.pred.problems() and rot.max_masters <= 1
+    assert rotation.succ_auth.problems() == [] and twin_auth.problems()
+    assert w.pred.problems() and rotation.max_masters <= 1
 
 
 def test_h_a_successor_that_dies_after_taking_the_lease_leaves_a_recoverable_programme(w):
     dead_pid = 2_000_000_000                                   # no such process
-    rot = Rotation(w, succ_pid=dead_pid, hooks={"handed": lambda r: None})
+    rotation = Rotation(w, succ_pid=dead_pid, hooks={"handed": lambda r: None})
 
     def take_only(r):
         # the successor acquires, and the process dies before the receipt is written
@@ -755,8 +781,8 @@ def test_h_a_successor_that_dies_after_taking_the_lease_leaves_a_recoverable_pro
                            sleep=r.w.clock.advance, wait_s=20)
         r.succ.poll()
 
-    rot.hooks["handed"] = take_only
-    result = rot.go()
+    rotation.hooks["handed"] = take_only
+    result = rotation.go()
     assert result.outcome is Outcome.COMPLETE                  # the epoch moved: the predecessor is done
     assert not list((w.dir / "rollover").glob("*.receipt.json"))        # but nothing says more
     probe = w.authority("reader")
@@ -766,13 +792,13 @@ def test_h_a_successor_that_dies_after_taking_the_lease_leaves_a_recoverable_pro
     fresh = w.authority("operator-session")
     epoch = fresh.acquire(program_generation=1)
     assert epoch.reason is Reason.RECOVERY and epoch.epoch == 3
-    assert fresh.problems() == [] and rot.succ_auth.problems() and w.pred.problems()
+    assert fresh.problems() == [] and rotation.succ_auth.problems() and w.pred.problems()
     assert chain_reasons(w) == [Reason.INITIAL, Reason.SUCCESSION, Reason.RECOVERY]
 
 
 def test_a_successor_that_verifies_and_never_takes_over_costs_one_takeover_window(w):
-    rot = Rotation(w, takes=False, takeover_s=120)
-    result = rot.go()
+    rotation = Rotation(w, takes=False, takeover_s=120)
+    result = rotation.go()
     assert result.outcome is Outcome.RECLAIMED and result.predecessor_is_master
     assert result.reclaimed_epoch == 2 and result.token
     handoff = next(r for r in RolloverLog(w.dir).events() if r["event"] == "handoff")
@@ -780,37 +806,37 @@ def test_a_successor_that_verifies_and_never_takes_over_costs_one_takeover_windo
     from datetime import datetime
     spent = (datetime.strptime(reclaimed["at"], "%Y-%m-%dT%H:%M:%SZ")
              - datetime.strptime(handoff["at"], "%Y-%m-%dT%H:%M:%SZ")).total_seconds()
-    assert 120 <= spent < 120 + 2 * rot.poll_s                 # one takeover window, not a TTL
+    assert 120 <= spent < 120 + 2 * rotation.poll_s                 # one takeover window, not a TTL
     assert w.ttl == 1800 > spent
     # the program is the predecessor's again, at a fresh epoch, with a new token
     assert chain_reasons(w) == [Reason.INITIAL, Reason.RECOVERY]
     assert [e.master_id for e in EpochStore(w.dir).chain()] == ["pred", "pred"]
-    assert w.pred.problems() == [] and rot.max_masters <= 1
+    assert w.pred.problems() == [] and rotation.max_masters <= 1
     assert w.pred.read_lease().token_sha256 != load_capsule(
-        rot.capsule_file()).predecessor_token_sha256
+        rotation.capsule_file()).predecessor_token_sha256
     assert "hoh project hold" in result.hint                   # and it says what to do next
-    assert rot.launcher.stopped and events(w)[-2:] == ["handoff", "reclaimed"]
+    assert rotation.launcher.stopped and events(w)[-2:] == ["handoff", "reclaimed"]
     assert RolloverLog(w.dir).state() is State.ACTIVE
     # a successor that wakes up late takes nothing
     with pytest.raises(RolloverError, match="aborted"):
-        Successor(rot.succ_auth, rot.capsule_file(), observer=w.observer,
+        Successor(rotation.succ_auth, rotation.capsule_file(), observer=w.observer,
                   sleep=w.clock.advance, wait_s=20).poll()
-    assert rot.succ_auth.problems() and rot.succ_auth.epoch is None
+    assert rotation.succ_auth.problems() and rotation.succ_auth.epoch is None
 
 
 def test_a_write_in_flight_marks_the_rotation_pending_and_it_runs_at_the_next_safe_point(w):
     busy = {"yes": True}
     launcher = FakeLauncher()
-    rot = Rotation(w, launcher=launcher)
-    first = rot.go(safe=lambda: not busy["yes"])
+    rotation = Rotation(w, launcher=launcher)
+    first = rotation.go(safe=lambda: not busy["yes"])
     assert first.outcome is Outcome.DEFERRED and first.predecessor_is_master
     assert not launcher.started and not list((w.dir / "rollover").glob("*.capsule.json"))
     assert events(w) == ["pending"] and RolloverLog(w.dir).state() is State.ROTATION_PENDING
     assert_still_master(w)
-    second = rot.go(safe=lambda: not busy["yes"])              # still unsafe: no second record
+    second = rotation.go(safe=lambda: not busy["yes"])              # still unsafe: no second record
     assert second.outcome is Outcome.DEFERRED and events(w) == ["pending"]
     busy["yes"] = False
-    third = rot.go(safe=lambda: not busy["yes"])               # the next safe point continues
+    third = rotation.go(safe=lambda: not busy["yes"])               # the next safe point continues
     assert third.outcome is Outcome.COMPLETE
     assert events(w) == ["pending", "draining", "frozen", "launched", "ack", "handoff",
                          "complete", "retired"]
@@ -818,11 +844,11 @@ def test_a_write_in_flight_marks_the_rotation_pending_and_it_runs_at_the_next_sa
 
 def test_a_session_that_is_no_longer_the_master_cannot_start_a_rollover(w):
     w.pred.handoff("somebody-else", reason="manual rotation")
-    rot = Rotation(w)
-    result = rot.go()
+    rotation = Rotation(w)
+    result = rotation.go()
     assert result.outcome is Outcome.REFUSED and not result.predecessor_is_master
     assert "stale master" in result.detail
-    assert not rot.launcher.started and not (w.dir / "rollover").exists()
+    assert not rotation.launcher.started and not (w.dir / "rollover").exists()
 
 
 def test_a_lease_nobody_keeps_alive_is_refused_before_anything_is_frozen(w):
@@ -831,12 +857,12 @@ def test_a_lease_nobody_keeps_alive_is_refused_before_anything_is_frozen(w):
     gone = w.authority("pred", pid=2_000_000_000)                  # no such process
     gone.acquire()
     w.pred = gone
-    rot = Rotation(w)
-    result = rot.go()
+    rotation = Rotation(w)
+    result = rotation.go()
     assert result.outcome is Outcome.REFUSED and result.predecessor_is_master
     assert "not held by a living process" in result.detail and "LOST" in result.detail
     assert "hoh project hold" in result.hint
-    assert not rot.launcher.started and not (w.dir / "rollover").exists()
+    assert not rotation.launcher.started and not (w.dir / "rollover").exists()
 
 
 def test_a_succession_in_flight_blocks_a_second_one_until_its_deadline_passes(w):
@@ -844,13 +870,13 @@ def test_a_succession_in_flight_blocks_a_second_one_until_its_deadline_passes(w)
     log.record("draining", capsule_id="rc-old", expires_at="2026-10-07T12:05:00Z")
     log.record("frozen", capsule_id="rc-old", expires_at="2026-10-07T12:05:00Z")
     log.record("launched", capsule_id="rc-old", expires_at="2026-10-07T12:05:00Z")
-    rot = Rotation(w)
-    blocked = rot.go()
+    rotation = Rotation(w)
+    blocked = rotation.go()
     assert blocked.outcome is Outcome.IN_FLIGHT and blocked.predecessor_is_master
-    assert blocked.capsule_id == "rc-old" and not rot.launcher.started
+    assert blocked.capsule_id == "rc-old" and not rotation.launcher.started
     assert events(w) == ["draining", "frozen", "launched"]     # nothing was disturbed
     w.clock.advance(301)                                       # past rc-old's own deadline
-    result = rot.go()
+    result = rotation.go()
     assert result.outcome is Outcome.COMPLETE
     ended = [r for r in RolloverLog(w.dir).events() if r["event"] == "abort"]
     assert len(ended) == 1 and ended[0]["reason"] == "expired"
@@ -859,17 +885,17 @@ def test_a_succession_in_flight_blocks_a_second_one_until_its_deadline_passes(w)
 
 
 def test_a_predecessor_that_lost_the_lease_while_waiting_reports_it(w):
-    def intrude(rot):
-        clone = rot.w.authority("pred")
-        clone.present(epoch=1, token=rot.w.pred.token)
+    def intrude(rotation):
+        clone = rotation.w.authority("pred")
+        clone.present(epoch=1, token=rotation.w.pred.token)
         clone.handoff("intruder", reason="somebody else took the programme")
 
-    rot = Rotation(w, acks=False, hooks={"launched": intrude})
-    result = rot.go()
+    rotation = Rotation(w, acks=False, hooks={"launched": intrude})
+    result = rotation.go()
     assert result.outcome is Outcome.SUPERSEDED and not result.predecessor_is_master
     assert "lost the lease" in result.detail
     assert w.pred.problems()
-    assert rot.launcher.stopped and aborted_path(w.dir, result.capsule_id).exists()
+    assert rotation.launcher.stopped and aborted_path(w.dir, result.capsule_id).exists()
     assert RolloverLog(w.dir).state() is State.ACTIVE
     assert [e.master_id for e in EpochStore(w.dir).chain()] == ["pred"]     # nothing was begun
 
@@ -882,27 +908,27 @@ def test_a_handoff_that_fails_after_the_lease_was_written_still_completes(w):
         raise OSError("directory fsync failed")             # the lease is written, the call raised
 
     w.pred.handoff = flaky
-    rot = Rotation(w)
-    result = rot.go()
+    rotation = Rotation(w)
+    result = rotation.go()
     assert result.outcome is Outcome.COMPLETE, result.detail
     assert chain_reasons(w) == [Reason.INITIAL, Reason.SUCCESSION]
     # and a handoff that raised *without* writing is a refusal, and the predecessor stays
     world = World(w.root / "refused")
     world.pred.handoff = lambda *a, **k: (_ for _ in ()).throw(LeaseError("not today"))
-    rot2 = Rotation(world)
-    refused = rot2.go()
+    second_rotation = Rotation(world)
+    refused = second_rotation.go()
     assert refused.outcome is Outcome.HANDOFF_REFUSED and refused.predecessor_is_master
     assert "not today" in refused.detail
-    assert rot2.launcher.stopped and aborted_path(world.dir, refused.capsule_id).exists()
+    assert second_rotation.launcher.stopped and aborted_path(world.dir, refused.capsule_id).exists()
     assert world.pred.problems() == [] and not world.pred.read_lease().released_at
 
 
 def test_a_long_wait_for_the_ack_keeps_the_lease_alive(tmp_path):
     world = World(tmp_path, ttl=60)                            # a lease that lapses in a minute
-    rot = Rotation(world, ack_after=50, ack_timeout_s=600, poll_s=10.0)   # acks after ~500 s
-    result = rot.go()
+    rotation = Rotation(world, ack_after=50, ack_timeout_s=600, poll_s=10.0)   # acks after ~500 s
+    result = rotation.go()
     assert result.outcome is Outcome.COMPLETE, result.detail
-    assert rot.ticks >= 50 and all(rot.lease_live_at_each_tick[:50])
+    assert rotation.ticks >= 50 and all(rotation.lease_live_at_each_tick[:50])
     assert world.clock() > "2026-10-07T12:08:00Z"              # far past the 60 s TTL
     # the same wait with nobody renewing would have lost the lease: the control
     ctl = World(tmp_path / "control", ttl=60)
@@ -1172,11 +1198,10 @@ class ThreadLauncher:
         self.thread: threading.Thread | None = None
 
     def start(self, *, session_id, model, cwd, prompt, label):
-        [command] = [ln for ln in prompt.splitlines() if ln.startswith("  hoh ")]
-        argv = shlex.split(command)
-        cli.build_parser().parse_args(argv[1:])            # the pointer's own line is valid
+        argv = accept_argv(prompt, watch_pid=os.getpid())   # the shell's `$CLAUDE_PID`
+        cli.build_parser().parse_args(argv)                # the pointer's own line is valid
         # only to keep the test short: poll fast; the hold ends when the test fences it
-        self.argv = argv[1:] + ["--poll", "0.05", "--hold-for", "30", "--interval", "0.05"]
+        self.argv = argv + ["--poll", "0.05", "--hold-for", "30", "--interval", "0.05"]
         self.thread = threading.Thread(
             target=lambda: setattr(self, "rc", cli.main(self.argv)), daemon=True)
         self.thread.start()
@@ -1392,30 +1417,30 @@ def test_b1_the_ground_moving_after_the_ack_stops_the_takeover_and_the_predecess
         tmp_path, what):
     world = World(tmp_path)
 
-    def move(rot):
+    def move(rotation):
         if what == "head":
-            rot.w.observer.head_sha = "b" * 40
+            rotation.w.observer.head_sha = "b" * 40
         else:
-            rot.w.observer.runs[0]["stage"] = "VERIFYING"
+            rotation.w.observer.runs[0]["stage"] = "VERIFYING"
 
-    rot = Rotation(world, hooks={"handed": move}, takeover_s=60)
-    result = rot.go()
+    rotation = Rotation(world, hooks={"handed": move}, takeover_s=60)
+    result = rotation.go()
     # the acknowledgement was a faithful look at the capsule as frozen ...
     ack = json.loads(ack_path(world.dir, result.capsule_id).read_text())
     assert ack["verified"] is True
     # ... the ground moved before the handover was taken, so it was not taken
     assert result.outcome is Outcome.RECLAIMED, result.detail
-    [error] = rot.errors
+    [error] = rotation.errors
     assert isinstance(error, RolloverError) and "ground moved" in str(error)
     assert what in str(error) or "runs" in str(error) or "head" in str(error)
-    assert rot.taken is None and rot.succ_auth.epoch is None and rot.succ_auth.problems()
+    assert rotation.taken is None and rotation.succ_auth.epoch is None and rotation.succ_auth.problems()
     # no SUCCESSION epoch exists; the predecessor took the program back by RECOVERY
     assert chain_reasons(world) == [Reason.INITIAL, Reason.RECOVERY]
     assert [e.master_id for e in EpochStore(world.dir).chain()] == ["pred", "pred"]
     assert Reason.SUCCESSION not in chain_reasons(world)
     assert not list((world.dir / "rollover").glob("*.receipt.json"))      # no receipt
     assert world.pred.problems() == []                                     # master again
-    assert rot.max_masters <= 1                                            # never two masters
+    assert rotation.max_masters <= 1                                            # never two masters
     assert events(world)[-2:] == ["handoff", "reclaimed"]
 
 
@@ -1426,18 +1451,18 @@ def test_b1_the_ground_moving_after_the_ack_stops_the_takeover_and_the_predecess
 
 def test_b2_a_generation_that_differs_refuses_the_rotation_before_anything_is_frozen(tmp_path):
     world = World(tmp_path, generation=3)
-    rot = Rotation(world)
-    result = rot.go(generation=2)                       # the project state says 2, the lease 3
+    rotation = Rotation(world)
+    result = rotation.go(generation=2)                       # the project state says 2, the lease 3
     assert result.outcome is Outcome.REFUSED and result.predecessor_is_master
     assert "generation 2" in result.detail and "lease is at 3" in result.detail
     assert not (world.dir / "rollover").exists()        # nothing frozen, nothing logged
-    assert not rot.launcher.started and world.pred.problems() == []
+    assert not rotation.launcher.started and world.pred.problems() == []
     assert_still_master(world)
     ok = Rotation(world).go(generation=3)
     assert ok.outcome is Outcome.COMPLETE
     cap = load_capsule(capsule_path(world.dir, ok.capsule_id))
     assert cap.programme_generation == 3
-    assert rot.succ_auth.read_lease().program_generation == 3          # carried to the successor
+    assert rotation.succ_auth.read_lease().program_generation == 3          # carried to the successor
 
 
 # --------------------------------------------------------------------------- #
@@ -1447,8 +1472,8 @@ def test_b2_a_generation_that_differs_refuses_the_rotation_before_anything_is_fr
 
 def test_a_freeze_that_raises_ends_the_cycle_durably_and_the_next_rotation_can_start(w):
     w.observer.boom["file_digest"] = OSError("the register is unreadable")
-    rot = Rotation(w)
-    result = rot.go()
+    rotation = Rotation(w)
+    result = rotation.go()
     assert result.outcome is Outcome.REFUSED and result.predecessor_is_master
     assert "unreadable" in result.detail
     # durable: a fresh reader of the log sees the cycle ended, not DRAINING
@@ -1458,7 +1483,7 @@ def test_a_freeze_that_raises_ends_the_cycle_durably_and_the_next_rotation_can_s
     assert aborted_path(w.dir, result.capsule_id).exists()
     assert not list((w.dir / "rollover").glob("*.capsule.json"))        # capsule-less state intact
     assert_still_master(w)
-    assert not rot.launcher.started
+    assert not rotation.launcher.started
     del w.observer.boom["file_digest"]
     assert Rotation(w).go().outcome is Outcome.COMPLETE                 # nothing is wedged
 
@@ -1466,11 +1491,11 @@ def test_a_freeze_that_raises_ends_the_cycle_durably_and_the_next_rotation_can_s
 def test_a_draining_that_nobody_ended_expires_like_every_other_state(w):
     log = RolloverLog(w.dir, clock=w.clock)
     log.record("draining", capsule_id="rc-dead", expires_at="2026-10-07T12:05:00Z")
-    rot = Rotation(w)
-    assert rot.go().outcome is Outcome.IN_FLIGHT                        # not yet
-    assert not rot.launcher.started
+    rotation = Rotation(w)
+    assert rotation.go().outcome is Outcome.IN_FLIGHT                        # not yet
+    assert not rotation.launcher.started
     w.clock.advance(301)
-    result = rot.go()
+    result = rotation.go()
     assert result.outcome is Outcome.COMPLETE                           # then it is ended on record
     rows = RolloverLog(w.dir).events()
     assert [r["event"] for r in rows][:3] == ["draining", "abort", "draining"]
@@ -1490,13 +1515,13 @@ def test_a_handoff_refused_because_this_session_is_stale_is_reported_as_supersed
         raise StaleMaster("stale master: superseded between the ack and the handoff")
 
     w.pred.handoff = stale
-    rot = Rotation(w)
-    result = rot.go()
+    rotation = Rotation(w)
+    result = rotation.go()
     assert result.outcome is Outcome.SUPERSEDED
     assert result.predecessor_is_master is False                        # not "master": it is not
     assert "no longer the master" in result.detail
-    assert rot.launcher.stopped and aborted_path(w.dir, result.capsule_id).exists()
-    assert RolloverLog(w.dir).state() is State.ACTIVE and not rot.errors
+    assert rotation.launcher.stopped and aborted_path(w.dir, result.capsule_id).exists()
+    assert RolloverLog(w.dir).state() is State.ACTIVE and not rotation.errors
     assert result.as_dict()["predecessor_is_master"] is False
 
 
@@ -1510,7 +1535,10 @@ def test_every_value_in_the_pointers_command_is_shell_quoted(tmp_path):
         "token_out": str(tmp_path / "t o k" / "master.token"),
     }
     text = pointer_prompt(**nasty)
-    [command] = [ln for ln in text.splitlines() if ln.startswith("  hoh ")]
+    command = pointer_command(text)
+    assert command.startswith("hoh --root ")                           # the default: bare `hoh`
+    assert command.endswith(WATCH_TAIL)
+    command = command.removesuffix(WATCH_TAIL)
     argv = shlex.split(command)
     assert argv == ["hoh", "--root", nasty["root"], "project", "rollover-accept",
                     nasty["project_id"], "--capsule", nasty["capsule_file"], "--digest",
@@ -1520,7 +1548,7 @@ def test_every_value_in_the_pointers_command_is_shell_quoted(tmp_path):
     for key, value in nasty.items():
         if shlex.quote(value) != value:
             assert shlex.quote(value) in command, key
-    assert shlex.join(argv) == command.strip()                          # exactly shlex's quoting
+    assert shlex.join(argv) == command                          # exactly shlex's quoting
     assert text.isascii() and len(text) < 2500
     # what cannot be quoted safely is refused rather than sent
     with pytest.raises(RolloverError, match="ASCII"):
@@ -1548,7 +1576,7 @@ def test_hold_gives_the_lease_back_when_the_token_cannot_be_written(tmp_path, ca
     assert MasterAuthority(store.dir, "next").acquire().epoch == 2
     # and the successor's side behaves the same: the lease is given back, no receipt
     world = World(tmp_path / "w")
-    rot = Rotation(world, takes=False)
+    rotation = Rotation(world, takes=False)
     take = {}
 
     def take_with_bad_token(r):
@@ -1560,8 +1588,8 @@ def test_hold_gives_the_lease_back_when_the_token_cannot_be_written(tmp_path, ca
         except TokenOutError as exc:
             take["error"] = exc
 
-    rot.hooks["handed"] = take_with_bad_token
-    result = rot.go()
+    rotation.hooks["handed"] = take_with_bad_token
+    result = rotation.go()
     assert isinstance(take["error"], TokenOutError)
     assert not list((world.dir / "rollover").glob("*.receipt.json"))
     log = [json.loads(ln) for ln in (world.dir / "lease.log.jsonl").read_text().splitlines()]
@@ -1572,3 +1600,285 @@ def test_hold_gives_the_lease_back_when_the_token_cannot_be_written(tmp_path, ca
     assert result.outcome is Outcome.RECLAIMED and "gave it back" in result.detail
     assert chain_reasons(world) == [Reason.INITIAL, Reason.SUCCESSION, Reason.RECOVERY]
     assert world.pred.problems() == []
+
+
+# --------------------------------------------------------------------------- #
+# crl-followup (F1, F2, F4 and the minors of the integration reviews)
+# --------------------------------------------------------------------------- #
+
+
+def second_look_setup(world: World):
+    """A capsule frozen, acknowledged, and handed over to `succ`, who has not yet taken it."""
+    frozen = world.freeze()
+    cap = frozen.capsule
+    succ_auth = world.authority("succ")
+    successor = Successor(succ_auth, frozen.path, observer=world.observer,
+                          pointer_digest=cap.capsule_digest, sleep=world.clock.advance,
+                          poll_s=1, wait_s=30)
+    _, ack = successor.acknowledge()
+    world.pred.handoff("succ", reason="verified rollover", expires_in=120)
+    return cap, successor, succ_auth, ack
+
+
+def predecessor_reclaims(world: World, cap) -> None:
+    """The handover window lapses and the predecessor's reclaiming command takes the program
+    back (RECOVERY); its process then exits, so the lease it holds reads LOST."""
+    world.clock.advance(200)
+    world.authority("pred", pid=999999).acquire(
+        program_generation=cap.programme_generation, reason=Reason.RECOVERY, note="lapsed")
+
+
+def epochs(world: World) -> list[tuple[int, str, str]]:
+    return [(e.epoch, e.master_id, e.reason.value) for e in EpochStore(world.dir).chain()]
+
+
+def test_f1_a_forged_capsule_id_makes_the_successor_refuse_before_it_writes_anything(w):
+    frozen = w.freeze()
+    # the file a forgery would want written is outside rollover/; the wrong pointer digest is
+    # what used to let an acknowledgement through before the digest was judged
+    forge_capsule_id(frozen.path, "../../escape-ack")
+    from hoh.succession_capsule import CapsuleError
+    before = w.snapshot()
+    successor = Successor(w.authority("succ"), frozen.path, observer=w.observer,
+                          pointer_digest="0" * 64)
+    with pytest.raises(RolloverError, match="capsule id"):
+        successor.acknowledge()
+    assert w.snapshot() == before                         # nothing, anywhere under the root
+    assert not [p for p in w.root.rglob("*") if "escape" in p.name]
+    with pytest.raises(CapsuleError):
+        load_capsule(frozen.path)
+    # and the predecessor's own entry point refuses a bad id before it writes a line
+    clean = World(w.root / "clean")
+    before = clean.snapshot()
+    launcher = FakeLauncher()
+    result = run_rollover(clean.pred, clean.dir, inp=clean.input(), observer=clean.observer,
+                          launcher=launcher, root=clean.root, repo=clean.repo, project_id="p",
+                          successor_session="succ", capsule_id="../../escape-ack")
+    assert result.outcome is Outcome.REFUSED and "capsule id" in result.detail
+    assert not launcher.started and clean.snapshot() == before
+    assert RolloverLog(clean.dir).events() == []
+
+
+def test_f2_a_handover_that_lapses_during_the_last_verify_is_not_taken(w):
+    cap, successor, succ_auth, _ = second_look_setup(w)
+    real = successor.verify
+
+    def verify_then_lapse(**kw):
+        verdict = real(**kw)
+        predecessor_reclaims(w, cap)                      # after the verify, before the acquire
+        return verdict
+
+    successor.verify = verify_then_lapse
+    with pytest.raises(RolloverError, match="no longer stands"):
+        successor.poll()
+    assert epochs(w) == [(1, "pred", "INITIAL"), (2, "pred", "RECOVERY")]    # no SUCCESSION epoch
+    assert succ_auth.epoch is None and succ_auth.problems()
+    assert w.authority("pred", pid=999999).read_lease().leader_session_id == "pred"
+
+
+def test_f2_an_acquire_that_lands_on_another_epoch_gives_the_lease_back_and_says_so(w):
+    # P2-09 (conditional acquire), by addition: this test used to prove that an acquire which
+    # *landed* on epoch 3 over the reclaimed epoch 2 was given back. The acquire is now conditional
+    # on the handover (`only_handover`), so it never lands: see the next test. The give-back
+    # after the acquire stays as a second line, proved here with the acquire itself faked to land.
+    cap, successor, succ_auth, _ = second_look_setup(w)
+    real = succ_auth.acquire
+
+    def lands_on_epoch_three(**kw):
+        predecessor_reclaims(w, cap)                      # between the last look and the acquire
+        kw.pop("only_handover", None)                         # an unconditional acquire, as before
+        return real(**kw)
+
+    succ_auth.acquire = lands_on_epoch_three
+    with pytest.raises(RolloverError, match="intended") as caught:
+        successor.poll()
+    assert "hoh project hold" in str(caught.value)       # the truth: nobody is master now
+    assert epochs(w) == [(1, "pred", "INITIAL"), (2, "pred", "RECOVERY"), (3, "succ", "SUCCESSION")]
+    lease = w.authority("probe").read_lease()
+    assert lease.leader_session_id == "succ" and lease.released_at   # given back, not kept
+    assert succ_auth.problems() and w.pred.problems()    # never two masters; here, none
+
+
+def test_p209_a_handover_reclaimed_between_the_last_look_and_the_acquire_is_refused_inside_the_acquire(w):
+    cap, successor, succ_auth, _ = second_look_setup(w)
+    real = succ_auth.acquire
+
+    def reclaimed_then_acquire(**kw):
+        predecessor_reclaims(w, cap)                      # between the last look and the acquire
+        return real(**kw)
+
+    succ_auth.acquire = reclaimed_then_acquire
+    with pytest.raises(RolloverError, match="not this session's to take"):
+        successor.poll()
+    assert epochs(w) == [(1, "pred", "INITIAL"), (2, "pred", "RECOVERY")]   # no epoch 3 ever began
+    assert succ_auth.epoch is None and succ_auth.problems()
+    assert w.authority("probe").read_lease().leader_session_id == "pred"    # the predecessor's, untouched
+
+
+def test_p209_poll_takes_the_handover_only_of_this_capsules_token_and_epoch(w):
+    cap, successor, succ_auth, _ = second_look_setup(w)
+    real, seen = succ_auth.acquire, []
+
+    def spy(**kw):
+        seen.append(kw)
+        return real(**kw)
+
+    succ_auth.acquire = spy
+    assert successor.poll().epoch == cap.successor_epoch
+    [kw] = seen
+    want = kw["only_handover"]
+    assert (want.master_epoch, want.token_sha256) == (cap.predecessor_epoch,
+                                                      cap.predecessor_token_sha256)
+    assert want.token_sha256 and kw["reason"] is Reason.SUCCESSION
+
+
+def test_f2_the_reclaiming_predecessor_marks_the_cycle_first_and_holds_the_lease_while_it_lingers(w):
+    rotation = Rotation(w, takes=False, takeover_s=60)
+    seen = {}
+    real = w.pred.acquire
+
+    def watch(**kw):
+        seen["marked_before"] = aborted_path(w.dir, rotation.capsule_id()).exists()
+        return real(**kw)
+
+    w.pred.acquire = watch
+    result = rotation.go(reclaim_linger_s=30)
+    assert result.outcome is Outcome.RECLAIMED and result.predecessor_is_master
+    assert seen["marked_before"] is True                  # a late successor finds the marker first
+    lease = w.pred.read_lease()
+    assert lease.renewed_at > lease.acquired_at           # it kept renewing after the reclaim
+    assert events(w)[-2:] == ["handoff", "reclaimed"]
+
+
+def test_f2_a_reclaim_that_is_lost_while_lingering_reports_the_truth(w):
+    rotation = Rotation(w, takes=False, takeover_s=60,
+                        hooks={"other": lambda r: r.w.pred.release(reason="gone while lingering")})
+    result = rotation.go(reclaim_linger_s=30)
+    assert result.outcome is Outcome.SUPERSEDED and not result.predecessor_is_master
+
+
+def test_a_receipt_that_cannot_be_written_gives_the_lease_back(w):
+    cap, successor, succ_auth, ack = second_look_setup(w)
+    receipt_path(w.dir, cap.capsule_id).mkdir(parents=True)       # a directory where the receipt goes
+    with pytest.raises(RolloverError, match="receipt"):
+        successor.take(ack, token_out=None)
+    lease = w.authority("probe").read_lease()
+    assert lease.leader_session_id == "succ" and lease.released_at and "receipt failed" in lease.released_reason
+    assert succ_auth.problems()                                   # not a master of record on a LOST lease
+
+
+class FailingLauncher:
+    """The successor does not start: the rotation ends at once, after the capsule was frozen."""
+
+    def __init__(self, *a, **k) -> None:
+        pass
+
+    def start(self, **kw):
+        raise LauncherError("no pane")
+
+    def stop(self, handle) -> None:
+        pass
+
+
+def test_f4_a_relative_root_is_resolved_before_the_run_set_is_bound(tmp_path, monkeypatch, capsys):
+    project = make_project(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(ro, "HerdrLauncher", FailingLauncher)
+    rc = cli.main(["--root", "hohroot", "project", "rollover", "p", "--model", "claude-opus-5-5",
+                   *master_args(project)])
+    assert rc == 5 and '"LAUNCH_FAILED"' in capsys.readouterr().out    # no wait for an ack
+    [path] = sorted((project.store.dir / "rollover").glob("*.capsule.json"))
+    cap = load_capsule(path)
+    run_set = next(e for e in cap.entries if e.entry_id == "run-set")
+    assert run_set.params["runs_root"] == str(project.root) and os.path.isabs(run_set.params["runs_root"])
+
+
+@pytest.mark.parametrize("payload", ["[]", '"x"', "null", "7", "true"])
+def test_a_rollover_input_that_is_not_a_json_object_is_refused_with_exit_2(tmp_path, monkeypatch,
+                                                                            capsys, payload):
+    project = make_project(tmp_path)
+    monkeypatch.setattr(ro, "HerdrLauncher", NullLauncher)
+    given = tmp_path / "input.json"
+    given.write_text(payload, encoding="utf-8")
+    rc = hoh(project, "rollover", "p", "--input", str(given), *master_args(project),
+             "--ack-timeout", "1", "--poll", "0.05")
+    err = capsys.readouterr().err
+    assert rc == 2 and "refused" in err and "JSON object" in err
+    assert project.master.problems() == []                          # still the master
+    assert not (project.store.dir / "rollover").exists()            # nothing frozen
+
+
+@pytest.mark.parametrize("interval", ["-1", "0", "-0.5", "nan", "inf", "-inf"])
+def test_a_hold_interval_that_is_not_positive_and_finite_is_refused_before_the_lease_is_taken(
+        tmp_path, capsys, interval):
+    project = make_project(tmp_path)
+    project.master.release(reason="free it for hold")
+    rc = hoh(project, "hold", "p", "--session", "h1", f"--interval={interval}", "--hold-for", "1")
+    assert rc == 2 and "--interval must be positive and finite" in capsys.readouterr().err
+    lease = MasterAuthority(project.store.dir, "probe").read_lease()
+    assert lease.leader_session_id == "pred" and lease.released_at          # h1 never acquired
+    rc = hoh(project, "rollover-accept", "p", "--capsule", str(tmp_path / "none.json"),
+             "--digest", "d", "--session", "s", f"--interval={interval}")
+    assert rc == 2 and "--interval must be positive and finite" in capsys.readouterr().err
+
+
+def test_f2_a_handover_that_has_only_lapsed_is_not_taken(w):
+    cap, successor, succ_auth, _ = second_look_setup(w)
+    real = successor.verify
+
+    def verify_then_let_the_window_pass(**kw):
+        verdict = real(**kw)
+        w.clock.advance(200)                              # the window passes; nobody reclaims
+        return verdict
+
+    successor.verify = verify_then_let_the_window_pass
+    with pytest.raises(RolloverError, match="no longer stands"):
+        successor.poll()
+    assert epochs(w) == [(1, "pred", "INITIAL")] and succ_auth.epoch is None
+
+
+def test_f2_a_cycle_that_is_only_marked_aborted_is_not_taken(w):
+    cap, successor, succ_auth, _ = second_look_setup(w)
+    real = successor.verify
+
+    def verify_then_mark(**kw):
+        verdict = real(**kw)                              # the lease still stands; only the marker appears
+        ro._mark_aborted(w.dir, cap.capsule_id, "RECLAIM_ATTEMPTED", "taking it back", w.clock())
+        return verdict
+
+    successor.verify = verify_then_mark
+    with pytest.raises(RolloverError, match="aborted"):
+        successor.poll()
+    assert epochs(w) == [(1, "pred", "INITIAL")] and succ_auth.epoch is None
+
+
+def test_f2_the_marker_written_before_a_reclaim_does_not_claim_an_outcome(w):
+    rotation = Rotation(w, takes=False, takeover_s=60)
+
+    def successor_won(**kw):
+        raise LeaseHeld("the successor holds the lease")
+
+    w.pred.acquire = successor_won                        # the reclaiming acquire is refused
+    result = rotation.go(reclaim_linger_s=0)
+    assert result.outcome is Outcome.SUPERSEDED and not result.predecessor_is_master
+    marker = json.loads(aborted_path(w.dir, result.capsule_id).read_text(encoding="utf-8"))
+    assert marker["outcome"] == "RECLAIM_ATTEMPTED" and "RECLAIMED" not in json.dumps(marker)
+    assert events(w)[-1] == "abort"
+    assert RolloverLog(w.dir).last()["outcome"] == "SUPERSEDED"      # the truth is in the log
+
+
+def test_f2_a_transient_fault_in_the_linger_still_ends_with_a_result(w):
+    rotation = Rotation(w, takes=False, takeover_s=60)
+    real = w.pred.renew
+    faults = []
+
+    def flaky(*a, **kw):
+        if events(w) and events(w)[-1] == "reclaimed" and not faults:
+            faults.append(1)
+            raise LockBusy("the program lock is busy")
+        return real(*a, **kw)
+
+    w.pred.renew = flaky
+    result = rotation.go(reclaim_linger_s=30)
+    assert faults == [1]                                  # it happened, in the linger
+    assert result.outcome is Outcome.RECLAIMED and result.predecessor_is_master

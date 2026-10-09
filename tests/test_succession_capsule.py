@@ -188,6 +188,16 @@ def rewrite(path: Path, edit, *, redigest: bool = False) -> Capsule:
     return load_capsule(path)
 
 
+def forge_capsule_id(path: Path, capsule_id: str) -> None:
+    """Write a *self-consistent* forgery whose id is `capsule_id`, whatever it is: the model
+    refuses to build one, so the digest is computed over the raw document."""
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["capsule_id"] = capsule_id
+    data.pop("capsule_digest", None)
+    data["capsule_digest"] = sc.sha256_of(data)
+    path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+
 def entry(cap: Capsule, entry_id: str) -> Entry:
     return next(e for e in cap.entries if e.entry_id == entry_id)
 
@@ -771,3 +781,67 @@ def test_b2_the_programme_generation_is_derived_never_supplied(tmp_path, monkeyp
     ver = w2.verify(cap2)
     assert not ver.ok and ver.lease_generation is None
     assert "programme_generation" in ver.subjects()
+
+
+# --------------------------------------------------------------------------- #
+# crl-followup -- the capsule id is a name; the successor's second look
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.parametrize("bad", ["../../escape-ack", "a/b", ".hidden", "a b", "x" * 65,
+                                 "rc-\u00e4", "a\tb", "-lead", "a.b", "..", "/abs"])
+def test_f1_a_capsule_id_is_a_plain_name_and_nothing_is_written_for_another(world, bad):
+    frozen = world.freeze(capsule_id="rc-plain")
+    # the helper's digest is the model's: an untouched document is self-consistent
+    forge_capsule_id(frozen.path, "rc-plain")
+    assert load_capsule(frozen.path).capsule_digest == load_capsule(frozen.path).compute_digest()
+    # a forged capsule that is self-consistent but carries a path as its id does not load
+    forge_capsule_id(frozen.path, bad)
+    with pytest.raises(sc.CapsuleError):
+        load_capsule(frozen.path)
+    # the path builders refuse it too, so no caller can build a path outside rollover/
+    for builder in (sc.capsule_path, sc.ack_path, sc.receipt_path, sc.aborted_path):
+        with pytest.raises(sc.CapsuleError):
+            builder(world.dir, bad)
+    # and a capsule is not frozen under it
+    before = world.snapshot()
+    with pytest.raises(sc.CapsuleError):
+        world.freeze(capsule_id=bad)
+    assert world.snapshot() == before
+    # the names the product makes, and plain ones, are fine
+    for empty in ("", None, 7):
+        with pytest.raises(sc.CapsuleError):
+            sc.check_capsule_id(empty)
+    assert sc.check_capsule_id(sc.new_capsule_id("2026-10-07T12:00:00Z")).startswith("rc-")
+    assert sc.check_capsule_id("rc-second") == "rc-second" and sc.check_capsule_id("c1") == "c1"
+
+
+def test_the_second_look_ends_with_the_handover_window(world):
+    cap = world.freeze().capsule
+    world.pred.handoff("succ", reason="verified rollover", expires_in=30)
+    assert world.verify(cap, handover=True).ok                 # inside the window
+    world.clock.advance(31)
+    late = world.verify(cap, handover=True)                    # after it, the handover is gone
+    assert not late.ok and ("lease", "handover") in {(d.kind, d.subject) for d in late.differences}
+
+
+def test_the_second_look_names_the_chain_master_and_the_lease_holder_separately(world):
+    frozen = world.freeze()
+    forged = rewrite(frozen.path, lambda d: d.__setitem__("predecessor_session", "someone-else"),
+                     redigest=True)
+    seen = {(d.kind, d.subject) for d in world.verify(forged).differences}
+    assert ("chain", "master") in seen                         # epoch 1 is not held by "someone-else"
+    assert ("lease", "holder") in seen                         # nor is the lease
+
+
+def test_f1_edge_whitespace_in_a_capsule_id_is_stripped_and_then_judged(world):
+    frozen = world.freeze(capsule_id="rc-plain")
+    forge_capsule_id(frozen.path, " rc-plain\n")                  # the model strips edge whitespace
+    cap = load_capsule(frozen.path)
+    assert cap.capsule_id == "rc-plain"                           # a name after stripping: no path hazard
+    assert sc.capsule_path(world.dir, cap.capsule_id) == frozen.path
+    ver = world.verify(cap)
+    assert not ver.ok and "digest" in ver.kinds()                 # but it is not the document that was digested
+    forge_capsule_id(frozen.path, " ../x\n")                      # stripping does not make a path a name
+    with pytest.raises(sc.CapsuleError):
+        load_capsule(frozen.path)

@@ -1273,15 +1273,12 @@ def test_run_check_scratch_is_fresh_for_every_sandboxed_check(w, tmp_path):
     one candidate under a sandbox each get an **empty** scratch (the pin's
     ``.hoh-scratch-<receipt>``), so a second sandboxed use of a workspace the
     first check wrote into is refused (``ValueError``, "own workspace") until it
-    is emptied, and what the first check planted never reaches the second. In the
-    unsandboxed regime a directory this process already vetted may be used again
-    by the next check of the candidate (the pin's shared ``<arena>.scratch``), but
-    a *new* directory with a planted file, and another directory at a vetted
-    path (the directory is what is remembered, not a flag: while another directory
-    is vetted, a new one with a planted file is still refused), are refused; and a directory
-    vetted by an unsandboxed use and written into is still refused under a sandbox
-    (a vetted mark never relaxes the sandboxed rule). Negative
-    control: the unsandboxed second use of the vetted workspace runs."""
+    is emptied, and what the first check planted never reaches the second. **The
+    unsandboxed regime is the same** (since the vet left the process's memory): a
+    workspace an unsandboxed check wrote into is refused ("not empty") for the next
+    unsandboxed check too -- one workspace per check, as the pin's ``.hoh-scratch-<receipt>``
+    was -- and so are a *new* directory with a planted file and another directory at the
+    path of a used one. Negative control: the first use of a new, empty workspace runs."""
     from hoh import runner
     from hoh.sandbox import Isolation, LaunchPlan
 
@@ -1318,11 +1315,11 @@ def test_run_check_scratch_is_fresh_for_every_sandboxed_check(w, tmp_path):
     runner.run_check(_check(command), _candidate(arena), run_id="r1", iteration=1, attempt=1,
                      scratch=again.path)
     assert (again.path / "first").read_text() == "first\n"
-    receipt, _ = runner.run_check(_check("true"), _candidate(arena), run_id="r1", iteration=1,
-                                  attempt=2, scratch=again.path)     # vetted: may be non-empty
-    assert receipt.runner_ok
-    with pytest.raises(ValueError, match="own workspace"):  # vetted by an unsandboxed use and written
-        runner.run_check(_check("true"), _candidate(arena), scratch=again.path, **kw)  # into: not for a sandbox
+    with pytest.raises(ValueError, match="not empty"):   # nothing is vetted: a used workspace is
+        runner.run_check(_check("true"), _candidate(arena), run_id="r1", iteration=1,   # refused
+                         attempt=2, scratch=again.path)                                 # unsandboxed too
+    with pytest.raises(ValueError, match="own workspace"):  # and for a sandbox, as before
+        runner.run_check(_check("true"), _candidate(arena), scratch=again.path, **kw)
     assert backend.scratch == [ws.path, ws.path]
     swapped = again.path.with_name(again.path.name + "-swapped")
     again.path.rename(swapped)                       # the same path, another directory
@@ -1333,7 +1330,7 @@ def test_run_check_scratch_is_fresh_for_every_sandboxed_check(w, tmp_path):
                          attempt=4, scratch=again.path)
     bystander = roots(w).create(creator="runner.run_check", purpose="check", run_id="r1")
     runner.run_check(_check("true"), _candidate(arena), run_id="r1", iteration=1, attempt=5,
-                     scratch=bystander.path)             # another directory is vetted meanwhile
+                     scratch=bystander.path)             # another directory is used meanwhile
     fresh = roots(w).create(creator="runner.run_check", purpose="check", run_id="r1")
     (fresh.path / "usercustomize.py").write_text("planted")
     with pytest.raises(ValueError, match="not empty"):
@@ -1383,7 +1380,7 @@ def test_a_refused_scratch_is_refused_again_until_it_is_emptied(w, tmp_path):
     """M5. Catches a guard that a retry walks around: a scratch directory with a
     planted file is refused (`ValueError`, "not empty") on the first call **and
     on every later call** -- the runner must not remember a directory it has
-    refused as vetted -- and the command never runs; once the file is gone the
+    refused as acceptable -- and the command never runs; once the file is gone the
     directory is accepted. Negative control: the empty directory runs."""
     from hoh import runner
 
@@ -1409,12 +1406,12 @@ def test_a_scratch_used_by_a_sandboxed_check_is_not_trusted_by_an_unsandboxed_on
     `git x` alias or a `usercustomize.py` runs as the unsandboxed check's `$HOME`)
     is never accepted later by an unsandboxed check on the same ``scratch=``,
     which is refused ("not empty") and never runs. (1) sandboxed, then
-    unsandboxed; (2) **unsandboxed (which vets the empty directory), sandboxed,
-    unsandboxed** -- the order in which a vet that only ever grows let it through;
+    unsandboxed; (2) **unsandboxed, sandboxed,
+    unsandboxed** -- the order in which a remembered vet once let it through;
     (3) the same where the directory is reached by **another name** (a symlinked
-    parent: the vet belongs to the real directory); (4) an unsandboxed use that
+    parent: the directory is judged, not the name); (4) an unsandboxed use that
     wrote, then a sandboxed use that is **refused** (not empty), then an
-    unsandboxed use: refused too -- any sandboxed use takes the vet away.
+    unsandboxed use: refused too -- a refused use changes nothing.
     Negative control: emptied, the unsandboxed check runs."""
     from hoh import runner
     from hoh.sandbox import Isolation, LaunchPlan
@@ -1456,7 +1453,7 @@ def test_a_scratch_used_by_a_sandboxed_check_is_not_trusted_by_an_unsandboxed_on
     with pytest.raises(ValueError, match="not empty"):
         unsandboxed(ws.path, "ran-1")
     assert not (arena / "ran-1").exists()
-    # (2) unsandboxed (vets the empty directory), sandboxed, unsandboxed
+    # (2) unsandboxed, sandboxed, unsandboxed
     ws = new_workspace()
     unsandboxed(ws.path, "ran-2a")
     assert (arena / "ran-2a").exists()
@@ -1469,7 +1466,7 @@ def test_a_scratch_used_by_a_sandboxed_check_is_not_trusted_by_an_unsandboxed_on
     ws = new_workspace()
     alias = tmp_path / "alias"
     alias.symlink_to(ws.path.parent)
-    unsandboxed(alias / ws.path.name, "ran-3a")          # vets, by the real directory
+    unsandboxed(alias / ws.path.name, "ran-3a")          # by the real directory
     sandboxed(ws.path)
     plant(ws.path)
     with pytest.raises(ValueError, match="not empty"):

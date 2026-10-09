@@ -345,3 +345,110 @@ def test_the_real_exit_includes_are_bound_and_the_checklist_gates_are_not():
     met, why = bp.phase_gates(proven, requirements)[1]["P2"]
     assert met is False
     assert why.startswith("3 exit condition(s) nothing here measures yet"), why
+
+
+# --- the five P0 measurement rows read their status back ----------------------
+
+_P0_MEASURE_IDS = (
+    "P0.measure.fresh-install-path",
+    "P0.measure.current-cli-commands",
+    "P0.measure.current-service-runtime-model",
+    "P0.measure.current-human-intervention-points",
+    "P0.measure.existing-long-horizon-dogfood-evidence",
+)
+_HEADINGS = {
+    "fresh-install-path": "Fresh install path",
+    "current-cli-commands": "Current CLI commands",
+    "current-service-and-runtime-model": "Current service and runtime model",
+    "current-human-intervention-points": "Current human intervention points",
+    "existing-long-horizon-dogfood-evidence":
+        "Existing long-horizon dogfood evidence",
+}
+
+
+def _baseline(tmp_path, sections, monkeypatch=None):
+    """A current baseline with the given {heading: body} sections, and `a.txt`
+    (two lines) for them to cite, under a tree that `bp.HOH` is pointed at."""
+    doc = tmp_path / "program/v3_3/VERIHARNESS_CURRENT_BASELINE.md"
+    doc.parent.mkdir(parents=True, exist_ok=True)
+    doc.write_text("# Current baseline\n\n" + "".join(
+        f"## {heading}\n\n{body}\n\n" for heading, body in sections.items()))
+    (tmp_path / "a.txt").write_text("one\ntwo\n")
+    return tmp_path
+
+
+def _point_at(monkeypatch, tmp_path):
+    monkeypatch.setattr(bp, "HOH", tmp_path)
+
+
+def test_a_measurement_is_measured_only_when_its_section_reads_back(
+        tmp_path, monkeypatch):
+    _baseline(tmp_path, {
+        "Fresh install path": "* a figure — `a.txt:1`",
+        "Current CLI commands": "* NOT_MEASURED — the CLI did not answer",
+        "Current service and runtime model": "* a — `a.txt:1; a.txt:9`",
+        "Current human intervention points": "A sentence, and no figure.",
+    })
+    _point_at(monkeypatch, tmp_path)
+    assert bp.measurement_status("P0.measure.fresh-install-path") == (
+        "measured: VERIHARNESS_CURRENT_BASELINE.md#fresh-install-path")
+    assert bp.measurement_status("P0.measure.current-cli-commands") == (
+        "NOT MEASURED: the section reports NOT_MEASURED")
+    assert bp.measurement_status("P0.measure.current-service-runtime-model") == (
+        "NOT MEASURED: cited line a.txt:9 does not exist")
+    assert bp.measurement_status(
+        "P0.measure.current-human-intervention-points") == (
+        "NOT MEASURED: the section has no figure with a source")
+    assert bp.measurement_status(
+        "P0.measure.existing-long-horizon-dogfood-evidence") == (
+        "NOT MEASURED: no section `Existing long-horizon dogfood evidence`")
+
+
+def test_without_the_baseline_no_measurement_is_measured(tmp_path, monkeypatch):
+    _point_at(monkeypatch, tmp_path)
+    for item in _P0_MEASURE_IDS:
+        assert bp.measurement_status(item) == (
+            "NOT MEASURED: VERIHARNESS_CURRENT_BASELINE.md is missing"), item
+    _baseline(tmp_path, {"Fresh install path": "* a — `a.txt:1`"})
+    assert bp.measurement_status("P0.measure.no-such-item").startswith(
+        "NOT MEASURED: no section")
+
+
+def _p0_rows(text):
+    rows, inside = [], False
+    for line in text.splitlines():
+        if line.startswith("## "):
+            inside = line.startswith("## P0 ")
+        elif inside and line.startswith("| ") and not line.startswith("| line"):
+            rows.append([c.strip() for c in line.strip().strip("|").split("|")])
+    return rows
+
+
+def test_the_dispositions_table_shows_each_measurement_row_status(monkeypatch):
+    needs_evidence(PROGRAM_REGISTER)
+    monkeypatch.setattr(bp, "measurement_status", lambda i: f"S[{i}]")
+    text = bp.render_dispositions({"measured_at_utc": "t"}, {"capabilities": []})
+    p0 = _p0_rows(text)
+    measured = [r for r in p0 if r[2] == "measurement"]
+    assert len(measured) == 5, measured
+    assert {r[-1] for r in measured} == {f"S[{i}]" for i in _P0_MEASURE_IDS}
+    assert text.count("| file present |") == 11
+
+
+def test_the_real_dispositions_never_leave_a_measurement_row_blank():
+    needs_evidence(PROGRAM_REGISTER)
+    text = bp.render_dispositions({"measured_at_utc": "t"}, {"capabilities": []})
+    measured = [r for r in _p0_rows(text) if r[2] == "measurement"]
+    assert len(measured) == 5, measured
+    for row in measured:
+        assert row[-1].startswith(("measured: ", "NOT MEASURED: ")), row
+
+
+def test_every_measurement_row_points_at_its_exact_heading_anchor(
+        tmp_path, monkeypatch):
+    _baseline(tmp_path, {h: "* f — `a.txt:1 to a.txt:2`"
+                         for h in _HEADINGS.values()})
+    _point_at(monkeypatch, tmp_path)
+    got = [bp.measurement_status(i) for i in _P0_MEASURE_IDS]
+    assert got == ["measured: VERIHARNESS_CURRENT_BASELINE.md#" + a
+                   for a in _HEADINGS], got

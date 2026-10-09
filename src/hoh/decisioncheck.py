@@ -24,8 +24,8 @@ Decision ids are global across the sequence handed in: the same id in two maps
 is the same question, which is what makes the cross-map checks meaningful.
 
 Pure: no filesystem, git or network access. The graph and the clock are handed
-in. Out of scope here: the `veriharness decision check` CLI command and
-persisting the receipt.
+in. The command surface is `hoh decision check` in `hoh.cli`, which reads the
+files and may write the receipt; nothing here does.
 """
 
 from __future__ import annotations
@@ -50,6 +50,10 @@ from hoh.decisions import (
     ResolutionRecord,
     graduation_blockers,
 )
+
+#: Bound into every receipt (`CheckResult.validator_version`) by `hoh decision check`.
+#: Bump it when a check is added, removed or changes what it reports.
+VALIDATOR_VERSION = "decisioncheck/1"
 
 #: `unusually-large-map` fires above this many nodes (while any is unresolved).
 LARGE_MAP_THRESHOLD = 50

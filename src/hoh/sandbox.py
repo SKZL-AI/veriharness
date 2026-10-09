@@ -45,14 +45,29 @@ assumption that it is there.
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import shutil
 import subprocess
+import sys
 from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
 from typing import Protocol
+
+#: NixOS and other Nix hosts keep every binary, library and interpreter under
+#: absolute store paths (RPATH, ELF interpreter), so a sandbox that binds only
+#: `/usr`, `/bin` and `/lib*` cannot start anything there. These roots are bound
+#: read-only **only when the store exists**; on every other host the argv is
+#: unchanged. Module constants so a test can point them at a temporary
+#: directory. `/nix/var` (the database, profiles' writers) is never bound.
+NIX_STORE = "/nix/store"
+NIX_EXTRA_ROOTS = ("/run/current-system/sw", "/etc/static", "/etc/profiles")
+
+#: Ubuntu 24.04 sets this to 1 by default; bubblewrap then cannot create the
+#: user namespace unless an AppArmor profile allows it.
+APPARMOR_USERNS_SYSCTL = "/proc/sys/kernel/apparmor_restrict_unprivileged_userns"
 
 
 class Isolation(StrEnum):
@@ -245,6 +260,13 @@ def own_namespaces() -> dict[str, str]:
     return out_list
 
 
+def nix_roots() -> tuple[str, ...]:
+    """The read-only roots a Nix host needs, or `()` when there is no store."""
+    if not os.path.isdir(NIX_STORE):
+        return ()
+    return (NIX_STORE, *NIX_EXTRA_ROOTS)
+
+
 def _limits_for(spec: SandboxSpec):
     """A `preexec_fn` applying the spec's resource ceilings, or None.
 
@@ -310,6 +332,70 @@ def _rlimit_pairs(spec: SandboxSpec):
     return out_list
 
 
+_CONFIRM_CACHE: dict = {}
+
+_CONFIRM_CODE = (
+    "import json, resource\n"
+    "print(json.dumps({str(r): resource.getrlimit(r)[0] for r in %r}))\n"
+)
+
+
+def confirmed_rlimits(pairs, *, child_argv=None) -> dict:
+    """Which of the `(resource, value)` pairs a child process really holds.
+
+    `setrlimit` failures are swallowed on purpose (a check must still run), so
+    the *requested* ceilings are not evidence of the *applied* ones; macOS in
+    particular refuses some. A throw-away child is started with the same
+    `preexec_fn` the checks use and reports its own soft limits. `True` only
+    when the child's value equals the request; a child that cannot be started,
+    prints something unparsable, or omits a resource confirms nothing for it
+    (`False`, rendered `not-applied` in the receipt). Cached per process,
+    keyed on the pairs and on this process's own limits, which the child
+    inherits. `child_argv` is a test seam for the child program.
+    """
+    import resource
+
+    pairs = list(pairs)
+    if not pairs:
+        return {}
+    key = (tuple(pairs), tuple(resource.getrlimit(r) for r, _ in pairs),
+           tuple(child_argv) if child_argv else None)
+    if key in _CONFIRM_CACHE:
+        return dict(_CONFIRM_CACHE[key])
+    ids = [r for r, _ in pairs]
+
+    def apply_now() -> None:                      # pragma: no cover - runs post-fork
+        for identifier_, value_ in pairs:
+            try:
+                _, hard = resource.getrlimit(identifier_)
+                resource.setrlimit(identifier_, (value_, hard))
+            except (ValueError, OSError):
+                continue
+
+    argv = list(child_argv) if child_argv else [
+        sys.executable, "-I", "-c", _CONFIRM_CODE % (ids,)]
+    seen: dict = {}
+    try:
+        p = subprocess.run(argv, capture_output=True, text=True, timeout=30,
+                           preexec_fn=apply_now)
+        data = json.loads(p.stdout.strip().splitlines()[-1]) if p.returncode == 0 else {}
+        if isinstance(data, dict):
+            seen = data
+    except (OSError, ValueError, IndexError, TypeError, subprocess.SubprocessError):
+        seen = {}
+    out = {r: (str(r) in seen and seen[str(r)] == v) for r, v in pairs}
+    _CONFIRM_CACHE[key] = dict(out)
+    return out
+
+
+def render_limits(pairs, names_) -> list[str]:
+    """`name=value` for ceilings a child was seen to hold, `name=not-applied`
+    for the others."""
+    confirmed = confirmed_rlimits(pairs)
+    return [f"{names_[k]}={v}" if confirmed.get(k) else f"{names_[k]}=not-applied"
+            for k, v in pairs]
+
+
 def applied_limits(spec: SandboxSpec) -> str:
     """The ceilings that will actually be in force, rendered for a receipt.
 
@@ -326,7 +412,7 @@ def applied_limits(spec: SandboxSpec) -> str:
         resource.RLIMIT_CPU: "cpu",
         resource.RLIMIT_FSIZE: "fsize",
     }
-    parts = [f"{names_[k]}={v}" for k, v in _rlimit_pairs(spec)]
+    parts = render_limits(_rlimit_pairs(spec), names_)
     parts.append(f"timeout={spec.timeout}s")
     return ",".join(parts) if parts else "none"
 
@@ -382,6 +468,12 @@ class BubblewrapSandbox(SandboxBackend):
         return self._probe or None
 
     def _probe_now(self) -> str | None:
+        if sys.platform == "darwin":
+            return (
+                "STRICT isolation needs Linux namespaces (bubblewrap) and macOS "
+                "is only partially supported: use --isolation none; no sandbox "
+                "backend exists on this platform"
+            )
         if not self.bwrap:
             return (
                 "bwrap is not installed; install bubblewrap, or ask for "
@@ -389,8 +481,8 @@ class BubblewrapSandbox(SandboxBackend):
             )
         try:
             p = subprocess.run(
-                [self.bwrap, "--ro-bind", "/", "/", "--unshare-all",
-                 "--die-with-parent", "true"],
+                [self.bwrap, "--ro-bind", "/", "/", "--proc", "/proc",
+                 "--dev", "/dev", "--unshare-all", "--die-with-parent", "true"],
                 capture_output=True, text=True, timeout=30,
             )
         except subprocess.TimeoutExpired:
@@ -399,9 +491,21 @@ class BubblewrapSandbox(SandboxBackend):
             # run hung before doing any work.
             return "bwrap did not answer the availability probe within 30s"
         if p.returncode != 0:
+            hint = ""
+            try:
+                with open(APPARMOR_USERNS_SYSCTL, encoding="ascii") as handle:
+                    if handle.read().strip() == "1":
+                        hint = (
+                            "; kernel.apparmor_restrict_unprivileged_userns=1 is "
+                            "set: allow user namespaces for bwrap (an AppArmor "
+                            "profile with `userns,` for its path) or set that "
+                            "sysctl to 0, or ask for --isolation none"
+                        )
+            except OSError:
+                pass
             return (
                 f"bwrap is installed but cannot create a namespace here: "
-                f"{(p.stderr or p.stdout).strip()[:200]}"
+                f"{(p.stderr or p.stdout).strip()[:200]}{hint}"
             )
         return None
 
@@ -415,7 +519,10 @@ class BubblewrapSandbox(SandboxBackend):
             "--dev", "/dev",
             # A minimal read-only system. Not `--ro-bind / /`: that would carry
             # the whole machine in, including the ancestor checkout whose .git
-            # is the thing limit 6 is about.
+            # is the thing limit 6 is about. On a Nix host (`nix_roots()`) the
+            # whole store and the system/profile link roots are added below,
+            # read-only: everything in the store is then readable by a check
+            # (source copies, derivation secrets); closure binds are deferred.
             "--ro-bind", "/usr", "/usr",
             "--ro-bind-try", "/bin", "/bin",
             "--ro-bind-try", "/lib", "/lib",
@@ -429,6 +536,8 @@ class BubblewrapSandbox(SandboxBackend):
         ]
         if not spec.network:
             cmd.append("--unshare-net")
+        for root in nix_roots():
+            cmd += ["--ro-bind-try", root, root]
         for p in spec.ro_binds:
             cmd += ["--ro-bind-try", str(p), str(p)]
         for k, v in _env_for(spec).items():

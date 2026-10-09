@@ -26,6 +26,7 @@ Layout under `runs/<run_id>/`:
 
 from __future__ import annotations
 
+import errno
 import fcntl
 import json
 import os
@@ -39,7 +40,7 @@ from typing import Iterator
 
 from pydantic import BaseModel, ValidationError
 
-from . import durable_io
+from . import durable_io, migrations
 from .contracts import AcceptanceCheck, RunState, digest
 from .evidence import EvidenceBundle
 
@@ -157,23 +158,16 @@ class RunStore:
         return self.dir / ".process.lock"
 
     @contextmanager
-    def process_marker(self) -> Iterator[None]:
-        """Hold, for the whole of a `hoh run`, the claim that this process
-        executes the run.
+    def process_lock(self) -> Iterator[None]:
+        """Hold `.process.lock` exclusively and write nothing: the claim without
+        the marker.
 
-        The run lock is held per iteration only, so between iterations a run
-        still being executed looks unlocked (review B3, C). This holds a second,
-        exclusive lock -- `.process.lock` -- for the run's whole lifetime, and
-        writes `process.json` naming the process. The kernel releases the lock
-        when the process dies, however it dies, so "is the run still being
-        executed" is answered by the lock, not by pids that can be reused or
-        belong to another namespace (review A4, S1/S2). A second `hoh run` of
-        the same run is refused instead of erasing the first one's marker
-        (review A4, G2). Only the holder rewrites the marker, and it is never
-        deleted: an orderly end marks it ended.
+        `process_marker` is this plus the marker; a caller that only has to keep
+        a `hoh run` out for a while (`hoh migrate --apply`) takes this, so the
+        run's `process.json` -- including the marker a crashed run left behind --
+        stays exactly as it was. The lock is refused (`LockBusy`) while another
+        process holds it, the kernel releases it however this process ends.
         """
-        from .succession import boot_id
-
         self.ensure()
         fd = os.open(str(self.process_lock_path), os.O_CREAT | os.O_RDWR, 0o644)
         try:
@@ -197,6 +191,29 @@ class RunStore:
                             f"Run {self.run_id} is already being executed by {who}"
                         ) from exc
                     time.sleep(0.01)
+            yield
+        finally:
+            os.close(fd)                      # releases the lock
+
+    @contextmanager
+    def process_marker(self) -> Iterator[None]:
+        """Hold, for the whole of a `hoh run`, the claim that this process
+        executes the run.
+
+        The run lock is held per iteration only, so between iterations a run
+        still being executed looks unlocked (review B3, C). This holds a second,
+        exclusive lock -- `.process.lock` -- for the run's whole lifetime, and
+        writes `process.json` naming the process. The kernel releases the lock
+        when the process dies, however it dies, so "is the run still being
+        executed" is answered by the lock, not by pids that can be reused or
+        belong to another namespace (review A4, S1/S2). A second `hoh run` of
+        the same run is refused instead of erasing the first one's marker
+        (review A4, G2). Only the holder rewrites the marker, and it is never
+        deleted: an orderly end marks it ended.
+        """
+        from .succession import boot_id
+
+        with self.process_lock():
             base = {"pid": os.getpid(), "boot_id": boot_id(), "since": _stamp()}
             _atomic_write(self.process_path,
                           json.dumps({**base, "state": "running"}) + "\n")
@@ -205,8 +222,6 @@ class RunStore:
             finally:
                 _atomic_write(self.process_path, json.dumps(
                     {**base, "state": "ended", "ended": _stamp()}) + "\n")
-        finally:
-            os.close(fd)                      # releases the lock
 
     def _marker(self) -> dict | None:
         try:
@@ -374,7 +389,9 @@ class RunStore:
         through a private function. No data was lost -- but the way back was
         undocumented, which for a run record is nearly as bad.
         """
-        return self._parse_state(Path(path).read_text(encoding="utf-8"))
+        raw = Path(path).read_text(encoding="utf-8")
+        self._require_readable(raw, f"parked state {Path(path).name}", parked=True)
+        return self._parse_state(raw)
 
     def _read_state_file(self) -> RunState:
         """Reads the state file, with field migration where needed.
@@ -386,14 +403,41 @@ class RunStore:
         return self._parse_state(self.state_path.read_text(encoding="utf-8"))
 
     @staticmethod
+    def _require_readable(raw: str, what: str, *, parked: bool = False) -> None:
+        """P2-12: a state is read only at the current schema version.
+
+        `schema_version` is a plain integer on the model, so a state written by
+        a newer version that happens to add no field reads as current, and one
+        that adds a field fails as "damaged". Both are answered here, before the
+        model sees the text: from the future, or behind and in need of
+        `hoh migrate`, is a refusal that names the version, never a best effort.
+        A parked copy (`parked=True`) is history and is never migrated: behind the
+        current version it is refused without pointing at `hoh migrate`.
+        Text that is not a JSON object is left to the model's own error.
+        """
+        try:
+            record = json.loads(raw)
+        except migrations.UNPARSEABLE:
+            return
+        if not isinstance(record, dict):
+            return
+        try:
+            migrations.require_readable(
+                record, registry=migrations.STATE_REGISTRIES["run"], what=what,
+                migratable=not parked)
+        except migrations.MigrationError as exc:
+            raise StoreError(str(exc)) from exc
+
+    @staticmethod
     def _parse_state(raw: str) -> RunState:
         """The one parser, so a parked state reads exactly like a current one."""
+        RunStore._require_readable(raw, "state")
         try:
             return RunState.model_validate_json(raw)
         except ValidationError as exc:
             try:
                 parsed = json.loads(raw)
-            except json.JSONDecodeError:
+            except migrations.UNPARSEABLE:
                 raise exc from None
             migrated = _migrate(parsed) if isinstance(parsed, dict) else None
             if migrated is None:
@@ -416,10 +460,10 @@ class RunStore:
         """
         if not self.state_path.exists():
             raise StoreError(f"no state for run {self.run_id} at {self.state_path}")
+        raw = self.state_path.read_text(encoding="utf-8")
+        self._require_readable(raw, f"state of run {self.run_id}")
         try:
-            fresh = RunState.model_validate_json(
-                self.state_path.read_text(encoding="utf-8")
-            )
+            fresh = RunState.model_validate_json(raw)
             return fresh
         except ValidationError:
             pass                                # once more in a moment, migrating
@@ -504,7 +548,7 @@ class RunStore:
         buf = io.BytesIO()
         with tarfile.open(fileobj=buf, mode="w:gz") as tar:
             for entry in sorted(self.dir.iterdir()):
-                if entry.name in ("arena", "attic", ".lock"):
+                if entry.name in ("arena", "attic", ".lock", ".process.lock"):
                     continue
                 tar.add(entry, arcname=f"{self.run_id}/{entry.name}")
         data = buf.getvalue()
@@ -522,42 +566,115 @@ class RunStore:
         )
 
     def restore(self, archive: Path | str, *, overwrite: bool = False) -> Path:
+        """Restores a backed-up run; see `_restore` for what that means.
+
+        An overwrite over a run that has files in it is a write into a live
+        run: it takes the controller lock and then the process lock (the order
+        `hoh migrate --apply` takes them in), both non-blocking, so a `hoh run`
+        executing the run or a controller iterating it is refused with
+        `LockBusy` before anything is extracted. Every other restore -- beside
+        the run, or into a run that is not there or is empty -- takes no lock
+        and creates no lock file.
+        """
+        live = overwrite and self.dir.is_dir() and any(self.dir.iterdir())
+        if not live:
+            return self._restore(archive, overwrite=overwrite)
+        with self.lock(), self.process_lock():
+            return self._restore(archive, overwrite=overwrite)
+
+    def _restore(self, archive: Path | str, *, overwrite: bool = False) -> Path:
         """Restores a backed-up run.
 
         Without `overwrite` an existing run is not touched -- the restored one
-        lands next to it under `<run_id>-restored-<time>`. That is the house
-        rule "delete nothing" in operational form.
+        lands next to it under `<run_id>-restored-<time>`, and a name that is
+        taken (a second restore in the same second) gets `-001`, `-002`, ...
+        rather than being overlaid. That is the house rule "delete nothing" in
+        operational form.
+
+        Staged (P2-41 closure S1): every member is checked and the room is
+        measured before anything is created; the archive is extracted into
+        `<root>/_restore/<run>.<pid>.<random>`, read back there, and only then
+        published by `durable_io.durable_publish_tree` -- renamed whole into a
+        fresh or empty target, or, with `overwrite`, laid over the live run
+        file by file with `state.json` last (what the backup does not hold
+        stays). A full disk or an unreadable backup leaves the existing run
+        untouched; a failed extraction leaves its staging directory, named in
+        the error: nothing is deleted.
+
+        The run's own lock files (`.lock`, `.process.lock`) are never restored,
+        and neither is a member below a path of either name at the top of the
+        run: they belong to the live run, and replacing one would swap the
+        inode another process holds its lock on. A member the owner cannot read
+        back (a file without owner read, a directory without owner read and
+        search) is a `StoreError` before anything is created.
         """
+        import secrets
         import tarfile
 
         archive = Path(archive)
         if not archive.exists():
             raise StoreError(f"backup not found: {archive}")
 
+        target_run_id = self.run_id
         if self.dir.exists() and any(self.dir.iterdir()) and not overwrite:
-            target_run_id = f"{self.run_id}-restored-{_stamp()}"
-        else:
-            target_run_id = self.run_id
+            base = f"{self.run_id}-restored-{_stamp()}"
+            target_run_id = base
+            n = 0
+            while True:
+                taken = self.root / _check_name(target_run_id)
+                if not (os.path.lexists(taken)
+                        and (not taken.is_dir() or any(taken.iterdir()))):
+                    break
+                n += 1
+                target_run_id = f"{base}-{n:03d}"
 
         target = self.root / _check_name(target_run_id)
-        target.mkdir(parents=True, exist_ok=True)
+        self.root.mkdir(parents=True, exist_ok=True)
         target_root = target.resolve()
 
         with tarfile.open(archive, "r:gz") as tar:
+            members = []
+            total = 0
             for member in tar.getmembers():
                 # The first path component is the original run id; it is replaced.
                 parts = Path(member.name).parts[1:]
                 if not parts:
                     continue
+                if parts[0] in (".lock", ".process.lock"):
+                    continue
+                if (member.isreg() and not member.mode & 0o400) or (
+                        member.isdir() and member.mode & 0o500 != 0o500):
+                    raise StoreError(
+                        f"backup member {member.name} has mode "
+                        f"{member.mode & 0o7777:#o}, which the owner cannot read "
+                        "back; refusing to restore it")
                 out = (target / Path(*parts)).resolve()
-                if not str(out).startswith(str(target_root)):
+                if not out.is_relative_to(target_root):
                     raise StoreError(f"path points out of the target: {member.name!r}")
                 member.name = str(Path(*parts))
-            tar.extractall(target, filter="tar")
+                members.append(member)
+                if member.isreg():
+                    total += member.size
 
-        # Checked by reading back: a backup that cannot be loaded is not one.
-        restored = RunStore(self.root, target_run_id)
-        restored.read_state()
+            durable_io.require_room(self.root, total)
+            stage_root = self.root / "_restore"
+            staging = stage_root / f"{target_run_id}.{os.getpid()}.{secrets.token_hex(4)}"
+            try:
+                staging.mkdir(parents=True)
+                tar.extractall(staging, members=members, filter="tar")
+            except OSError as exc:
+                if exc.errno in (errno.ENOSPC, errno.EDQUOT, errno.EFBIG):
+                    raise durable_io.DiskFullError(
+                        staging, total, None,
+                        f"restore ran out of room extracting into {staging}; the "
+                        f"existing run {self.dir} is untouched") from exc
+                raise
+
+        # Checked by reading back, before anything is published: a backup that
+        # cannot be loaded is not one, and must not replace or sit beside a run.
+        RunStore(stage_root, staging.name).read_state()
+        durable_io.durable_publish_tree(staging, target, merge=overwrite,
+                                        last=("state.json",))
         return target
 
     # -- Retention ---------------------------------------------------------- #
@@ -642,7 +759,13 @@ class RunStore:
             # keeping as many as there are arenas.
             sandbox_ = sorted(
                 (d for d in arena.iterdir()
-                 if d.is_dir() and d.name.startswith(".hoh-scratch-")),
+                 if d.is_dir() and d.name.startswith(".hoh-scratch-")
+                 # A role's scratch (`dispatchers.ROLE_SCRATCH_PREFIX`) is the `TMPDIR`
+                 # of a pane that may still be open when this runs (`_end_of_run`
+                 # prunes also when the tabs stay open for an approval). Moved away,
+                 # it leaves the pane without it, and Python falls back to `/tmp`.
+                 # `prune` cannot tell a live pane, so it never moves these.
+                 and not d.name.startswith(".hoh-scratch-role-")),
                 key=lambda d: d.stat().st_mtime,
             )
             # `run_check` writes one of these beside the arena per check, and

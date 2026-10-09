@@ -108,6 +108,23 @@ context bringing them along:
 - NO `nvidia-smi`, in any form, not even from code you write. Read GPU state
   through `ps -ef | grep python`, `fuser -v /dev/nvidia*`, `/proc/<pid>/stat`.
 - Other people's worktrees and reference projects are read-only.
+- **pytest stays in your own TMPDIR.** Never run it on the shared default
+  `/tmp/pytest-of-<user>`: that directory belongs to every session of this
+  machine, and pytest's retention removes the numbered directories of other
+  sessions there. In a pane HoH opened, `TMPDIR` points at a directory of your
+  own whose last component starts with `.hoh-scratch-role-`, so pytest's default
+  basetemp, `$TMPDIR/pytest-of-<user>`, is yours alone and its retention
+  touches only your own earlier runs: leave `TMPDIR` set. If `echo $TMPDIR`
+  shows nothing or a path without `.hoh-scratch-role-` in it, or
+  `test -d "$TMPDIR"` or `test -w "$TMPDIR"` fails, stop: do not run pytest, and
+  say so in your answer (Python falls back to `/tmp` when `TMPDIR` is missing or
+  not writable). Never pass `--basetemp` an existing directory -- pytest empties
+  it first; give it a fresh path that does not exist yet, below `$TMPDIR`. That
+  `TMPDIR` is long (over 100 characters) and a Unix socket path may not exceed
+  107 bytes: `multiprocessing.Manager()` or the `forkserver` start method, which
+  make theirs below `$TMPDIR`, fail here with `AF_UNIX path too long`. That is
+  the layout, not the code under test, and the acceptance checks run under a
+  `TMPDIR` just as long: report it, and do not unset `TMPDIR` to get around it.
 
 An acceptance criterion that violates these rules is not executed by the runner
 in the first place and can therefore never turn green.

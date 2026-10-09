@@ -1,0 +1,6 @@
+{
+  "handoff": "<HANDOFF_FILE>",
+  "handoff_sha256": "<sha256 of the handoff file as you computed it>",
+  "successor_session": "<your session id>",
+  "at": "<UTC timestamp>"
+}

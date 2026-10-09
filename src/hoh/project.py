@@ -45,8 +45,12 @@ from typing import Any
 from pydantic import Field, model_validator
 
 from .contracts import Strict, utcnow
+from .programlogic import Event
 
-PROJECT_SCHEMA_VERSION = 1
+#: 1 -> 2 (P2-15): `ProjectState.activity_events`, the dispatch activity log. A
+#: version-1 file is refused by the read gate until `hoh migrate --apply` adds
+#: the empty log (`migrations.STATE_REGISTRIES["project"]`).
+PROJECT_SCHEMA_VERSION = 2
 
 
 def digest_obj(obj: Any) -> str:
@@ -351,6 +355,11 @@ class ProjectState(Strict):
     #: `master_epoch` on purpose -- a successor master continues the same
     #: programme, and must resume the timers its predecessor armed.
     program_generation: int = Field(default=1, ge=1)
+    #: The dispatch activity log (V3.3 P2-15): append-only `programlogic.Event`s,
+    #: written in the same atomic write as the lifecycle transition they belong
+    #: to and read only through `programlogic.reduce` (see `hoh.projectactivity`).
+    #: Empty for a state written before the log existed.
+    activity_events: list[Event] = Field(default_factory=list)
 
     def node(self, node_id: str) -> TaskNode | None:
         for n in self.nodes:

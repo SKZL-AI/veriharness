@@ -39,6 +39,8 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from . import durable_io
+
 SCHEMA = "hoh-role-approval/1"
 
 #: Modes that never stop for a human. Everything else is refused.
@@ -215,12 +217,12 @@ class RoleApprovalPolicy:
             for rule in (_answers_rule(answers_dir), _answers_read_rule(answers_dir)):
                 if rule not in allow:
                     allow.append(rule)
-        settings.write_text(json.dumps({"permissions": {
+        durable_io.durable_write(settings, json.dumps({"permissions": {
             "defaultMode": self.mode,
             "deny": list(self.deny),
             "allow": allow,
-        }}, indent=2) + "\n", encoding="utf-8")
-        prompt.write_text(self.house_rules + "\n", encoding="utf-8")
+        }}, indent=2) + "\n", mode=None)
+        durable_io.durable_write(prompt, self.house_rules + "\n", mode=None)
         return settings, prompt
 
     def args(self, role: str, settings: Path, prompt: Path) -> list[str]:

@@ -35,11 +35,13 @@ one place, so that a reader can.
 from __future__ import annotations
 
 import hashlib
+import stat
 from enum import StrEnum
 from pathlib import Path
 
 from pydantic import Field, model_validator
 
+from . import durable_io
 from .contracts import Strict, utcnow
 
 AMENDMENT_SCHEMA_VERSION = 1
@@ -264,7 +266,7 @@ def park_and_amend(
 ) -> SpecAmendment:
     """Writes the new specification beside the old one and returns the record.
 
-    The old file is **kept**, renamed with a version suffix, in line with this
+    The old file is **kept**, copied under a version suffix, in line with this
     machine's rule that nothing is deleted. The returned amendment names both
     paths, so the superseded text can be read rather than reconstructed.
 
@@ -303,6 +305,17 @@ def park_and_amend(
         after_acceptance=after_acceptance,
         write_seq=write_seq,
     )
-    path.rename(parked)
-    path.write_text(new_text, encoding="utf-8")
+    # The superseded text is parked first, as a whole copy under a name that
+    # must not exist; only then is the specification replaced. A full disk while
+    # parking changes nothing, and one while writing leaves the old text in
+    # place (and a harmless copy equal to it) with no record returned. It was a
+    # rename first, so a failed write left no specification at all.
+    raw = path.read_bytes()
+    try:
+        durable_io.durable_create(parked, raw, mode=stat.S_IMODE(path.stat().st_mode))
+    except FileExistsError:
+        # The name carries the digest: the same text parked in the same second.
+        if parked.read_bytes() != raw:
+            raise
+    durable_io.durable_write(path, new_text, mode=None)
     return record_

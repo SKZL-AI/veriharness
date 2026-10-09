@@ -78,6 +78,18 @@ def utc() -> str:
     return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def _self_start() -> str:
+    """This process's start time in clock ticks since boot (field 22 of
+    /proc/self/stat), or "" when it cannot be read. Written into the pause mark
+    so the harness signals the pid later only if the same process still holds it."""
+    try:
+        stat = Path("/proc/self/stat").read_text()
+    except OSError:
+        return ""
+    fields = stat[stat.rfind(")") + 2:].split()
+    return fields[19] if len(fields) > 19 else ""
+
+
 def pause(point: str) -> None:
     """Stop at a named point if the scenario asked for it; see the module doc."""
     wanted = {p.strip() for p in os.environ.get(PAUSE_ENV, "").split(",") if p.strip()}
@@ -89,7 +101,8 @@ def pause(point: str) -> None:
     release = d / f"{point.replace(':', '__')}.release"
     try:
         with open(reached, "x", encoding="utf-8") as fh:
-            json.dump({"point": point, "pid": os.getpid(), "at": utc()}, fh)
+            json.dump({"point": point, "pid": os.getpid(), "start": _self_start(),
+                       "at": utc()}, fh)
             fh.flush()
             os.fsync(fh.fileno())
     except FileExistsError:

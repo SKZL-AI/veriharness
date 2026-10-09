@@ -238,13 +238,22 @@ def resume(state: RunState) -> RunState:
     return state
 
 
-def block(state: RunState, reason: str) -> RunState:
+def block(state: RunState, reason: str, *, scan_for_quota: bool = True) -> RunState:
     """An unclear state or a real user decision -- an unambiguous waiting state
     instead of an endless replanning loop (handoff §8).
 
     An exhausted quota is **marked as such**. It is not a failure but a wait:
     `blocked_kind='usage_limit'` and `retry_after` make it machine-readable, so
     that `hoh resume-quota` can pick it up without guessing at free text.
+
+    ``scan_for_quota=False`` is for a reason that **carries text the product did
+    not write** -- an exception's message, which holds a role's pane and a role's
+    own words. The quota detector reads a phrase anywhere in a reason, so
+    `Rate limit: cap at 100/min` on a developer's screen used to park a run for
+    an hour (P2-43b integration review, B1). Such a block is a plain block for a
+    person; the provider's own limits reach `blocked_kind` through
+    `hoh.failures` instead, which reads where a harness prints and not what a
+    role wrote.
     """
     from . import quota
 
@@ -262,7 +271,7 @@ def block(state: RunState, reason: str) -> RunState:
         state.retry_after = None
         state.note(f"BLOCKED (still a capability violation): {reason}")
         return state
-    if quota.is_quota_exhausted(reason):
+    if scan_for_quota and quota.is_quota_exhausted(reason):
         state.blocked_kind = "usage_limit"
         state.retry_after = quota.next_attempt_at(reason).isoformat()
         state.note(

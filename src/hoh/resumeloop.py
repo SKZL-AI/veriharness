@@ -21,8 +21,10 @@ pass, for every run and every project under a root:
 
 Three rules decide what it may touch, and each is a refusal first:
 
-* **Only its own class.** `resume-quota` owns `usage_limit` and nothing else.
-  A branch parked by the autonomy contract, or a question collected for the
+* **Only its own class.** `resume-quota` owns `usage_limit` and the other
+  automatic waits of `hoh.failures.AUTOMATIC_KINDS` (`QUOTA_CLASSES`), and
+  nothing else. A branch parked by the autonomy contract, an operator-required
+  failure (an expired credential never wakes on a timer), or a question collected for the
   digest, is also a timed wait -- and it is somebody else's: resuming it here
   would answer a question nobody answered. Such a decision is reported as
   `CLASS_NOT_OWNED` and its timer stays armed for its own consumer.
@@ -82,11 +84,12 @@ from pathlib import Path
 from typing import Any
 
 from .contracts import Condition
+from .failures import AUTOMATIC_KINDS
 from .resumption import Resumption, ResumptionError, Verdict, consume, due_resumptions, normalise_now
 from .timers import TimerStatus, TimerStore, TimerStoreError
 
 #: The class `hoh resume-quota` owns. Everything else is reported, not touched.
-QUOTA_CLASSES = frozenset({"usage_limit"})
+QUOTA_CLASSES = frozenset({"usage_limit"}) | AUTOMATIC_KINDS
 
 #: The class `hoh resume-storage` owns (STORAGE-B3). Never resumed by the
 #: quota functions, which keep `QUOTA_CLASSES` as their default.
@@ -525,6 +528,10 @@ def drive_governed(store, authority, factory, **controller_kw):
 
     try:
         launcher, gates = factory(store)
+        # P2-43b: the runs this master launches are bound to it.
+        bind_master = getattr(launcher, "bind_master", None)
+        if callable(bind_master) and authority.epoch is not None:
+            bind_master(authority.session_id, authority.epoch)
         result = ProjectController(store, launcher, gates, authority=authority,
                                    **controller_kw).run()
     except Exception as exc:                              # noqa: BLE001 - classified

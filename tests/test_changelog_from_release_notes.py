@@ -166,5 +166,54 @@ def test_a_date_other_than_unreleased_survives_the_check(tmp_path):
     assert cg.main(["--root", str(root), "check"]) == 0
 
 
+NOTES_TWO = """\
+# Release notes -- v1.3.0a2 (pre-release)
+
+Second alpha intro.
+
+## Added
+
+* the second alpha thing
+
+---
+
+# Release notes -- v1.2.0a1 (pre-release)
+
+First alpha intro.
+
+## Added
+
+* the first alpha thing, as rewritten in the notes
+"""
+
+
+def test_a_newer_section_goes_above_the_whole_earlier_generated_block(tmp_path):
+    """The earlier section's BEGIN marker stands on the line above its heading:
+    the new section must not land between the two, or the earlier block loses
+    its start and the generator can no longer find it."""
+    root = make(tmp_path)
+    assert cg.main(["--root", str(root), "generate", "--date", "2026-10-07"]) == 0
+    (root / "RELEASE_NOTES.md").write_text(NOTES_TWO, encoding="utf-8")
+    assert cg.main(["--root", str(root), "generate", "--date", "2026-10-09"]) == 0
+    text = (root / "CHANGELOG.md").read_text(encoding="utf-8")
+    begin_a2 = "<!-- BEGIN GENERATED: tools/changelog_from_release_notes.py 1.3.0a2 -->"
+    begin_a1 = "<!-- BEGIN GENERATED: tools/changelog_from_release_notes.py 1.2.0a1 -->"
+    end = "<!-- END GENERATED: tools/changelog_from_release_notes.py -->"
+    assert text.count(begin_a2) == 1 and text.count(begin_a1) == 1
+    assert text.count(end) == 2
+    # a2 block, then the a1 block, each marker directly above its own heading
+    assert text.index(begin_a2) < text.index("## [1.3.0a2]") < text.index(end)
+    assert text.index(end) < text.index(begin_a1) < text.index("## [1.2.0a1]")
+    assert text.index(begin_a1) + len(begin_a1) + 1 == text.index("## [1.2.0a1]")
+    assert text.index("## [1.2.0a1]") < text.index("## [1.0.0]")
+    assert text.startswith("# Changelog\n\nIntro of the changelog.")
+    # the older generated block is untouched, and the newest one checks out
+    assert "* one thing" in text and "* another thing" in text
+    assert cg.main(["--root", str(root), "check"]) == 0
+    # generating again changes nothing
+    assert cg.main(["--root", str(root), "generate"]) == 0
+    assert (root / "CHANGELOG.md").read_text(encoding="utf-8") == text
+
+
 def test_the_repositorys_own_changelog_is_what_its_notes_produce():
     assert cg.check(ROOT) == []

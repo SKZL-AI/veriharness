@@ -20,6 +20,7 @@ from pathlib import Path
 from . import pane_ledger, stages
 from .contracts import Budgets, Condition, Role, Stage
 from .controller import Controller, new_run_id
+from .durable_io import DiskFullError, DurableWriteNotSynced, durable_write
 from .store import LockBusy, RunStore, StoreError, list_runs
 
 DEFAULT_ROOT = Path(os.environ.get("HOH_RUNS", Path.home() / "hoh" / "runs"))
@@ -205,8 +206,11 @@ def cmd_resume_quota(args) -> int:
     may retry, and this command -- by hand, from the systemd timer in `ops/`,
     or as a Herdr action -- consumes the due timers (`hoh.resumeloop`).
 
-    Only `blocked_kind='usage_limit'` is resumed. A branch parked by the
-    autonomy contract, a question collected for the digest, or a capability
+    Only the automatic waits are resumed: `usage_limit` and the other kinds of
+    `hoh.failures.AUTOMATIC_KINDS` (rate limit, provider unavailable, network,
+    prompt stall, role timeout). A branch parked by the autonomy contract, a
+    question collected for the digest, an operator-required failure (expired
+    credential, account action, model or local runtime missing) or a capability
     violation is reported and left alone: each of those has an owner who is
     not a timer. With `--drive`, a project whose branch was resumed is driven
     on by a new governed master (a new epoch), if it registered a driver.
@@ -1139,6 +1143,19 @@ def _isolation(name: str):
         raise ValueError(f"unknown isolation {name!r}; expected one of: {allowed_}") from None
 
 
+def _master_epoch(value: str) -> int:
+    """`--master-epoch`: a positive integer. argparse echoes the text of a
+    `ValueError` from `type=int` (`invalid int value: '<what was typed>'`); a key
+    pasted into the wrong option must not reach a terminal."""
+    try:
+        epoch = int(value)
+    except ValueError:
+        epoch = 0
+    if epoch < 1:
+        raise argparse.ArgumentTypeError("takes a positive integer (the value is not shown)")
+    return epoch
+
+
 def _per_role(pairs: list[str]) -> dict[Role, str]:
     """Parses `role=value` pairs into a per-role mapping.
 
@@ -1345,6 +1362,42 @@ def _finish_run(store, dispatcher, controller, state, *, waiting_for_approval: b
     return payload, (1 if touched else 0)
 
 
+def _write_record(path: Path, payload: dict) -> int | None:
+    """Write one run record whole or not at all. None: it is in place (a
+    directory entry that may not be durable is a warning). 2: it could not be
+    written; the old file, if any, is untouched."""
+    try:
+        durable_write(path, json.dumps(payload, indent=2) + "\n", mode=None)
+    except DurableWriteNotSynced as exc:
+        print(f"warning: {path.name} is written, but its directory entry may not "
+              f"be durable: {exc}", file=sys.stderr)
+    except OSError as exc:
+        print(f"NEEDS_YOU: {path.name} could not be written: {exc}", file=sys.stderr)
+        return 2
+    return None
+
+
+def _park_stale_record(path: Path) -> None:
+    """Set an earlier record aside under `<name>.v<UTC>.<n>` by a rename (which
+    needs no free space; nothing is deleted), so that it can never be read as
+    the current one after a write failed."""
+    if not os.path.lexists(path):
+        return
+    from .contracts import utcnow
+    stamp = utcnow().replace(":", "-")
+    n = 1
+    while True:
+        aside = path.with_name(f"{path.name}.v{stamp}.{n}")
+        if not os.path.lexists(aside):
+            break
+        n += 1
+    try:
+        path.rename(aside)
+    except OSError as exc:
+        print(f"the earlier {path.name} could not be set aside either: {exc}",
+              file=sys.stderr)
+
+
 def _integrity_close(store, before) -> bool:
     """Verify the inventory after the roles ran. False when the rule broke.
 
@@ -1359,8 +1412,19 @@ def _integrity_close(store, before) -> bool:
     record = {"held": not problems, "violations": problems,
               "checked": ["pre-existing tracked files", "refs", "own branch history",
                           "other worktrees"]}
-    (store.dir / "approval" / "integrity.json").write_text(
-        json.dumps(record, indent=2) + "\n", encoding="utf-8")
+    approval = store.dir / "approval"
+    try:
+        approval.mkdir(parents=True, exist_ok=True)
+        durable_write(approval / "integrity.json",
+                      json.dumps(record, indent=2) + "\n", mode=None)
+    except DurableWriteNotSynced as exc:
+        print(f"warning: integrity.json is written, but its directory entry may "
+              f"not be durable: {exc}", file=sys.stderr)
+    except OSError as exc:
+        print(f"the integrity record could not be written: {exc}", file=sys.stderr)
+        _park_stale_record(approval / "integrity.json")
+        if not problems:
+            return False
     if not problems:
         return True
     print("INTEGRITY VIOLATION -- the house rule was broken by this run:",
@@ -1473,8 +1537,8 @@ def _cmd_run(args) -> int:
             print(f"approval policy refused: {exc}", file=sys.stderr)
             return 2
         approval_dir.mkdir(parents=True, exist_ok=True)
-        (approval_dir / "policy.json").write_text(
-            json.dumps(policy.evidence(), indent=2) + "\n", encoding="utf-8")
+        if (rc := _write_record(approval_dir / "policy.json", policy.evidence())) is not None:
+            return rc
         _print({"approval_policy": {"mode": policy.mode, "digest": policy.digest,
                                     "denied": len(policy.deny),
                                     "source": policy.source}})
@@ -1501,15 +1565,35 @@ def _cmd_run(args) -> int:
         except ContractRefused as exc:
             print(f"autonomy contract refused: {exc}", file=sys.stderr)
             return 2
+        except DiskFullError as exc:
+            print(f"NEEDS_YOU: the autonomy contract could not be pinned: {exc}",
+                  file=sys.stderr)
+            return 2
         if governor is not None:
             asked = getattr(args, "program_epoch", None)
             if asked is not None and governor.contract.program_epoch != asked:
                 print(f"--program-epoch {asked} ignored: this run is pinned at epoch "
                       f"{governor.contract.program_epoch}", file=sys.stderr)
             approval_dir.mkdir(parents=True, exist_ok=True)
-            (approval_dir / "autonomy.json").write_text(
-                json.dumps(governor.evidence(), indent=2) + "\n", encoding="utf-8")
+            if (rc := _write_record(approval_dir / "autonomy.json",
+                                    governor.evidence())) is not None:
+                return rc
             _print({"autonomy_contract": governor.evidence()})
+    # P2-43b. The declaration is validated here, before anything is written
+    # and before any role starts; it is *recorded* just before the controller
+    # is built, under the run's lock (below). Every message is fixed text: a
+    # pasted key must not reach a terminal or a log.
+    from . import dispatchrecovery
+
+    try:
+        recovery = dispatchrecovery.RecoveryContext(
+            accounts=dispatchrecovery.parse_role_accounts(
+                getattr(args, "role_account", None) or []))
+        dispatchrecovery.check_master_args(getattr(args, "master_session", None),
+                                           getattr(args, "master_epoch", None))
+    except ValueError as exc:
+        print(f"recovery declaration refused: {exc}", file=sys.stderr)
+        return 2
     if getattr(args, "trust_worktree", False):
         from .trust import TrustRefused, trust_run_worktree
         try:
@@ -1518,8 +1602,8 @@ def _cmd_run(args) -> int:
             print(f"worktree trust refused: {exc}", file=sys.stderr)
             return 2
         approval_dir.mkdir(parents=True, exist_ok=True)
-        (approval_dir / "worktree_trust.json").write_text(
-            json.dumps(granted, indent=2) + "\n", encoding="utf-8")
+        if (rc := _write_record(approval_dir / "worktree_trust.json", granted)) is not None:
+            return rc
         _print({"worktree_trust": granted})
     try:
         dispatcher = build_dispatcher(
@@ -1597,14 +1681,34 @@ def _cmd_run(args) -> int:
         print(f"integrity inventory not measurable here: {exc}", file=sys.stderr)
     if integrity_before is not None:
         (store.dir / "approval").mkdir(parents=True, exist_ok=True)
-        (store.dir / "approval" / "integrity-before.json").write_text(
-            json.dumps(integrity_before, indent=2) + "\n", encoding="utf-8")
+        if (rc := _write_record(store.dir / "approval" / "integrity-before.json",
+                                integrity_before)) is not None:
+            return rc
+
+    # P2-43b: who this run works for, recorded under the run's lock after every
+    # other refusal. A bare run records `master: NONE` -- stated, not absent.
+    try:
+        with store.lock():
+            master = dispatchrecovery.declare_master(
+                store.dir, session=getattr(args, "master_session", None),
+                epoch=getattr(args, "master_epoch", None))
+    except LockBusy as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+    except ValueError as exc:
+        print(f"recovery declaration refused: {exc}", file=sys.stderr)
+        return 2
+    _print({"recovery": {"master": master.model_dump(),
+                         "accounts": {r.value: h for r, h in recovery.accounts.items()},
+                         "route_policy": f"{dispatchrecovery.ROUTE_POLICY_ID}/"
+                                         f"{dispatchrecovery.ROUTE_POLICY_VERSION}"}})
 
     controller = Controller(
         store, dispatcher, spec_path=state.spec_path, isolation=isolation,
         storage_admission=storage_admission,
         steward=_hook_steward(storage_root, state.project_name or state.run_id,
                               storage_admission),
+        recovery=recovery,
     )
 
     ran = 0
@@ -1632,8 +1736,11 @@ def _cmd_run(args) -> int:
                     print(f"autonomy contract unreadable, blocking without it: "
                           f"{contract_exc}", file=sys.stderr)
                     governor = None
+                # The exception's text is not ours: it carries a role's pane and a
+                # role's words. It is shown, never read as a quota statement.
                 routing = block_under_contract(
-                    fresh, f"iteration aborted: {exc}", governor)
+                    fresh, f"iteration aborted: {exc}", governor,
+                    scan_for_quota=False)
                 store.write_state(fresh)
                 if routing is not None:
                     _print({"autonomy": {"handling": routing.handling.value,
@@ -1693,6 +1800,36 @@ def _cmd_run(args) -> int:
                               run_id=args.run_id, ran=ran)
     _print(payload)
     return rc
+
+
+def cmd_agent_setup(args) -> int:
+    """`hoh agent-setup`: print, or install into a named directory, the text that tells a
+    coding-agent session to use VeriHarness. Starts nothing; writes only new files."""
+    from . import agent_setup as setup
+
+    kinds = ["skill", "snippet"] if args.kind == "all" else [args.kind]
+    try:
+        if args.print_text:
+            if args.kind == "all":
+                raise setup.SetupRefused("--print shows one kind at a time: skill or snippet")
+            sys.stdout.write(setup.render(args.kind, args.delegation))
+            return 0
+        written = setup.install(args.install, kinds, args.delegation,
+                                allow_user_config=args.allow_user_config)
+    except setup.SetupFailed as exc:
+        print(f"agent-setup failed: {exc}", file=sys.stderr)
+        return 2
+    except setup.SetupRefused as exc:
+        print(f"agent-setup refused: {exc}", file=sys.stderr)
+        return 2
+    _print({
+        "written": [str(p) for p in written],
+        "note": "files only; nothing was started and no existing file was changed",
+        "next": ("a skill is loaded by a harness that reads SKILL.md directories from the "
+                 "directory you chose; the snippet is a file to include from, or paste into, "
+                 "the project's CLAUDE.md or AGENTS.md (this command never edits those)"),
+    })
+    return 0
 
 
 def cmd_deliver(args) -> int:
@@ -1833,6 +1970,9 @@ def cmd_restore(args) -> int:
         target = store.restore(args.archive, overwrite=args.overwrite)
     except StoreError as exc:
         print(str(exc), file=sys.stderr)
+        return 2
+    except OSError as exc:
+        print(f"NEEDS_YOU: the restore did not complete: {exc}", file=sys.stderr)
         return 2
     _print({"restored_to": str(target), "run_id": target.name})
     return 0
@@ -1983,6 +2123,86 @@ def cmd_stuck(args) -> int:
     return 1 if found else 0
 
 
+def cmd_decision(args) -> int:
+    """`hoh decision check MAP [MAP ...]` (P2-21): the decision graph fsck.
+
+    Each MAP is a `DecisionMap` as JSON, exactly what `DecisionMap.model_dump(mode="json")`
+    writes; several files form one graph (the cross-map checks need that). Read-only:
+    the inputs are read and nothing is written, except `--receipt FILE`, a new file
+    that is never replaced. Prints the `CheckResult` (the receipt: status, errors,
+    warnings, checked_generation, decision_graph_digest, validator_version) as JSON.
+
+    Exit 0: PASS (warnings never fail). Exit 1: FAIL, at least one ERROR finding.
+    Exit 2: refused (argparse usage errors included: they print a usage line, not
+    `decision check refused:`) -- an input that is not a DecisionMap, a malformed option, a
+    receipt that cannot be created, a checker that raised. A graph the models refuse
+    to construct (a dangling `blocked_by`, a cycle) is a refusal, not a FAIL: it cannot
+    be represented, so it cannot be checked. Nothing is printed to stdout on a refusal.
+
+    What this is not: it does not discover, locate or persist a decision graph (the
+    product keeps none; a MAP file is the model's own JSON, no new format), it is wired
+    into no run, controller, gate or readiness path, and `check` is structure, not truth.
+    """
+    from datetime import datetime
+
+    from pydantic import TypeAdapter, ValidationError
+
+    from .decisioncheck import VALIDATOR_VERSION, ProgramRef, check
+    from .decisions import DecisionMap
+    from .durable_io import durable_create
+
+    def refuse(message: str) -> int:
+        print(f"decision check refused: {message}", file=sys.stderr)
+        return 2
+
+    def read(path: str) -> str:
+        return Path(path).expanduser().read_text(encoding="utf-8")
+
+    def why(exc: Exception) -> str:
+        if not isinstance(exc, ValidationError):
+            return str(exc) or repr(exc)
+        errors = exc.errors()
+        message = "; ".join(f"{'.'.join(str(p) for p in e['loc']) or 'map'}: {e['msg']}"
+                            for e in errors[:3])
+        return message + (f"; and {len(errors) - 3} more" if len(errors) > 3 else "")
+
+    now = None
+    if args.now is not None:
+        try:
+            now = datetime.fromisoformat(args.now)
+        except ValueError:
+            return refuse(f"--now {args.now!r} is not an ISO 8601 instant")
+        if now.tzinfo is None:
+            return refuse(f"--now {args.now!r} has no timezone offset; an instant without a "
+                          f"zone is not an instant")
+    maps = []
+    for path in args.maps:
+        try:
+            maps.append(DecisionMap.model_validate_json(read(path)))
+        except (OSError, ValueError, RuntimeError) as exc:   # ValidationError, UnicodeDecodeError,
+            # and expanduser() on an unknown ~user
+            return refuse(f"{path}: {why(exc)}")
+    refs: list = []
+    if args.program_refs is not None:
+        try:
+            refs = TypeAdapter(list[ProgramRef]).validate_json(read(args.program_refs))
+        except (OSError, ValueError, RuntimeError) as exc:
+            return refuse(f"{args.program_refs}: {why(exc)}")
+    try:
+        result = check(maps, validator_version=VALIDATOR_VERSION, program_refs=refs,
+                       settled_refs=args.settled_ref, now=now)
+    except Exception as exc:                      # noqa: BLE001 - never read as a FAIL
+        return refuse(f"the checker itself failed: {type(exc).__name__}: {exc}")
+    text = json.dumps(result.model_dump(mode="json"), indent=2) + "\n"
+    if args.receipt is not None:
+        try:
+            durable_create(Path(args.receipt).expanduser(), text)
+        except (OSError, ValueError, RuntimeError) as exc:
+            return refuse(f"--receipt {args.receipt}: {exc}")
+    sys.stdout.write(text)
+    return 1 if result.errors else 0
+
+
 def cmd_list(args) -> int:
     runs = list_runs(args.root)
     if not runs:
@@ -1995,6 +2215,159 @@ def cmd_list(args) -> int:
         except StoreError as exc:
             print(f"{rid}  UNREADABLE: {exc}")
     return 0
+
+
+def cmd_migrate(args) -> int:
+    """`hoh migrate [--apply]`: bring the durable state under --root to the
+    current schema version (P2-12).
+
+    The records are the one state file each run (`<id>/state.json`) and each
+    project (`projects/<id>/project.json`) keeps -- the files the two stores
+    read through the version gate. A dry run is the default and writes nothing,
+    not even a lock file; `--apply` takes each store's own lock, refuses a run
+    that a process is executing, parks the previous bytes beside the original as
+    `<name>.v<old>.<UTC>` and replaces the record atomically
+    (`migrations.migrate`). Nothing is deleted. The plan is made over every
+    record first: one refusal (a record from the future, without a readable
+    version, unparseable in any way -- including nesting or digits no parser
+    will take) and nothing at all is applied.
+
+    A run or project directory, the `projects` directory, a record file or a
+    lock file that is a symbolic link, or whose resolved location leaves the
+    root, is a refusal (`migrations.confine`), at the plan and again just before
+    each store's locks are taken. Hard links and a same-user race between that
+    re-check and the open are not closed.
+    The run's `process.json` is never rewritten: the apply holds the run's
+    `.process.lock` (`RunStore.process_lock`) and writes no marker, so the
+    marker a crashed run left behind stays as it was.
+
+    Exit 0 = every record is at the current version or was migrated; 1 = at
+    least one record is refused; 2 = the command could not run (unusable --now,
+    a run being executed, a store locked).
+
+    What this is not: it changes no schema and no version number, registers no
+    migration step itself (the steps live in `migrations.STATE_REGISTRIES`: none
+    for runs, the project step of P2-15), does not migrate on read (a state behind the current version is refused with this
+    command named), and does not touch amendments, goalbooks, timers, epochs,
+    capsules or any string-versioned record. The controller and the gates do not
+    run it.
+    """
+    import contextlib
+    from datetime import datetime, timezone
+
+    from . import migrations
+    from .projectstore import ProjectStore, list_projects
+
+    def stop(reason: str) -> int:
+        print(f"migrate refused: {reason}", file=sys.stderr)
+        return 2
+
+    if args.now:
+        try:
+            now = datetime.fromisoformat(args.now)
+        except ValueError:
+            return stop(f"--now is not an ISO 8601 instant: {args.now!r}")
+        if now.tzinfo is None:
+            return stop(f"--now needs an offset (for example Z): {args.now!r}")
+    else:
+        now = datetime.now(timezone.utc)
+
+    root = Path(args.root).expanduser()
+    if not root.is_dir():
+        # A root that is not there answers about nothing; so does a typo.
+        return stop(f"--root is not a directory: {root}")
+
+    def owned(kind, store):
+        """Every path an apply opens or writes for this store: all of them must stay
+        inside the root, with no symbolic link on the way (`migrations.confine`)."""
+        paths = [store.dir, store.state_path, store.lock_path]
+        if kind == "run":
+            paths.append(store.process_lock_path)
+        return paths
+
+    refused: list[dict] = []
+    targets = []
+    for kind, ids, store_class in (("run", list_runs(root), RunStore),
+                                   ("project", list_projects(root), ProjectStore)):
+        for ident in ids:
+            try:
+                store = store_class(root, ident)
+                migrations.confine(store.root, *owned(kind, store))
+                targets.append((kind, ident, store))
+            except (StoreError, migrations.MigrationError) as exc:
+                # a directory the store would not name, or a link out of the root
+                refused.append({"kind": kind, "id": ident,
+                                "file": migrations.STATE_FILES[kind], "reason": str(exc)})
+
+    def run_one(kind, store, *, dry_run):
+        return migrations.migrate(
+            store.dir, registry=migrations.STATE_REGISTRIES[kind], now=now,
+            dry_run=dry_run, only=[migrations.STATE_FILES[kind]])
+
+    def line(kind, ident, entry) -> dict:
+        return {"kind": kind, "id": ident, "file": entry.file,
+                "direction": entry.direction.name,
+                "from_version": entry.from_version, "to_version": entry.to_version,
+                "steps": list(entry.steps), "digest_before": entry.digest_before,
+                "digest_after": entry.digest_after, "preserved_to": entry.preserved_to}
+
+    records: list[dict] = []
+    forward: list[tuple[str, str, object]] = []
+    for kind, ident, store in targets:
+        try:
+            report = run_one(kind, store, dry_run=True)
+        except migrations.PlanRefused as exc:
+            refused += [{"kind": kind, "id": ident, "file": str(r.key),
+                         "reason": r.reason} for r in exc.plan.refusals]
+            continue
+        except (migrations.MigrationError, OSError, *migrations.UNPARSEABLE) as exc:
+            refused.append({"kind": kind, "id": ident,
+                            "file": migrations.STATE_FILES[kind], "reason": str(exc)})
+            continue
+        for entry in report.files:
+            records.append(line(kind, ident, entry))
+            if entry.direction is migrations.Direction.FORWARD:
+                forward.append((kind, ident, store))
+
+    applied = False
+    if args.apply and forward and not refused:
+        for kind, ident, store in forward:
+            if kind == "run" and store.running_process() is not None:
+                return stop(f"run {ident} is being executed by a process; nothing was migrated")
+        done: list[str] = []
+        records = [r for r in records if r["direction"] != "FORWARD"]
+        try:
+            for kind, ident, store in forward:
+                # The plan was made a moment ago; nothing may have become a link since.
+                migrations.confine(store.root, *owned(kind, store))
+                with contextlib.ExitStack() as held:
+                    held.enter_context(store.lock())
+                    if kind == "run":
+                        # Holds the run's `.process.lock` for the write: a `hoh run`
+                        # starting now is refused (LockBusy) instead of reading a
+                        # state half-way. The pre-check above is for all-or-nothing;
+                        # this is the exclusion. Only the lock: the run's
+                        # `process.json` -- the marker a crashed run left behind
+                        # included -- is not rewritten, so nothing is replaced
+                        # unparked. A project has no liveness marker; its
+                        # orchestrator lock is the only guard.
+                        held.enter_context(store.process_lock())
+                    report = run_one(kind, store, dry_run=False)
+                records += [line(kind, ident, e) for e in report.files]
+                done.append(f"{kind} {ident}")
+        except (LockBusy, migrations.MigrationError, OSError, StoreError) as exc:
+            return stop(f"{exc}; already migrated: {done or 'none'} (rerun resumes)")
+        applied = True
+
+    _print({"dry_run": not args.apply, "applied": applied, "root": str(root),
+            "to_versions": {k: r.current_version
+                            for k, r in migrations.STATE_REGISTRIES.items()},
+            "records": sorted(records, key=lambda r: (r["kind"], r["id"])),
+            "refused": refused,
+            "counts": {"records": len(records),
+                       "forward": sum(r["direction"] == "FORWARD" for r in records),
+                       "refused": len(refused)}})
+    return 1 if refused else 0
 
 
 # --------------------------------------------------------------------------- #
@@ -2125,11 +2498,27 @@ def cmd_project(args) -> int:
 
     verdict_text, why = resume_decision(st)
 
+    from .taskstate import PROJECT_SCOPE, from_project, render
+
+    # Layer 0 for a fresh session. A state it cannot be built from (a duplicate or
+    # blank node id, a lifecycle with no mapping) is reported next to the verdict,
+    # never in place of it: the verdict is what this command has always answered
+    # and must not start failing. The message is one line, whatever raised it.
+    try:
+        compact_, compact_error = from_project(st), None
+    except ValueError as exc:
+        compact_, compact_error = None, " ".join(str(exc).split())[:300]
+
     if args.project_cmd == "resume":
         print(json.dumps({"project_id": st.project_id, "verdict": verdict_text,
                           "reason": why, "measurement_head": st.measurement_head,
                           "closure_generation": st.closure_generation,
-                          "rc_closed": st.rc_closed()}, indent=2))
+                          "rc_closed": st.rc_closed(),
+                          "gates_green": st.gates_green(),
+                          "task_state_scope": PROJECT_SCOPE,
+                          "task_state": (compact_.model_dump(mode="json")
+                                         if compact_ is not None else None),
+                          "task_state_error": compact_error}, indent=2))
         return 0
 
     # status
@@ -2167,6 +2556,16 @@ def cmd_project(args) -> int:
             moved_ = "" if r.changed_the_tree else "  (tree unchanged)"
             print(f"    {r.action_id} {r.actor}: {r.head_before or '?'} -> "
                   f"{r.head_after or '?'}{moved_}  {r.reason[:60]}")
+    print("  compact task state (Layer 0):")
+    if compact_ is None:
+        print(f"    unavailable: {compact_error}")
+    else:
+        for line_ in render(compact_).splitlines():
+            print(f"    {line_}")
+    print(f"    scope: {PROJECT_SCOPE}")
+    if not st.gates_green():
+        print("    NOT ALL CLEAR: the gates are not all green (see the verdict and the "
+              "gates above); this block covers nodes only")
     return 0
 
 
@@ -2403,7 +2802,15 @@ def _project_hold(args, store, st) -> int:
     from .orchestrator import write_lock
     from .rollover import RolloverError, hand_token_over, hold_lease
     from .succession import LeaseError, LeaseHeld, MasterAuthority
+    import math
 
+    if args.interval is not None and not (0 < args.interval and math.isfinite(args.interval)):
+        # before the lease is taken: a renewal period that is not positive and finite
+        # would busy-renew or fail after the acquire (`sleep(nan)`, `sleep(inf)`,
+        # `sleep(-1)`) and leave a LOST lease behind
+        print(f"refused: --interval must be positive and finite, got {args.interval}",
+              file=sys.stderr)
+        return 2
     try:
         authority = MasterAuthority(store.dir, args.session, ttl_seconds=args.ttl,
                                     serialize=lambda: write_lock(store))
@@ -2434,7 +2841,9 @@ def _rollover_default_input(store, st, args, model: str | None) -> dict:
             {"entry_id": "project-state", "section": "REGISTER", "deriver": "file_digest",
              "params": {"path": str(store.state_path)}},
             {"entry_id": "run-set", "section": "RUNS", "deriver": "run_set",
-             "params": {"runs_root": str(Path(args.root).expanduser())}},
+             # absolute: the successor starts in its own directory, where a
+             # relative `--root` would name another place and re-derive another set
+             "params": {"runs_root": str(Path(args.root).expanduser().resolve())}},
             {"entry_id": "repo-head", "section": "CANDIDATES", "deriver": "ref_state",
              "params": {"repo": st.repo_path, "ref": "HEAD"}},
         ],
@@ -2449,11 +2858,28 @@ def _project_rollover(args, store, st) -> int:
     master, or the command was refused; 6: another session is master; 7: no
     safe point yet, recorded as pending. See `hoh.rollover.run_rollover`.
     """
+    import math
+
     from .rollover import (
         HerdrLauncher, Outcome, RolloverError, TriggerError, evaluate_trigger,
         hand_token_over, run_rollover,
     )
     from .succession_capsule import CapsuleInput, LocalObserver
+
+    if not (math.isfinite(args.prompt_delay) and 0 <= args.prompt_delay <= 300):
+        print(f"refused: --prompt-delay must be between 0 and 300 seconds, got "
+              f"{args.prompt_delay}", file=sys.stderr)
+        return 2
+    if args.prompt_delay > 0 and args.prompt_delay >= args.ack_timeout:
+        print(f"refused: --prompt-delay ({args.prompt_delay}) must be shorter than "
+              f"--ack-timeout ({args.ack_timeout}): the delay and the agent start come out "
+              "of the acknowledgement window", file=sys.stderr)
+        return 2
+    successor_args: list[str] = []
+    if args.successor_permission_mode:
+        successor_args += ["--permission-mode", args.successor_permission_mode]
+    if args.successor_effort:
+        successor_args += ["--effort", args.successor_effort]
 
     authority, refusal = _claimed_master(args, store)
     if refusal:
@@ -2462,6 +2888,9 @@ def _project_rollover(args, store, st) -> int:
     try:
         if args.input:
             data = json.loads(Path(args.input).expanduser().read_text(encoding="utf-8"))
+            if not isinstance(data, dict):
+                raise ValueError(f"the capsule input must be a JSON object, got "
+                                 f"{type(data).__name__}")
             if args.model:
                 data["successor_model"] = args.model
         else:
@@ -2484,7 +2913,9 @@ def _project_rollover(args, store, st) -> int:
     try:
         result = run_rollover(
             authority, store.dir, inp=inp, observer=LocalObserver(),
-            launcher=HerdrLauncher(), root=str(store.root), repo=st.repo_path,
+            launcher=HerdrLauncher(agent_args=tuple(successor_args),
+                                   prompt_delay_s=args.prompt_delay),
+            root=str(store.root), repo=st.repo_path,
             project_id=st.project_id, successor_session=successor, trigger=trigger,
             safe=lambda: _program_lock_free(store), generation=st.program_generation,
             ack_timeout_s=args.ack_timeout, takeover_s=args.takeover, poll_s=args.poll)
@@ -2538,7 +2969,12 @@ def _project_rollover_accept(args, store, st) -> int:
     from .rollover import RolloverError, Successor, hold_lease
     from .succession import LeaseError, MasterAuthority
     from .succession_capsule import CapsuleError, LocalObserver, load_capsule
+    import math
 
+    if args.interval is not None and not (0 < args.interval and math.isfinite(args.interval)):
+        print(f"refused: --interval must be positive and finite, got {args.interval}",
+              file=sys.stderr)
+        return 2
     try:
         cap = load_capsule(args.capsule)
         if cap.project_id != st.project_id:
@@ -2701,6 +3137,21 @@ def build_parser() -> argparse.ArgumentParser:
         "--role-effort", action="append", default=[], metavar="ROLE=LEVEL",
         help="effort level per role, same shape: low, medium, high, xhigh, max",
     )
+    r.add_argument(
+        "--role-account", action="append", default=[], metavar="ROLE=HANDLE",
+        help="the operator-registered handle of the account a role runs under, "
+             "same shape as --role-model. A name, never a credential: a value "
+             "that looks like a key is refused. Recorded with every dispatch "
+             "(P2-43); without it the record says NOT_AVAILABLE.")
+    r.add_argument(
+        "--master-session", default=None, metavar="ID",
+        help="the governed master this run works for: its session id. Given "
+             "together with --master-epoch by a master that launches runs "
+             "(P2-43). A park is recorded as bound to it. Without both, the "
+             "run records 'master: NONE'.")
+    r.add_argument(
+        "--master-epoch", type=_master_epoch, default=None, metavar="N",
+        help="the master's epoch (with --master-session)")
     r.add_argument("--role-timeout", type=int, default=2700, metavar="SEC",
                    help="deadline per role run in seconds (default 2700 = 45 min). "
                         "A thorough differential review takes time; too tight a "
@@ -2867,6 +3318,24 @@ def build_parser() -> argparse.ArgumentParser:
                      help="the storage state root, named explicitly (no fallback)")
     sgr.set_defaults(func=cmd_storage_adopt_legacy)
 
+    asu = sub.add_parser(
+        "agent-setup",
+        help="Print or install the text that makes an agent session use VeriHarness",
+    )
+    asg = asu.add_mutually_exclusive_group(required=True)
+    asg.add_argument("--print", dest="print_text", action="store_true",
+                     help="print one text to stdout and write nothing")
+    asg.add_argument("--install", metavar="DIR", default=None,
+                     help="write new files into this existing directory; never replaces a file")
+    asu.add_argument("--kind", choices=("skill", "snippet", "all"), default="skill")
+    asu.add_argument("--delegation", choices=("ask", "standing"), default="ask",
+                     help="ask: offer a run and wait for a yes; standing: the operator delegated "
+                          "starting runs for development tasks")
+    asu.add_argument("--allow-user-config", action="store_true",
+                     help="permit a DIR inside ~/.claude, ~/.codex, ~/.agents, ~/.config or "
+                          "$CLAUDE_CONFIG_DIR")
+    asu.set_defaults(func=cmd_agent_setup, run_id=None)
+
     dl = sub.add_parser("deliver", help="Deliver an accepted checkpoint")
     dl.add_argument("run_id")
     dl.add_argument("--approve", action="store_true",
@@ -2889,6 +3358,16 @@ def build_parser() -> argparse.ArgumentParser:
     c = sub.add_parser("list", help="All runs")
     c.set_defaults(func=cmd_list, run_id=None)
 
+    mg = sub.add_parser(
+        "migrate",
+        help="Bring run and project state to the current schema version "
+             "(dry run unless --apply; the old form is parked, never deleted)")
+    mg.add_argument("--apply", action="store_true",
+                    help="write the migrated records (default: report only)")
+    mg.add_argument("--now", default=None, metavar="ISO8601",
+                    help="the instant that names the parked copies (default: now)")
+    mg.set_defaults(func=cmd_migrate, run_id=None)
+
     t = sub.add_parser("timers", help="Durable waits under this root")
     t.set_defaults(func=cmd_timers, run_id=None)
 
@@ -2901,6 +3380,30 @@ def build_parser() -> argparse.ArgumentParser:
 
     st = sub.add_parser("stuck", help="Non-terminal objects with no way out")
     st.set_defaults(func=cmd_stuck, run_id=None)
+
+    dc = sub.add_parser(
+        "decision",
+        help="The decision exploration plane, read-only (P2-21)",
+    )
+    dcs = dc.add_subparsers(dest="decision_cmd", required=True)
+    dk = dcs.add_parser(
+        "check",
+        help="Decision graph fsck: validate the structure of one or more DecisionMap "
+             "files; exit 0 PASS, 1 FAIL, 2 refused",
+    )
+    dk.add_argument("maps", nargs="+", metavar="MAP",
+                    help="a DecisionMap as JSON (model_dump(mode='json')); several files "
+                         "are one graph")
+    dk.add_argument("--program-refs", default=None, metavar="FILE",
+                    help="JSON list of ProgramRef: which maps a programme graduated")
+    dk.add_argument("--settled-ref", action="append", default=[], metavar="ID",
+                    help="a decision id offered as settled provenance (repeatable)")
+    dk.add_argument("--now", default=None, metavar="ISO8601",
+                    help="instant with an offset for the lease checks; without it the "
+                         "lease-expiry check is not evaluated")
+    dk.add_argument("--receipt", default=None, metavar="FILE",
+                    help="also write the result to this new file (never replaced)")
+    dc.set_defaults(func=cmd_decision, run_id=None)
 
     pr = sub.add_parser(
         "project",
@@ -3024,6 +3527,23 @@ def build_parser() -> argparse.ArgumentParser:
     ro.add_argument("--token-out", default=None,
                     help="write the new token here if the handover lapses and this "
                          "session takes the program back")
+    ro.add_argument("--successor-permission-mode", default=None,
+                    choices=("auto",),
+                    help="the successor's Claude permission mode. Only `auto` is offered: "
+                         "the successor must run its first command unattended, and the "
+                         "role deny-list and house-rules prompt of a role session do not "
+                         "travel with it, so bypassPermissions is not offered and dontAsk "
+                         "could not run the pointer's command. Without it Claude's own "
+                         "default applies and the successor waits at its first approval, "
+                         "unacknowledged (NO_ACK)")
+    ro.add_argument("--successor-effort", default=None,
+                    choices=("low", "medium", "high", "xhigh", "max"),
+                    help="the successor's Claude effort level (without it, Claude's default)")
+    ro.add_argument("--prompt-delay", type=float, default=0.0,
+                    help="seconds to idle between starting the successor and sending its "
+                         "pointer (0 to 300, and shorter than --ack-timeout; default 0). "
+                         "The delay and the agent start come out of the acknowledgement "
+                         "window, which is fixed when the capsule is frozen")
     rv = ps.add_parser(
         "rollover-verify",
         help="Read-only: re-derive a succession capsule and print every difference",

@@ -125,6 +125,33 @@ def test_unclassified_file_defaults_to_exclude(tmp_path):
     assert entry["rule"] == "unclassified"
 
 
+def test_the_nix_packaging_at_the_root_is_part_of_the_package(tmp_path):
+    """`flake.nix` (and a `flake.lock`, should one be committed) is the Nix
+    packaging of the package and is exported with it: the README and the release
+    notes present it as delivered, and an unclassified file is EXCLUDE. Root
+    level only."""
+    _write(tmp_path, "pyproject.toml", ["[project]"])
+    _write(tmp_path, "flake.nix", ["{ description = \"fixture\"; }"])
+    _write(tmp_path, "flake.lock", ["{}"])
+    _write(tmp_path, "sub/flake.nix", ["{ }"])
+    by = _entries_by_path(em.derive(tmp_path))
+    for root_file in ("pyproject.toml", "flake.nix", "flake.lock"):
+        assert (by[root_file]["decision"], by[root_file]["rule"]) == ("INCLUDE", "package")
+    assert (by["sub/flake.nix"]["decision"], by["sub/flake.nix"]["rule"]) == ("EXCLUDE", "unclassified")
+
+
+def test_the_committed_manifest_exports_the_flake_the_documents_present_as_delivered():
+    """The committed manifest, read and not re-derived: when the repository holds a
+    `flake.nix`, the manifest says INCLUDE (v0.3.0a2 release review B1: it had said
+    EXCLUDE, so the published repository would not have held a file the README
+    describes)."""
+    if not (REPO_ROOT / "flake.nix").is_file():
+        pytest.skip("this tree has no flake.nix")
+    manifest = json.loads((REPO_ROOT / "EXPORT_MANIFEST.json").read_text(encoding="utf-8"))
+    entry = _entries_by_path(manifest)["flake.nix"]
+    assert (entry["decision"], entry["rule"]) == ("INCLUDE", "package")
+
+
 # --------------------------------------------------------------------------- #
 # K4 -- deterministic derivation
 # --------------------------------------------------------------------------- #

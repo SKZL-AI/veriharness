@@ -47,7 +47,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any, Literal, Protocol
 
-from pydantic import ConfigDict, ValidationError, model_validator
+from pydantic import ConfigDict, ValidationError, field_validator, model_validator
 
 from . import capsule as hoh_capsule
 from .contracts import Strict
@@ -112,25 +112,40 @@ def new_capsule_id(now: str) -> str:
 # paths
 # --------------------------------------------------------------------------- #
 
+#: A capsule id names files under `rollover/`, so it is a plain name: letters,
+#: digits, `_` and `-`, at most 64 characters, no dot, no separator. `new_capsule_id`
+#: makes `rc-<stamp>-<8 hex>`. A capsule read from disk is untrusted: an id such
+#: as `../../x` would otherwise place the successor's acknowledgement outside the
+#: rollover directory.
+_CAPSULE_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}")
+
+
+def check_capsule_id(capsule_id: object) -> str:
+    """The id, or `CapsuleError`. The single choke point for every path below."""
+    if not isinstance(capsule_id, str) or not _CAPSULE_ID.fullmatch(capsule_id):
+        raise CapsuleError(f"{capsule_id!r} is not a capsule id: letters, digits, '_' and '-' "
+                           f"only, 1-64 characters, starting with a letter or digit")
+    return capsule_id
+
 
 def rollover_dir(directory: Path | str) -> Path:
     return Path(directory) / ROLLOVER_DIRNAME
 
 
 def capsule_path(directory: Path | str, capsule_id: str) -> Path:
-    return rollover_dir(directory) / f"{capsule_id}.capsule.json"
+    return rollover_dir(directory) / f"{check_capsule_id(capsule_id)}.capsule.json"
 
 
 def ack_path(directory: Path | str, capsule_id: str) -> Path:
-    return rollover_dir(directory) / f"{capsule_id}.ack.json"
+    return rollover_dir(directory) / f"{check_capsule_id(capsule_id)}.ack.json"
 
 
 def receipt_path(directory: Path | str, capsule_id: str) -> Path:
-    return rollover_dir(directory) / f"{capsule_id}.receipt.json"
+    return rollover_dir(directory) / f"{check_capsule_id(capsule_id)}.receipt.json"
 
 
 def aborted_path(directory: Path | str, capsule_id: str) -> Path:
-    return rollover_dir(directory) / f"{capsule_id}.aborted.json"
+    return rollover_dir(directory) / f"{check_capsule_id(capsule_id)}.aborted.json"
 
 
 # --------------------------------------------------------------------------- #
@@ -273,6 +288,11 @@ class Capsule(Strict):
     ack_deadline: str
     entries: tuple[Entry, ...]
     capsule_digest: str = ""
+
+    @field_validator("capsule_id")
+    @classmethod
+    def _plain_name(cls, value: str) -> str:
+        return check_capsule_id(value)
 
     def body(self) -> dict[str, Any]:
         return self.model_dump(mode="json", exclude={"capsule_digest"})
@@ -561,7 +581,7 @@ def freeze_capsule(authority: MasterAuthority, inp: CapsuleInput, *,
         raise CapsuleError("not frozen: " + "; ".join(problems))
 
     now = authority.clock()
-    cid = capsule_id or new_capsule_id(now)
+    cid = check_capsule_id(capsule_id or new_capsule_id(now))
     cap = Capsule(
         capsule_id=cid,
         project_id=project_id,

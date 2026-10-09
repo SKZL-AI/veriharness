@@ -148,6 +148,22 @@ recovery can verify the box; the recovery still refuses, as designed, when
 Claude Code word-wraps the pointer line in a narrow pane (it blocked one run
 before any candidate, and the readiness fix is the next P2 strand).
 
+**Added for the v0.3.0a2 pre-release.** The readiness fix named at the end of the
+paragraph above is merged: before the first prompt the dispatcher waits for an
+idle input box that holds still, and the recovery models the word wrap of the box
+as three recorded boxes show it. Whether this cures the first-prompt stall is
+SUSPECTED until a live check. A failed provider dispatch is now classified from
+its evidence, and a QA role re-raises a provider failure instead of having it
+booked as a rejected iteration (P2-43, first slice; the row still reads MISSING).
+A park now also records what it stands on (run, iteration, attempt, stage,
+candidate, master, session) and the provenance of the dispatch that failed, and
+the retry time is the provider's own stated reset where one is printed (P2-43,
+second slice); resume does not check that binding yet, so a stale or foreign park
+is resumed as before.
+`hoh migrate` brings run and project state to the current schema, a dry run unless
+`--apply`, parking the old form. `hoh restore` never replaces the process lock of a
+live run. `RELEASE_NOTES.md` has the account and its limits.
+
 **Durable waits and an acting resume loop.** A wait is now a durable timer on
 disk, not a sleeping process. `hoh resume-quota` acts on due timers; with
 `--drive --recover`, the unattended continuation unit drives a resumed project

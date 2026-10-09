@@ -24,6 +24,7 @@ the next session do?
 from __future__ import annotations
 
 import fcntl
+import json
 import os
 import re
 import stat
@@ -34,8 +35,10 @@ from typing import Iterator
 
 from pydantic import ValidationError
 
+from . import migrations
 from .durable_io import durable_create
 from .project import Lifecycle, ProjectState
+from .projectactivity import ActivityLogError, abandon as abandon_dispatch, in_flight_disagreements
 from .store import LockBusy, StaleWrite, StoreError, _atomic_write
 
 #: Directory name under the HoH root. Sibling of runs/, not inside it: a
@@ -148,6 +151,20 @@ class ProjectStore:
         if not self.state_path.exists():
             raise StoreError(f"Project {self.project_id} has no state at {self.state_path}")
         raw = self.state_path.read_text(encoding="utf-8")
+        # P2-12: read only at the current schema version (see
+        # `RunStore._require_readable`); text that is not a JSON object is left
+        # to the model's own error below.
+        try:
+            record = json.loads(raw)
+        except migrations.UNPARSEABLE:
+            record = None
+        if isinstance(record, dict):
+            try:
+                migrations.require_readable(
+                    record, registry=migrations.STATE_REGISTRIES["project"],
+                    what=f"state of project {self.project_id}")
+            except migrations.MigrationError as exc:
+                raise StoreError(str(exc)) from exc
         try:
             return ProjectState.model_validate_json(raw)
         except ValidationError as exc:
@@ -244,6 +261,25 @@ def resume_decision(state: ProjectState) -> tuple[str, str]:
             + "; ".join(f"{k} -> {v}" for k, v in sorted(unknown_.items()))
             + ". An unresolvable dependency reads to a scheduler exactly like a "
             "satisfied one, so this blocks rather than proceeding."
+        )
+
+    # The dispatch activity log, folded by the pure reducer (P2-15): whether a
+    # dispatch is still open is a function of the recorded events, and it must
+    # agree with what the node lifecycles claim. A log that cannot be folded, or
+    # that disagrees, is damage or ambiguity -- examined before progress.
+    try:
+        disagree_ = in_flight_disagreements(state)
+    except ActivityLogError as exc:
+        return BLOCK, (
+            f"{exc}. A history with a missing or duplicated event is not a history "
+            "that happened, so this blocks rather than guessing."
+        )
+    if disagree_:
+        return BLOCK, (
+            "the activity log and the node lifecycles disagree about what is in flight: "
+            + "; ".join(disagree_)
+            + ". Which of the two is right cannot be read from this state, so it is "
+            "not advanced."
         )
 
     laufend = [n for n in state.nodes if n.lifecycle is Lifecycle.RUNNING]
@@ -401,6 +437,16 @@ def abandon(store: "ProjectStore", node_id: str, reason: str,
     previous_state = node.lifecycle.value
     node.lifecycle = Lifecycle.ABANDONED
     node.note = (f"{before} | abandoned {utc()}: {reason}" if before else reason)
+    # A node abandoned while its dispatch is open closes that activity in the
+    # same write; otherwise the log and the lifecycle would disagree.
+    try:
+        abandon_dispatch(state, node_id, reason)
+    except ActivityLogError:
+        # The operator's way out must not depend on the log it is getting out
+        # of: the node is settled, the damaged log is left exactly as it is
+        # (it still blocks the project, by name), and the recovery is the
+        # parked predecessor of the state (`ProjectStore.parked_states`).
+        pass
     state.decisions.append(
         DecisionRecord(
             id=f"D{len(state.decisions) + 1:04d}",

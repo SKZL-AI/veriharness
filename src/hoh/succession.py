@@ -60,6 +60,7 @@ import socket
 import threading
 from collections.abc import Callable, Iterator
 from contextlib import AbstractContextManager, contextmanager, nullcontext
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -90,6 +91,12 @@ class LeaseError(RuntimeError):
 class LeaseHeld(LeaseError):
     """Another live session holds the lease. Displacing it would be two
     masters; the way past a live holder is that holder's handoff."""
+
+
+class HandoverGone(LeaseError):
+    """A conditional acquire found the lease on disk is not the handover it
+    was asked to take. Nothing was written: no epoch began, no lease changed,
+    no log line was appended."""
 
 
 class StaleMaster(StaleWrite):
@@ -165,6 +172,19 @@ def pid_alive(pid: int) -> bool:
     except PermissionError:
         return True
     return True
+
+
+@dataclass(frozen=True)
+class ExpectedHandover:
+    """The one handover a conditional `acquire` may take.
+
+    `master_epoch` is the epoch the handing-over master held, and
+    `token_sha256` the digest of its token, as the capsule recorded them before
+    the handover. The successor is always the acquiring handle's own session.
+    """
+
+    master_epoch: int
+    token_sha256: str
 
 
 class Lease(Strict):
@@ -341,7 +361,8 @@ class MasterAuthority:
     # --- the four verbs ---------------------------------------------------
 
     def acquire(self, *, program_generation: int = 1, note: str = "",
-                reason: Reason | None = None) -> MasterEpoch:
+                reason: Reason | None = None,
+                only_handover: ExpectedHandover | None = None) -> MasterEpoch:
         """Become the master: begin a new epoch and take the lease.
 
         Always a new epoch, even for a session that held the previous one --
@@ -349,12 +370,42 @@ class MasterAuthority:
         and "the same id" is exactly what a stale context would also present.
         The one exception is a handle that already holds a live lease in this
         very process, for which acquiring again is a no-op.
+
+        **Conditional acquire (`only_handover`).** A successor that has verified
+        one handover must take *that* handover and nothing else. Between its
+        last look and the acquire the world can move (the handover lapses and
+        the predecessor takes the program back), and an unconditional acquire
+        would then begin an epoch over somebody else's lease. With
+        `only_handover` the lease on disk is compared with the expectation
+        **under this same lock, immediately before the epoch begins**: it must
+        be a released lease whose successor is this session, whose token digest
+        and epoch are the expected ones, that has not expired, over an epoch
+        chain whose current epoch is the expected one. Anything else raises
+        `HandoverGone` with nothing written. The re-entrant no-op above does
+        not apply to a conditional acquire.
         """
+        if only_handover is not None:
+            if not isinstance(only_handover, ExpectedHandover):
+                raise LeaseError("only_handover must be an ExpectedHandover, got "
+                                 f"{type(only_handover).__name__}")
+            if reason is not None and reason is not Reason.SUCCESSION:
+                raise LeaseError("a conditional acquire takes a handover: its "
+                                 "reason is SUCCESSION")
+            if (not isinstance(only_handover.token_sha256, str)
+                    or not only_handover.token_sha256
+                    or isinstance(only_handover.master_epoch, bool)
+                    or not isinstance(only_handover.master_epoch, int)):
+                raise LeaseError("a conditional acquire names the epoch and the "
+                                 "token digest of the handover it takes")
         with self.serialize(), self._locked():
             now = self.clock()
             lease = self.read_lease()
             state, why = self.holder_state(lease, now)
             current = self.epochs.current()
+            if only_handover is not None:
+                gone = self._handover_problem(only_handover, lease, current, now)
+                if gone:
+                    raise HandoverGone(f"the handover is not there to take: {gone}")
             if (state == "LIVE" and lease is not None
                     and lease.leader_session_id == self.session_id
                     and lease.holder_pid == self.pid
@@ -392,6 +443,29 @@ class MasterAuthority:
             self.token = token
             self.program_generation = new.program_generation
             return epoch
+
+    def _handover_problem(self, want: ExpectedHandover, lease: Lease | None,
+                          current: MasterEpoch | None, now: str) -> str:
+        """Why `lease` is not exactly the handover `want` to this session, or ""."""
+        if lease is None:
+            return "no lease exists"
+        if not lease.released_at:
+            return (f"the lease is held by {lease.leader_session_id!r}, not handed "
+                    f"over")
+        if lease.successor != self.session_id:
+            return (f"it was handed to {lease.successor!r}, not to "
+                    f"{self.session_id!r}")
+        if lease.token_sha256 != want.token_sha256:
+            return "it is the handover of another token"
+        if lease.master_epoch != want.master_epoch:
+            return (f"it is the handover of epoch {lease.master_epoch}, not "
+                    f"{want.master_epoch}")
+        if lease.expires_at <= now:
+            return f"the handover lapsed at {lease.expires_at}"
+        if current is None or current.epoch != want.master_epoch:
+            return (f"the epoch chain is at "
+                    f"{current.epoch if current else None}, not {want.master_epoch}")
+        return ""
 
     def present(self, *, epoch: int, token: str) -> None:
         """Make this handle act as the master that acquired `epoch`, on the

@@ -32,6 +32,7 @@ import json
 import os
 import re
 import subprocess
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -41,7 +42,9 @@ from .orchestrator import (
     BudgetExhausted, MergeFailure, MergeResult, RunLauncher, RunOutcome,
     RunVerdict,
 )
+from .failures import AUTOMATIC_KINDS
 from .controller import open_seal_arenas
+from .durable_io import durable_create
 from .project import ActionClass, TaskNode
 from .stages import violation_unresolved
 from .store import LockBusy, RunStore, StoreError
@@ -54,7 +57,7 @@ PROVIDER_BLOCKED = frozenset({"usage_quota", "quota", "rate_limit", "provider",
                               # AMBIGUOUS instead of parking it (found 2026-09-25
                               # once the durability fixture stopped re-implementing
                               # this mapping).
-                              "usage_limit"})
+                              "usage_limit"}) | AUTOMATIC_KINDS
 
 #: Phrases with which `hoh run` refuses to start, or a run stops, because
 #: storage admission is not usable (STORAGE-B3). A run that says one of them
@@ -139,6 +142,17 @@ class Dispatch:
     stderr: str
 
 
+def hoh_command() -> list[str]:
+    """How this launcher starts `hoh` itself: the interpreter that is running
+    it (`sys.executable`), or `$HOH_PYTHON` when the operator names one.
+
+    The bare `python3` found on `PATH` is not the interpreter HoH was
+    installed into on Nix profiles, pipx installs or any host with several
+    Pythons: it lacks `hoh` and `pydantic`, and every dispatched node fails.
+    """
+    return [os.environ.get("HOH_PYTHON") or sys.executable, "-m", "hoh.cli"]
+
+
 class HohRunLauncher(RunLauncher):
     """Drives real runs through the `hoh` CLI and the ordinary git mainline."""
 
@@ -159,8 +173,26 @@ class HohRunLauncher(RunLauncher):
         dispatch_budget: int | None = None,
         storage_root: Path | str | None = None,
         storage_admission_factory=None,
+        master_session: str | None = None,
+        master_epoch: int | None = None,
+        role_accounts: dict[str, str] | None = None,
     ) -> None:
         self.root = Path(root).expanduser().resolve()
+        #: P2-43b: the governed master this launcher works for, passed to every
+        #: `hoh run` it starts (`--master-session`, `--master-epoch`) so the
+        #: run's parks are bound to it. None: the runs record `master: NONE`.
+        self.master_session = master_session
+        self.master_epoch = master_epoch
+        #: role name -> operator-registered account handle (`--role-account`).
+        from .contracts import Role
+        from .dispatchrecovery import RecoveryError, check_account_handle
+
+        known = {r.value for r in Role}
+        if any(str(r) not in known for r in (role_accounts or {})):
+            raise RecoveryError("role_accounts names a role that is not planner, "
+                                "developer or qa (the name is not shown)")
+        self.role_accounts = {str(r): check_account_handle(h)
+                              for r, h in (role_accounts or {}).items()}
         #: STORAGE-B3: the storage state root every spawned `hoh run` is given
         #: (`--storage-root`): this launcher's own configuration, else
         #: `$HOH_STATE_ROOT` as resolved now, at construction. None leaves the
@@ -201,6 +233,11 @@ class HohRunLauncher(RunLauncher):
         self.approvals = approvals or NoApprovalProvider()
         #: Every answer the authority gave, so a halt can quote it.
         self.approvals_given: list[Approval] = []
+
+    def bind_master(self, session: str, epoch: int) -> None:
+        """Tell the launcher which master it launches for (the governed drive
+        calls this once the lease is held)."""
+        self.master_session, self.master_epoch = session, int(epoch)
 
     # -- classification ---------------------------------------------------- #
 
@@ -309,10 +346,17 @@ class HohRunLauncher(RunLauncher):
                     f"node {run_id} has no run and no specification at "
                     f"{spec_file}; there is nothing to dispatch"
                 )
-            spec_file.write_text(self._repair_spec(node), encoding="utf-8")
+            try:
+                durable_create(spec_file, self._repair_spec(node), mode=None)
+            except FileExistsError:
+                if not spec_file.exists():      # a dangling link holds the name
+                    return (f"the repair specification path {spec_file} is a dangling "
+                            f"link; nothing to dispatch for {run_id}")
+            except OSError as exc:
+                return f"could not write the repair specification {spec_file} for {run_id}: {exc}"
 
         wt = self._run_cli([
-            "python3", "-m", "hoh.cli", "--root", str(self.root),
+            *hoh_command(), "--root", str(self.root),
             "worktree", "--repo", str(self.repo_path), "--branch", branch_,
         ])
         if wt.exit_code != 0 and "already exists" not in (wt.stdout + wt.stderr):
@@ -330,7 +374,7 @@ class HohRunLauncher(RunLauncher):
             return release_.as_reason()
 
         argumente = [
-            "python3", "-m", "hoh.cli", "--root", str(self.root), "start",
+            *hoh_command(), "--root", str(self.root), "start",
             "--repo", str(worktree), "--spec", str(spec_file), "--run-id", run_id,
         ]
         argumente += self.budget_argumente()
@@ -444,7 +488,7 @@ class HohRunLauncher(RunLauncher):
             return f"run {run_id} waits on a trust approval -- {release_.as_reason()}"
 
         ub = self._run_cli([
-            "python3", "-m", "hoh.cli", "--root", str(self.root), "unblock", run_id,
+            *hoh_command(), "--root", str(self.root), "unblock", run_id,
         ])
         if ub.exit_code != 0:
             return f"trust granted but run {run_id} stayed blocked: {(ub.stderr or ub.stdout)[-160:]}"
@@ -572,11 +616,16 @@ class HohRunLauncher(RunLauncher):
         before = node.accepted_before or self.accepted_baseline(node)
 
         argv = [
-            "python3", "-m", "hoh.cli", "--root", str(self.root), "run", run_id,
+            *hoh_command(), "--root", str(self.root), "run", run_id,
             "--iterations", str(self.iterations),
             "--planner", self.planner, "--developer", self.developer, "--qa", self.qa,
             "--isolation", self.isolation,
         ]
+        if self.master_session is not None and self.master_epoch is not None:
+            argv += ["--master-session", str(self.master_session),
+                     "--master-epoch", str(self.master_epoch)]
+        for role_name, handle in sorted(self.role_accounts.items()):
+            argv += ["--role-account", f"{role_name}={handle}"]
         if self.storage_root is not None:
             argv += ["--storage-root", str(self.storage_root)]
             refused = self._claim_storage_boot()

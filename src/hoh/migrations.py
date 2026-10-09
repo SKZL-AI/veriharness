@@ -40,8 +40,16 @@ from typing import Any, Callable, Iterable, Mapping
 
 from .contracts import SCHEMA_VERSION
 from .durable_io import durable_create, durable_write
+from .project import PROJECT_SCHEMA_VERSION
 
 VERSION_FIELD = "schema_version"
+
+#: What parsing a damaged or hostile record can raise: `json.JSONDecodeError` and
+#: `UnicodeDecodeError` are both `ValueError`s, and so is the "too many digits"
+#: refusal of a huge integer; a deeply nested document is a `RecursionError`.
+#: Every place that parses a record to decide whether it may be read or migrated
+#: catches exactly this and turns it into a refusal, never a traceback.
+UNPARSEABLE = (ValueError, RecursionError)
 
 # Already-preserved copies (`state.json.v1.2026-09-24T00-00-00Z`) are history,
 # not records; they are never migrated a second time.
@@ -78,6 +86,14 @@ class ChainGap(MigrationError):
 
 class NoPath(MigrationError):
     """No chain of registered steps connects the two versions."""
+
+
+class NeedsMigration(MigrationError):
+    """A record behind the current version, met by a reader that does not migrate.
+
+    Reading it as if it were current would be the silent best effort this module
+    exists to prevent; the reader refuses and says which command migrates it.
+    """
 
 
 class PlanRefused(MigrationError):
@@ -196,6 +212,100 @@ class Registry:
                 f"no registered step starts at version {from_version}; the chain "
                 f"begins at {self.lowest_version}")
         return tuple(self._steps[v] for v in range(from_version, target))
+
+
+# --- the product's own state ----------------------------------------------------
+
+#: One registry per kind of durable state the product keeps, built from the
+#: version constant the model itself carries. No step is registered: the
+#: current schema is the first one, so every real record is at the current
+#: version. The first schema change registers its step here, bumps the constant
+#: in the same change, and `hoh migrate` and both stores' read paths then carry
+#: it (a test holds that the two cannot drift apart).
+#:
+#: To add a step: bump the model's constant (`SCHEMA_VERSION` /
+#: `PROJECT_SCHEMA_VERSION`), register the step on the next line below the dict,
+#:     STATE_REGISTRIES["project"].register(Migration(1, 2, "name", "why", fn))
+#: and add the test of the step itself. The registry is built at the new base
+#: version and the step reaches back to the old one (`lowest_version`).
+STATE_REGISTRIES: dict[str, Registry] = {
+    "run": Registry(SCHEMA_VERSION),
+    "project": Registry(PROJECT_SCHEMA_VERSION),
+}
+
+# The first project-state schema change (P2-15): version 2 adds the dispatch
+# activity log. A version-1 file gets the empty log; nothing else changes.
+STATE_REGISTRIES["project"].register(Migration(
+    1, 2, "project-add-activity-events",
+    "adds ProjectState.activity_events as the empty list (the dispatch activity log)",
+    lambda record: {**record, "activity_events": record.get("activity_events", [])}))
+
+#: The one record file a store keeps per kind, relative to the store's own
+#: directory (`runs/<id>/state.json`, `projects/<id>/project.json`).
+STATE_FILES: dict[str, str] = {"run": "state.json", "project": "project.json"}
+
+
+def require_readable(record: Any, *, registry: Registry, what: str,
+                     migratable: bool = True) -> None:
+    """The read-side gate: a record is read only if it is at the current version.
+
+    Raises `FromTheFuture` (written by a newer version: unknown fields would
+    drop out and defaults fill in), `NeedsMigration` (behind the current
+    version: `hoh migrate` first) or `MigrationError` (no readable
+    `schema_version`, or no path from it). Never a best effort.
+    """
+    if not isinstance(record, Mapping):
+        raise MigrationError(f"{what}: not a record object")
+    if VERSION_FIELD not in record:
+        raise MigrationError(
+            f"{what}: no {VERSION_FIELD}; a record without a version is not "
+            "assumed to be current")
+    version = record[VERSION_FIELD]
+    if not _is_version(version):
+        raise MigrationError(f"{what}: {VERSION_FIELD} is not an integer: {version!r}")
+    try:
+        steps = registry.path(version)
+    except MigrationError as exc:
+        raise type(exc)(f"{what}: {exc}") from exc
+    if steps:
+        if not migratable:
+            raise NeedsMigration(
+                f"{what}: {VERSION_FIELD} {version} is behind the current version "
+                f"{registry.current_version}; a parked copy is history and is never "
+                "migrated, so it is not read as current")
+        raise NeedsMigration(
+            f"{what}: {VERSION_FIELD} {version} is behind the current version "
+            f"{registry.current_version}; run `hoh migrate --apply` first")
+
+
+def confine(root: Path | str, *paths: Path | str) -> None:
+    """Refuse a path that can lead out of `root`: fail closed, writes nothing.
+
+    Every path must lie under `root`, no component from `root` down to it (the
+    path itself included) may be a symbolic link, and its resolved location must
+    be inside the resolved `root`. A symlinked run or project directory, a
+    symlinked `projects` directory or a symlinked lock file would otherwise be
+    followed by the migration and written outside the root it was given.
+    `root` itself is the operator's own argument and may be reached by a link.
+    A path that does not exist yet is fine (nothing on the way is a link).
+    """
+    base = Path(os.path.realpath(root))
+    for raw in paths:
+        path = Path(raw)
+        try:
+            relative = path.relative_to(root)
+        except ValueError:
+            raise MigrationError(f"{path} is not under {root}") from None
+        walked = Path(root)
+        for part in relative.parts:
+            walked = walked / part
+            if walked.is_symlink():
+                raise MigrationError(
+                    f"{walked} is a symbolic link; a path that can lead out of the "
+                    "root is never followed")
+        real = Path(os.path.realpath(path))
+        if real != base and base not in real.parents:
+            raise MigrationError(f"{path} resolves to {real}, outside {root}")
 
 
 # --- plan ---------------------------------------------------------------------
@@ -374,7 +484,19 @@ def _stamp(now: datetime) -> str:
     return now.astimezone(timezone.utc).strftime("%Y-%m-%dT%H-%M-%SZ")
 
 
-def _record_files(root: Path) -> list[Path]:
+def _record_files(root: Path, only: Iterable[str] | None = None) -> list[Path]:
+    if only is not None:
+        # Exactly the named records, relative to `root`. A name that is not a
+        # regular file is refused: asking for a record that is not there and
+        # getting a clean report would be an answer about nothing.
+        found = []
+        for name in sorted(set(only)):
+            candidate = root / name
+            if (".." in Path(name).parts or Path(name).is_absolute()
+                    or not candidate.is_file() or candidate.is_symlink()):
+                raise MigrationError(f"not a record file under {root}: {name!r}")
+            found.append(candidate)
+        return found
     found = []
     for candidate in sorted(root.rglob("*.json")):
         if not candidate.is_file() or candidate.is_symlink():
@@ -430,7 +552,8 @@ def _atomic_write(path: Path, payload: str) -> None:
 
 
 def migrate(path: Path | str, *, registry: Registry, now: datetime,
-            dry_run: bool = True) -> MigrationReport:
+            dry_run: bool = True, only: Iterable[str] | None = None
+            ) -> MigrationReport:
     """Migrate every JSON record file under `path` to `registry.current_version`.
 
     A dry run unless `dry_run=False`. The plan is made over all files first;
@@ -439,6 +562,11 @@ def migrate(path: Path | str, *, registry: Registry, now: datetime,
     directory as it was. Then, per changed file: preserve the old bytes as
     `<name>.v<old>.<UTC>`, write the new form atomically. Files already at the
     current version are not written at all.
+
+    `only` restricts the run to the named record files (paths relative to
+    `path`); the default is every JSON record under it, as before. A store
+    directory holds results, receipts and logs that carry no version, so the
+    product's own migration names the one record its store keeps.
     """
     root = Path(path)
     if not root.is_dir():
@@ -448,13 +576,13 @@ def migrate(path: Path | str, *, registry: Registry, now: datetime,
     raw: dict[str, bytes] = {}
     records: dict[str, Any] = {}
     parse_refusals: list[Refusal] = []
-    for file in _record_files(root):
+    for file in _record_files(root, only):
         rel = file.relative_to(root).as_posix()
         data = file.read_bytes()
         raw[rel] = data
         try:
             records[rel] = json.loads(data.decode("utf-8"))
-        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        except UNPARSEABLE as exc:
             parse_refusals.append(Refusal(rel, f"not readable JSON: {exc}"))
 
     the_plan = plan(records, registry=registry)

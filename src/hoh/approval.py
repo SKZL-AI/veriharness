@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import stat
 import subprocess
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol
@@ -129,15 +130,30 @@ class PrefixScopedProvider(ApprovalProvider):
     #: Prefixes that would make the scope decorative. Refused on construction
     #: rather than at approval time, so a mistake is loud immediately.
     FORBIDDEN = ("/", "/home", "/root", "/tmp", "/usr", "/etc", "/var", "/opt",
-                "/srv", "/mnt", "/media", "/Users")
+                "/srv", "/mnt", "/media", "/Users",
+                # macOS: `/tmp`, `/var` and `/etc` are links into `/private`, so
+                # a scope named `/tmp/x` resolves to `/private/tmp/x`.
+                "/private/tmp", "/private/var", "/private/etc",
+                "/var/root", "/System/Volumes/Data", "/System/Volumes/Data/Users")
 
     def __post_init__(self) -> None:
         resolved_ = self.prefix.expanduser().resolve()
         home_dir = Path.home().resolve()
+        # Both sides canonical: a forbidden entry that is a link (`/tmp` on
+        # macOS) is compared by where it leads, not only by its name.
+        forbidden = {*self.FORBIDDEN, *(str(Path(f).resolve()) for f in self.FORBIDDEN)}
+        shown = str(resolved_)
+        home_shown = str(home_dir)
+        home_parents = {str(p) for p in home_dir.parents}
+        if sys.platform == "darwin":              # case-insensitive volumes
+            forbidden = {f.casefold() for f in forbidden}
+            shown = shown.casefold()
+            home_shown = home_shown.casefold()
+            home_parents = {p.casefold() for p in home_parents}
         if (
-            str(resolved_) in self.FORBIDDEN
-            or resolved_ == home_dir
-            or resolved_ in home_dir.parents
+            shown in forbidden
+            or shown == home_shown
+            or shown in home_parents
             or len(resolved_.parts) < 3
         ):
             raise ValueError(

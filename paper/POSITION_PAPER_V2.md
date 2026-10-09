@@ -2,7 +2,9 @@
 
 *Second position paper. Status: **companion to the pre-release `v0.3.0a1`**,
 prepared from the development repository at the base commit named in
-`paper/NUMBERS_V2.md` (2026-10-07). It describes development after the
+`paper/NUMBERS_V2.md` (2026-10-07); the moving-present figures were taken again
+on 2026-10-09 for the pre-release `v0.3.0a2`, and §15 lists what the ledger
+entries O256 to O260 changed in the narrative. It describes development after the
 `v0.1.0` release. It is not a release claim for phase P2, which is in progress
 and not closed, and it has not yet been through the two independent
 documentation reviews that `paper/AUDIT_V2.md` lists: those are `NOT_RUN` at
@@ -82,19 +84,23 @@ the following day `[V03]`, and from 2026-09-25 on every product run followed
 one shape: an isolated clone pinned to one commit, role tabs in the operator's
 Herdr workspace, the accepted candidate imported byte for byte and checked
 with an import verifier, and two independent integration reviewers before any
-merge. Between 2026-09-25 and 2026-10-07 there were 46 such merges into the
-development mainline `[V01]`, and 34 of them change `src/hoh/` `[V02]` **R**. (The
-count includes the merge of the role-pane lifecycle with its tests-only
-follow-up, which carries a different title and brings two runs; the tool counts
-it once.)
+merge. Between 2026-09-25 and 2026-10-09 there were 69 such merges into the
+development mainline `[V01]`, and 55 of them change `src/hoh/` `[V02]` **R**
+(46 and 34 as measured on 2026-10-07 for the first alpha, which was tagged 2026-10-08). (The count includes the merge
+of the role-pane lifecycle with its tests-only follow-up, which carries a
+different title and brings two runs; the tool counts it once. Since 2026-10-09
+it also counts three merges whose titles the title grep had missed: the P2-17
+owned contracts (`Merge p217o`), the role scratch follow-up (`Merge rbtf`) and
+the second recovery slice with its two repairs (`Merge p243b`).)
 
 **The honest ratio is not the flattering one.** The repository's attribution
-check counts the development nodes after its anchor commit. Of 141 nodes
-`[V06]`, one `[V06a]` ran through the shipped control plane end to end,
-including the merge decision; 63 more `[V06b]` were developed by the product
-and merged by the orchestrating session after review, and the tool
-deliberately counts them in neither number; the remaining 77 are the
-orchestrating session's direct work `[V06c]` **R**. Every commit but the tip
+check counts the development nodes after its anchor commit. Of 189 nodes
+`[V06]` (141 as measured on 2026-10-07), one `[V06a]` ran through the shipped
+control plane end to end, including the merge decision; 91 more `[V06b]` were
+developed by the product and merged by the orchestrating session after review
+(63 then), and the tool deliberately counts them in neither number; the
+remaining 97 are the orchestrating session's direct work `[V06c]` **R** (77
+then). Every commit but the tip
 has an attribution entry at the base, the records commits included; the tip's
 entry is written by the next commit, which is the price of a ledger that cannot
 name its own commit. Outside that one node, the merge decision stayed with the
@@ -125,15 +131,16 @@ that a property of the programme rather than of one run.
 **What exists.** Durable timers instead of sleeping processes; a sentinel that
 says what is due; a never-stuck check; a master epoch with a recorded holder;
 session succession, under which a returning old master's writes are not
-authoritative; a leader lease that is still only a per-project lock (PARTIAL);
-a resume loop that acts on due timers; an unattended continuation unit that
+authoritative; a leader lease (at the first alpha still only a per-project lock,
+PARTIAL; since 2026-10-08 P2-09 reads PROVEN under the limits `RELEASE_NOTES.md`
+states); a resume loop that acts on due timers; an unattended continuation unit that
 drives a registered project on after a quota wait or a dead master; an
 autonomy contract that says what a programme may decide on its own; a project
 contract that says what an external project manager owns; an `EvidenceClaim`
 schema linked into the digital thread; and a programme checklist whose phase
 gate an independent supervisor review must pass. Of P2's 43 registered
-requirements `[V10b]`, 26 read PROVEN `[V10c]`, and the remainder are PARTIAL,
-IMPLEMENTED_NOT_PROVEN or missing **R**. The register as a whole holds 227
+requirements `[V10b]`, 32 read PROVEN `[V10c]` (26 as measured on 2026-10-07), and
+the remainder are PARTIAL, IMPLEMENTED_NOT_PROVEN or missing **R**. The register as a whole holds 227
 requirements `[V10]`: P1's 16 all read PROVEN `[V11]`, and 150 of the 168
 registered for P3 to P12 read MISSING `[V11b]` **R**.
 
@@ -223,8 +230,9 @@ product had accepted were refused by independent integration review `[V07t]`:
 18 in O236 to O251 `[V07]` and 8 in O252 to O254 `[V07b]` (the last is the
 role-pane lifecycle: its reviewers found the code correct and refused its
 tests). In the same
-period there were 46 merges `[V01]` **R**, 22 of them in the window of the
-first count `[V08]`. Some refusals were repeated runs of one specification, so
+period there were 46 merges, the count measured on 2026-10-07 (`[V01]` reads 69
+at the base of the second alpha, which also counts the entries after O254)
+**R**, 22 of them in the window of the first count `[V08]`. Some refusals were repeated runs of one specification, so
 the ratio describes attempts, not features. The refusals were not about style.
 Examples, each proven by a reviewer before it was recorded:
 
@@ -398,7 +406,7 @@ that carry the pane's minted mark and are anchored to the pane's own shell; one
 signal to one process, never a group; a marked process outside the pane is
 named and not signalled. Its first live use closed the planner and developer panes at turn end; the
 QA pane's release was refused because two marked processes had escaped it, and
-the pane was gone without anyone closing it by hand. What stays open is
+the pane was gone without anyone closing it by hand (Correction, 2026-10-08: the lifecycle log of that run, `pane-lifecycle.jsonl`, also holds a `closing` and a `closed` line for the QA pane, in the same second as the `refused` line; the earlier "closed three panes and refused one" counted that pane twice, and the text above replaced it.) (Further correction, 2026-10-08: the `closing` line is written by HoH before its own close command and the `closed` line only after a second snapshot no longer lists the pane, and a pane found already gone is written with an `already_gone` field, which this line does not carry (`_close_own_pane` in `src/hoh/dispatchers.py`); so HoH itself closed the QA pane's tab, nobody closed it by hand, and the `refused` line that follows names the two escaped processes, not a failed close.) What stays open is
 in §13.
 
 **The planner re-types the criteria.** A planner copies the specification's
@@ -709,7 +717,8 @@ rejection (§5) is the one place where that rule is not yet true of the code.
   forged plan honoured inside its own arena. The sentence of an earlier entry
   of the ledger that the legacy fallback of the hold only denies was wrong, and
   stays corrected.
-* **P2 is not closed.** Its gate has 17 requirements blocking and open, and 3
+* **P2 is not closed.** Its gate has 11 requirements blocking and open (17 as
+  measured on 2026-10-07), and 3
   exit conditions no instrument measures yet `[V12]` **R**; the board reads
   `TECHNICALLY_STABLE_READY = no` `[V13]` **R**. The pre-release is planned
   anyway, by the operator's decision, and says so.
@@ -766,3 +775,46 @@ this paper is not reviewed. The first paper and its audit,
 `paper/POSITION_PAPER.md` and `paper/AUDIT.md`, are the record of `v0.1.0`; they
 carry dated errata added by this checkpoint, and none of their figures was
 changed.
+
+## 15. Update for the pre-release v0.3.0a2 (added 2026-10-09)
+
+The narrative above is the text of the first alpha, and it stays as written. The
+figures marked **R** were taken again at the base named in `paper/NUMBERS_V2.md`
+and carry their earlier value in parentheses. These statements of the narrative
+no longer hold, and what holds now is as follows; `RELEASE_NOTES.md` has the account
+and every limit.
+
+* **The quota repair (§5 and §13).** "It is not merged" is superseded for
+  the first two slices: a failed provider dispatch is classified, every dispatch
+  records its provenance, every park is bound to what it stands on, QA re-raises a
+  provider failure instead of booking it as a rejection, and a role's own words
+  no longer park a run through the abort path. The binding is written and nothing
+  checks it on resume. The register still reads P2-43 MISSING `[V40]`, the third
+  slice is not merged at the base of this text, and the place where §12 found the rule that a quota error is never a
+  product verdict not yet true of the code (QA) is changed in the merged code,
+  shown by the merge run's tests and its integration review and not on a live
+  run.
+* **The wrapped pointer line (§5).** "The next P2 strand, not started" is
+  superseded: first-prompt readiness is merged. Whether the wait before the first
+  prompt cures the stall is SUSPECTED until a live check; the recovery still fails
+  closed when its model of the wrap does not apply.
+* **The rollover (§5 and §13).** The follow-up items listed in §13
+  are fixed in code, the launcher starts its successor in an explicit permission
+  mode, and the acquire can be conditional on an expected handover. No live
+  succession has been run, so nothing in the register is proven by one.
+* **The leader lease and the register.** P2-09, P2-12, P2-13, P2-15, P2-17 and
+  P2-21 read PROVEN, each with limits that its register note and `RELEASE_NOTES.md`
+  state; the matrix measures an import statement and never execution, so the weight
+  of each rests on the merge run's criteria and its integration pair.
+* **Disk-full safety (§13).** "12 writers remain" `[V44]` is the figure of
+  the first alpha. Two more slices are merged (P2-41), which leave the row PARTIAL
+  and the writers of the dispatcher unmigrated; the figure is not re-derived.
+* **Integration review.** The count of candidates refused at integration review
+  `[V07t]` is dated to the entries O236 to O254. Four more candidates were refused
+  and merged only with a repair after a second review: the portability patch, the P0
+  measurements, the P2-42 increment and the second recovery slice (whose first repair
+  was refused in turn, for a test it had not run, and repaired by a test-only run).
+* **What did not change.** P2 is not closed, the board still reads `TECHNICALLY_STABLE_READY = no` `[V13]`
+  and was not regenerated, no real reboot (DS2) has been run, no coding-agent session
+  has been shown to use `hoh agent-setup`, and nothing was run on a real NixOS or
+  macOS host.

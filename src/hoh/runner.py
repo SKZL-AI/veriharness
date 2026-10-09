@@ -48,14 +48,19 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
     from . import sandbox as sandbox_mod
 
 import datetime
+import errno
+import fcntl
+import functools
 import os
 import platform
 import re
 import resource
+import shutil
 import signal
 import socket
 import stat
 import subprocess
+import sys
 import threading
 import time
 from pathlib import Path
@@ -278,7 +283,49 @@ _DIRECTORY_CHANGE = re.compile(
 # `//home/...` is identical to `/home/...` on Linux; the lookbehind fell for
 # that. Multiple slashes are therefore normalized before the check (see
 # `assert_stays_in_arena`).
-_ABSOLUTE_PATH = re.compile(r"(?<![\w/])(/home/|/root/|/etc/|/mnt/[a-z]/|~/)")
+#
+# Fixed prefixes: Linux homes and mounts, macOS user homes (`/Users/`), mounted
+# volumes (`/Volumes/`) and the real locations behind macOS's `/etc`, `/var`
+# and `/tmp` symlinks (`/private/`). The invoking user's own home directory is
+# added by `_home_dirs()` because it need not live under any of them.
+_FIXED_FORBIDDEN = ("/home/", "/root/", "/etc/", "/mnt/[a-z]/", "/Users/",
+                    "/Volumes/", "/private/", "/System/Volumes/Data/", "/var/root/")
+
+
+def _home_dirs() -> list[str]:
+    """Home directories to refuse: `$HOME` and the account database's entry."""
+    found: list[str] = []
+    try:
+        found.append(str(Path.home()))
+    except (RuntimeError, KeyError):
+        pass
+    try:
+        import pwd
+        found.append(pwd.getpwuid(os.getuid()).pw_dir)
+    except (ImportError, KeyError, OSError):
+        pass
+    return found
+
+
+def _absolute_path_pattern() -> "re.Pattern[str]":
+    """The refused absolute prefixes, built per call.
+
+    A home that is `/`, empty, relative or has fewer than two components would
+    make the pattern swallow system paths (`/usr/bin/python3` must stay
+    allowed), so it is ignored. Regex metacharacters in a home are literal.
+    """
+    extra: list[str] = []
+    for home in _home_dirs():
+        norm = os.path.normpath(home) if home else ""
+        if norm.startswith("/") and len(Path(norm).parts) >= 3 and norm not in extra:
+            extra.append(norm)
+    parts = [*_FIXED_FORBIDDEN, *(re.escape(h) + "/" for h in extra), "~/"]
+    # macOS volumes are case-insensitive by default: a differently cased
+    # spelling of a home root names the same directory.
+    flags = re.IGNORECASE if sys.platform == "darwin" else 0
+    return re.compile(r"(?<![\w/])(" + "|".join(parts) + ")", flags)
+
+
 # A relative ascent leads out of the object under test -- and the arena sits
 # next to `runs/<id>/`, so `../../checks.json`, `../../state.json` and
 # `../../receipts/` are reachable from there. A reviewer used it to empty the
@@ -373,7 +420,7 @@ def assert_stays_in_arena(command: str) -> None:
             f"the binding worthless. If you need the path, write {ARENA_PLACEHOLDER}."
         )
 
-    path = _ABSOLUTE_PATH.search(normalized)
+    path = _absolute_path_pattern().search(normalized)
     if path:
         raise ArenaEscape(
             f"Check command names an absolute path outside the object under "
@@ -439,6 +486,70 @@ def assert_command_allowed(command: str) -> None:
                 f"Check command violates {source} '{pattern}': {command!r}. "
                 f"An acceptance criterion must not bypass the guards."
             )
+
+
+#: Where the historical shell lives. NixOS has no `/bin/bash` (only `/bin/sh`),
+#: so it is a preference, not an assumption: see `resolve_shell`. Module
+#: constant so a test can fake its absence.
+FIXED_BASH = "/bin/bash"
+
+
+class ShellUnavailable(RuntimeError):
+    """No bash could be found. There is deliberately no fallback to `sh`: a
+    check written for bash must not run under a different shell and report a
+    verdict about the shell."""
+
+
+def resolve_shell() -> str:
+    """The bash a check runs under.
+
+    `/bin/bash` when it is executable (every FHS host: unchanged behaviour),
+    else the `bash` found on `PATH`, resolved through its symlinks so that the
+    path names the real file (on Nix a store path, which STRICT binds).
+
+    Only **absolute** `PATH` entries are searched and the result must be
+    absolute: an empty or `.` entry (a trailing colon is a common accident)
+    would otherwise resolve against the runner's working directory, which is
+    the repository under test, and a committed `bash` could then decide every
+    verdict. Raises `ShellUnavailable` naming what was looked at.
+    """
+    if os.access(FIXED_BASH, os.X_OK):
+        return FIXED_BASH
+    entries = [e for e in os.environ.get("PATH", os.defpath).split(os.pathsep)
+               if e and os.path.isabs(e)]
+    found = shutil.which("bash", path=os.pathsep.join(entries)) if entries else None
+    if found and os.path.isabs(found):
+        return os.path.realpath(found)
+    raise ShellUnavailable(
+        f"bash not found: {FIXED_BASH} is not executable and there is no bash in "
+        "an absolute PATH entry; checks run under bash and are not run under sh "
+        "instead")
+
+
+def sandbox_path(path: str) -> str:
+    """`path` with every entry that is a link into the Nix store replaced by
+    its target.
+
+    A profile such as `~/.nix-profile/bin` lies outside what STRICT binds, but
+    the directory it points at is in the store, which is. Entries that do not
+    resolve into the store, or do not exist, are left exactly as they were; with
+    no store nothing changes.
+    """
+    from . import sandbox as _sb
+
+    store = _sb.NIX_STORE
+    if not os.path.isdir(store):
+        return path
+    prefix = os.path.realpath(store) + os.sep
+    out = []
+    for entry in path.split(":"):
+        real = os.path.realpath(entry) if entry else entry
+        if (entry and not entry.startswith(store + os.sep)
+                and real.startswith(prefix) and os.path.isdir(real)):
+            out.append(real)
+        else:
+            out.append(entry)
+    return ":".join(out)
 
 
 def runner_identity() -> str:
@@ -729,14 +840,17 @@ def _limit_policy() -> str:
         resource.RLIMIT_AS: "as",
         resource.RLIMIT_FSIZE: "fsize",
     }
-    return ",".join(f"{names_[res]}={value_}" for res, value_ in _unsandboxed_limits())
+    from .sandbox import render_limits
+
+    return ",".join(render_limits(_unsandboxed_limits(), names_))
 
 
 def interpreter_toolchain() -> tuple[tuple[Path, ...], str]:
     """The interpreter HoH runs under, as read-only binds and a PATH prefix.
 
     O200. The strict backend exposes `/usr`, `/bin`, `/lib*` and `/etc/ssl`
-    and nothing else, so a check's `python3` resolved to the system
+    (and, only on a host with a Nix store, the read-only roots of
+    `sandbox.nix_roots()`) and nothing else, so a check's `python3` resolved to the system
     interpreter -- whatever the operator installed. The shipped minimal
     example asks for `python3 -m pytest`; on a machine whose system Python has
     no pytest every strict run of it was INCONCLUSIVE on the candidate *and*
@@ -745,7 +859,7 @@ def interpreter_toolchain() -> tuple[tuple[Path, ...], str]:
     The interpreter a check should see is the one the operator installed HoH
     into: `sys.prefix`, and `sys.base_prefix` behind it when that is a venv.
     Both are bound read-only and put first on PATH. Nothing else of the home
-    directory becomes visible -- bwrap binds exactly these paths -- and an
+    directory becomes visible -- bwrap binds exactly the paths named above -- and an
     interpreter already under `/usr` needs no bind at all.
     """
     import sys as _sys
@@ -759,13 +873,17 @@ def interpreter_toolchain() -> tuple[tuple[Path, ...], str]:
     return tuple(seen), ":".join(bins)
 
 
-def _with_toolchain_path(env: dict, prefix: str) -> dict:
+def _with_toolchain_path(env: dict, prefix: str, *, sandbox: bool = False) -> dict:
     """Put the interpreter's `bin` first on PATH, after the caller's own PATH
-    if it set one and before the system directories otherwise."""
-    if not prefix:
+    if it set one and before the system directories otherwise. For a sandboxed
+    launch (`sandbox=True`) Nix profile links are replaced by their store
+    targets (`sandbox_path`) so the PATH names directories the sandbox binds."""
+    if not prefix and not sandbox:
         return env
     base = env.get("PATH") or os.environ.get("PATH") or "/usr/local/bin:/usr/bin:/bin"
-    env["PATH"] = f"{prefix}:{base}"
+    if sandbox:
+        base = sandbox_path(base)
+    env["PATH"] = f"{prefix}:{base}" if prefix else base
     return env
 
 
@@ -809,6 +927,7 @@ def _scratch_dir(workdir: Path) -> Path:
         # on this project's own runs -- and would throw away the pip and pytest
         # caches between two checks of the same candidate.
         _fresh_scratch(scratch)
+        _record_own_scratch(scratch)
     except OSError:
         # Falling back to the old behaviour is worse than a sibling and better
         # than failing the run: a check that cannot start produces no verdict
@@ -848,13 +967,223 @@ def _fresh_scratch(scratch: Path) -> Path:
 #: the situation the parking exists for.
 _OWN_SCRATCHES: dict[str, int] = {}
 
-# Caller-supplied scratch directories (`run_check(scratch=)`) this process vetted for the
-# UNSANDBOXED regime, by what the directory is -- (st_dev, st_ino) -- not by any name it was
-# reached by (a symlinked parent, a `..`, a bind mount are all the same directory).
-_VETTED_CALLER_SCRATCHES: set[tuple[int, int]] = set()
+#: The shapes of the runner's own scratch names (`_scratch_dir`: ``<arena>.scratch``; the sandboxed
+#: path: ``.hoh-scratch-<receipt>``). A caller never names one: the runner reuses its own
+#: scratch from its own memory and parks one it did not make, so a sandboxed check that wrote
+#: into it through ``scratch=`` would be reused by the next unsandboxed check of the owner.
+_OWN_SCRATCH_PREFIX = ".hoh-scratch-"
+_OWN_SCRATCH_SUFFIX = ".scratch"
+
+#: The record a reusable scratch (`_scratch_dir`) has **beside** it, for every other process: `<scratch name>.owner`, an
+#: append-only file with one line ``<st_dev> <st_ino>`` per directory the runner made under that name. A caller's check
+#: reads it (`_recorded_as_the_runners_own`): the kernel's identity of the directory, not a name, a spelling of the arena
+#: or any process's memory, says that the runner reuses it. Never inside the scratch (the check's `HOME`: a command can
+#: remove what is there), never removed or rewritten.
+_OWN_RECORD_SUFFIX = ".owner"
+_OWN_RECORD_LIMIT = 1 << 20
 
 
-def _caller_scratch(scratch: "str | Path", workdir: Path, *, fresh_each_use: bool) -> Path:
+def _record_own_scratch(scratch: Path) -> None:
+    """Make sure the identity of the runner's own scratch is recorded beside it, before it is used as a
+    `HOME`: looked at on **every** call (a record that went missing is written again; the check costs a
+    small read), appended only when the line is not there. `OSError` when it cannot be read or written,
+    and `_scratch_dir` then does not use the scratch at all. Appended, never replaced: a parked scratch
+    keeps its line."""
+    info = os.lstat(scratch)
+    line = f"{info.st_dev} {info.st_ino}\n".encode()
+    fd = os.open(scratch.with_name(scratch.name + _OWN_RECORD_SUFFIX),
+                 os.O_RDWR | os.O_APPEND | os.O_CREAT | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC,
+                 0o600)
+    try:
+        if not stat.S_ISREG(os.fstat(fd).st_mode):      # a FIFO planted there would block the read
+            raise OSError(errno.EINVAL, "the record of the scratch is not a regular file")
+        known = os.read(fd, _OWN_RECORD_LIMIT + 1)
+        if len(known) > _OWN_RECORD_LIMIT:
+            raise OSError(errno.EFBIG, "the record of the scratch is too long")
+        if line not in known.splitlines(keepends=True):
+            if known and not known.endswith(b"\n"):      # a torn tail (a crash mid-line): start a new line
+                line = b"\n" + line
+            if os.write(fd, line) != len(line):         # pragma: no cover - a full disk raises first
+                raise OSError(errno.EIO, "the record of the scratch was not written whole")
+    finally:
+        os.close(fd)
+
+
+def _scratch_locks(scratch: "str | Path") -> list[int]:
+    """Hold a caller's scratch for one check, **across processes**: an exclusive ``flock`` on the
+    directory, a shared one on every ancestor that could itself be a scratch (owned by this
+    user, no group or other permission bits: the same guard `_caller_scratch` applies). The
+    kernel keeps the locks and drops them with the process, so nothing about "who used this
+    directory" lives in the runner's memory: two checks on one scratch, a scratch inside another
+    and a scratch holding another all conflict, in either order, in one process or two.
+    ``ValueError`` when a lock is held elsewhere or cannot be taken (failing closed, whatever the
+    error: a path that is missing, a link or not a directory, an exhausted descriptor table). The
+    descriptors are close-on-exec; the caller closes them when the check is done."""
+    fds: list[int] = []
+    try:
+        try:
+            fd = os.open(scratch, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC)
+        except OSError as exc:                          # missing, a link, a file, EMFILE, ...:
+            # never "no lock". A path that is unusable *now* may be a real, empty directory a
+            # moment later (a same-uid actor swaps one in); a check that then ran would run unheld.
+            raise ValueError(f"scratch {scratch} cannot be locked, so it is not used "
+                             f"({exc.strerror or exc})") from exc
+        fds.append(fd)
+        _flock(fd, fcntl.LOCK_EX, f"scratch {scratch} is in use by another check, or lies "
+                                  f"inside or holds a scratch that is")
+        try:
+            current = os.lstat(scratch)
+        except OSError as exc:
+            raise ValueError(f"scratch {scratch} cannot be used: {exc}") from exc
+        if (current.st_dev, current.st_ino) != (os.fstat(fd).st_dev, os.fstat(fd).st_ino):
+            raise ValueError(f"scratch {scratch} was replaced while it was being locked; "
+                             f"it is not used")
+        euid = os.geteuid()
+        for ancestor in Path(os.path.realpath(scratch)).parents:
+            try:
+                info = os.lstat(ancestor)
+                if info.st_uid != euid or stat.S_IMODE(info.st_mode) & 0o077:
+                    continue                            # cannot be a scratch: refused as one
+                fds.append(os.open(ancestor, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+                                   | os.O_CLOEXEC))
+            except OSError as exc:                      # an ancestor that cannot be told: closed
+                raise ValueError(f"the scratch cannot be locked ({ancestor}: {exc}); "
+                                 f"it is not used") from exc
+            _flock(fds[-1], fcntl.LOCK_SH, f"scratch {scratch} lies inside a scratch that is "
+                                           f"in use ({ancestor})")
+        return fds
+    except BaseException:
+        _release_locks(fds)
+        raise
+
+
+def _flock(fd: int, how: int, busy: str) -> None:
+    try:
+        fcntl.flock(fd, how | fcntl.LOCK_NB)
+    except BlockingIOError:
+        raise ValueError(busy) from None
+    except OSError as exc:
+        raise ValueError(f"the scratch cannot be locked ({exc}); it is not used") from exc
+
+
+def _release_locks(fds: "list[int]") -> None:
+    for fd in fds:
+        try:
+            os.close(fd)                                # closing drops the flock
+        except OSError:                                 # pragma: no cover
+            pass
+
+
+def _holding_scratch(function):
+    """Decorates `run_check`: a caller's ``scratch`` is held (`_scratch_locks`) from before
+    `_caller_scratch` judges it until the check is done -- on every way out, a raise included."""
+    @functools.wraps(function)
+    def held(*args, **kwargs):
+        scratch = kwargs.get("scratch")
+        locks = _scratch_locks(scratch) if scratch is not None else []
+        try:
+            return function(*args, **kwargs)
+        finally:
+            _release_locks(locks)
+
+    return held
+
+
+def _same_entry(a: Path, b: Path) -> bool:
+    """Whether `a` and `b` are the same file. A path that does not exist is not (nothing is there to
+    be the arena); any other failure (permission, a loop) cannot be told and **counts as the
+    same**: the caller is refused, never admitted on a guess."""
+    try:
+        return os.path.samefile(a, b)
+    except (FileNotFoundError, NotADirectoryError):
+        return False
+    except OSError:
+        return True
+
+
+def _inside_the_runners_own_scratch(there: Path, workdir: Path) -> "Path | None":
+    """The runner's own scratch directory that `there` (a caller's scratch, real path) lies inside,
+    or None. The owner reuses its scratch without a look, so what a sandboxed check wrote into a
+    *descendant* of it (`<arena>.scratch/.config/git/config` is read as `$HOME/.config/...`) runs
+    in the owner's next unsandboxed check. Two durable-or-remembered ways to know it: (1) a strict
+    ancestor that is a **sibling of the arena** with the shape of one of the runner's own names --
+    the places `_scratch_dir` (`<arena>.scratch`) and the sandboxed path (`.hoh-scratch-<receipt>`,
+    created beside the output sink, which is `workdir.parent`) make, whichever process made them; (2) a scratch this process made (`_OWN_SCRATCHES`), wherever it is. **Not**
+    "any ancestor with an own shape": a caller's scratch legitimately lies inside the scratch of
+    an *outer* check (a test run under `run_check` has its temporary directory there)."""
+    # The runner builds its own scratch from the arena **as the *owner* was given it**
+    # (`workdir.with_name(...)`, `workdir.parent`), and `there` is a real path; the owner may have
+    # spelled the arena differently from this caller (the target, a link to it, a path through a
+    # symlinked parent directory). "Beside the arena" is therefore: the parent of the **real** arena
+    # (the owner used the target, whatever its name), or any directory in which the arena is also
+    # present **by the name this caller was given** (`ancestor.parent / workdir.name` is the same
+    # file as `workdir`: the owner used the link, or a path through a symlinked parent).
+    beside = {Path(os.path.realpath(workdir)).parent}
+    for ancestor in there.parents:
+        if (ancestor.name.startswith(_OWN_SCRATCH_PREFIX)
+                or ancestor.name.endswith(_OWN_SCRATCH_SUFFIX)) and (
+                ancestor.parent in beside
+                or _same_entry(ancestor.parent / workdir.name, workdir)):
+            return ancestor
+    for key in list(_OWN_SCRATCHES):
+        own = Path(os.path.realpath(key))
+        if there == own or there.is_relative_to(own):
+            return own
+    return None
+
+
+def _recorded_as_the_runners_own(there: Path, workdir: Path) -> "Path | None":
+    """The directory, the scratch or one above it, that **some process of the runner recorded as its own
+    scratch** (`_record_own_scratch`) and that the arena is not inside; or None. The record is read from
+    beside each directory on the real path of `there`, and matched by the directory's identity: so the
+    arena may be spelled any way, the owner may be another process and may have another arena (another
+    parent, another name). Fails closed: a record that cannot be read, is a link or not a regular file
+    (never opened blocking: a FIFO planted there), is too long, ends in a torn line (no newline) or has a
+    line that is not ``<dev> <ino>`` refuses the caller (`ValueError`); one whose identity is not the
+    directory's (a stale line: the directory was replaced) is not about it. **Not** a directory that holds
+    the arena itself: a check run by a check (this module's tests under the product's runner) has its
+    arena and its scratch under the outer check's own scratch, and a caller whose arena is in the scratch is
+    not a stranger to it."""
+    arena = Path(os.path.realpath(workdir))
+    for directory in (there, *there.parents):
+        if directory.parent == directory:
+            break
+        record = directory.with_name(directory.name + _OWN_RECORD_SUFFIX)
+        try:
+            fd = os.open(record, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC)
+        except (FileNotFoundError, NotADirectoryError):
+            continue
+        except OSError as exc:                          # a link, a permission, a loop: cannot be told
+            raise ValueError(f"the record beside {directory} cannot be read ({exc.strerror or exc}); "
+                             f"it is not known whether the runner reuses it, so it is not used") from exc
+        try:
+            if not stat.S_ISREG(os.fstat(fd).st_mode):  # never block on a FIFO or read a device
+                raise OSError(errno.EINVAL, "not a regular file")
+            raw = os.read(fd, _OWN_RECORD_LIMIT + 1)
+        except OSError as exc:
+            raise ValueError(f"the record beside {directory} cannot be read ({exc.strerror or exc}); "
+                             f"it is not used") from exc
+        finally:
+            os.close(fd)
+        try:
+            if len(raw) > _OWN_RECORD_LIMIT:
+                raise ValueError("too long")
+            if raw and not raw.endswith(b"\n"):          # a torn last line: the owner closes it at its next check
+                raise ValueError("torn last line")
+            identities = {tuple(int(part) for part in line.split(b" ")) for line in raw.splitlines()}
+            if any(len(identity) != 2 for identity in identities):
+                raise ValueError("not <dev> <ino>")
+            info = os.lstat(directory)
+        except (ValueError, OSError) as exc:
+            raise ValueError(f"the record beside {directory} cannot be read ({exc}); it is not known "
+                             f"whether the runner reuses it, so it is not used") from exc
+        if (info.st_dev, info.st_ino) in identities and not (arena == directory
+                                                             or arena.is_relative_to(directory)):
+            return directory
+    return None
+
+
+def _caller_scratch(scratch: "str | Path", workdir: Path) -> Path:
     """The directory a caller supplies as the check's `HOME` and `TMPDIR`
     (a registered ephemeral workspace, `hoh.storage_ephemeral`).
 
@@ -863,19 +1192,15 @@ def _caller_scratch(scratch: "str | Path", workdir: Path, *, fresh_each_use: boo
     first line (a reviewer demonstrated it), so what the runner cannot create
     itself it must vouch for. Refused with a `ValueError`, before anything
     runs, unless the path is an absolute, existing, real directory (not a
-    symlink) that neither holds nor lies inside the arena, is owned by the
-    effective uid, has no group or other permission bits (0700 or tighter),
-    and is **empty** the first time this process uses it unsandboxed. A directory
-    this process vetted for the unsandboxed regime before (the same directory,
-    by device and inode, whatever name reached it) may be non-empty again there, where the checks of one candidate share
-    a scratch as they do on the pin; under a sandbox (`fresh_each_use`) it must be
-    empty at **every** use -- one workspace per check, as
-    `.hoh-scratch-<receipt>` was -- and **any sandboxed use, even one that is
-    refused, takes the vet away** (an unsandboxed use must then find it empty
-    again): what a sandboxed check wrote is never accepted later by an
-    unsandboxed one, in whatever order the regimes alternate. A sandboxed use
-    never vets.
-    The runner never parks, renames or removes what a caller names."""
+    symlink) that neither holds nor lies inside the arena, is not the shape of
+    one of the runner's own scratch names, is owned by the effective uid, has no
+    group or other permission bits (0700 or tighter), and is **empty at every
+    use, in either regime** -- one workspace per check. The runner remembers
+    nothing about a directory it has used: what a check (sandboxed or not,
+    in this process or another) wrote is found in the directory, and the
+    directory is then refused. `run_check` holds the scratch (`_scratch_locks`) from before
+    this test until the check is done. The runner never parks, renames or
+    removes what a caller names."""
     path = Path(scratch)
     if not path.is_absolute():
         raise ValueError(f"scratch must be an absolute path, got {os.fspath(scratch)!r}")
@@ -883,13 +1208,6 @@ def _caller_scratch(scratch: "str | Path", workdir: Path, *, fresh_each_use: boo
         info = os.lstat(path)
     except OSError as exc:
         raise ValueError(f"scratch {path} cannot be used: {exc}") from exc
-    # What was vetted is the directory, not a name for it.
-    ident = (info.st_dev, info.st_ino)
-    if fresh_each_use:
-        # ANY sandboxed use takes the vet away -- before anything can refuse or run: what a
-        # sandboxed check wrote must never be accepted later by an unsandboxed one, whatever
-        # the order of the uses (NONE, STRICT, NONE as much as STRICT, NONE).
-        _VETTED_CALLER_SCRATCHES.discard(ident)
     if not stat.S_ISDIR(info.st_mode):
         raise ValueError(f"scratch {path} is not a real directory")
     # realpath, not abspath: a scratch reached through a symlinked parent that lies
@@ -897,26 +1215,33 @@ def _caller_scratch(scratch: "str | Path", workdir: Path, *, fresh_each_use: boo
     here, there = Path(os.path.realpath(workdir)), Path(os.path.realpath(path))
     if there == here or here.is_relative_to(there) or there.is_relative_to(here):
         raise ValueError(f"scratch {path} and the arena {workdir} must be separate trees")
+    if there.name.startswith(_OWN_SCRATCH_PREFIX) or there.name.endswith(_OWN_SCRATCH_SUFFIX):
+        raise ValueError(f"scratch {path} has the name of one of the runner's own scratch "
+                         f"directories; a caller's scratch is a registered workspace")
+    own = _inside_the_runners_own_scratch(there, workdir)
+    if own is not None:
+        raise ValueError(f"scratch {path} lies inside {own}, one of the runner's own scratch "
+                         f"directories (it is reused by its owner without a look); a caller's "
+                         f"scratch is a registered workspace")
+    recorded = _recorded_as_the_runners_own(there, workdir)
+    if recorded is not None:
+        raise ValueError(f"scratch {path} lies inside {recorded}, which a runner recorded as its own scratch "
+                         f"directory (it is reused by its owner without a look); a caller's scratch is "
+                         f"a registered workspace")
     if info.st_uid != os.geteuid():
         raise ValueError(f"scratch {path} is not owned by this user (uid {info.st_uid})")
     if stat.S_IMODE(info.st_mode) & 0o077:
         raise ValueError(f"scratch {path} has group or other permissions "
                          f"({stat.S_IMODE(info.st_mode):o}); it must be 0700 or tighter")
-    if fresh_each_use or ident not in _VETTED_CALLER_SCRATCHES:
-        try:
-            with os.scandir(path) as listing:
-                first = next(listing, None)
-        except OSError as exc:
-            raise ValueError(f"scratch {path} cannot be listed: {exc}") from exc
-        if first is not None:
-            raise ValueError(f"scratch {path} is not empty ({first.name!r}): a file planted "
-                             f"before the check would run as its $HOME"
-                             + ("; under a sandbox each check needs its own workspace"
-                                if fresh_each_use else ""))
-    if not fresh_each_use:
-        # Vetted for the unsandboxed regime only: what a sandboxed check wrote
-        # must never be accepted later by an unsandboxed one.
-        _VETTED_CALLER_SCRATCHES.add(ident)
+    try:
+        with os.scandir(path) as listing:
+            first = next(listing, None)
+    except OSError as exc:
+        raise ValueError(f"scratch {path} cannot be listed: {exc}") from exc
+    if first is not None:
+        raise ValueError(f"scratch {path} is not empty ({first.name!r}): a file planted "
+                         f"before the check would run as its $HOME; each check needs its own "
+                         f"workspace")
     return path
 
 
@@ -981,6 +1306,7 @@ def _terminate(proc: subprocess.Popen) -> None:
             continue
 
 
+@_holding_scratch
 def run_check(
     check: AcceptanceCheck,
     candidate: Candidate,
@@ -1031,9 +1357,12 @@ def run_check(
     directory, so what a check writes is owned, leased and cleaned like the rest
     of the project's temporary state. It is held to the guard of the runner's own
     scratch (`_caller_scratch`: a real directory outside the arena, owned by the
-    caller's uid, 0700, empty when first used -- and under STRICT empty at every
-    use) and is refused with a `ValueError` before anything runs otherwise; it is
-    never parked, and the runner never removes it.
+    caller's uid, 0700, **empty at every use**, in either regime, and not named like
+    one of the runner's own) and is held (`_scratch_locks`: against any other check
+    on it, inside it or holding it, in this process or another) until the check is
+    done; it is refused with a `ValueError` before anything runs otherwise; it is
+    never parked, and the runner never removes it. Nothing about a scratch it has
+    used is remembered: the directory is judged each time.
     """
     from .sandbox import (
         Isolation as _Isolation,
@@ -1063,9 +1392,7 @@ def run_check(
     assert_stays_in_arena(check.command)
 
     workdir = Path(cwd or candidate.repo_path)
-    caller_scratch = (_caller_scratch(scratch, workdir,
-                                      fresh_each_use=isolation is not _Isolation.NONE)
-                      if scratch is not None else None)
+    caller_scratch = _caller_scratch(scratch, workdir) if scratch is not None else None
     resolved_command = check.command.replace(ARENA_PLACEHOLDER, str(workdir))
     # `receipt_suffix` separates evidence that belongs to the same iteration
     # and the same criterion but measures different states: the candidate run
@@ -1197,7 +1524,7 @@ def run_check(
                 # from inside". The strongest-looking receipt was the
                 # vulnerable one.
                 scratch = (caller_scratch if caller_scratch is not None
-                           else _fresh_scratch(sink.parent / f".hoh-scratch-{receipt_id}"))
+                           else _fresh_scratch(sink.parent / f"{_OWN_SCRATCH_PREFIX}{receipt_id}"))
                 # The proof travels out over a pipe this process holds. It used
                 # to be a file in the scratch directory -- which is
                 # bind-mounted read-write and is also the check's $HOME and
@@ -1223,11 +1550,12 @@ def run_check(
                     # same call produced different environments depending on
                     # isolation. No in-tree caller passed it, which is how it
                     # stayed unnoticed.
-                    extra_env=_with_toolchain_path(dict(env or {}), toolchain_path),
+                    extra_env=_with_toolchain_path(dict(env or {}), toolchain_path,
+                                                   sandbox=True),
                     ro_binds=toolchain_binds,
                     proof_fd=write_end,
                 )
-                plan = sandbox.plan(["/bin/bash", "-c", resolved_command], spec)
+                plan = sandbox.plan([resolve_shell(), "-c", resolved_command], spec)
                 proc = subprocess.Popen(
                     plan.argv,
                     cwd=plan.cwd,
@@ -1255,7 +1583,7 @@ def run_check(
                 isolation_reason = note
                 network_ = mount = limits_ = NOT_APPLIED
                 applied_ = None
-            except OSError as exc:
+            except (OSError, ShellUnavailable) as exc:
                 # `scratch.mkdir` used to sit outside every try. An ENOSPC or
                 # an EEXIST there left `run_check` through the exception
                 # instead of through a receipt -- the O14 lesson, reintroduced
@@ -1314,7 +1642,7 @@ def run_check(
         with buffer as fh:
             try:
                 proc = subprocess.Popen(
-                    ["/bin/bash", "-c", resolved_command],  # no -l: no login profile
+                    [resolve_shell(), "-c", resolved_command],  # no -l: no login profile
                     cwd=workdir,
                     env=_env(workdir, env, caller_scratch),
                     stdout=fh,
@@ -1322,7 +1650,7 @@ def run_check(
                     stdin=subprocess.DEVNULL,
                     preexec_fn=_limits,
                 )
-            except OSError as exc:
+            except (OSError, ShellUnavailable) as exc:
                 exit_code, runner_ok = 127, False
                 note = f"Process could not be started: {exc}"
             else:

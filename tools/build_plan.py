@@ -46,6 +46,33 @@ def _matrix():
     return cm
 
 
+def _baseline_docs():
+    spec = importlib.util.spec_from_file_location("baseline_docs",
+                                                  HERE / "baseline_docs.py")
+    bd = importlib.util.module_from_spec(spec)
+    sys.modules["baseline_docs"] = bd
+    spec.loader.exec_module(bd)
+    return bd
+
+
+def measurement_status(item_id: str) -> str:
+    """The status of a P0 `measurement` item, read back from the generated
+    current baseline: its section is there, sourced, honest about
+    NOT_MEASURED, and every line it cites exists. Not a state somebody sets;
+    and not a freshness claim -- that is the board's `baseline_docs` row."""
+    bd = _baseline_docs()
+    title = bd.MEASUREMENT_SECTIONS.get(item_id)
+    if title is None:
+        return ("NOT MEASURED: no section of the baseline is defined for "
+                "this item")
+    path = HOH / "program/v3_3" / bd.CURRENT_BASELINE
+    text = path.read_text(encoding="utf-8") if path.is_file() else None
+    ok, reason = bd.section_status(text, title, HOH)
+    if not ok:
+        return f"NOT MEASURED: {reason}"
+    return f"measured: {bd.CURRENT_BASELINE}#{'-'.join(title.lower().split())}"
+
+
 def _program_scope():
     spec = importlib.util.spec_from_file_location("program_scope",
                                                   HERE / "program_scope.py")
@@ -506,6 +533,8 @@ def render_dispositions(plan: dict, body: dict) -> str | None:
             if r["kind"] == "baseline_deliverable":
                 present = (HOH / "program/v3_3" / r["text"]).is_file()
                 start = "file present" if present else "FILE MISSING"
+            elif r["kind"] == "measurement":
+                start = measurement_status(r["item"])
             else:
                 start = start_label(rid, st, r["waits_for_gate"], open_gates,
                                     ready, held, pulled)

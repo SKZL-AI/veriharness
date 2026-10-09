@@ -54,14 +54,16 @@ STEPS: tuple[tuple[str, list[str]], ...] = (
         "tools/capability_matrix.py",
         "--out", str(PROGRAM / "VERIHARNESS_CAPABILITY_MATRIX.json"),
         "--gaps", str(PROGRAM / "VERIHARNESS_GAP_REGISTER.md")]),
+    # The baseline documents come before the plan: the plan's dispositions read
+    # the five measurement sections back out of the current baseline.
+    ("baseline documents", [
+        "tools/baseline_docs.py", "--out-dir", str(PROGRAM)]),
     ("build plan", [
         "tools/build_plan.py",
         "--dag", str(PROGRAM / "VERIHARNESS_IMPLEMENTATION_DAG.json"),
         "--checklist", str(PROGRAM / "VERIHARNESS_BUILD_CHECKLIST.json"),
         "--markdown", str(PROGRAM / "VERIHARNESS_BUILD_CHECKLIST.md"),
         "--dispositions", str(PROGRAM / "PROGRAMME_DISPOSITIONS.md")]),
-    ("baseline documents", [
-        "tools/baseline_docs.py", "--out-dir", str(PROGRAM)]),
     ("readiness board", ["tools/readiness.py", "--write"]),
 )
 

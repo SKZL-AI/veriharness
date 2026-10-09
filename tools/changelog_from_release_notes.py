@@ -102,6 +102,11 @@ def _block_span(text: str, version: str):
     return i, j + len(end)
 
 
+_BEGIN_RE = re.compile(
+    r"^<!-- BEGIN GENERATED: tools/changelog_from_release_notes\.py [^\s>]+ -->[ \t]*\n?\Z",
+    re.M)
+
+
 def splice(changelog: str, section: str, version: str) -> str:
     span = _block_span(changelog, version)
     if span:
@@ -109,7 +114,15 @@ def splice(changelog: str, section: str, version: str) -> str:
     m = re.search(r"^## \[", changelog, re.M)
     if not m:
         return changelog.rstrip("\n") + "\n\n" + section + "\n"
-    return changelog[:m.start()] + section + "\n\n" + changelog[m.start():]
+    at = m.start()
+    # When that heading belongs to an earlier generated section, its BEGIN
+    # marker stands on the line above it: the new section goes above the whole
+    # earlier block, not between the marker and its heading (which would leave
+    # the earlier block without its start and `check` unable to find it).
+    marker = _BEGIN_RE.search(changelog[:at])
+    if marker:
+        at = marker.start()
+    return changelog[:at] + section + "\n\n" + changelog[at:]
 
 
 def _current_date(changelog: str, version: str) -> str:

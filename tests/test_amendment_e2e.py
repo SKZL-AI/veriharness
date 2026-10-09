@@ -431,13 +431,17 @@ def test_a_qa_outage_is_not_reported_as_an_unmeasured_criterion(
 
     The gate ran ahead of the outage branch, so an amended run turned every
     provider failure into "the amendment's criterion was not measured".
+
+    The fake QA stands for an outage that names no cause: a quota is no longer
+    an outage, it blocks the run as a wait
+    (`tests/test_failure_classes.py`).
     """
     from hoh.controller import DispatchError
 
     class Outage(Dispatcher):
         def dispatch(self, role, prompt, *, state):
             if role is Role.QA:
-                raise DispatchError("quota exhausted", transient=False)
+                raise DispatchError("qa left no answer file behind", transient=False)
             return super().dispatch(role, prompt, state=state)
 
     d = Outage(repo=repo, checks=lambda i: ["K1"])

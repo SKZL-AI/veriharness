@@ -27,7 +27,7 @@ from typing import TYPE_CHECKING, Protocol
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from . import sandbox as sandbox_mod
 
-from . import roles, stages
+from . import dispatchrecovery, failures, roles, stages
 from .contracts import (
     AcceptanceCheck,
     Budgets,
@@ -279,8 +279,13 @@ class Controller:
         storage_admission=None,
         park_policy=None,
         steward=None,
+        recovery: "dispatchrecovery.RecoveryContext | None" = None,
     ) -> None:
         self.store = store
+        #: P2-43b: the accounts and data class the caller declared, for the
+        #: provenance of every dispatch. None (library use) records
+        #: `NOT_AVAILABLE` for the account and `UNSPECIFIED` for the data class.
+        self.recovery = recovery
         #: STORAGE-D: the project's storage steward, or None. It is only told
         #: (`on_event`, which records one bounded line and returns) about a
         #: terminal transition and -- through the park -- about a refused
@@ -398,6 +403,16 @@ class Controller:
             # role starts in this iteration; the run is no longer ACTIVE,
             # so `hoh run` stops looping.
             return LoopOutcome(state.iteration, False, parked.reason)
+        except DispatchError as exc:
+            # P2-43a: every role's failed dispatch ends here (the planner, the
+            # developer, a transient retry that ran out, the follow-up for a
+            # missing answer; QA re-raises from `_verify`). A wait or an
+            # operator action is not a verdict and not an iteration; anything
+            # else leaves exactly as before, to the CLI's generic block.
+            failure = failures.classify(exc)
+            if not failures.is_infrastructure(failure):
+                raise
+            return self._failure_wait(state, exc, failure)
         except CapabilityViolation as exc:
             # Fail closed, and as a *result* rather than as a crash. A
             # violation is not an outage and must not be re-read as a
@@ -416,7 +431,7 @@ class Controller:
             # rolled back and the run waits for a person, rather than letting
             # QA review a candidate it could write.
             self._block(state, f"the candidate arena could not be sealed, "
-                               f"QA was not started: {exc}")
+                               f"QA was not started: {exc}", scan_for_quota=False)
             self.store.write_state(state)
             return LoopOutcome(state.iteration, False,
                                state.blocked_reason or str(exc))
@@ -581,7 +596,7 @@ class Controller:
             result = self._verify(state, spec_text=spec_text, plan=plan, candidate=candidate)
         except stages.FreezeError as exc:
             # Sources changed between freeze and verdict (A05).
-            self._block(state, f"candidate binding violated: {exc}")
+            self._block(state, f"candidate binding violated: {exc}", scan_for_quota=False)
             self.store.write_state(state)
             return LoopOutcome(iteration, False, str(exc))
 
@@ -1002,6 +1017,13 @@ class Controller:
             discriminating=len(discriminating),
             artefactual=len(getattr(self, "_artefactual", set()) & set(discriminating)),
         )
+
+        # A wait or an operator action in QA (a usage limit, an expired
+        # credential, ...) is no verdict and no rejection: it leaves through
+        # `_run_iteration_guarded`. A QA turn without an answer file and
+        # without a recognised cause keeps the outage route below.
+        if qa_exc is not None and failures.is_infrastructure(failures.classify(qa_exc)):
+            raise qa_exc
 
         verdicts, gaps, summary = self._parse_qa(
             raw, plan=plan, receipts=receipts, state=state, candidate=candidate,
@@ -2032,9 +2054,20 @@ class Controller:
                             _configured("profiles") or NOT_AVAILABLE)
             rest.setdefault("model", _configured("models") or NOT_AVAILABLE)
             rest.setdefault("effort", _configured("efforts") or NOT_AVAILABLE)
+            normalized = None
             if outcome != "ok":
+                normalized = failures.classify(exc, detail=detail)
+                rest.setdefault("normalized_failure", normalized)
                 rest.setdefault("failure_class",
-                                classify_failure(exc, detail=detail))
+                                failures.TAXONOMY.get(normalized)
+                                or classify_failure(exc, detail=detail))
+            # P2-43b: who ran this, under which account and policy -- on every
+            # dispatch of a dispatch role, failed or not.
+            prov = dispatchrecovery.provenance_for(
+                lookup_key, provider=rest["provider"], model=rest["model"],
+                context=getattr(self, "recovery", None), failure=normalized)
+            rest.setdefault("provenance",
+                            prov.model_dump(mode="json") if prov is not None else None)
             scope_ = getattr(self, "_witness_scope", None)
             if scope_ is not None:
                 rest.setdefault("witnessed_trees", scope_[0])
@@ -2185,17 +2218,140 @@ class Controller:
                 self._governor = False          # asked once, answered once
         return self._governor or None
 
+    def _failure_wait(self, state, exc: BaseException,
+                      failure: failures.NormalizedFailure) -> LoopOutcome:
+        """A failed dispatch that is a wait or an operator action (P2-43a).
+
+        Not a verdict and not an iteration: the candidate is not rejected, the
+        working tree is not touched, and a PLANNING charge is handed back
+        (resuming charges it again through `stages.begin_iteration`). An
+        automatic class blocks durably with its own `blocked_kind`, a
+        `retry_after` and a PROVIDER_RETRY timer, outside the contract's
+        decision routing; an operator-required class blocks for a person.
+        """
+        mode = failures.RETRY_MODE[failure]
+        role = {Stage.PLANNING: Role.PLANNER, Stage.DEVELOPING: Role.DEVELOPER,
+                Stage.VERIFYING: Role.QA}.get(state.stage)
+        role_name = role.value if role is not None else state.stage.value.lower()
+        first = (str(exc).strip().splitlines() or [""])[0][:300]
+        if state.stage is Stage.PLANNING and state.usage.iterations > 0:
+            state.usage.iterations -= 1
+            state.note(f"iteration {state.iteration}: charge returned -- it ended "
+                       f"in {failure.value} before a plan existed")
+        state.note(f"failure class {failure.value} ({mode.value}) in {role_name}: {first}")
+        held = stages.violation_unresolved(state)
+        automatic = mode is failures.RetryMode.AUTOMATIC and not held
+        retry_at = (failures.next_attempt(failure, str(exc)).isoformat()
+                    if automatic else None)
+        # P2-43b: the receipt first, then the timer, then the parked state --
+        # a parked state is never durable without its record and its wake-up.
+        # A park that cannot be recorded cannot be bound, and a wait nobody can
+        # bind must not wake itself: it needs a person.
+        recorded = self._record_park(state, failure, role, retry_at=retry_at,
+                                     held=held, mode=mode)
+        if automatic and recorded is None:
+            # No class name in the reason: `stages.block` reads a quota phrase
+            # anywhere in a reason, `RATE_LIMIT` is one, and it would arm the very
+            # timer this branch exists to refuse. The class is in the note above.
+            reason = (f"a provider wait in {role_name}; the recovery record could not "
+                      f"be written, so no automatic retry")
+            self._block(state, reason)
+            self._refuse_automatic_kind(state)
+        elif automatic:
+            reason = f"{failure.value} in {role_name}, automatic retry"
+            state.condition = Condition.BLOCKED
+            state.blocked_reason = state.stop_reason = reason
+            state.blocked_kind = failures.blocked_kind(failure)
+            state.retry_after = retry_at
+            state.note(f"BLOCKED ({state.blocked_kind}, earliest retry "
+                       f"{state.retry_after}): not a decision and not a verdict; "
+                       f"`hoh resume-quota` resumes it")
+            self._arm_quota_timer(state, self._contract_governor(state))
+        elif mode is failures.RetryMode.AUTOMATIC:
+            reason = (f"a provider wait in {role_name}; a capability violation "
+                      f"still holds this run, so no automatic retry")
+            self._block(state, reason)
+        else:
+            # The provider's text is in the note, not in the reason:
+            # `stages.block` reads a quota phrase anywhere in a reason.
+            reason = f"{failure.value} in {role_name}, operator action required"
+            self._block(state, reason)
+        self.store.write_state(state)
+        return LoopOutcome(state.iteration, False, f"no verdict -- {reason}")
+
+    @staticmethod
+    def _refuse_automatic_kind(state) -> None:
+        """Belt and braces for the unrecordable park: whatever `_block` made of
+        the reason, the run must not carry an automatic kind or a `retry_after`
+        (a state that reads as a wait with no receipt behind it)."""
+        if state.blocked_kind in failures.AUTOMATIC_KINDS | {"usage_limit"}:
+            state.blocked_kind = None
+        state.retry_after = None
+
+    def _record_park(self, state, failure, role, *, retry_at, held, mode):
+        """Append the park's receipt (`RoutingDecision` for an automatic wait,
+        `RoutingEscalation` for a person) beside the run state. Returns the
+        record, or None -- noted on `state` -- when it could not be written."""
+        try:
+            governor = self._contract_governor(state)
+            binding = dispatchrecovery.park_binding(
+                state, governor=governor,
+                master=dispatchrecovery.read_master(self.store.dir))
+            provider, model = self._role_identity(role)
+            prov = dispatchrecovery.provenance_for(
+                role, provider=provider, model=model, context=getattr(self, "recovery", None),
+                failure=failure)
+            if prov is None:
+                raise dispatchrecovery.RecoveryError(
+                    f"stage {state.stage.value} has no dispatch role")
+            pid = dispatchrecovery.park_id(binding, failure, retry_at)
+            if retry_at is not None:
+                record = dispatchrecovery.RoutingDecision(
+                    park_id=pid, reason=failure.value, binding=binding,
+                    provenance=prov, retry_at=retry_at)
+            else:
+                record = dispatchrecovery.RoutingEscalation(
+                    park_id=pid, reason=failure.value, binding=binding, provenance=prov,
+                    escalation="HELD_BY_VIOLATION" if held else "OPERATOR_REQUIRED")
+            dispatchrecovery.append_record(self.store.dir, record)
+            state.note(f"routing receipt {record.kind} {pid[:12]} "
+                       f"(policy {record.route_policy_id}/{record.route_policy_version}, "
+                       f"master {binding.master.kind})")
+            return record
+        except Exception as rec_exc:              # noqa: BLE001 - noted, never fatal here
+            # A validation error quotes its input; the type is enough.
+            why = ("" if isinstance(rec_exc, ValueError) and not isinstance(
+                rec_exc, dispatchrecovery.RecoveryError) else f": {str(rec_exc)[:200]}")
+            state.note(f"recovery record NOT written ({type(rec_exc).__name__}{why})")
+            return None
+
+    def _role_identity(self, role) -> tuple[str, str]:
+        """(provider, model) the dispatcher was configured with for a role."""
+        sender = getattr(self, "dispatcher", None)
+
+        def configured(name: str) -> str:
+            table_ = getattr(sender, name, None)
+            return (table_.get(role) or "") if isinstance(table_, dict) else ""
+        return (configured("profiles") or NOT_AVAILABLE,
+                configured("models") or NOT_AVAILABLE)
+
     def _block_violation(self, state, reason: str):
         """Block for a capability violation, with the kind that keeps it held."""
         state.blocked_kind = stages.CAPABILITY_VIOLATION
         return self._block(state, reason)
 
-    def _block(self, state, reason: str):
-        """Block, under the contract if this run has one."""
+    def _block(self, state, reason: str, *, scan_for_quota: bool = True):
+        """Block, under the contract if this run has one.
+
+        ``scan_for_quota=False`` for a reason that carries text the product did
+        not write -- an exception whose message names a path a role created or a
+        file name a role chose (`rate_limit.py` is a quota phrase to
+        `stages.block`)."""
         from .governance import block_under_contract
 
         governor = self._contract_governor(state)
-        routing = block_under_contract(state, reason, governor)
+        routing = block_under_contract(state, reason, governor,
+                                       scan_for_quota=scan_for_quota)
         if state.blocked_kind == "usage_limit" and state.retry_after:
             self._arm_quota_timer(state, governor)
         return routing
@@ -2215,7 +2371,8 @@ class Controller:
         try:
             TimerStore(self.store.dir.parent).arm_new(
                 kind=TimerKind.PROVIDER_RETRY, due_at=due,
-                reason=f"usage limit: {(state.blocked_reason or '')[:200]}",
+                reason=(f"{(state.blocked_kind or 'usage_limit').replace('_', ' ')}: "
+                        f"{(state.blocked_reason or '')[:200]}"),
                 program_id=(governor.contract.contract_id if governor else ""),
                 program_epoch=(governor.contract.program_epoch if governor else 0),
                 run_id=state.run_id)
@@ -2526,6 +2683,12 @@ class Controller:
         return owned
 
     def _dispatch_admitted(self, role: Role, prompt: str, state: RunState) -> str:
+        # The role's scratch directory (`TMPDIR` of its pane) must exist, and it must
+        # exist *before* the witness below is taken: made during the dispatch it would
+        # be a new child of the arena root. Nothing is charged for a refusal.
+        ensure_scratch_ = getattr(self.dispatcher, "ensure_role_scratch", None)
+        if callable(ensure_scratch_):
+            ensure_scratch_(role)
         # Handoff §8: "Check budget and deadline before every dispatch; count
         # retries and supervision in." Previously it was counted only once per
         # iteration and checked only at the start of the iteration.

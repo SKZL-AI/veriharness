@@ -20,7 +20,8 @@ apart on purpose.
 | Track | State | What it means for a reader |
 |---|---|---|
 | **Latest stable release** | `v0.1.0`, tagged 2026-09-14, on PyPI since 2026-09-15 | The only stable release. The campaign figures, the benchmark and the findings further down this file describe the work that produced it, and they stay as they were measured. |
-| **Pre-release** | `v0.3.0a1` -- **PRE-RELEASE**, an alpha and a research preview, **prepared, not yet cut** | Prepared at a documentation checkpoint, not at the end of a phase. Its integrity gate is met for the paths its reviewers replayed (the qaw-followup merge `ab41589f` closed the three findings that had held it; one residual is stated in `docs/LIMITATIONS.md`), and the cut waits for the operator's decision on the exact commit. Once cut, it is installed from the tagged source and is not published to PyPI: the distribution workflow of this repository accepts only the audited `v0.1.0`. `pyproject.toml` carries `0.3.0a1`. `RELEASE_NOTES.md` opens with its account; its open gates are listed as NOT_YET_PROVEN there and in `docs/LIMITATIONS.md`. |
+| **Pre-release** | `v0.3.0a1` -- **PRE-RELEASE**, an alpha and a research preview, **prepared, not yet cut** | Prepared at a documentation checkpoint, not at the end of a phase. Its integrity gate is met for the paths its reviewers replayed (the qaw-followup merge `ab41589f` closed the three findings that had held it; one residual is stated in `docs/LIMITATIONS.md`), and the cut waits for the operator's decision on the exact commit. Once cut, it is installed from the tagged source and is not published to PyPI: the distribution workflow of this repository accepts only the audited `v0.1.0`. `pyproject.toml` carries `0.3.0a1`. `RELEASE_NOTES.md` opens with its account; its open gates are listed as NOT_YET_PROVEN there and in `docs/LIMITATIONS.md`. (Correction, 2026-10-09: `v0.3.0a1` was cut on 2026-10-08; "prepared, not yet cut" and "the cut waits for the operator's decision" are the text of the checkpoint before the cut and are kept here. `pyproject.toml` now carries the next pre-release, in the next row.) |
+| **Newer pre-release** | `v0.3.0a2` -- **PRE-RELEASE**, an alpha and a research preview, tagged `v0.3.0a2` | Prepared at a documentation checkpoint after the ledger entries O256 to O260, not at the end of a phase. It adds a NixOS-first portability patch, `hoh agent-setup`, owned control of the agents HoH starts, more disk-full-safe writers, a classification of failed provider dispatches with its provenance and park binding, `hoh migrate` and `hoh decision check`, and the five P0 measurements; none of it was run on a real NixOS or macOS host or in a live coding-agent session. It is installed from the tagged source and is not published to PyPI. `pyproject.toml` carries `0.3.0a2`. `RELEASE_NOTES.md` opens with its account; its open gates are listed as NOT_YET_PROVEN there and in `docs/LIMITATIONS.md`. |
 | **Current development** | Phase P2, *v0.3 Durable Program Runtime + Autonomy Contract Base* -- **IN PROGRESS** | Not closed. The pre-release is a snapshot of this line, and a clone of the default branch may be ahead of the tag. |
 | **Long-term roadmap** | Phases P0 to P12, v0.2 through v2.0 | A registered plan, not a promise. P1 was completed as an internal development milestone. No public v0.2 release was cut; the latest stable public release remains v0.1.0 while the development line continues through P2. Of the requirements registered for P3 to P12, 150 of 168 read MISSING `[V11b]`; ten of the 11 that read PROVEN are storage-lifecycle items that amendment A1 placed there and that were built early. |
 
@@ -32,6 +33,7 @@ at the commit that carries the pre-release: it is conservative (its `attribution
 and its `tests` row predate the entries and the run that now close them), and it is
 not regenerated at the cut, because regenerating it needs the network (the
 `clean_install` row and the union gate's wheel build call the package index).
+(Correction, 2026-10-08, of the text published with the pre-release tag: "close them" is inexact for the `tests` row. The last suite run of the checkpoint still had failed tests (two environment failures of the scratch placement and one artefact of that run's own PATH), so the row is stale and conservative, not closed. The earlier wording is kept and corrected here; the newest ledger entry has the figures.)
 Figures below that carry a bracketed tag are listed,
 with their source and the command that regenerates them, in
 `paper/NUMBERS_V2.md`.
@@ -46,9 +48,9 @@ prepared from. `paper/POSITION_PAPER_V2.md` gives the full account.
   Since 2026-09-23, product runs have written kernel modules under `src/hoh/`.
   From 2026-09-25 on, every such run worked in an isolated clone pinned to one
   commit, its accepted candidate was imported byte for byte, and two
-  independent integration reviewers released it before it was merged: 34 of
-  the 46 product-run merges between 2026-09-25 and 2026-10-07 change
-  `src/hoh/` `[V02]` `[V01]`.
+  independent integration reviewers released it before it was merged: 55 of
+  the 69 product-run merges between 2026-09-25 and 2026-10-09 change
+  `src/hoh/` `[V02]` `[V01]` (34 of 46 as measured on 2026-10-07 for the first alpha, which was tagged 2026-10-08).
 * **Acceptance is not merge.** A product run writes candidate bytes; the
   product's own QA and receipts decide acceptance; independent integration
   review decides whether accepted bytes may be merged; the orchestrating
@@ -60,10 +62,11 @@ prepared from. `paper/POSITION_PAPER_V2.md` gives the full account.
   refused at integration review `[V07t]`.
 * **A durable programme runtime (P2).** Durable timers, a sentinel and a
   never-stuck check; session succession with a master epoch and a leader lease
-  (the lease is still partial); a resume loop that acts on due timers; an
+  (partial at the first alpha; P2-09 reads PROVEN since 2026-10-08, under the
+  limits `RELEASE_NOTES.md` states); a resume loop that acts on due timers; an
   autonomy contract; and a programme checklist whose phase gate an independent
-  supervisor review has to pass. 26 of P2's 43 registered requirements read
-  PROVEN `[V10c]` `[V10b]`, and P2 is **not** closed.
+  supervisor review has to pass. 32 of P2's 43 registered requirements read
+  PROVEN `[V10c]` `[V10b]` (26 as measured on 2026-10-07), and P2 is **not** closed.
 * **The orchestrating session can be rolled over under a protocol (Layer A,
   merged, not yet exercised live).** Four commands (`hoh project hold`,
   `rollover`, `rollover-verify`, `rollover-accept`) freeze a capsule whose
@@ -80,6 +83,7 @@ prepared from. `paper/POSITION_PAPER_V2.md` gives the full account.
   it; its first live use closed the planner and developer panes at turn end and,
   for the QA pane, refused the release because two marked processes had escaped
   it (named, never signalled); the QA pane was gone without anyone closing it by hand.
+  (Correction, 2026-10-08: the lifecycle log of that run, `pane-lifecycle.jsonl`, also holds a `closing` and a `closed` line for the QA pane, in the same second as the `refused` line; the earlier "closed three panes and refused one" counted that pane twice, and the text above replaced it.) (Further correction, 2026-10-08: the `closing` line is written by HoH before its own close command and the `closed` line only after a second snapshot no longer lists the pane, and a pane found already gone is written with an `already_gone` field, which this line does not carry (`_close_own_pane` in `src/hoh/dispatchers.py`); so HoH itself closed the QA pane's tab, nobody closed it by hand, and the `refused` line that follows names the two escaped processes, not a failed close.)
 * **Every long role prompt goes through a pointer file (merged).** A prompt
   above 8 KiB, or one holding a character an input box treats specially, is
   written to a file and the agent gets a short pointer, so the stalled-submit
@@ -131,10 +135,30 @@ readiness fix is the next P2 strand. A role's own background task is now ended
 before the freeze by the merged role-pane lifecycle, which has had one live use
 and carries tracked minor survivors. **Context rollover is built and not
 exercised**: no live succession has run, the draining state is recorded and not
-enforced, and five follow-up items are open (and nine guard rules have no test that kills their removal). The storage steward has not reclaimed anything of
+enforced, and five follow-up items are open (and nine guard rules have no test that kills their removal; corrected 2026-10-08 from "three", the count RELEASE_NOTES and LIMITATIONS list). The storage steward has not reclaimed anything of
 VeriHarness's own data. The exact-head external CI, the benchmark freeze and
 the programme supervisor's review of P2 all read red on the board. The full
 list is *Current open limitations* at the top of `docs/LIMITATIONS.md`.
+
+**Update, 2026-10-09, for `v0.3.0a2`.** The paragraph above is the text of the
+first alpha. Since then the ledger entries O256 to O260 changed these
+statements, and `RELEASE_NOTES.md` has the account and every limit:
+
+* The first two slices of the quota repair are merged: a failed provider dispatch
+  is classified, QA re-raises a provider failure instead of booking it as a
+  rejected iteration, every dispatch records its provenance, and every park is
+  bound to what it stands on. The binding is written and not yet checked on
+  resume. P2-43 still reads MISSING `[V40]`; the third slice is not merged.
+* First-prompt readiness is merged (a bounded wait before the first prompt, and a
+  model of the box's word wrap); whether it cures the stall is SUSPECTED until a
+  live check, so "the readiness fix is the next P2 strand" no longer holds.
+* The follow-up items of the context rollover are fixed in code, the launcher can
+  start its successor, and the acquire can be conditional (P2-09 reads PROVEN).
+  It has still not run live.
+* More writers are disk-full safe; P2-41 is PARTIAL still.
+* New: `hoh agent-setup`, `hoh migrate`, `hoh decision check`, owned agent control
+  (P2-17 reads PROVEN, with limits), the NixOS-first portability patch (never run
+  on a real NixOS or macOS host), and the five P0 measurements.
 
 ## What this actually is
 
@@ -182,7 +206,44 @@ python -m pip install -e .
 An editable checkout of the default branch is development code. Once the tag
 `v0.3.0a1` is cut, checking it out before installing gives the pre-release (see
 *Where the project stands* above); `pip install hoh==0.1.0` is the only package published
-to PyPI.
+to PyPI. The same holds for the tag `v0.3.0a2`.
+
+### Platform notes
+
+HoH is developed and tested on Ubuntu (including WSL2). Other platforms:
+
+- **NixOS and other Nix hosts.** `flake.nix` provides a package, an app and a
+  dev shell (`nix develop`). It was written without a Nix binary and has
+  **never been evaluated or built** (NOT_RUN). Checks run under the `bash`
+  found in an absolute `PATH` entry when `/bin/bash` does not exist, and
+  `--isolation strict` binds `/nix/store`, `/run/current-system/sw`, and the
+  `static` and `profiles` directories of `/etc` read-only, only when the store
+  exists (wording corrected 2026-10-08: the two paths were first
+  written out in full, which the export leak scan reads as a system path).
+  **Everything in those roots is readable by a strict check**, including
+  source copies of projects and any secret a derivation put in the store;
+  closure-only binds are deferred. Both behaviours are covered by tests that
+  fake a Nix host; neither has been run on a real one. If your Herdr server
+  runs under a wrapper with another process name, set `HOH_HERDR_COMM` to that
+  name (`herdr` and `.herdr-wrapped` are recognised; the second is expected from
+  nixpkgs wrappers and not yet observed). The wrapped package puts `git`,
+  `bash` and `bubblewrap` on `PATH`; `herdr` and the agent CLIs you bring
+  yourself.
+- **macOS: partially supported.** Only `--isolation none` exists (there is no
+  bubblewrap); `--isolation strict` is refused with a message saying so. The
+  arena guard and the approval scope were narrowed for macOS paths (text
+  patterns only, not tested on a Mac). Herdr-driven role runs need `/proc` and
+  read-only sealing needs `O_PATH`, neither of which macOS has, so a full run is
+  not expected to work. This README does not claim macOS support; a complete
+  port is a separate task.
+- **Ubuntu 24.04 and `--isolation strict`.** `bubblewrap` needs unprivileged
+  user namespaces, which Ubuntu 24.04 restricts by default
+  (`kernel.apparmor_restrict_unprivileged_userns=1`). When bubblewrap cannot
+  create a namespace, HoH refuses `strict` before dispatching anything and
+  says so. The preferred remedy is an AppArmor profile that grants `userns,`
+  to the `bwrap` path; setting
+  `kernel.apparmor_restrict_unprivileged_userns=0` removes that hardening
+  system-wide and is a last resort. `--isolation none` is unaffected.
 
 ## Running it: two commands, on purpose
 

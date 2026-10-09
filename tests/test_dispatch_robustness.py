@@ -1726,6 +1726,19 @@ class RestoredRig(Rig):
                  row: dict | None = None, restored: bool = True, **options) -> None:
         super().__init__(root, monkeypatch, **options)
         d = self.d
+        herdr_call = self.herdr.__call__
+
+        def fresh_box_after_close(args, **kwargs):
+            # The agent started in place of a closed restored pane shows an
+            # empty box until it is prompted (`_await_ready` reads it so).
+            if (args[1:3] in (["agent", "read"], ["pane", "read"]) and self.closed()
+                    and not self.herdr.prompts):
+                self.herdr.calls.append(list(args))
+                return _screen(EMPTY_BOX)
+            return herdr_call(args, **kwargs)
+
+        monkeypatch.setattr(dispatchers, "subprocess", types.SimpleNamespace(
+            run=fresh_box_after_close, TimeoutExpired=subprocess.TimeoutExpired))
         monkeypatch.setattr(d, "_ensure_agent",
                             types.MethodType(HerdrDispatcher._ensure_agent, d))
         d.profiles = {Role.QA: "claude", Role.PLANNER: "claude", Role.DEVELOPER: "claude"}
@@ -1789,7 +1802,11 @@ class RestoredRig(Rig):
         self.herdr.on_prompt = lambda n: self.write_answer()
 
 
-_REPLACED = [["agent", "get"], ["agent", "read"], ["pane", "close"], ["agent", "prompt"]]
+#: What a first prompt costs in front of it: the dispatcher reads the new agent's
+#: status and box until the box has held still (`_await_ready`).
+_READY = [["agent", "get"], ["agent", "read"]] * (getattr(dispatchers, "READY_QUIET_POLLS", 3) + 1)
+_REPLACED = [["agent", "get"], ["agent", "read"], ["pane", "close"], *_READY,
+             ["agent", "prompt"]]
 
 
 @pytest.mark.parametrize("read, recorded", [
@@ -1892,7 +1909,7 @@ def test_fresh_agent_not_checked(tmp_path, monkeypatch):
     result, exc = rig.dispatch()
     assert exc is None and result == ANSWER
     assert rig.started == [(rig.name, FRESH_PANE)]
-    assert rig.kinds() == [["agent", "prompt"]]
+    assert rig.kinds() == [*_READY, ["agent", "prompt"]]
     assert rig.d._unsettled() == {}
 
     control = RestoredRig(tmp_path / "control", monkeypatch)
@@ -2647,20 +2664,46 @@ def _qaw3_sent() -> str:
             + _answer_instruction(QAW3_PROMPT / "i1-a0-planner.json"))
 
 
+def _claude_wrap(line: str, columns: int) -> list[str]:
+    """Soft wrap of one line as Claude Code's box does it (runs qaw3, qaw4 and
+    qfu4): words at single spaces fill a row, a word that does not fit starts
+    the next one and the spaces at the break are dropped, a hyphen is no break
+    point, and a word longer than a row starts on the current row and is cut
+    exactly at `columns`. Written here independently of the product's own
+    `_claude_rows`, so that the one cannot vouch for the other."""
+    rows = [""]
+    for index, word in enumerate(line.split(" ")):
+        if index:
+            if len(rows[-1]) >= columns:
+                rows.append("")
+            else:
+                rows[-1] += " "
+        if len(word) > columns:
+            for ch in word:
+                if len(rows[-1]) >= columns:
+                    rows.append("")
+                rows[-1] += ch
+            continue
+        if rows[-1] and len(rows[-1]) + len(word) > columns:
+            rows.append("")
+        rows[-1] += word
+    return [row.rstrip(" ") for row in rows]
+
+
 def _claude_box(text: str, width: int = 88) -> str:
     """A pane view of Claude Code's input box holding `text`, typed and not
     submitted, in a pane `width` columns wide: the rules span the pane, the
     first line follows the input mark, every further line is indented by two
-    spaces, and a line breaks mid-word two columns short of the rule -- as
-    in runs qaw3 and qaw4 (rule 88, broken lines 86)."""
+    spaces, and a line wraps (`_claude_wrap`) two columns short of the rule --
+    as in runs qaw3, qaw4 and qfu4 (rule 88, rows of at most 86; rule 78, rows
+    of at most 76)."""
     rule = "\u2500" * width
     out = []
     for n, line in enumerate(text.strip().split("\n")):
         if not line:
             out.append("")
             continue
-        avail = width - 4
-        chunks = [line[i:i + avail] for i in range(0, len(line), avail)]
+        chunks = _claude_wrap(line, width - 4)
         out.append(("\u276f " if n == 0 else "  ") + chunks[0])
         out.extend("  " + c for c in chunks[1:])
     return (f"\u273b Baked for 0s\n{rule}\n" + "\n".join(out)

@@ -237,3 +237,14 @@ one commit, under a registered run root outside the canonical repository; the
 canonical repository is written only by the orchestrating session's merges.
 This is a deployment choice, not a property of `hoh start`, whose default
 layout is unchanged (limit 6).
+
+**Agent control and ownership.** `agentcontrol.py` puts an `AgentControlAdapter`
+between the Herdr dispatcher and Herdr (`HerdrAgentControl` behind it; the
+dispatcher spells no Herdr command itself) and holds `OwnedAgentRegistry`, the
+durable record `owned-agents.jsonl` in a run's directory of the agents that run
+started or adopted, by role. `OwnedAgentControl` refuses to prompt, press or
+close an agent, pane or tab the registry does not hold, before Herdr is called,
+and a restarted run's close recalls the panes the registry still holds. The
+registry is a record kept by HoH's own process; it is not a defence against a
+process of the same user that can write the run directory
+(`docs/LIMITATIONS.md`, the entry on the role-pane lifecycle).

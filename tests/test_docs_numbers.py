@@ -259,6 +259,27 @@ def test_merges_are_counted_by_title_and_src_changes_by_diff(repo):
     assert facts["candidates_imported"] == 0
 
 
+def test_the_product_run_merges_with_another_title_are_counted(repo):
+    """`caa732db` ("Merge role-pane-lifecycle"), `a7d73b8e` ("Merge p217o"),
+    `b7cf790b` ("Merge rbtf") and `a4e8fbad` ("Merge p243b + ...") are
+    product-run merges whose title does not begin "Merge VeriHarness run"; all
+    four are counted, and a merge with an unrelated title is not."""
+    for i, title in enumerate(("Merge role-pane-lifecycle (rpl)",
+                               "Merge p217o: P2-17 owned contracts",
+                               "Merge rbtf: role scratch follow-up",
+                               "Merge p243b + p243bf + p243bf2: slice b",
+                               "Merge p2170 lookalike",
+                               "Merge rbt-lookalike")):
+        git(repo, "checkout", "-q", "-b", f"f{i}")
+        commit(repo, f"feature {i}", f"2026-10-0{i + 1}T10:00:00+0300",
+               {f"src/hoh/m{i}.py": "x = 1\n"})
+        git(repo, "checkout", "-q", "main")
+        git(repo, "merge", "--no-ff", "-q", f"f{i}", "-m", title)
+    base = git(repo, "rev-parse", "HEAD")
+    facts = dn.derive_git(repo, base)
+    assert facts["merges"] == 4 and facts["merges_src"] == 4
+
+
 def test_the_candidate_phrase_is_counted_only_inside_its_window(repo):
     commit(repo, "import candidate as the product wrote it (x)",
            "2026-09-24T10:00:00+0300")

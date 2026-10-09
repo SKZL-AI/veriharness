@@ -39,6 +39,7 @@ from pydantic import Field
 
 from .contracts import Strict, utcnow
 from .durable_io import durable_append, durable_write
+from .failures import NormalizedFailure
 from .taxonomy import FailureClass, disposition
 
 TELEMETRY_SCHEMA_VERSION = 1
@@ -88,6 +89,14 @@ class DispatchRecord(Strict):
     #: "ok" / "failed" / "inconclusive".
     outcome: str = "ok"
     failure_class: FailureClass | None = None
+    #: The A5 class of a failed dispatch (`failures.classify`); None on
+    #: success and on lines written before the field existed.
+    normalized_failure: NormalizedFailure | None = None
+    #: P2-43b: the dispatch's provenance (`dispatchrecovery.DispatchProvenance`
+    #: as a dict: provider, model, account handle, role, route policy and
+    #: version, capability requirements, data class, failure class); None for
+    #: the orchestration steps and for lines written before the field existed.
+    provenance: dict | None = None
     detail: str = ""
     #: Retries already spent on this dispatch when the record was written.
     retries: int = 0

@@ -32,6 +32,7 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
+from . import durable_io
 from .autonomy import (
     AutonomyContract,
     Handling,
@@ -63,13 +64,14 @@ class Governor:
         """Route one decision and record it. The record is the point."""
         routing = route(self.contract, decision=decision, kind=kind, delegable=delegable)
         self._log.parent.mkdir(parents=True, exist_ok=True)
-        with self._log.open("a", encoding="utf-8") as fh:
-            fh.write(json.dumps({
-                "at": utcnow(),
-                "contract_digest": self.contract.digest(),
-                "program_epoch": self.contract.program_epoch,
-                **json.loads(routing.model_dump_json()),
-            }) + "\n")
+        # A routing that could not be written down is not returned as made: a
+        # full disk is a `DiskFullError` here, before the caller acts on it.
+        durable_io.durable_append(self._log, json.dumps({
+            "at": utcnow(),
+            "contract_digest": self.contract.digest(),
+            "program_epoch": self.contract.program_epoch,
+            **json.loads(routing.model_dump_json()),
+        }) + "\n")
         return routing
 
     def routings(self) -> list[dict]:
@@ -205,15 +207,30 @@ def bind(run_dir: Path | str, *, contract: AutonomyContract | None = None,
     if problems:
         raise ContractRefused("; ".join(problems))
     pinned = contract if program_epoch is None else contract.pin(program_epoch)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(pinned.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    # A witness that records another contract, with the pin missing: one
+    # ordinary fault (witness written, pin not) plus a different contract
+    # offered would pin the other one and overwrite the record of what this
+    # run was bound to. The same contract still repairs the run.
+    recorded, _ = _witnessed_digest(witness)
+    if recorded and recorded != pinned.digest():
+        raise ContractRefused(
+            f"this run was bound to contract {recorded}, its pinned file {path} is "
+            f"missing, and the contract offered digests {pinned.digest()}. Restore "
+            f"the pinned file, offer the contract the run was bound to, or start a "
+            f"new run.")
     governor = Governor(contract=pinned, run_dir=Path(run_dir))
     # The witness is written here, not by the caller: a run pinned a moment ago
     # has no routing yet, so a caller that wrote it afterwards left a window in
-    # which a swapped pin had nothing to be compared against.
+    # which a swapped pin had nothing to be compared against. And it is written
+    # *first*: a full disk between the two used to leave a pin with no witness,
+    # which every later call refuses; a witness with no pin is the state this
+    # function already describes for a deleted pin, and offering the contract
+    # again pins it.
+    path.parent.mkdir(parents=True, exist_ok=True)
     witness.parent.mkdir(parents=True, exist_ok=True)
-    witness.write_text(json.dumps(governor.evidence(), indent=2) + "\n",
-                       encoding="utf-8")
+    durable_io.durable_write(witness, json.dumps(governor.evidence(), indent=2) + "\n",
+                             mode=None)
+    durable_io.durable_write(path, pinned.model_dump_json(indent=2) + "\n", mode=None)
     return governor
 
 
@@ -228,7 +245,8 @@ _HELD_NOTE = ("autonomy: the run stays held by its capability violation; the "
 #: could not decide, so the decision is never delegable -- that is what being
 #: blocked *is*.
 def block_under_contract(state: RunState, reason: str, governor: Governor | None,
-                         *, kind: str = "decision") -> Routing | None:
+                         *, kind: str = "decision",
+                         scan_for_quota: bool = True) -> Routing | None:
     """Block, then do what the contract says about blocking.
 
     Without a contract this is exactly the old behaviour: the run stays BLOCKED
@@ -248,7 +266,7 @@ def block_under_contract(state: RunState, reason: str, governor: Governor | None
     """
     from . import stages
 
-    stages.block(state, reason)
+    stages.block(state, reason, scan_for_quota=scan_for_quota)
     if governor is None:
         return None
     routing = governor.decide(decision=reason, kind=kind, delegable=False)
@@ -359,17 +377,16 @@ def record_override(governor: Governor | None, *, routing: Routing, by: str,
     if governor is None:
         return
     governor._log.parent.mkdir(parents=True, exist_ok=True)
-    with governor._log.open("a", encoding="utf-8") as fh:
-        fh.write(json.dumps({
-            "at": utcnow(), "contract_digest": governor.contract.digest(),
-            "program_epoch": governor.contract.program_epoch,
-            "override_of": routing.handling.value, "kind": routing.kind,
-            "decision": what, "by": by,
-            "why": f"a human authority overrode a {routing.handling.value} routing",
-            # The routing's own words, kept: what was overridden matters as
-            # much as that it was.
-            "routing_why": routing.why,
-        }) + "\n")
+    durable_io.durable_append(governor._log, json.dumps({
+        "at": utcnow(), "contract_digest": governor.contract.digest(),
+        "program_epoch": governor.contract.program_epoch,
+        "override_of": routing.handling.value, "kind": routing.kind,
+        "decision": what, "by": by,
+        "why": f"a human authority overrode a {routing.handling.value} routing",
+        # The routing's own words, kept: what was overridden matters as
+        # much as that it was.
+        "routing_why": routing.why,
+    }) + "\n")
 
 
 def forbidden_outright(routing: Routing | None) -> bool:

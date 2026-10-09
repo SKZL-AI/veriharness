@@ -32,12 +32,14 @@ from __future__ import annotations
 
 import fcntl
 import json
+import math
 import os
 import secrets
 import shlex
 import subprocess
+import sys
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
@@ -47,12 +49,12 @@ from .durable_io import durable_append, durable_create, durable_write
 from .epoch import MasterEpoch, Reason
 from .store import LockBusy
 from .succession import (
-    Lease, LeaseError, LeaseHeld, MasterAuthority, StaleMaster,
+    ExpectedHandover, Lease, LeaseError, LeaseHeld, MasterAuthority, StaleMaster,
     pid_alive, utc_now,
 )
 from .succession_capsule import (
     CapsuleError, CapsuleInput, FrozenCapsule, Observer, Verification, ack_path,
-    ack_problems, aborted_path, build_ack, build_receipt, freeze_capsule,
+    ack_problems, aborted_path, build_ack, build_receipt, check_capsule_id, freeze_capsule,
     load_capsule, new_capsule_id, plus_seconds, receipt_path, rollover_dir,
     verify_capsule,
 )
@@ -61,7 +63,8 @@ __all__ = [
     "DEFAULT_THRESHOLD", "HerdrLauncher", "HoldResult", "LaunchHandle", "LauncherError",
     "Outcome", "RolloverError", "RolloverLog", "RolloverResult", "State", "Successor",
     "SuccessorLauncher", "TokenOutError", "TookOver", "TriggerError", "TriggerResult",
-    "evaluate_trigger", "hand_token_over", "hold_lease", "pointer_prompt", "run_rollover",
+    "evaluate_trigger", "hand_token_over", "hold_lease", "pointer_prompt",
+    "product_invocation", "run_rollover",
 ]
 
 
@@ -324,17 +327,61 @@ def expire_stale(log: RolloverLog, now: str) -> dict[str, Any] | None:
 
 POINTER_MAX_CHARS = 2500
 
+#: The one piece of the pointer's command that a shell expands: the process the
+#: lease is bound to. `$CLAUDE_PID` is the Claude Code process, which Claude
+#: Code exports to its Bash tool; `$PPID` is the same process when it is not
+#: set (the Bash tool's shell is Claude's child, in the foreground and in the
+#: background). A constant of the product, never an input, so it is appended
+#: after the quoted values and not itself quoted.
+SESSION_PID_EXPR = '"${CLAUDE_PID:-$PPID}"'
+
+
+def product_invocation(*, python: str | None = None,
+                       package_root: str | os.PathLike[str] | None = None) -> tuple[str, ...]:
+    """The words that start THIS product from any shell, with no `hoh` on PATH:
+    `env PYTHONPATH=<import root> <this interpreter> -m hoh.cli`.
+
+    Derived from the running process, so the successor runs the same
+    interpreter and the same code as the predecessor. `env` carries the
+    assignment because a quoted `PYTHONPATH=...` word is not an assignment to
+    a shell. Refuses (RolloverError) rather than print a command that cannot
+    run: no interpreter, an import root that does not hold `hoh/cli.py`, or a
+    path with a character that is not printable (a newline would split the
+    pointer's one command line in two).
+
+    `-P` (Python 3.11, the product's floor) keeps the working directory off
+    `sys.path`: `-m` would otherwise put it ahead of `PYTHONPATH`, and a
+    `hoh/cli.py` in the successor's directory would shadow the product.
+    """
+    interpreter = python if python is not None else sys.executable
+    if not interpreter or not os.path.isabs(interpreter):
+        raise RolloverError("cannot tell which Python interpreter runs this product "
+                            f"({interpreter!r}); the successor could not be pointed at it")
+    root = Path(package_root if package_root is not None
+                else Path(__file__).resolve().parent.parent)
+    if not (root / "hoh" / "cli.py").is_file():
+        raise RolloverError(f"{root} is not an import root of this product (no hoh/cli.py "
+                            "in it); the successor could not be pointed at it")
+    if not (str(root).isprintable() and interpreter.isprintable()):
+        raise RolloverError("the interpreter or the import root has a character that is "
+                            "not printable; the pointer's command could not be one line")
+    return ("env", f"PYTHONPATH={root}", interpreter, "-P", "-m", "hoh.cli")
+
 
 def pointer_prompt(*, root: str, project_id: str, capsule_file: str,
-                   capsule_digest: str, session: str, token_out: str) -> str:
+                   capsule_digest: str, session: str, token_out: str,
+                   invocation: Sequence[str] = ("hoh",)) -> str:
     """What the successor is told: a pointer and nothing else. It carries no
     history -- not a decision, not a note -- only where the capsule is and the
     one command to run. ASCII, under 2,500 characters, every value of the
-    command shell-quoted."""
-    argv = ["hoh", "--root", root, "project", "rollover-accept", project_id,
+    command shell-quoted. `invocation` is how the command starts the product
+    (`product_invocation()` in a real rotation; the bare `hoh` only where it is
+    known to be on PATH). The command ends with the lease bound to the
+    successor's own conversation process (`SESSION_PID_EXPR`)."""
+    argv = [*invocation, "--root", root, "project", "rollover-accept", project_id,
             "--capsule", capsule_file, "--digest", capsule_digest,
             "--session", session, "--token-out", token_out]
-    command = " ".join(shlex.quote(a) for a in argv)
+    command = " ".join(shlex.quote(a) for a in argv) + f" --watch-pid {SESSION_PID_EXPR}"
     text = (
         f"You are the successor orchestrator session {shlex.quote(session)} for project "
         f"{shlex.quote(project_id)}.\n"
@@ -396,7 +443,11 @@ class HerdrLauncher:
     def __init__(self, *, run: Callable[..., Any] | None = None,
                  workspace: str | None = None, agent_kind: str = "claude",
                  timeout_s: float = 300.0, settle_s: float = 2.0,
-                 sleep: Callable[[float], None] = time.sleep) -> None:
+                 sleep: Callable[[float], None] = time.sleep,
+                 agent_args: Sequence[str] = (), prompt_delay_s: float = 0.0) -> None:
+        if not (math.isfinite(prompt_delay_s) and prompt_delay_s >= 0):
+            raise ValueError(f"prompt_delay_s must be finite and not negative, "
+                             f"got {prompt_delay_s}")
         self._run = run or subprocess.run
         self.workspace = workspace if workspace is not None \
             else os.environ.get("HERDR_WORKSPACE_ID")
@@ -404,6 +455,15 @@ class HerdrLauncher:
         self.timeout_s = timeout_s
         self.settle_s = settle_s
         self._sleep = sleep
+        #: Arguments for the successor's own `claude`, after `--model` (e.g.
+        #: `--permission-mode auto`): without them it starts in the default
+        #: permission mode and waits at its first approval, before it can
+        #: acknowledge.
+        self.agent_args = tuple(agent_args)
+        #: Seconds to idle between `agent start` and the pointer. 0 sends it
+        #: at once. Claude Code 2.1.292 left a first prompt typed but unsent; a
+        #: stall that survives any delay still fails closed (no ack, NO_ACK).
+        self.prompt_delay_s = float(prompt_delay_s)
 
     def _cli(self, argv: list[str], purpose: str) -> dict[str, Any]:
         try:
@@ -449,7 +509,8 @@ class HerdrLauncher:
                 try:
                     started = self._cli(
                         ["herdr", "agent", "start", name, "--kind", self.agent_kind,
-                         "--pane", pane, "--timeout", "240000", "--", "--model", model],
+                         "--pane", pane, "--timeout", "240000", "--", "--model", model,
+                         *self.agent_args],
                         f"start the successor agent {name}")
                     break
                 except LauncherError as exc:
@@ -458,6 +519,8 @@ class HerdrLauncher:
                     self._sleep(1.0 + attempt * 0.5)
             if started is None:
                 raise LauncherError(f"the successor agent {name} could not be started")
+            if self.prompt_delay_s > 0:
+                self._sleep(self.prompt_delay_s)
             self._cli(["herdr", "agent", "prompt", name, prompt],
                       f"send the pointer to {name}")
         except BaseException:
@@ -674,10 +737,21 @@ class Successor:
         if not again.ok:
             raise RolloverError("the ground moved after the acknowledgement; nothing is "
                                 "taken: " + "; ".join(str(d) for d in again.differences))
+        # The last look, immediately before the acquire: verifying takes time, and
+        # in that time the handover may have lapsed and the predecessor taken the
+        # program back (it marks the cycle aborted *before* it acquires). Acquiring
+        # then would take a lease that is the predecessor's again.
+        self._refuse_if_aborted()
+        if not self._handover_stands(self.authority.read_lease()):
+            raise RolloverError("the handover no longer stands (it lapsed or was taken "
+                                "back); nothing is taken")
         try:
             epoch = self.authority.acquire(
                 program_generation=cap.programme_generation, reason=Reason.SUCCESSION,
-                note=f"rollover {cap.capsule_id}")
+                note=f"rollover {cap.capsule_id}",
+                only_handover=ExpectedHandover(
+                    master_epoch=cap.predecessor_epoch,
+                    token_sha256=cap.predecessor_token_sha256))
         except (LeaseHeld, LeaseError, LockBusy) as exc:
             raise RolloverError(f"the lease is not this session's to take: {exc}") from exc
         if epoch.epoch != cap.successor_epoch:
@@ -687,8 +761,20 @@ class Successor:
             except Exception:                               # noqa: BLE001 - best effort
                 pass
             raise RolloverError(f"acquired epoch {epoch.epoch}, not the intended "
-                                f"{cap.successor_epoch}; the lease was given back")
+                                f"{cap.successor_epoch}; the lease was given back and the "
+                                f"program has no master until a session runs "
+                                f"`hoh project hold`")
         return epoch
+
+    def _handover_stands(self, lease: Lease | None) -> bool:
+        """Is `lease` still the predecessor's handover of this capsule to this
+        session, and not yet lapsed?"""
+        cap = self.cap
+        return (lease is not None and bool(lease.released_at)
+                and lease.successor == self.session
+                and lease.token_sha256 == cap.predecessor_token_sha256
+                and lease.master_epoch == cap.predecessor_epoch
+                and lease.expires_at > self.authority.clock())
 
     def take(self, ack: dict[str, Any], *, token_out: str | None = None) -> TookOver:
         """After the acknowledgement: wait for the handover, derive again, take
@@ -767,12 +853,13 @@ class RolloverResult:
                 "reclaimed_epoch": self.reclaimed_epoch, "hint": self.hint}
 
 
-def _mark_aborted(directory: Path, capsule_id: str, outcome: Outcome, detail: str,
+def _mark_aborted(directory: Path, capsule_id: str, outcome: Outcome | str, detail: str,
                   at: str) -> None:
     """The abort marker, for the paths that end a cycle after a handover. A
-    successor that comes late finds it and takes nothing."""
-    payload = json.dumps({"outcome": outcome.value, "detail": detail, "at": at},
-                         sort_keys=True) + "\n"
+    successor that comes late finds it and takes nothing. It is written once and
+    never replaced, so what it says must stay true whatever happens next."""
+    payload = json.dumps({"outcome": getattr(outcome, "value", outcome), "detail": detail,
+                          "at": at}, sort_keys=True) + "\n"
     try:
         durable_create(aborted_path(directory, capsule_id), payload, mode=0o600)
     except OSError:
@@ -818,7 +905,9 @@ def run_rollover(authority: MasterAuthority, directory: Path | str, *,
                  generation: int | None = None, ack_timeout_s: int = 600,
                  takeover_s: int = 300, drain_s: int = 300, poll_s: float = 1.0,
                  sleep: Callable[[float], None] = time.sleep,
-                 capsule_id: str | None = None) -> RolloverResult:
+                 capsule_id: str | None = None,
+                 reclaim_linger_s: float = 5.0,
+                 invocation: Sequence[str] | None = None) -> RolloverResult:
     """The predecessor's whole rotation. See the module docstring; the steps:
 
     1. check; the trigger (optional) must fire; a cycle in flight refuses; no
@@ -831,7 +920,12 @@ def run_rollover(authority: MasterAuthority, directory: Path | str, *,
     5. hand over, bounded by `takeover_s`.
     6. see the successor hold exactly the intended epoch -> COMPLETE; else the
        handover lapses and this session acquires again -> RECLAIMED.
+
+    `invocation` is how the pointer's command starts the product; None (the
+    default) is `product_invocation()`, resolved first, so a product that cannot
+    name itself refuses (RolloverError) before anything is frozen or launched.
     """
+    invocation = tuple(invocation) if invocation is not None else product_invocation()
     directory = Path(directory)
     log = RolloverLog(directory, clock=authority.clock)
 
@@ -881,6 +975,10 @@ def run_rollover(authority: MasterAuthority, directory: Path | str, *,
                                      "recorded as pending, the next start continues")
 
     capsule_id = capsule_id or new_capsule_id(authority.clock())
+    try:
+        check_capsule_id(capsule_id)          # a name, before any path is built from it
+    except CapsuleError as exc:
+        return RolloverResult(Outcome.REFUSED, detail=str(exc))
     successor = str(successor_session).strip()
     handle: Any = None
 
@@ -929,7 +1027,8 @@ def run_rollover(authority: MasterAuthority, directory: Path | str, *,
         prompt = pointer_prompt(root=str(root), project_id=project_id,
                                 capsule_file=str(frozen.path),
                                 capsule_digest=cap.capsule_digest, session=successor,
-                                token_out=str(cwd / "master.token"))
+                                token_out=str(cwd / "master.token"),
+                                invocation=invocation)
         handle = launcher.start(session_id=successor, model=cap.successor_model,
                                 cwd=cwd, prompt=prompt, label=f"successor-{capsule_id}")
     except Exception as exc:                                # noqa: BLE001 - fail closed
@@ -1023,7 +1122,15 @@ def run_rollover(authority: MasterAuthority, directory: Path | str, *,
             detail=f"{successor!r} holds epoch {cap.successor_epoch}; this session is "
                    f"fenced and must go idle")
 
-    # The handover lapsed: take the program back (a fresh epoch, RECOVERY).
+    # The handover lapsed: take the program back (a fresh epoch, RECOVERY). The
+    # cycle is marked aborted *first*: a successor that is about to acquire looks
+    # at the marker last of all, and one that looks later still finds this
+    # session's live lease and is refused (`LeaseHeld`). The marker is written once,
+    # before the outcome is known, so it says only that a reclaim was attempted; what
+    # came of it is in the log (`reclaimed`, or `abort` with the outcome).
+    _mark_aborted(directory, capsule_id, "RECLAIM_ATTEMPTED",
+                  "the handover window passed and this session is taking the program back",
+                  authority.clock())
     try:
         epoch = authority.acquire(program_generation=cap.programme_generation,
                                   reason=Reason.RECOVERY,
@@ -1032,18 +1139,31 @@ def run_rollover(authority: MasterAuthority, directory: Path | str, *,
         return abort(Outcome.SUPERSEDED, f"the handover lapsed and the lease was not "
                                          f"this session's to take back: {exc}",
                      master=False)
-    _mark_aborted(directory, capsule_id, Outcome.RECLAIMED,
-                  "the successor did not take over within the handover window",
-                  authority.clock())
     log.record("reclaimed", capsule_id=capsule_id, epoch=epoch.epoch)
     if handle is not None:
         try:
             launcher.stop(handle)
         except Exception:                                   # noqa: BLE001 - best effort
             pass
+    # Linger, renewing: this command is about to exit and a lease is judged by its
+    # holder's process, so for a moment longer the reclaimed lease is held by a
+    # living one. Then say what is true now, not what was true at the acquire.
+    until = plus_seconds(authority.clock(), reclaim_linger_s)
+    while authority.clock() < until:
+        try:
+            authority.renew()
+        except StaleMaster as exc:
+            return RolloverResult(
+                Outcome.SUPERSEDED, capsule_id=capsule_id, capsule_file=frozen.path,
+                predecessor_is_master=False,
+                detail=f"this session took the program back and then lost it again: {exc}")
+        except (LockBusy, LeaseError, OSError):
+            pass            # transient, as in `hold_lease`: the result line is still printed
+        sleep(poll_s)
     return RolloverResult(
         Outcome.RECLAIMED, capsule_id=capsule_id, capsule_file=frozen.path,
-        reclaimed_epoch=epoch.epoch, predecessor_is_master=True, token=authority.token,
+        reclaimed_epoch=epoch.epoch, predecessor_is_master=not authority.problems(),
+        token=authority.token,
         detail=("the successor took the program and gave it back" if seen == "gave_back"
                 else "the successor did not take over within the handover window")
                + "; this session took the program back at a fresh epoch",

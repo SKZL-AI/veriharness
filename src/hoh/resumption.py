@@ -56,6 +56,7 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
 
+from .failures import AUTOMATIC_KINDS
 from .taxonomy import FailureClass, classify_failure
 from .timers import Timer, TimerStatus, TimerStore, TimerStoreError, check_time
 
@@ -123,7 +124,7 @@ TERMINAL = frozenset({"ACCEPTED", "STOPPED", "CANCELLED", "FAILED"})
 #: run with one of these, and no capability violation behind it, is parked in
 #: the sense this module resumes -- by the consumer that owns its class.
 WAITING_KINDS = frozenset({"parked_by_contract", "collected_for_digest", "usage_limit",
-                           "storage_pressure"})
+                           "storage_pressure"}) | AUTOMATIC_KINDS
 
 
 def normalise_now(now: datetime | str) -> str:

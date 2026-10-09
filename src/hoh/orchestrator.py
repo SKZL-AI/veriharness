@@ -53,6 +53,11 @@ from .project import (
     ProjectState,
     TaskNode,
 )
+from .programlogic import EventKind
+from .projectactivity import (
+    ActivityLogError, abandon as abandon_dispatch, close as close_dispatch, in_flight_disagreements,
+    outcome_digest, start as start_dispatch,
+)
 from .projectstore import ProjectStore
 from .store import LockBusy, StaleWrite, StoreError
 from .succession import MasterAuthority, StaleMaster
@@ -605,6 +610,22 @@ class ProjectController:
             steps_.append(Step(0, HaltClass.BLOCKED_DEPENDENCY, detail=why))
             return Result(HaltClass.BLOCKED_DEPENDENCY, why, steps_)
 
+        # The dispatch activity log, folded by the pure reducer (P2-15). A log that
+        # cannot be folded, or that disagrees with the node lifecycles about what is
+        # in flight, is not something this session may drive on: which of the two is
+        # right cannot be read from here, and re-dispatching on the wrong one repeats
+        # an acceptance or abandons a live run.
+        try:
+            disagree_ = in_flight_disagreements(state)
+        except ActivityLogError as exc:
+            steps_.append(Step(0, HaltClass.CORRUPT_STATE, detail=str(exc)))
+            return Result(HaltClass.CORRUPT_STATE, str(exc), steps_)
+        if disagree_:
+            why = ("the activity log and the node lifecycles disagree about what is in "
+                   "flight: " + "; ".join(disagree_))
+            steps_.append(Step(0, HaltClass.AMBIGUOUS, detail=why))
+            return Result(HaltClass.AMBIGUOUS, why, steps_)
+
         # A RUNNING node means a previous session died mid-dispatch. Rather
         # than halting on principle, ask the run's own recorded state what
         # happened -- that is a read, costs nothing, and is the only way a
@@ -624,7 +645,13 @@ class ProjectController:
                 # between persisting the lifecycle and dispatching. Nothing was
                 # spent and nothing can be repeated, so it simply becomes work
                 # again.
-                n.lifecycle = Lifecycle.READY
+                # The node of the *current* state: an earlier iteration's `_persist`
+                # replaced `state`, and a lifecycle written to the stale object is lost.
+                reset_ = state.node(n.id)
+                assert reset_ is not None
+                reset_.lifecycle = Lifecycle.READY
+                close_dispatch(state, n.id, EventKind.FAILED,
+                               failure=f"NOT_STARTED: {outcome_.detail}"[:300])
                 state = self._persist(state)
                 steps_.append(Step(0, "RESET_TO_READY", n.id, outcome_.detail))
                 continue
@@ -728,6 +755,9 @@ class ProjectController:
                 continue
 
             task.lifecycle = Lifecycle.RUNNING
+            # The dispatch is an activity: its STARTED event is persisted in the
+            # same write as RUNNING, before the launch (P2-15).
+            start_dispatch(state, task.id)
             # The baseline goes into state before the dispatch, not after: it
             # is what a fresh process needs in order to tell an acceptance from
             # a run that ended where it started, and a process that dies during
@@ -836,6 +866,17 @@ class ProjectController:
         """
         task = state.node(node_id)
         assert task is not None
+
+        # The dispatch activity ends with the outcome, in the same write as the
+        # lifecycle transition below. IN_FLIGHT is the one verdict that writes
+        # nothing: the run is still executing, so its activity stays open.
+        if outcome_.verdict is RunVerdict.ACCEPTED:
+            close_dispatch(state, node_id, EventKind.SUCCEEDED,
+                           result_digest=outcome_digest(candidate=outcome_.candidate,
+                                                        tree=outcome_.candidate_tree))
+        elif outcome_.verdict is not RunVerdict.IN_FLIGHT:
+            close_dispatch(state, node_id, EventKind.FAILED,
+                           failure=f"{outcome_.verdict.value}: {outcome_.detail}"[:300])
 
         if outcome_.verdict is RunVerdict.PROVIDER_UNAVAILABLE:
             task.lifecycle = Lifecycle.BLOCKED
@@ -1004,6 +1045,7 @@ class ProjectController:
             task.rejections += 1
             if task.rejections > MAX_REJECTIONS:
                 task.lifecycle = Lifecycle.ABANDONED
+                abandon_dispatch(state, node_id, f"{task.rejections} rejections without progress")
                 self._record(
                     state, DecisionKind.ABANDON_NODE,
                     f"{task.rejections} rejections without progress",

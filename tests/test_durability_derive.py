@@ -20,7 +20,7 @@
    in case order, each entry prefixed with its case -- nothing sorted, nothing
    deduplicated.
 
-The derived record states RECORD_VERSION 5 and lists the new control.
+The derived record states RECORD_VERSION 6 and lists the new control.
 
 Plain unittest on purpose: the file runs under pytest and under
 `python3 -m unittest`, needs neither pytest nor pydantic, and never starts the
@@ -402,7 +402,7 @@ class QuotaCrashRecordTest(unittest.TestCase):
 class RecordVersionTest(unittest.TestCase):
 
     def test_record_version_stated_and_new_control_listed(self):
-        self.assertEqual(dur.RECORD_VERSION, 5)
+        self.assertEqual(dur.RECORD_VERSION, 6)
         # The only process derive would start is `git show` for the evidence
         # commit's unit; answered here as unreadable, so nothing is started.
         unreadable = mock.Mock(returncode=128, stdout="", stderr="")
@@ -411,7 +411,7 @@ class RecordVersionTest(unittest.TestCase):
             (Path(tmp) / "meta.json").write_text(json.dumps(CLEAN_META))
             record = dur.derive(Path(tmp))
         self.assertEqual(run.call_count, 1)
-        self.assertEqual(record["record_version"], 5)
+        self.assertEqual(record["record_version"], 6)
         entry = record["negative_controls"]["marker-names-other-pid@orphaned-run"]
         self.assertEqual(entry["targets"], ["marker_names_the_orphaned_child"])
         self.assertEqual(entry["status"], "NOT_RUN")

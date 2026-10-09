@@ -350,6 +350,10 @@ class Server:
         #: Called with the pane id when Herdr closes a pane.
         self.on_pane_close: list = []
         self.screen = SCREEN
+        #: Agents `agent start` made that no prompt has been sent to: until
+        #: then their screen is Claude Code's empty box (the dispatcher waits
+        #: for it before a first prompt, `_await_ready`).
+        self.unprompted: set[str] = set()
         self.reads = 0
         self._n = itertools.count(1)
         self._add_pane(CALLER, CALLER_TAB, str(root))
@@ -451,6 +455,8 @@ class Server:
         if verb == ["agent", "read"]:
             if args[3] not in self.agents:
                 return _error("agent_not_found")
+            if args[3] in self.unprompted:
+                return _text(EMPTY_BOX)
             return _text(self.screen)
         if verb == ["pane", "read"]:
             if args[3] not in self.panes:
@@ -486,6 +492,7 @@ class Server:
                "workspace_id": WS, "agent": args[args.index("--kind") + 1],
                "agent_status": "idle", "cwd": cwd, "foreground_cwd": cwd}
         self.agents[name] = row
+        self.unprompted.add(name)
         if self.start_fails_after_registering:
             return _error("agent_not_ready", "the agent did not become ready")
         self.tick(except_agent=name)
@@ -496,6 +503,7 @@ class Server:
         row = self.agents.get(name)
         if row is None:
             return _error("agent_not_found")
+        self.unprompted.discard(name)
         self.tick(except_agent=name)
         if name in self.fail_prompt:
             return _error(self.fail_prompt[name])
@@ -1193,7 +1201,13 @@ def test_only_two_functions_ask_herdr_to_close_something():
     for the literal spelling**, in either quote and with any spacing; code
     review is the other half."""
     source = (Path(dispatchers.__file__)).read_text(encoding="utf-8")
-    assert _close_sites(source) == {"_close_own_pane", "_replace_restored"}
+    # P2-17: the dispatcher no longer spells a command at all. The close goes
+    # through `self.control.close_pane` / `close_tab`, whose Herdr spelling is
+    # `HerdrAgentControl`'s, and the two functions that may call them are
+    # pinned by `tests/test_agent_control.py::test_the_dispatcher_closes_only_through_two_functions`.
+    assert _close_sites(source) == set()
+    control = (Path(dispatchers.__file__).parent / "agentcontrol.py").read_text(encoding="utf-8")
+    assert _close_sites(control, "HerdrAgentControl") == {"close_pane", "close_tab"}
 
     # The scanner itself sees every spelling it claims to.
     for spelling in ("['herdr', 'tab' ,  'close', x]", '["herdr", "pane", "close", x]',

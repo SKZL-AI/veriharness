@@ -89,7 +89,7 @@ HERE = Path(__file__).resolve().parent
 HOH = HERE.parent
 sys.path.insert(0, str(HOH / "src"))
 
-RECORD_VERSION = 5
+RECORD_VERSION = 6
 PROJECT = "dur"
 CONTINUATION_UNIT = HOH / "ops" / "hoh-continue.service"
 
@@ -354,6 +354,69 @@ def utc() -> str:
     return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def _pid_start(pid) -> str | None:
+    """Start time of `pid` in clock ticks since boot (field 22 of /proc/<pid>/stat),
+    or None when there is no such process or the file cannot be read or parsed.
+    With the pid it names one process; the fixture writes the same value into
+    its pause marks (`durability_fixture._self_start`)."""
+    try:
+        stat = Path(f"/proc/{int(pid)}/stat").read_text()
+    except (OSError, ValueError, TypeError):
+        return None
+    fields = stat[stat.rfind(")") + 2:].split()
+    return fields[19] if len(fields) > 19 else None
+
+
+def _current_boot_id() -> str:
+    """This boot's id, or "" when it cannot be read."""
+    try:
+        return Path("/proc/sys/kernel/random/boot_id").read_text().strip()
+    except OSError:
+        return ""
+
+
+def _archive_matches_head(code: Path, head: str | None, repo: Path | None = None,
+                          paths: tuple[str, ...] | None = None) -> bool:
+    """Whether the tree at `code` holds exactly `head`'s files under `paths`
+    (default RELEVANT_PATHS): every blob equal, no file missing, none extra
+    (`__pycache__` aside). This is what `reboot-verify` runs after the restart
+    (the archive `reboot-arm` exported), not the file that started the command.
+    False when `head` is unknown or anything cannot be read: never a guess."""
+    if not head:
+        return False
+    repo = HOH if repo is None else repo
+    paths = RELEVANT_PATHS if paths is None else paths
+    ls = _git(repo, "ls-tree", "-r", "-z", head, "--", *paths)
+    if ls.returncode != 0 or not ls.stdout:
+        return False
+    want = {}
+    for rec in ls.stdout.split("\0"):
+        if not rec:
+            continue
+        meta, _, name = rec.partition("\t")
+        mode, kind, sha = meta.split()
+        if kind != "blob" or mode not in ("100644", "100755"):
+            return False
+        want[name] = sha
+    code = Path(code).resolve()
+    files = [code / n for n in want]
+    if not all(f.is_file() and not f.is_symlink() for f in files):
+        return False
+    hashed = subprocess.run(["git", "-C", str(repo), "hash-object", "--stdin-paths"],
+                            input="\n".join(str(f) for f in files) + "\n",
+                            capture_output=True, text=True, check=False)
+    if hashed.returncode != 0 or hashed.stdout.split() != list(want.values()):
+        return False
+    for p in paths:
+        root = code / p
+        if root.is_dir():
+            extra = {str(f.relative_to(code)) for f in root.rglob("*")
+                     if f.is_file() and "__pycache__" not in f.parts}
+            if extra - set(want):
+                return False
+    return True
+
+
 def _git(repo: Path, *args: str) -> subprocess.CompletedProcess:
     env = {**os.environ, "GIT_AUTHOR_NAME": "fixture", "GIT_AUTHOR_EMAIL": "f@localhost",
            "GIT_COMMITTER_NAME": "fixture", "GIT_COMMITTER_EMAIL": "f@localhost"}
@@ -517,17 +580,32 @@ class Scenario:
         self.step("moment", tag=tag, projects=list(pids or (PROJECT,)),
                   after_capture=self.captured)
 
-    def capture(self) -> None:
+    def capture(self, *, skip_marks: bool = False) -> None:
         # A paused role-run child is not in self.procs (the fixture started it);
-        # its pid is in the mark it wrote. Released points are left alone.
-        for mark in self.marks.glob("*.reached"):
+        # its pid and its start time are in the mark it wrote. Released points
+        # are left alone. A pid is signalled only if the process holding it now
+        # started when the mark says: a pid reused by an unrelated process, or
+        # a mark that carries no start time, or a start time that cannot be
+        # read, signals nothing. `skip_marks` is for a capture after (or not
+        # provably without) a reboot: no mark is read at all.
+        for mark in ([] if skip_marks else self.marks.glob("*.reached")):
             if mark.with_suffix(".release").exists():
                 continue
             try:
-                pid = json.loads(mark.read_text())["pid"]
+                data = json.loads(mark.read_text())
+                pid = data["pid"]
+                now = _pid_start(pid)
+                if now is None:
+                    continue                      # no such process, or unreadable
+                if not data.get("start") or data["start"] != now:
+                    self.step("mark-not-signalled", pid=pid, point=data.get("point"),
+                              reason="the process now holding the pid is not the one "
+                                     "that wrote the mark" if data.get("start")
+                                     else "the mark carries no process start time")
+                    continue
                 os.kill(pid, signal.SIGKILL)
                 self.step("sigkill", pid=pid, point="cleanup-child", returncode=None)
-            except (OSError, ValueError, KeyError):
+            except (OSError, ValueError, KeyError, TypeError):
                 pass
         for p in self.procs:
             if p.poll() is None:
@@ -887,14 +965,25 @@ def cmd_reboot_arm(args) -> int:
 def cmd_reboot_verify(args) -> int:
     evidence = Path(args.evidence).resolve()
     armed = json.loads((evidence / "reboot" / "ARMED.json").read_text())
-    global CODE, CONTINUE_ARGV
+    if any(s.get("kind") == "reboot-verify" for s in _steps(evidence / "reboot")):
+        print(f"refused: {evidence / 'reboot'} was verified already; evidence is "
+              "never appended to", file=sys.stderr)
+        return 2
+    global CODE, CONTINUE_ARGV, EXPORTED_HEAD
     CODE = Path(armed.get("code_root") or HOH)
     CONTINUE_ARGV = _continue_argv(CODE / "ops" / "hoh-continue.service")
     if CODE != HOH:
         _use_code_for_this_process()
+    EXPORTED_HEAD = armed.get("head") or None
     sc = Scenario(Path(armed["base"]), evidence, "reboot", [], fresh=False)
-    boot = Path("/proc/sys/kernel/random/boot_id").read_text().strip()
-    sc.step("reboot-verify", boot_id=boot)
+    boot = _current_boot_id() or ""
+    # Pause marks name pids of the previous boot. They are read only when the
+    # boot is positively the same one: a missing, empty or unreadable boot id
+    # on either side is "not provably the same" and signals nothing.
+    same_boot = bool(boot) and armed.get("boot_id") == boot
+    sc.step("reboot-verify", boot_id=boot, marks_skipped=not same_boot,
+            tool_matches_armed_head=bool(EXPORTED_HEAD) and _harness_matches_head(),
+            code_matches_armed_head=_archive_matches_head(CODE, EXPORTED_HEAD))
     try:
         deadline = time.monotonic() + 90
         ticks = 0
@@ -905,8 +994,9 @@ def cmd_reboot_verify(args) -> int:
                 break
             time.sleep(2)
     finally:
-        sc.capture()
-    print(f"verify done after {ticks} tick(s); boot {armed['boot_id'][:8]} -> {boot[:8]}")
+        sc.capture(skip_marks=not same_boot)
+    print(f"verify done after {ticks} tick(s); boot "
+          f"{str(armed.get('boot_id') or '')[:8]} -> {boot[:8]}")
     return 0
 
 
@@ -1503,15 +1593,40 @@ def derive_orphaned_run(d: Path, work: Path) -> dict:
     return _result(steps, facts, repo, checks, ["DS1-ORPHAN"], d=d)
 
 
+def _read_json(path: Path) -> dict:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
 def derive_reboot(d: Path, work: Path) -> dict:
     steps, facts, repo = _steps(d), _project_facts(d), _repo_facts(d, work)
-    arm = next((s for s in steps if s["kind"] == "reboot-arm"), {})
-    ver = next((s for s in steps if s["kind"] == "reboot-verify"), {})
+    arms = [s for s in steps if s["kind"] == "reboot-arm"]
+    vers = [s for s in steps if s["kind"] == "reboot-verify"]
+    arm, ver = (arms or [{}])[0], (vers or [{}])[0]
     ticks = [s for s in steps if s["kind"] == "process-exit"
              and str(s.get("label", "")).startswith("tick-")]
     recovered = [r for t in ticks for r in t["output"].get("projects", [])
                  if r.get("action") == "recovered"]
+    armed, meta = _read_json(d / "ARMED.json"), _read_json(d.parent / "meta.json")
     checks = {
+        # One arm and one verify: a second verify would append ticks to a
+        # finished record, and only the first is read below.
+        "armed_and_verified_once": len(arms) == 1 and len(vers) == 1,
+        # The restart is evidence about one commit's code: the arm must have run
+        # from the very commit the other scenarios ran from, on a clean tree, and
+        # the verify with that commit's own harness, fixture, unit and src/hoh
+        # (the archive that actually ran after the restart, not only the file
+        # that started the command). The arm's record and the steps are the
+        # harness's own statements, at the trust level of meta.json.
+        "armed_at_the_evidence_commit": bool(armed.get("head"))
+                                        and armed.get("head") == meta.get("head")
+                                        and armed.get("dirty") is False
+                                        and str(armed.get("code", "")).startswith("git archive "),
+        "verified_with_the_armed_harness": ver.get("tool_matches_armed_head") is True
+                                           and ver.get("code_matches_armed_head") is True,
         "boot_changed": bool(arm.get("boot_id")) and bool(ver.get("boot_id"))
                         and arm["boot_id"] != ver["boot_id"],
         "recovered_after_reboot": [r for _, _, r in facts["epochs"]][:2]
@@ -1527,6 +1642,14 @@ def derive_reboot(d: Path, work: Path) -> dict:
 #: Which scenarios each registered exit condition rests on. Written down, not
 #: inferred: a reader can disagree with one line without re-reading the tool.
 REQUIREMENTS = {
+    # Crash AND reboot recovery. Standalone: a record without the operator's
+    # restart still speaks for the five exit conditions, so this row is read by
+    # its own key and is not part of the record's top-level conjunction.
+    "P2-11": {"item": "P2.build-verify.crash-reboot-recovery",
+              "needs": ["controller-kill", "orphaned-run", "reboot"],
+              "standalone": True,
+              "note": "crash recovery is DS1 (external SIGKILL, automatic replacement) and "
+                      "DS1-ORPHAN; reboot recovery is DS2, an operator-run restart"},
     # The umbrella line: the four lines under it are its content, so it holds
     # only when they all hold (and_requirements), evaluated after them.
     "P2-33": {"item": "P2.exit-includes.unattended-test",
@@ -1630,6 +1753,14 @@ def _evaluate_requirements(scenarios: dict, meta: dict, instrument_ok: bool,
     return {rid: reqs[rid] for rid in REQUIREMENTS}
 
 
+def _exit_conditions_satisfied(reqs: dict) -> bool:
+    """The record's top-level flag: every requirement except the standalone
+    ones (P2-11 needs an operator's restart; a record without it still speaks
+    for the five exit conditions, each of which is read by its own key)."""
+    return all(r["satisfied"] for rid, r in reqs.items()
+               if not REQUIREMENTS[rid].get("standalone"))
+
+
 def derive(evidence: Path) -> dict:
     meta = json.loads((evidence / "meta.json").read_text())
     # Judge against the command that actually ran (it came from the code the
@@ -1711,7 +1842,7 @@ def derive(evidence: Path) -> dict:
         "negative_controls": controls,
         "instrument_falsifiable": instrument_ok,
         "requirements": reqs,
-        "requirement_satisfied": all(r["satisfied"] for r in reqs.values()),
+        "requirement_satisfied": _exit_conditions_satisfied(reqs),
     }
 
 

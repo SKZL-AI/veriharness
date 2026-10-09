@@ -31,7 +31,9 @@ directory names.
 Rule set (14 named rules, plus the conservative default `unclassified`):
 
     package                    what a user installs and runs: src/,
-                               pyproject.toml
+                               pyproject.toml, and the Nix packaging of the
+                               package at the repository root (flake.nix,
+                               flake.lock)
     tests                      tests/
     tooling                    tools/
     example                    examples/
@@ -209,6 +211,15 @@ GOVERNANCE_BASENAMES = frozenset(
 )
 
 REPO_META_BASENAMES = frozenset({".gitignore", ".gitattributes", ".dockerignore"})
+
+#: Root-level files that are part of the package itself and not documentation.
+#: `pyproject.toml` always was. `flake.nix` (and its lock file, should one ever
+#: be committed) is the Nix packaging of the same package: the README and the
+#: release notes present it as delivered (NixOS support), and a file that falls
+#: through to `unclassified` is EXCLUDE, so the published repository would not
+#: have held it. Added 2026-10-09 (v0.3.0a2 release review, ledger O260). Root
+#: level only: a `flake.nix` in a subdirectory is not claimed by this rule.
+PACKAGE_ROOT_BASENAMES = frozenset({"pyproject.toml", "flake.nix", "flake.lock"})
 
 #: See the "CLAIMS.json / CLAIMS.md, specifically" note in the module
 #: docstring for how these two came to be public-docs rather than
@@ -760,7 +771,7 @@ def _classify(rel_path: str, root: Path) -> tuple[str, str]:
     if m and (root / "/".join(parts[:-1]) / m.group("base")).is_file():
         return "EXCLUDE", "parked-predecessor"
 
-    if rel_path == "pyproject.toml" or top == "src":
+    if rel_path in PACKAGE_ROOT_BASENAMES or top == "src":
         return "INCLUDE", "package"
 
     # Named evidence subtrees, checked before the wholesale directory rules.

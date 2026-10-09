@@ -39,7 +39,22 @@ _PATTERNS = [
 
 #: "Your limit will reset at 5pm" / "resets at 17:00" / "in 2h 30m"
 _CLOCK_TIME = re.compile(r"reset[s]?\s+at\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?", re.I)
-_DURATION = re.compile(r"(?:in|after)\s+(?:(\d+)\s*h)?\s*(?:(\d+)\s*m)?", re.I)
+#: At most five digits a side: a longer number is no duration (and `int()` of
+#: thousands of digits raises, which the receipt path must never meet).
+_DURATION = re.compile(r"\b(?:in|after)\s+(?:(\d{1,5})\s*h)?\s*(?:(\d{1,5})\s*m)?", re.I)
+
+#: What the provider prints on a limit (2026-10-04, four runs):
+#: `Usage limit reached · continuing automatically at 3:20am · esc to cancel`
+#: and `You've hit your session limit · resets 3:20am (Europe/Istanbul)`.
+#: The clock time comes without `at`, so the old pattern read neither -- every
+#: wait was `now + 1 h` and spent up to four of five resume attempts on a
+#: five-hour reset (P2-43 Q4). Without an `at`, a bare number is not a time:
+#: it needs minutes or am/pm (`resets 3 requests` is not 03:00).
+_STATED_CLOCK = re.compile(
+    r"(?:\bresets?(?:\s+at)?|\bcontinuing automatically at|\btry again at)\s+"
+    r"(\d{1,2})(?::(\d{2}))?\s*(am|pm)?(?![\w:])", re.I)
+#: The zone the provider names after its time, `(Europe/Istanbul)`.
+_STATED_ZONE = re.compile(r"\s*\(\s*([A-Za-z][A-Za-z0-9_+\-]*(?:/[A-Za-z0-9_+\-]+)*)\s*\)")
 
 #: How long to wait when the text names no time at all. With the providers used
 #: here a quota typically resets hourly or every five hours; one hour is the
@@ -67,12 +82,19 @@ def next_attempt_at(text: str, *, now: datetime | None = None) -> datetime:
     """
     now = now or datetime.now(timezone.utc)
 
-    d = _DURATION.search(text or "")
-    if d and (d.group(1) or d.group(2)):
-        return now + timedelta(hours=int(d.group(1) or 0), minutes=int(d.group(2) or 0))
+    # The provider's own banner first: its stated reset (with its zone) is the
+    # best evidence there is, and a role's `finished in 5m` elsewhere must not
+    # outrank it.
+    stated = _stated_clock(text or "", now)
+    if stated is not None:
+        return stated if stated is not _UNTRUSTED else now + DEFAULT_WAIT
+
+    wait = _stated_duration(text or "")
+    if wait is not None:
+        return now + wait
 
     c = _CLOCK_TIME.search(text or "")
-    if c:
+    if c and int(c.group(2) or 0) < 60:           # `resets at 99:99` is no time
         hour = int(c.group(1)) % 12
         if (c.group(3) or "").lower() == "pm":
             hour += 12
@@ -85,6 +107,117 @@ def next_attempt_at(text: str, *, now: datetime | None = None) -> datetime:
         return target
 
     return now + DEFAULT_WAIT
+
+
+#: Added to a reset time the provider states: the banner names the minute, the
+#: reset happens somewhere inside it, and a run resumed one second early meets
+#: the same banner -- whose reset time, read just after the minute, is then
+#: tomorrow's.
+STATED_RESET_MARGIN = timedelta(minutes=1)
+
+#: A line that says something about a limit: the only lines a duration
+#: (`retry in 2h 30m`) is read from. A role's `finished in 5m` is not one.
+_LIMIT_WORDS = re.compile(r"\b(?:resets?|limit|quota|retry|try again)\b", re.I)
+#: No provider waits longer than this for a duration; a larger number is a typo
+#: or a role's, and reading it would park a run for good.
+_MAX_STATED_WAIT = timedelta(hours=72)
+
+#: How a provider's own banner starts (after its leading glyphs): the only
+#: lines a stated clock time and zone are read from, so a role's own
+#: `resets 5pm (Pacific/Kiritimati)` cannot supply the zone of a real banner.
+_BANNER_OPENER = re.compile(
+    r"^(?:(?:claude ai )?usage limit reached|you['’]?ve hit your|(?:your )?limit (?:will )?resets?)",
+    re.I)
+_LEAD = re.compile(r"^[\s\u0080-\U0010ffff]+")
+
+
+def _stated_duration(text: str) -> timedelta | None:
+    """The first `in 2h 30m` / `after 5m` on a line that talks about a limit."""
+    for ln in text.splitlines():
+        if not _LIMIT_WORDS.search(ln):
+            continue
+        for d in _DURATION.finditer(ln):
+            if d.group(1) or d.group(2):
+                hours, minutes = int(d.group(1) or 0), int(d.group(2) or 0)
+                if hours <= 72 and minutes < 24 * 60:        # before timedelta can overflow
+                    wait = timedelta(hours=hours, minutes=minutes)
+                    if wait <= _MAX_STATED_WAIT:
+                        return wait
+    return None
+
+
+#: A stated time whose zone this machine does not know: no evidence.
+_UNTRUSTED = object()
+
+
+def _stated_clock(text: str, now: datetime):
+    """The next occurrence of the clock time the provider states, in the zone it
+    states. None when the text states none in the provider's form (the older
+    patterns then decide); `_UNTRUSTED` when it names a zone that does not
+    resolve (the time is then not evidence, and the default wait applies).
+
+    A zone named anywhere in the text applies to every stated time in it: the
+    banner's first line carries the time without it (`continuing automatically
+    at 3:20am`), its second the zone (`resets 3:20am (Europe/Istanbul)`).
+    Read only from lines that open like a provider banner (`Usage limit
+    reached ...`, `You've hit your ... limit ...`, `limit resets ...`), so a
+    role's own `resets 5pm (Pacific/Kiritimati)` or `finished in 5m` elsewhere
+    on the screen says nothing; a time without a zone keeps the older rule (the
+    clock read in `now`'s own zone).
+    """
+    from zoneinfo import ZoneInfo
+
+    lines = [ln for ln in text.splitlines() if _BANNER_OPENER.match(_LEAD.sub("", ln))]
+    first = None
+    zone_name = None
+    for ln in lines:
+        for m in _STATED_CLOCK.finditer(ln):
+            has_at = bool(re.search(r"\bat\s*$", ln[:m.start(1)], re.I))
+            if not (has_at or m.group(2) or m.group(3)):
+                continue                      # a bare number is not a time
+            if first is None:
+                first = m
+            z = _STATED_ZONE.match(ln, m.end())
+            if z is not None and zone_name is None:
+                zone_name = z.group(1)
+    if first is None:
+        return None
+    hour = int(first.group(1))
+    ampm = (first.group(3) or "").lower()
+    if ampm:
+        hour = hour % 12 + (12 if ampm == "pm" else 0)
+    elif hour > 23:
+        return None
+    minute = int(first.group(2) or 0)
+    if minute > 59:
+        return None
+    if zone_name is None:
+        return None                           # no zone named: the older rule decides
+    try:
+        zone = ZoneInfo(zone_name)
+    except (KeyError, ValueError, OSError):
+        return _UNTRUSTED
+    local = now.astimezone(zone)
+    # The earliest moment after `now` at which the zone's clock shows the time
+    # (plus the margin), today or tomorrow, **in either fold**: on the autumn
+    # change `1:30am` happens twice, and taking only the first reading waited
+    # a day for a reset that was an hour away. A fold counts only if the clock
+    # really shows that time then (`wall` survives the round trip); a time the
+    # spring-forward change skips (`2:30am`) has neither, and is read as the
+    # clock reads it after the gap (fold 0: 03:30 daylight time), never as an
+    # instant before the change.
+    best = None
+    for day in (0, 1):
+        wall = (local.replace(tzinfo=None, hour=hour, minute=minute, second=0,
+                              microsecond=0) + timedelta(days=day))
+        readings = [wall.replace(tzinfo=zone, fold=fold) for fold in (0, 1)]
+        real = [r for r in readings
+                if r.astimezone(timezone.utc).astimezone(zone).replace(tzinfo=None) == wall]
+        for reading in real or readings[:1]:
+            moment = reading.astimezone(timezone.utc) + STATED_RESET_MARGIN
+            if moment > now and (best is None or moment < best):
+                best = moment
+    return best.astimezone(now.tzinfo or timezone.utc)
 
 
 def is_due(retry_after: str | None, *, now: datetime | None = None) -> bool:

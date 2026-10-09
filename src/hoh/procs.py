@@ -67,6 +67,14 @@ MARK_ENV = "HOH_ROLE_MARK"
 SERVER_COMM = "herdr"
 """The name of the Herdr server process: the parent of every pane shell."""
 
+SERVER_COMMS = ("herdr", ".herdr-wrapped")
+"""Names the server runs under. `.herdr-wrapped` is what a nixpkgs wrapper is
+expected to produce (the kernel's `comm` is the executable's file name,
+whatever `argv[0]` says): SUSPECTED, not observed on a Nix host. The environment
+variable `HOH_HERDR_COMM` names exactly one more name for other wrappers; it
+widens only which process counts as the server, which `scan` still requires to
+be a session leader, the single root's unmarked parent."""
+
 #: SIGTERM, then this long, then SIGKILL for what is left, then this long.
 TERM_WAIT_S = 5.0
 KILL_WAIT_S = 3.0
@@ -277,7 +285,13 @@ def excluded(procs: list[Proc], me: int | None = None) -> set[int]:
 def is_server(proc: Proc | None) -> bool:
     """A Herdr server: named exactly `herdr` and leading its own session (the
     `herdr` client that starts the server is not a leader)."""
-    return proc is not None and proc.comm == SERVER_COMM and proc.sid == proc.pid
+    if proc is None or proc.sid != proc.pid:
+        return False
+    names = {SERVER_COMM, *SERVER_COMMS}
+    extra = os.environ.get("HOH_HERDR_COMM")
+    if extra:
+        names.add(extra)
+    return proc.comm in names
 
 
 def marked_left(procs: list[Proc], mark: str, skip: Iterable[int] = ()) -> list[Proc]:

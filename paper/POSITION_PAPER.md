@@ -1072,8 +1072,9 @@ source and the command that regenerates it, in `paper/NUMBERS_V2.md`.
   about pointing the loop at `src/hoh/` itself".** The campaign sentences
   describe the campaign (limit 8 already recorded the policy files and the three
   test files). They do not describe the development line: product runs have
-  written `src/hoh/` since 2026-09-23, and 34 of the 46 product-run merges
-  since 2026-09-25 change it `[V02]` `[V01]`.
+  written `src/hoh/` since 2026-09-23, and 55 of the 69 product-run merges
+  since 2026-09-25 change it `[V02]` `[V01]` (34 of 46 when this erratum was
+  written on 2026-10-07; figures taken again on 2026-10-09).
 * **E6 -- "there is no supported path to amend one".** Limit 15's own later
   subsection records `hoh amend` (2026-09-13); the headline sentence was already
   superseded at the release.

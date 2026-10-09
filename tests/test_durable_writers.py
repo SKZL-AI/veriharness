@@ -1510,30 +1510,13 @@ CLASSIFIED: dict[tuple[str, str, str], tuple[str, int, str]] = {
     ("durable_io.py", "*", "os.open(write)"): (
         "PRIMITIVE", 3, "the primitives' temp files (durable_write, durable_create) and the "
         "append (durable_append, added by H-a)"),
-    ("durable_io.py", "*", "os.replace"): ("PRIMITIVE", 1, "durable_write's publish"),
+    ("durable_io.py", "*", "os.replace"): (
+        "PRIMITIVE", 2, "durable_write's publish and durable_publish_tree's merge (S1)"),
+    ("durable_io.py", "*", "os.rename"): (
+        "PRIMITIVE", 1, "durable_publish_tree's whole-tree publish (S1)"),
     ("durable_io.py", "*", "os.link"): (
         "PRIMITIVE", 1, "durable_create's publish without replacing (added by H-a)"),
-    # -- MIGRATE_LATER: W16-W23, for H-b --------------------------------------
-    ("amendment.py", "park_and_amend", "Path.rename"): (
-        "MIGRATE_LATER", 1, "W16 park by rename then write (H-b)"),
-    ("amendment.py", "park_and_amend", "write_text"): (
-        "MIGRATE_LATER", 1, "W16 spec written in place after rename (H-b)"),
-    ("approval_policy.py", "RoleApprovalPolicy.write_role_files", "write_text"): (
-        "MIGRATE_LATER", 2, "W21/W22 role settings and house-rules prompt (H-b)"),
-    ("governance.py", "Governor.decide", "Path.open(write)"): (
-        "MIGRATE_LATER", 1, "W19 (H-b)"),
-    ("governance.py", "bind", "write_text"): ("MIGRATE_LATER", 2, "W17/W18 (H-b)"),
-    ("governance.py", "record_override", "Path.open(write)"): (
-        "MIGRATE_LATER", 1, "W20 (H-b)"),
-    ("launcher.py", "HohRunLauncher.prepare", "write_text"): (
-        "MIGRATE_LATER", 1, "W23 (H-b)"),
-    # -- DEFERRED: files reserved by other strands, for H2 --------------------
-    ("cli.py", "_cmd_run", "write_text"): (
-        "DEFERRED", 4, "approval/policy.json, autonomy.json (governance witness), "
-        "worktree_trust.json, integrity-before.json: run state; cli.py reserved "
-        "(project-adopt)"),
-    ("cli.py", "_integrity_close", "write_text"): (
-        "DEFERRED", 1, "approval/integrity.json: run evidence; cli.py reserved"),
+    # -- DEFERRED: files reserved by other strands, for S2 --------------------
     ("dispatchers.py", "HarnessDispatcher.dispatch", "write_text"): (
         "DEFERRED", 1, "role answer recorded as evidence; dispatchers.py reserved "
         "(dispatch-robustness)"),
@@ -1550,9 +1533,9 @@ CLASSIFIED: dict[tuple[str, str, str], tuple[str, int, str]] = {
     ("dispatchers.py", "_write_leaf", "os.replace"): (
         "DEFERRED", 1, "versioned leaf write; write loop `view[os.write(fd, view):]` spins "
         "on a zero-byte write (tracked defect); dispatchers.py reserved"),
-    ("store.py", "RunStore.restore", "extractall"): (
-        "DEFERRED", 1, "overwrite=True extracts in place over a live run dir; needs a "
-        "staging design (store.py shared with M)"),
+    ("store.py", "RunStore._restore", "extractall"): (
+        "STAGED_EXTRACT", 1, "extracts into <root>/_restore/<staging> after a room check; "
+        "published by durable_publish_tree"),
     # -- OWN_DURABLE: the A1 storage modules' own temp-fsync-publish helpers --
     ("archive_bundle.py", "ArchiveBundle._write_tar", "os.fdopen(write)"): (
         "OWN_DURABLE", 1, "payload into a .building staging dir, published by "
@@ -1607,7 +1590,7 @@ CLASSIFIED: dict[tuple[str, str, str], tuple[str, int, str]] = {
         "LOCK_FILE", 1, "flock target"),
     ("store.py", "RunStore.lock", "open(write)"): (
         "LOCK_FILE", 1, "flock target; holder line informational"),
-    ("store.py", "RunStore.process_marker", "os.open(write)"): ("LOCK_FILE", 1, "process lock"),
+    ("store.py", "RunStore.process_lock", "os.open(write)"): ("LOCK_FILE", 1, "process lock"),
     ("succession.py", "MasterAuthority._locked", "os.open(write)"): (
         "LOCK_FILE", 1, "flock target"),
     ("timers.py", "TimerStore._mutating", "os.open(write)"): ("LOCK_FILE", 1, "flock target"),
@@ -1630,6 +1613,9 @@ CLASSIFIED: dict[tuple[str, str, str], tuple[str, int, str]] = {
     ("storage_registry.py", "_rename_versioned", "os.rename"): (
         "RENAME_ONLY", 1, "versioning rename"),
     ("store.py", "RunStore.prune", "Path.rename"): ("RENAME_ONLY", 5, "attic moves"),
+    ("cli.py", "_park_stale_record", "Path.rename"): (
+        "RENAME_ONLY", 1, "a stale integrity record set aside by a versioned rename; "
+        "needs no free space"),
     # -- PARK_LINK / IN_MEMORY --------------------------------------------------
     ("store.py", "RunStore._park", "os.link"): (
         "PARK_LINK", 1, "no bytes written; inode condition documented in _park"),
@@ -1649,6 +1635,12 @@ CLASSIFIED: dict[tuple[str, str, str], tuple[str, int, str]] = {
     ("cli.py", "cmd_report", "write_text"): ("OUTPUT_NOT_STATE", 1, "--out report file"),
     ("runner.py", "run_check", "open(write)"): (
         "OUTPUT_NOT_STATE", 1, "check output capture (sink)"),
+    ("runner.py", "_record_own_scratch", "os.open(write)"): (
+        "OUTPUT_NOT_STATE", 1, "the identity record beside the runner's reusable scratch "
+        "(P2-42 residuals): coordination state about a temporary directory, never evidence; a "
+        "crash leaves the scratch unreused (the next process parks it), a lost record is "
+        "written again by the owner's next check, a torn last line (no newline) makes callers refuse until "
+        "the owner's next check closes it (fail closed)"),
     ("storage_ephemeral.py", "EphemeralRoots.create", "tempfile.mkdtemp"): (
         "OUTPUT_NOT_STATE", 1, "the workspace directory of a registered temporary root "
         "(P2-42): its record is written beside it before any content and its creator "
@@ -1663,7 +1655,7 @@ CLASSIFIED: dict[tuple[str, str, str], tuple[str, int, str]] = {
 
 _CLASSES = {"PRIMITIVE", "PARK_LINK", "LOCK_FILE", "RENAME_ONLY", "OWN_DURABLE",
             "APPEND_GUARDED", "APPEND_TOLERATED", "IN_MEMORY", "READ_BY_INSPECTION",
-            "OUTPUT_NOT_STATE", "DEFERRED", "MIGRATE_LATER"}
+            "OUTPUT_NOT_STATE", "STAGED_EXTRACT", "DEFERRED", "MIGRATE_LATER"}
 
 #: The rows H-a migrates (W1-W15, Appendix A class MIGRATE_H): none of them may
 #: be a hit afterwards.
@@ -1692,6 +1684,17 @@ MIGRATED = {
     ("telemetry.py", "TelemetryLog.rewrite_sorted", "tempfile.mkstemp"),   # W5
     ("trust.py", "register", "os.replace"),                                # W11
     ("trust.py", "register", "write_text"),                                # W10/W11
+    # P2-41 closure S1 (W16-W22):
+    ("amendment.py", "park_and_amend", "Path.rename"),
+    ("amendment.py", "park_and_amend", "write_text"),
+    ("approval_policy.py", "RoleApprovalPolicy.write_role_files", "write_text"),
+    ("governance.py", "Governor.decide", "Path.open(write)"),
+    ("governance.py", "bind", "write_text"),
+    ("governance.py", "record_override", "Path.open(write)"),
+    # P2-41 closure S3:
+    ("launcher.py", "HohRunLauncher.prepare", "write_text"),
+    ("cli.py", "_cmd_run", "write_text"),
+    ("cli.py", "_integrity_close", "write_text"),
 }
 
 

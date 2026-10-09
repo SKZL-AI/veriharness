@@ -61,20 +61,32 @@ W11), `projectstore.ProjectStore._park` (W12, a copy now, no longer a move),
 `succession.MasterAuthority._write` (the log append, W13), the fallback of
 `store.RunStore._park` (W14) and `store.RunStore.backup` (W15).
 
+Migrated by P2-41 closure S1 (2026-10). Three helpers were added for a tree
+rather than a file: `require_room` (the space pre-check for a directory, creates
+nothing), `fsync_tree` and `durable_publish_tree` (a complete staging tree,
+fsynced, published by one rename, or merged file by file with the named files
+last). Through them and the three siblings now go: `amendment.park_and_amend`
+(the superseded text is parked by `durable_create` before the new text is
+written), `approval_policy.RoleApprovalPolicy.write_role_files`,
+`governance.Governor.decide`, `governance.bind` (witness before pin) and
+`governance.record_override`, and `store.RunStore.restore` (extracted into a
+staging directory, read back, then published).
+
+Migrated by P2-41 closure S3 (2026-10). `launcher.HohRunLauncher.prepare` (the
+repair specification, by `durable_create`), `cli._cmd_run` (the four pre-run
+records) and `cli._integrity_close` (the integrity record, by `durable_write`;
+a record that cannot be written sets the earlier one aside under a versioned
+name, so a stale verdict is never read as the current one). A merged restore
+(`durable_publish_tree`, `merge=True`) now keeps the empty directories of the
+backup, creates the missing ones owner-only and gives them the backup's modes
+only after the last replace, and refuses a directory it cannot write into
+before it replaces anything.
+
 Still remaining:
 
-* `amendment.py`: `park_and_amend`
-* `approval_policy.py`: `RoleApprovalPolicy.write_role_files`
-* `governance.py`: `Governor.decide`
-* `governance.py`: `bind`
-* `governance.py`: `record_override`
-* `launcher.py`: `HohRunLauncher.prepare`
-* `cli.py`: `_cmd_run`
-* `cli.py`: `_integrity_close`
 * `dispatchers.py`: `HarnessDispatcher.dispatch`
 * `dispatchers.py`: `_append_audit`
 * `dispatchers.py`: `_write_leaf`
-* `store.py`: `RunStore.restore`
 
 P2-41 is not PROVEN while these remain.
 """
@@ -406,6 +418,264 @@ def durable_append(path: Path, line: bytes | str, *,
     finally:
         os.close(fd)
     _fsync_parent(path)
+
+
+def require_room(directory: Path, needed_bytes: int, *,
+                 min_free_bytes: int = 1 << 20) -> None:
+    """Refuse, before anything is created, when `directory` has too little room.
+
+    `f_bavail * f_frsize` of `os.statvfs(directory)` against `needed_bytes`
+    plus a reserve: the formula of `durable_write`'s pre-check, for a caller
+    that is about to write a tree. A refusal is `DiskFullError`; nothing is
+    created either way.
+    """
+    st = os.statvfs(directory)
+    free = st.f_bavail * st.f_frsize
+    needed = needed_bytes + min_free_bytes
+    if free < needed:
+        raise DiskFullError(directory, needed, free, "refused before writing")
+
+
+def _raise_walk_error(exc: OSError) -> None:
+    """`os.walk` skips a directory it cannot read unless `onerror` raises."""
+    raise exc
+
+
+def _fsync_dir(path: Path) -> None:
+    dir_fd = os.open(path, os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC)
+    try:
+        os.fsync(dir_fd)
+    finally:
+        os.close(dir_fd)
+
+
+def _depth(path: Path, root: Path) -> int:
+    return len(path.relative_to(root).parts)
+
+
+def fsync_tree(root: Path) -> None:
+    """Make a tree that was just written durable: every regular file, then
+    every directory, deepest first, `root` last. Writes nothing.
+
+    The walk raises on a directory it cannot read, so a tree that cannot be
+    read back completely is an error, not a smaller tree. Only a regular file
+    (by `lstat`, and again on the descriptor) is opened -- with `O_NOFOLLOW`
+    and `O_NONBLOCK`; a symbolic link, FIFO, socket or device is skipped
+    (opening a FIFO for reading blocks for ever, and an archive may hold one).
+    A space errno from any fsync is `DiskFullError` (delayed allocation
+    reports ENOSPC there); any other error is raised as it is.
+    """
+    root = Path(root)
+    try:
+        files: list[Path] = []
+        dirs: list[Path] = []
+        for dirpath, dirnames, filenames in os.walk(root, onerror=_raise_walk_error):
+            here = Path(dirpath)
+            dirs.append(here)
+            for name in (*dirnames, *filenames):
+                entry = here / name
+                if stat.S_ISREG(os.lstat(entry).st_mode):
+                    files.append(entry)
+        for entry in files:
+            fd = os.open(entry, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC)
+            try:
+                if stat.S_ISREG(os.fstat(fd).st_mode):
+                    os.fsync(fd)
+            finally:
+                os.close(fd)
+        for here in sorted(dirs, key=lambda d: (-_depth(d, root), str(d))):
+            _fsync_dir(here)
+    except OSError as exc:
+        if not isinstance(exc, DiskFullError) and exc.errno in _SPACE_ERRNOS:
+            raise DiskFullError(root, 0, None, os.strerror(exc.errno)) from exc
+        raise
+
+
+def _staged_entries(staging: Path) -> list[Path]:
+    """Relative names of everything in `staging` that is not a real directory.
+
+    A symbolic link to a directory is listed by `os.walk` with the directories
+    and not descended into; it is a name to move here, never a tree to follow.
+    """
+    found: list[Path] = []
+    for dirpath, dirnames, filenames in os.walk(staging, onerror=_raise_walk_error):
+        here = Path(dirpath)
+        for name in dirnames:
+            if (here / name).is_symlink():
+                found.append((here / name).relative_to(staging))
+        for name in filenames:
+            found.append((here / name).relative_to(staging))
+    return found
+
+
+def _staged_directories(staging: Path) -> list[Path]:
+    """Relative names of every real directory in `staging`, empty ones included,
+    parents before children. A symbolic link to a directory is not one (it is a
+    name to move, see `_staged_entries`). The walk raises on a directory it
+    cannot read."""
+    found: list[Path] = []
+    for dirpath, dirnames, _filenames in os.walk(staging, onerror=_raise_walk_error):
+        here = Path(dirpath)
+        for name in dirnames:
+            if not (here / name).is_symlink():
+                found.append((here / name).relative_to(staging))
+    return sorted(found, key=lambda r: (len(r.parts), r.as_posix()))
+
+
+def _nearest_existing(path: Path) -> Path:
+    while not os.path.lexists(path):
+        path = path.parent
+    return path
+
+
+def _check_merge_destination(target: Path, rel: Path) -> None:
+    """Refuse, before the first replace, a destination that a replace could not
+    or must not use: a link or a non-directory among the parents, or a
+    directory where a file is to go."""
+    here = target
+    for part in rel.parent.parts:
+        here = here / part
+        if here.is_symlink() or (os.path.lexists(here) and not here.is_dir()):
+            raise NotADirectoryError(errno.ENOTDIR, "a link or a file where a "
+                                     "directory is needed", str(here))
+        if not os.path.lexists(here):
+            return
+    dest = target / rel
+    if dest.is_dir() and not dest.is_symlink():
+        raise IsADirectoryError(errno.EISDIR, "a directory where a file is to "
+                                "be replaced", str(dest))
+
+
+def durable_publish_tree(staging: Path, target: Path, *, merge: bool = False,
+                         last: tuple[str, ...] = ()) -> None:
+    """Publish a complete staging tree at `target`, whole or not at all.
+
+    `staging` is a finished directory beside `target` (the same filesystem)
+    that the caller has written; a link or a non-directory is
+    `NotADirectoryError`. It is made durable first (`fsync_tree`). Then:
+
+    * `target` absent, or an empty directory (not a link): one `os.rename`,
+      then the parent is fsynced (`DurableWriteNotSynced` on failure, the tree
+      in place).
+    * `target` is a non-empty directory, a link or a file and `merge` is False:
+      `FileExistsError`, nothing touched.
+    * `merge` and a non-empty directory: every staged file is replaced onto its
+      name in `target`, one by one, the relative names in `last` after all the
+      others, so a crash between two replaces pairs old state with at most
+      newer receipts. Files of `target` the tree does not hold stay. Every
+      destination is checked first (`NotADirectoryError` for `target` or a
+      parent that is a link or not a directory, `IsADirectoryError` for a
+      directory in the way, `NotADirectoryError` for a staged directory over a
+      link or a non-directory); a failed check leaves `target` untouched. So
+      does the writability check: every existing directory that a replace or a
+      `mkdir` will write into must allow it (`PermissionError`), or a live
+      directory of mode 0o500 would fail a replace half way through the tree.
+      The staging tree is made owner-rwx first, because a rename out of a
+      directory needs write permission on it and the extraction gave the
+      directories the backup's modes. Missing directories (empty ones of the
+      backup included) are created owner-only before the first replace; only
+      after the last replace do the directories created here get the modes the
+      staging tree had, deepest first, so a directory of mode 0o500 holds all
+      its files by then. A directory that already exists keeps its own mode.
+      Afterwards every directory from each file's parent up to `target`, and
+      every one created, is fsynced, deepest first (`DurableWriteNotSynced` on
+      failure).
+
+    This function removes nothing: after a merge `staging` is a skeleton of
+    empty directories.
+    """
+    staging = Path(staging)
+    target = Path(target)
+    if staging.is_symlink() or not staging.is_dir():
+        raise NotADirectoryError(errno.ENOTDIR, "the staging tree is a link or "
+                                 "not a directory", str(staging))
+    fsync_tree(staging)
+
+    if not os.path.lexists(target) or (
+            not target.is_symlink() and target.is_dir() and not os.listdir(target)):
+        os.rename(staging, target)
+        _fsync_parent(target)
+        return
+    if not merge:
+        raise FileExistsError(errno.EEXIST, "a published tree never replaces a "
+                              "non-empty target", str(target))
+    if target.is_symlink() or not target.is_dir():
+        raise NotADirectoryError(errno.ENOTDIR, "the target is a link or not a "
+                                 "directory", str(target))
+
+    names = sorted(_staged_entries(staging), key=lambda r: r.as_posix())
+    tail = [Path(n) for n in last]
+    ordered = [r for r in names if r not in tail] + [r for r in tail if r in names]
+    for rel in ordered:
+        _check_merge_destination(target, rel)
+
+    directories = _staged_directories(staging)
+    for rel in directories:
+        here = target
+        for part in rel.parts:
+            here = here / part
+            if not os.path.lexists(here):
+                break
+            if here.is_symlink() or not here.is_dir():
+                raise NotADirectoryError(errno.ENOTDIR, "a link or a file where "
+                                         "a staged directory is needed", str(here))
+
+    # Writability, before anything changes: a replace writes into the parent of
+    # its file, a mkdir into the parent of the directory it creates.
+    written_into: set[Path] = set()
+    for rel in ordered:
+        written_into.add(_nearest_existing(target / rel.parent))
+    for rel in directories:
+        if not os.path.lexists(target / rel):
+            written_into.add(_nearest_existing(target / rel.parent))
+    for here in sorted(written_into, key=str):
+        if not os.access(here, os.W_OK | os.X_OK):
+            raise PermissionError(errno.EACCES, "a directory the merge must "
+                                  "write into does not allow it", str(here))
+
+    # The staging tree becomes owner-rwx (parents first), the modes it had are
+    # kept for the directories this merge creates.
+    modes: dict[Path, int] = {}
+    for rel in (Path("."), *directories):
+        here = staging / rel
+        mode = stat.S_IMODE(os.lstat(here).st_mode)
+        modes[rel] = mode
+        if mode & 0o700 != 0o700:
+            os.chmod(here, mode | 0o700)
+
+    created: list[Path] = []
+    try:
+        for rel in directories:
+            if not os.path.lexists(target / rel):
+                os.mkdir(target / rel, 0o700)
+                created.append(rel)
+        for rel in ordered:
+            os.makedirs(target / rel.parent, exist_ok=True)
+    except OSError as exc:
+        if exc.errno in _SPACE_ERRNOS:
+            raise DiskFullError(target, 0, None, os.strerror(exc.errno)) from exc
+        raise
+    for rel in ordered:
+        os.replace(staging / rel, target / rel)
+    for rel in sorted(created, key=lambda r: (-len(r.parts), r.as_posix())):
+        os.chmod(target / rel, modes[rel])
+
+    touched = {target}
+    for rel in ordered:
+        here = target / rel.parent
+        while here != target:
+            touched.add(here)
+            here = here.parent
+    for rel in created:
+        here = target / rel
+        while here != target:
+            touched.add(here)
+            here = here.parent
+    try:
+        for here in sorted(touched, key=lambda d: (-_depth(d, target), str(d))):
+            _fsync_dir(here)
+    except OSError as exc:
+        raise DurableWriteNotSynced(target, exc) from exc
 
 
 def _abandon_own_temp(fd: int, tmp_path: Path) -> bool:

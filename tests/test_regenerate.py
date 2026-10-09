@@ -86,3 +86,12 @@ def test_a_red_board_is_a_verdict_and_not_a_broken_step():
     source = (ROOT / "tools" / "regenerate.py").read_text()
     assert 'allowed = (0, 3, 1) if name == "readiness board" else (0, 3)' in source
     assert "indistinguishable from a crashed tool" in source
+
+
+def test_the_baseline_documents_are_written_before_the_plan_reads_them():
+    """The plan's dispositions read the five measurement sections back out of
+    the current baseline, so a plan built first would read last run's."""
+    names = [name for name, _ in rg.STEPS]
+    assert names.index("baseline documents") < names.index("build plan"), names
+    assert names.index("capability matrix") < names.index("baseline documents")
+    assert names[-1] == "readiness board", names

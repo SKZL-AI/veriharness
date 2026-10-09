@@ -30,6 +30,7 @@ from types import MappingProxyType
 from pydantic import ConfigDict, Field, field_serializer, field_validator, model_validator
 
 from hoh.contracts import Strict
+from hoh.project import Lifecycle, ProjectState, TaskNode, digest_obj
 
 
 class Health(StrEnum):
@@ -320,6 +321,120 @@ def compact(
         state_digest=state_digest(generation, as_of, kept, counts),
         truncated=truncated,
     )
+
+
+# --------------------------------------------------------------------------- #
+# from_project -- the product's own source of nodes
+# --------------------------------------------------------------------------- #
+
+#: How many lines `from_project` keeps unless told otherwise. A budget over lines,
+#: not a promise about size; FAILED, BLOCKED and WAITING_FOR_DECISION nodes are
+#: kept past it (see `compact`).
+DEFAULT_MAX_LINES = 40
+
+#: A compact state is small by construction, so free text from a node is clipped:
+#: a title to TITLE_MAX characters, a reason or a wait to DETAIL_MAX. Whitespace
+#: runs (newlines included) become single spaces, so a line stays one line.
+TITLE_MAX = 120
+DETAIL_MAX = 200
+
+#: What a project's compact state covers, said wherever it is printed. It is a
+#: projection of the nodes: gates are judged by the verdict, the reason and
+#: `gates_green` beside it, and a project state has no failed node, so the FAILED
+#: count is 0 by construction.
+PROJECT_SCOPE = ("nodes only; gates are judged by the verdict, the reason and "
+                 "gates_green, and a project state has no failed node (FAILED is 0 here)")
+
+#: The project lifecycles that have no `Health` of their own. They are mapped to
+#: the nearest member and the original word is put in front of the line's title,
+#: so a *kept* line still says which it was. The counts do not: once lines are
+#: dropped, DONE no longer separates merged from abandoned.
+_COLLAPSED = frozenset({Lifecycle.MERGED, Lifecycle.ABANDONED, Lifecycle.CONTINGENT})
+
+
+def _clip(text: str, limit: int) -> str:
+    one_line = " ".join(str(text).split())
+    return one_line if len(one_line) <= limit else one_line[:limit - 3] + "..."
+
+
+def line_for_node(node: TaskNode, *, open_dependencies: Iterable[str] = ()) -> NodeLine:
+    """One `TaskNode` of a project's state as one `NodeLine`.
+
+    READY and RUNNING map to themselves; MERGED and ABANDONED to DONE (settled);
+    CONTINGENT -- a node that only becomes real if an earlier result turns out a
+    particular way -- to WAITING_FOR_DECISION, because READY would invite a
+    dispatch of something that may never be real and the attention states are
+    never dropped. A BLOCKED node whose `blocked_kind` is "human" waits for a
+    decision; every other BLOCKED node (a usage limit, a capability violation,
+    an unclassified block) stays BLOCKED and names its kind. A READY node that
+    still has `open_dependencies` (unsettled, or naming no node) is not runnable
+    -- `ProjectState.ready()` excludes it -- so its line says so: the title ends
+    in "(dependency open)" and `waiting_on` names them. Nothing in a project's
+    state is a FAILED node, so none is produced. A lifecycle this mapping does
+    not know raises ValueError: a new lifecycle must be mapped on purpose, not
+    read as BLOCKED by default.
+    """
+    life = node.lifecycle
+    base = (node.note or "").strip() or node.id
+    title = _clip(f"{life.value}: {base}" if life in _COLLAPSED else base, TITLE_MAX)
+    reason = waiting = None
+    if life is Lifecycle.READY:
+        health = Health.READY
+        pending = list(open_dependencies)
+        if pending:
+            title += " (dependency open)"
+            waiting = _clip(", ".join(pending), DETAIL_MAX)
+    elif life is Lifecycle.RUNNING:
+        health = Health.RUNNING
+    elif life in (Lifecycle.MERGED, Lifecycle.ABANDONED):
+        health = Health.DONE
+    elif life is Lifecycle.CONTINGENT:
+        health = Health.WAITING_FOR_DECISION
+        waiting = "the result of an earlier node (contingent)"
+    elif life is Lifecycle.BLOCKED and node.blocked_kind == "human":
+        health = Health.WAITING_FOR_DECISION
+        waiting = _clip((node.note or "").strip() or "a human decision", DETAIL_MAX)
+    elif life is Lifecycle.BLOCKED:
+        health = Health.BLOCKED
+        text = node.blocked_kind or "unclassified"
+        if node.retry_after:
+            text += f", retry after {node.retry_after}"
+        if (node.note or "").strip():
+            text += f": {node.note.strip()}"
+        reason = _clip(text, DETAIL_MAX)
+    else:
+        raise ValueError(f"node {node.id}: lifecycle {life!r} has no compact mapping")
+    return NodeLine(node_id=node.id, title=title, health=health, attempts=node.rejections,
+                    blocked_reason=reason, waiting_on=waiting)
+
+
+def lines_for_state(state: ProjectState) -> list[NodeLine]:
+    """Every node of a project's state as a line, each READY node told which of
+    its dependencies are still open (a dependency naming no node is open)."""
+    known = {n.id: n for n in state.nodes}
+    lines = []
+    for node in state.nodes:
+        pending = [d if d in known else f"{d} (missing)"
+                   for d in node.dependencies if d not in known or not known[d].settled]
+        lines.append(line_for_node(node, open_dependencies=pending))
+    return lines
+
+
+def from_project(state: ProjectState, *, max_lines: int = DEFAULT_MAX_LINES) -> CompactState:
+    """The compact task state of a project: Layer 0 for a session that holds
+    nothing but the persisted state.
+
+    Pure: the state is handed in, nothing is read or written. The programme
+    generation is the state's, `as_of` is its `updated_at`, and the one source
+    it names is a digest of every node it was built from (the nodes only: the
+    gates, the decisions and any activity log are not part of it), so a reader
+    holding the state can tell whether this projection is still of its nodes.
+    """
+    return compact(
+        lines_for_state(state), program_id=state.project_id,
+        generation=state.program_generation, as_of=state.updated_at, max_lines=max_lines,
+        source_digests={"project-nodes": digest_obj(
+            [n.model_dump(mode="json") for n in state.nodes])})
 
 
 # --------------------------------------------------------------------------- #
