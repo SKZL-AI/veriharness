@@ -18,8 +18,8 @@ What this module owns (P2-42 and nothing of P5-35)
   2. the session holds a live registry lease **and it is this process's**
      (the lease's pid is ``getpid()``): another process's session is refused;
   3. the write is *admitted* (`StorageAdmission.reserve`, operation kind
-     ``tmp_workspace``); a refusal raises `TempAdmissionRefused` and nothing
-     is created, not even the root;
+     ``tmp_workspace``); a refusal raises `TempAdmissionRefused`, an admission that
+     cannot answer `TempAdmissionUnavailable`, and nothing is created, not even the root;
   4. the root is registered (`StorageRegistry.scratch_dir(p, s, "tmp")`: the
      ownership record and index entry are written before the path is
      returned);
@@ -78,6 +78,14 @@ What this module owns (P2-42 and nothing of P5-35)
   (P5-35) and the tests read: the record beside a workspace, and whether the
   process lease in it is proven dead.
 
+* `RunSession` / `name_for_run` / `project_for_run` -- what ``hoh run`` does with the above (the
+  controller wiring): one registry session per run process, named from the run
+  id; the project's ``tmp`` root for it registered before the run starts; the
+  `EphemeralRoots` the run's controller creates every acceptance-check scratch
+  and the iteration's workspace from; the lease ended on every way out of the
+  run. A project that is not registered has no root (`cli._open_ephemeral`
+  says so and the runner's sibling scratch is used, as before).
+
 Lifecycle
 ---------
 
@@ -98,6 +106,7 @@ a path it did not create.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -130,6 +139,7 @@ PURPOSES = frozenset({"process", "check", "test", "run", "reviewer", "sandbox",
 OP_KIND = "tmp_workspace"
 _PREFIX = re.compile(r"^[a-z0-9][a-z0-9._-]{0,47}$")
 _REC_SUFFIX = ".vh-ws.json"
+
 _DIR_FLAGS = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
 
 
@@ -145,6 +155,15 @@ class TempAdmissionRefused(EphemeralError):
     def __init__(self, refusal: Any) -> None:
         super().__init__(f"temporary workspace not admitted: {refusal}")
         self.refusal = refusal
+
+
+class TempAdmissionUnavailable(EphemeralError):
+    """The admission could not answer (it raised `cause`); nothing was created."""
+
+    def __init__(self, cause: BaseException) -> None:
+        super().__init__(f"temporary workspace not admitted: the admission cannot answer "
+                         f"({type(cause).__name__}: {cause})")
+        self.cause = cause
 
 
 def _utc_iso() -> str:
@@ -498,8 +517,11 @@ class EphemeralRoots:
                 f"process's ({self._getpid()}); no workspace is created")
         reservation = None
         if self.admission is not None:
-            answer = self.admission.reserve(self.project_id, OP_KIND,
-                                            estimate_bytes=estimate_bytes)
+            try:
+                answer = self.admission.reserve(self.project_id, OP_KIND,
+                                                estimate_bytes=estimate_bytes)
+            except Exception as exc:                # the ledger cannot answer: nothing is created
+                raise TempAdmissionUnavailable(exc) from exc
             if not getattr(answer, "admitted", False):
                 raise TempAdmissionRefused(answer)
             reservation = answer
@@ -594,9 +616,142 @@ def _dump(record: dict[str, Any]) -> str:
     return json.dumps(record, indent=2, sort_keys=True) + "\n"
 
 
+#: What a mapped name ends in (`name_for_run`): a run id that already ends so is mapped too, so
+#: no run id can be taken for another run id's mapped name.
+_MAPPED = re.compile(r"-[0-9a-f]{12}$")
+
+
+def name_for_run(run_id: str) -> str:
+    """The registry session id and the workspace name stem of a run: the run id
+    itself when it already is a short lower-case id that does not end in ``-`` and
+    twelve hex digits, otherwise its lower-case form (anything outside
+    ``[a-z0-9._-]`` becomes ``-``, at most 35 characters) followed by ``-`` and the
+    first twelve hex digits of the SHA-256 of the real run id. Two different run ids
+    therefore have two names unless their SHA-256 agree in 48 bits (a mapped name
+    always ends as a mapped name does and a plain one never does, so a literal id
+    cannot be another id's mapped form). Always a valid session id (<= 64) and
+    workspace stem (<= 48)."""
+    if _PREFIX.match(run_id) and not _MAPPED.search(run_id):
+        return run_id
+    safe = re.sub(r"[^a-z0-9._-]", "-", run_id.lower()).lstrip("._-")[:35] or "run"
+    return f"{safe}-{hashlib.sha256(run_id.encode('utf-8')).hexdigest()[:12]}"
+
+
+def project_for_run(registry, project_name: str, repo_path) -> tuple[str | None, str]:
+    """``(project_id, how)`` of the registered project a run belongs to, or
+    ``(None, why)``; ``how`` is ``name`` or ``repository``.
+
+    By name first -- the run's ``project_name`` is a registered project id, the
+    assumption the steward hook and the admission already make -- **and then the
+    repository is compared** when both the run's directory and the project's root
+    are repository roots: the same resolved ``git rev-parse --git-common-dir``
+    (a linked worktree of the project's repository has it, a separate clone or an
+    unrelated repository has not); a different one is no match (a directory that
+    merely carries the project's name does not bind it). A project registered on a
+    plain directory, or a run in one, is compared by name alone (the registry
+    compares plain directories by path only: stated limit L1b).
+
+    Then by repository: a run the launcher starts (`hoh start` without
+    ``--project``) carries its worktree's directory name, not the project's id, so
+    the one registered project whose repository has the run's git common directory
+    owns it -- the registry's own rule for "one root, one project"
+    (`register_project`). Nothing is proven when git cannot be read: the reason
+    says so (it is not "not a repository"), and the run keeps the sibling scratch."""
+    projects = registry._registered_projects()
+    if not projects:
+        return None, "no project is registered"
+    try:
+        here = registry._repo_identity(Path(repo_path).resolve(strict=True))
+        unreadable = ""
+    except Exception as exc:                   # noqa: BLE001 - nothing proven, said as what it is
+        here, unreadable = None, f"{type(exc).__name__}: {exc}"
+    if project_name in projects:
+        if unreadable:
+            return None, (f"the run's repository identity cannot be read ({unreadable}), so it "
+                          f"is not confirmed as the registered project {project_name!r}")
+        record = registry._project_record(project_name)
+        try:
+            theirs = registry._repo_identity(Path(record["project_root"]))
+        except Exception as exc:               # noqa: BLE001
+            return None, (f"the repository identity of the registered project {project_name!r} "
+                          f"cannot be read ({type(exc).__name__}: {exc})")
+        if here is not None and theirs is not None and here != theirs:
+            return None, (f"the run's repository is not the repository of the registered "
+                          f"project {project_name!r} (another git common directory)")
+        return project_name, "name"
+    if unreadable:
+        return None, (f"no registered project has this name and the run's repository identity "
+                      f"cannot be read ({unreadable})")
+    if here is None:
+        return None, "no registered project has this name and the run's directory is not a repository root"
+    found, skipped = [], 0
+    for candidate in projects:
+        record = registry._project_record(candidate)
+        try:
+            theirs = registry._repo_identity(Path(record["project_root"]))
+        except Exception:                      # noqa: BLE001 - this project's repository is unreadable
+            skipped += 1
+            continue
+        if theirs is not None and theirs == here:
+            found.append(candidate)
+    if len(found) == 1:
+        return found[0], "repository"
+    if found:
+        return None, f"the run's repository belongs to several registered projects ({', '.join(found)})"
+    return None, ("no registered project has this name or this repository"
+                  + (f" ({skipped} registered project(s) have a repository that cannot be read)"
+                     if skipped else ""))
+
+
+class RunSession:
+    """The registered session of one ``hoh run`` process (P2-42 wiring): the
+    registry lease of this process for the run's session id, the project's
+    ``tmp`` root for that session (registered before the run starts) and the
+    `EphemeralRoots` the run's controller creates every workspace from.
+
+    `begin` raises (nothing is left open) when the lease or the root cannot be
+    had -- the caller refuses to start; it never runs on without. `close`
+    ends the lease and reports a failure instead of raising: a run that has
+    done its work does not fail because its lease could not be closed."""
+
+    def __init__(self, registry, project_id: str, session_id: str, lease, roots: EphemeralRoots,
+                 root: Path) -> None:
+        self.registry = registry
+        self.project_id = project_id
+        self.session_id = session_id
+        self.lease = lease
+        self.roots = roots
+        self.root = root
+
+    @classmethod
+    def begin(cls, registry, project_id: str, run_id: str, *, admission=None) -> "RunSession":
+        session_id = name_for_run(run_id)
+        lease = registry.open_session(project_id, session_id, pid=os.getpid(),
+                                      boot_id=registry._boot_id_reader())
+        try:
+            root = Path(registry.scratch_dir(project_id, session_id, TMP_KIND))
+        except BaseException:
+            try:
+                registry.close_session(project_id, session_id, lease)
+            except Exception:                    # the first failure is the one that is said
+                pass
+            raise
+        return cls(registry, project_id, session_id, lease,
+                   EphemeralRoots(registry, project_id, session_id, admission=admission), root)
+
+    def close(self) -> str:
+        """End the lease; ``""`` when it ended, otherwise why not."""
+        try:
+            self.registry.close_session(self.project_id, self.session_id, self.lease)
+        except Exception as exc:                  # noqa: BLE001 - said, never raised
+            return f"{type(exc).__name__}: {exc}"
+        return ""
+
+
 __all__ = [
     "ACTIVE", "DEAD", "EphemeralError", "EphemeralRoots", "LIVE", "OP_KIND", "PURPOSES",
-    "RECORD_SCHEMA", "REGISTERED", "RELEASED", "STORED_STATES", "TMP_KIND",
-    "TempAdmissionRefused", "UNKNOWN", "Workspace", "creator_state", "read_record",
-    "record_path",
+    "RECORD_SCHEMA", "REGISTERED", "RELEASED", "RunSession", "STORED_STATES", "TMP_KIND",
+    "TempAdmissionRefused", "TempAdmissionUnavailable", "UNKNOWN", "Workspace",
+    "creator_state", "name_for_run",
+    "project_for_run", "read_record", "record_path",
 ]

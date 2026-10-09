@@ -14,13 +14,13 @@ import argparse
 import json
 import os
 import sys
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from pathlib import Path
 
 from . import pane_ledger, stages
 from .contracts import Budgets, Condition, Role, Stage
 from .controller import Controller, new_run_id
-from .durable_io import DiskFullError, DurableWriteNotSynced, durable_write
+from .durable_io import DurableWriteNotSynced, durable_write
 from .store import LockBusy, RunStore, StoreError, list_runs
 
 DEFAULT_ROOT = Path(os.environ.get("HOH_RUNS", Path.home() / "hoh" / "runs"))
@@ -340,9 +340,10 @@ def cmd_resume_storage(args) -> int:
 
     Owns only `blocked_kind='storage_pressure'`; a quota wait is left to
     `hoh resume-quota`. A due STORAGE_RECHECK timer resumes its branch only
-    when the state is better than CRITICAL and a role run would be admitted
-    now; otherwise a new timer is armed and the branch stays parked. The boot
-    is claimed first. Nothing is cleaned, ever.
+    when the state is better than CRITICAL and a role run, held together with
+    the iteration's temporary workspace, would be admitted now; otherwise a new
+    timer is armed and the branch stays parked. The boot is claimed first.
+    Nothing is cleaned, ever.
     """
     from .resumeloop import resume_storage
 
@@ -496,6 +497,44 @@ def _hook_steward(root: Path, project_id: str, admission):
         return StorageSteward(project_id, registry, admission, None, policy)
     except Exception:                                     # noqa: BLE001 - no steward
         return None
+
+
+class SessionHeld(StorageRefused):
+    """The run's temporary-root session is held by a live lease of another process: that
+    process is executing this run (it holds the run's process marker, which `cmd_run` takes
+    before any storage code -- this is the same answer by construction should the lease ever be
+    seen first). Nothing is written: the run's state is that process's, and a refused caller
+    must not pause it."""
+
+
+def _open_ephemeral(root: Path, project_name: str, repo_path: str, run_id: str, admission):
+    """``(session, how)``: the registered temporary root of this ``hoh run``
+    process (P2-42) -- a `storage_ephemeral.RunSession`, the registry lease of
+    this process for the run's session and the project's ``tmp`` root for it,
+    registered before anything else is written -- and how the run's project was
+    found (``name`` or ``repository``); or ``(None, why)`` when the run belongs
+    to no registered project (there is no root of a project to put a workspace
+    under: the caller says so and the runner's sibling scratch is used, as
+    before). A run of a registered project whose session or root cannot be had
+    is `StorageRefused`: it does not start and does not fall back to a scratch
+    beside the arena; a session held by a **live lease of another process** is
+    `SessionHeld` (a different thing: nobody's storage is wrong, the run is being
+    executed)."""
+    from .storage_ephemeral import RunSession, project_for_run
+    from .storage_registry import LIVE_HOLDER, StorageRegistry
+
+    try:
+        registry = StorageRegistry(root)
+        project_id, how = project_for_run(registry, project_name, repo_path)
+        if project_id is None:
+            return None, how
+        return RunSession.begin(registry, project_id, run_id, admission=admission), how
+    except Exception as exc:                              # noqa: BLE001 - fail closed
+        if getattr(exc, "reason", None) == LIVE_HOLDER:
+            raise SessionHeld(f"Run {run_id} is already being executed by another process: "
+                              f"the run's temporary-root session holds a live lease ({exc})") from exc
+        raise StorageRefused(f"{STORAGE_UNAVAILABLE}: the temporary root of the run's project "
+                             f"cannot be opened: {type(exc).__name__}: {exc}") from exc
 
 
 def _file_identity_probe(root: Path):
@@ -1367,6 +1406,7 @@ def _write_record(path: Path, payload: dict) -> int | None:
     directory entry that may not be durable is a warning). 2: it could not be
     written; the old file, if any, is untouched."""
     try:
+        path.parent.mkdir(parents=True, exist_ok=True)
         durable_write(path, json.dumps(payload, indent=2) + "\n", mode=None)
     except DurableWriteNotSynced as exc:
         print(f"warning: {path.name} is written, but its directory entry may not "
@@ -1445,6 +1485,15 @@ def _integrity_close(store, before) -> bool:
     return False
 
 
+def _close_ephemeral(session) -> None:
+    """End the lease of the run's temporary-root session; a failure is said on
+    stderr and changes no exit code (the run's work is done)."""
+    why = session.close()
+    if why:
+        print(f"closing the temporary-root session {session.session_id!r} failed: {why}",
+              file=sys.stderr)
+
+
 def cmd_run(args) -> int:
     """`hoh run`, with a process marker around the whole of it (review B3, C):
     a replacement master can tell a run still being executed between two
@@ -1468,7 +1517,16 @@ def _cmd_run(args) -> int:
     Without this command `hoh start` created a run that stayed in NEW:
     `run_iteration` was called from tests only, which left A01/A02/A12
     impossible to demonstrate.
+
+    What the run opens that has to be closed on every way out -- the registered
+    session of its temporary root (P2-42) -- is closed by `scope`, however
+    `_run_in` returns or raises.
     """
+    with ExitStack() as scope:
+        return _run_in(args, scope)
+
+
+def _run_in(args, scope: ExitStack) -> int:
     from .controller import Controller
     from .dispatchers import build_dispatcher
 
@@ -1486,6 +1544,15 @@ def _cmd_run(args) -> int:
     try:
         storage_admission, storage_root = storage_admission_for(
             getattr(args, "storage_root", None))
+        # P2-42: the temporary root is part of the same decision. Opened last,
+        # so a refusal above leaves nothing open.
+        ephemeral, matched = _open_ephemeral(storage_root, state.project_name or state.run_id,
+                                             state.repo_path, state.run_id, storage_admission)
+    except SessionHeld as exc:
+        # Another process is executing this run: nothing is written (no NEEDS_YOU, no pause), and
+        # the words are the ones the launcher already reads as "in flight".
+        print(str(exc), file=sys.stderr)
+        return 2
     except StorageRefused as exc:
         unpersisted = ""
         if str(exc).startswith(STORAGE_UNAVAILABLE):
@@ -1503,8 +1570,23 @@ def _cmd_run(args) -> int:
                                f"{type(persist_exc).__name__}: {persist_exc})")
         print(f"NEEDS_YOU: {exc}{unpersisted}", file=sys.stderr)
         return 2
+    if ephemeral is not None:
+        # registered at once: nothing below, a print included, can leave the lease open
+        scope.callback(_close_ephemeral, ephemeral)
     _print({"storage_admission": {"state_root": str(storage_root),
                                   "ledger": str(storage_admission.ledger)}})
+    if ephemeral is not None:
+        state.note(f"temporary roots: project {ephemeral.project_id!r} (by {matched}), "
+                   f"session {ephemeral.session_id!r}: every acceptance check and every "
+                   "iteration of this process works in a workspace of its tmp root")
+        _print({"ephemeral_roots": {"project": ephemeral.project_id,
+                                    "session": ephemeral.session_id,
+                                    "root": str(ephemeral.root), "matched_by": matched}})
+    else:
+        state.note(f"temporary roots: {matched}; the runner's sibling scratch "
+                   "(<arena>.scratch, .hoh-scratch-<receipt>) is used")
+        _print({"ephemeral_roots": {"state": "not registered", "why": matched,
+                                    "scratch": "runner sibling scratch"}})
 
     profile = {
         Role.PLANNER: args.planner,
@@ -1536,7 +1618,6 @@ def _cmd_run(args) -> int:
         except PolicyRefused as exc:
             print(f"approval policy refused: {exc}", file=sys.stderr)
             return 2
-        approval_dir.mkdir(parents=True, exist_ok=True)
         if (rc := _write_record(approval_dir / "policy.json", policy.evidence())) is not None:
             return rc
         _print({"approval_policy": {"mode": policy.mode, "digest": policy.digest,
@@ -1565,7 +1646,7 @@ def _cmd_run(args) -> int:
         except ContractRefused as exc:
             print(f"autonomy contract refused: {exc}", file=sys.stderr)
             return 2
-        except DiskFullError as exc:
+        except OSError as exc:
             print(f"NEEDS_YOU: the autonomy contract could not be pinned: {exc}",
                   file=sys.stderr)
             return 2
@@ -1574,7 +1655,6 @@ def _cmd_run(args) -> int:
             if asked is not None and governor.contract.program_epoch != asked:
                 print(f"--program-epoch {asked} ignored: this run is pinned at epoch "
                       f"{governor.contract.program_epoch}", file=sys.stderr)
-            approval_dir.mkdir(parents=True, exist_ok=True)
             if (rc := _write_record(approval_dir / "autonomy.json",
                                     governor.evidence())) is not None:
                 return rc
@@ -1601,7 +1681,6 @@ def _cmd_run(args) -> int:
         except TrustRefused as exc:
             print(f"worktree trust refused: {exc}", file=sys.stderr)
             return 2
-        approval_dir.mkdir(parents=True, exist_ok=True)
         if (rc := _write_record(approval_dir / "worktree_trust.json", granted)) is not None:
             return rc
         _print({"worktree_trust": granted})
@@ -1680,7 +1759,6 @@ def _cmd_run(args) -> int:
         integrity_before = None
         print(f"integrity inventory not measurable here: {exc}", file=sys.stderr)
     if integrity_before is not None:
-        (store.dir / "approval").mkdir(parents=True, exist_ok=True)
         if (rc := _write_record(store.dir / "approval" / "integrity-before.json",
                                 integrity_before)) is not None:
             return rc
@@ -1709,6 +1787,7 @@ def _cmd_run(args) -> int:
         steward=_hook_steward(storage_root, state.project_name or state.run_id,
                               storage_admission),
         recovery=recovery,
+        ephemeral_roots=ephemeral.roots if ephemeral is not None else None,
     )
 
     ran = 0
@@ -3267,7 +3346,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     rsg = sub.add_parser(
         "resume-storage",
-        help="Resume runs parked on storage pressure once a role run would be admitted",
+        help="Resume runs parked on storage pressure once a role run and the iteration's "
+             "temporary workspace would be admitted",
     )
     rsg.add_argument("run_id", nargs="?", default=None,
                      help="without an argument: check every run and project")

@@ -18,11 +18,13 @@ imported by a single line. As long as that is the case, A01, A02 and A12 are
 from __future__ import annotations
 
 import json
+import tempfile
 import time
 import uuid
+from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, NoReturn, Protocol
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from . import sandbox as sandbox_mod
@@ -253,6 +255,13 @@ class LoopOutcome:
     waiting_for_approval: bool = False
 
 
+class _ScratchRefused(RuntimeError):
+    """`run_check(scratch=)` refused the workspace the controller gave it (a
+    `ValueError` of the runner's guard): the check did not run. Only a
+    `ValueError` out of `run_check` itself becomes one -- never one out of making
+    the workspace."""
+
+
 class Controller:
     """Drives one run's iterations.
 
@@ -266,6 +275,17 @@ class Controller:
     Controller built **without** it -- every library caller and test that
     does not pass one -- performs no admission and writes no storage file; it
     records one note ``storage admission: not configured (library use)``.
+
+    Temporary workspaces (P2-42) are explicit too: with ``ephemeral_roots`` (the
+    `EphemeralRoots` of the run process's registered session -- `hoh run` builds
+    it for a registered project) every acceptance check, candidate and baseline,
+    runs with a workspace of its own as its ``HOME`` and ``TMPDIR``
+    (``scratch=``), and every iteration runs with a workspace as the default
+    temporary directory of the process (`workspace.snapshot` and `materialize`
+    make their temporary files there). A refused admission of either parks the
+    run exactly like a refused role dispatch. A Controller built **without** it
+    -- every library caller and test that does not pass one -- is unchanged: the
+    runner's sibling scratch and the host's default temporary directory.
     """
 
     def __init__(
@@ -280,8 +300,14 @@ class Controller:
         park_policy=None,
         steward=None,
         recovery: "dispatchrecovery.RecoveryContext | None" = None,
+        ephemeral_roots=None,
     ) -> None:
         self.store = store
+        #: P2-42: the `EphemeralRoots` of this process's registered session, or
+        #: None (library use, or a project that is not registered).
+        self.ephemeral_roots = ephemeral_roots
+        #: The `ExitStack` of the iteration that is running (see `_run_iteration_guarded`).
+        self._iteration_temp = None
         #: P2-43b: the accounts and data class the caller declared, for the
         #: provenance of every dispatch. None (library use) records
         #: `NOT_AVAILABLE` for the account and `UNSPECIFIED` for the data class.
@@ -396,7 +422,16 @@ class Controller:
         from .storage_park import StorageParked
 
         try:
-            return self._run_iteration_locked(state)
+            with ExitStack() as temp:
+                # The iteration's workspace is entered by `_enter_run_temp`, **after** every
+                # gate of `_run_iteration_locked` (a stop request, the budget, a drifted
+                # specification, a halted run): a run that would not have started is never
+                # parked for storage. It is released here, on every way out.
+                self._iteration_temp = temp
+                try:
+                    return self._run_iteration_locked(state)
+                finally:
+                    self._iteration_temp = None
         except StorageParked as parked:
             # The state was persisted by the park (or the NEEDS_YOU stop)
             # itself, timer first. Nothing else is written and no further
@@ -504,6 +539,10 @@ class Controller:
         stages.begin_iteration(state, reason="new iteration")
         iteration = state.iteration
         self.store.write_state(state)
+        # P2-42: the iteration's temporary workspace, asked for where the planner's own
+        # storage gate is -- after every gate above, so a refusal parks a run that was
+        # going to run (the iteration is charged as it is for a refused planner dispatch).
+        self._enter_run_temp(state)
 
         base = state.last_accepted_candidate or state.base_candidate
         if base is None:
@@ -1113,13 +1152,20 @@ class Controller:
                 # against 600 s, a slow criterion that was green on both
                 # states ran into the timeout here, thereby counted as "not
                 # green" and was credited as proof of an increment.
-                receipt, log = run_check(
-                    check, probe, run_id=state.run_id, iteration=state.iteration,
-                    attempt=state.attempt, cwd=arena, timeout=DEFAULT_CHECK_TIMEOUT,
-                    receipt_suffix="basis",
-                    isolation=self.isolation,
-                )
-            except (HouseRuleViolation, ArenaEscape, PolicyUnavailable) as exc:
+                with self._check_workspace(state) as scratch:
+                    try:
+                        receipt, log = run_check(
+                            check, probe, run_id=state.run_id, iteration=state.iteration,
+                            attempt=state.attempt, cwd=arena, timeout=DEFAULT_CHECK_TIMEOUT,
+                            receipt_suffix="basis",
+                            isolation=self.isolation,
+                            scratch=scratch,
+                        )
+                    except ValueError as exc:
+                        if scratch is None:
+                            raise
+                        raise _ScratchRefused(str(exc)) from exc
+            except (HouseRuleViolation, ArenaEscape, PolicyUnavailable, _ScratchRefused) as exc:
                 # Not measured means not demonstrated: the criterion ends up
                 # in neither of the two sets and therefore carries no
                 # discriminates.
@@ -1784,20 +1830,27 @@ class Controller:
         self, state: RunState, check: AcceptanceCheck, candidate: Candidate
     ) -> tuple[Receipt, str]:
         try:
-            return run_check(
-                check,
-                candidate,
-                run_id=state.run_id,
-                iteration=state.iteration,
-                attempt=state.attempt,
-                cwd=candidate.repo_path,  # is the arena (probe), never the live tree
-                isolation=self.isolation,
-            )
+            with self._check_workspace(state) as scratch:
+                try:
+                    return run_check(
+                        check,
+                        candidate,
+                        run_id=state.run_id,
+                        iteration=state.iteration,
+                        attempt=state.attempt,
+                        cwd=candidate.repo_path,  # is the arena (probe), never the live tree
+                        isolation=self.isolation,
+                        scratch=scratch,
+                    )
+                except ValueError as exc:
+                    if scratch is None:
+                        raise
+                    raise _ScratchRefused(str(exc)) from exc
         except PolicyUnavailable:
             # Without a policy nothing is executed -- and that is a visible
             # block, not a traceback in the middle of VERIFYING.
             raise
-        except (HouseRuleViolation, ArenaEscape) as exc:
+        except (HouseRuleViolation, ArenaEscape, _ScratchRefused) as exc:
             # A criterion that tried to bypass the guards is not a criterion.
             #
             # `ArenaEscape` was missing here and escaped `run_iteration` as an
@@ -1820,7 +1873,9 @@ class Controller:
                 runner_identity="guard",
                 runner_ok=False,   # the check never ran -- never a product verdict
             )
-            kind = "ARENA ESCAPE" if isinstance(exc, ArenaEscape) else "HOUSE RULE VIOLATION"
+            kind = ("ARENA ESCAPE" if isinstance(exc, ArenaEscape)
+                    else "SCRATCH REFUSED" if isinstance(exc, _ScratchRefused)
+                    else "HOUSE RULE VIOLATION")
             log = f"{kind}, not executed:\n{exc}\n"
             # The evidence carries the digest **of the log**, not that of the
             # exception. Previously the two diverged, and `verify_log`
@@ -2604,15 +2659,6 @@ class Controller:
         `StorageParked`; an admission that cannot answer at all, or refuses
         for a reason that is not capacity, stops the run NEEDS_YOU ("storage
         admission unavailable") -- fail closed, never skipped."""
-        from .storage_park import (
-            ADMISSION_UNAVAILABLE,
-            ParkPolicy,
-            StorageParked,
-            is_capacity_refusal,
-            park_for_storage_pressure,
-            stop_needs_you,
-        )
-
         # getattr: a controller assembled with `__new__` (several tests do)
         # has no admission, exactly like one built without it.
         admission = getattr(self, "storage_admission", None)
@@ -2625,11 +2671,38 @@ class Controller:
         try:
             decision = admission.reserve(project_id, op_kind="role_run")
         except Exception as exc:              # noqa: BLE001 - fail closed, classified
-            reason = f"{ADMISSION_UNAVAILABLE}: {type(exc).__name__}: {exc}"[:400]
-            stop_needs_you(state, self.store, reason)
-            raise StorageParked(reason, parked=False) from exc
+            self._admission_failed(state, exc)
         if getattr(decision, "admitted", False):
             return decision
+        self._refused(state, decision)
+
+    def _admission_failed(self, state: RunState, exc: BaseException) -> NoReturn:
+        """An admission that cannot answer at all stops the run NEEDS_YOU ("storage
+        admission unavailable") and raises `StorageParked(parked=False)` -- fail
+        closed, never skipped. Shared by the role dispatch and the temporary
+        workspaces."""
+        from .storage_park import ADMISSION_UNAVAILABLE, StorageParked, stop_needs_you
+
+        reason = f"{ADMISSION_UNAVAILABLE}: {type(exc).__name__}: {exc}"[:400]
+        stop_needs_you(state, self.store, reason)
+        raise StorageParked(reason, parked=False) from exc
+
+    def _refused(self, state: RunState, decision) -> NoReturn:
+        """A refused admission ends the operation that asked: a capacity
+        refusal parks the run (`storage_park.park_for_storage_pressure`, timer
+        first) and raises `StorageParked`; any other refusal -- the ledger
+        itself, not free space -- stops the run NEEDS_YOU and raises it with
+        ``parked=False``. Shared by the role dispatch (`_storage_gate`) and the
+        temporary workspaces (`_workspace`): one refusal, one route."""
+        from .storage_park import (
+            ADMISSION_UNAVAILABLE,
+            ParkPolicy,
+            StorageParked,
+            is_capacity_refusal,
+            park_for_storage_pressure,
+            stop_needs_you,
+        )
+
         if not is_capacity_refusal(decision):
             # Not free space: the ledger itself refused (another namespace, an
             # unclaimed boot, a malformed file). Waiting does not fix that.
@@ -2644,6 +2717,80 @@ class Controller:
             steward=getattr(self, "steward", None))
         reason = state.blocked_reason if parked else (state.stop_reason or "")
         raise StorageParked(reason or str(decision), parked=parked)
+
+    # -- P2-42: registered temporary workspaces ------------------------------- #
+
+    @contextmanager
+    def _workspace(self, state: RunState, *, creator: str, purpose: str):
+        """A registered temporary workspace of this run (`EphemeralRoots.create`:
+        admitted, recorded before any content, leased to this process) for the
+        body, released -- the creator's own cleanup -- on every way out, also
+        when the body raises. Yields its path, or None without
+        ``ephemeral_roots`` (library use, an unregistered project): the caller
+        then keeps the behaviour it had. A refused admission parks the run
+        (`_refused`) and an admission that cannot answer stops it NEEDS_YOU
+        (`_admission_failed`), exactly as for a role dispatch: nothing is created
+        and nothing falls back to a sibling or host directory. A workspace that
+        could not be removed is noted."""
+        roots = getattr(self, "ephemeral_roots", None)
+        if roots is None:
+            yield None
+            return
+        from .storage_ephemeral import (TempAdmissionRefused, TempAdmissionUnavailable,
+                                        name_for_run)
+
+        try:
+            ws = roots.create(creator=creator, purpose=purpose, run_id=name_for_run(state.run_id))
+        except TempAdmissionRefused as exc:
+            self._refused(state, exc.refusal)
+        except TempAdmissionUnavailable as exc:
+            self._admission_failed(state, exc.cause)
+        try:
+            yield ws.path
+        finally:
+            released = roots.release(ws)
+            if not released.get("removed"):
+                state.note(f"temporary workspace {ws.workspace_id} stays: "
+                           f"{released.get('note', '')}"[:400])
+                try:
+                    # the iteration's workspace is released after the iteration's last write:
+                    # the note reaches the disk here, best effort (the workspace's own record
+                    # on disk says it too)
+                    self.store.write_state(state)
+                except Exception:                  # noqa: BLE001 - never hides the real outcome
+                    pass
+
+    def _check_workspace(self, state: RunState):
+        """The workspace of one acceptance check (candidate or baseline): its
+        ``HOME`` and ``TMPDIR`` -- one per check, as the runner requires."""
+        return self._workspace(state, creator="controller.run_check", purpose="check")
+
+    def _enter_run_temp(self, state: RunState) -> None:
+        """Make the iteration's workspace part of the iteration that is running; it is
+        released when `_run_iteration_guarded` leaves. Without an iteration scope
+        (a caller of `_run_iteration_locked` that did not come through it) nothing."""
+        temp = getattr(self, "_iteration_temp", None)
+        if temp is not None:
+            temp.enter_context(self._run_temp(state))
+
+    @contextmanager
+    def _run_temp(self, state: RunState):
+        """The iteration's workspace is the default temporary directory of this
+        process for the iteration (`tempfile.tempdir`, restored on every way
+        out): the two temporary files `workspace.py` makes -- the git index of
+        `snapshot` and the tar of `materialize` -- land in a registered,
+        admitted, leased workspace that this iteration removes. Entered after the
+        iteration's gates (`_enter_run_temp`), before anything is spent."""
+        with self._workspace(state, creator="controller.run_iteration", purpose="run") as path:
+            if path is None:
+                yield
+                return
+            previous = tempfile.tempdir
+            tempfile.tempdir = str(path)
+            try:
+                yield
+            finally:
+                tempfile.tempdir = previous
 
     def _dispatch(self, role: Role, prompt: str, state: RunState) -> str:
         reservation = self._storage_gate(state)

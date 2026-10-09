@@ -38,6 +38,7 @@ gap is not a pass.
 from __future__ import annotations
 
 import argparse
+import datetime
 import json
 import re
 import subprocess
@@ -242,6 +243,67 @@ def derive_git(root: Path, base: str) -> dict:
     }
 
 
+#: The documents state dates in the commits' own offset (see the table's preface).
+LINE_TZ = datetime.timezone(datetime.timedelta(hours=3))
+LEDGER_ENTRY_HEADING = re.compile(r"^#{2,3} O(\d+)\b")
+
+
+def derive_line(root: Path, base: str) -> dict:
+    """The shape of the development line at the base: first and latest commit,
+    elapsed time, calendar days with a commit, the commit-free runs and the
+    longest run of consecutive days with a commit, the commit counts, and the
+    ledger's numbered entry headings (added 2026-10-09, ledger O263). Every
+    figure is a count over history up to the base; a day is the commit's own
+    calendar day at +0300."""
+    stamps = _git(root, "log", base, "--format=%cI").split()
+    if not stamps:
+        raise Gap("no commits up to the base")
+    when = sorted(datetime.datetime.fromisoformat(x).astimezone(LINE_TZ)
+                  for x in stamps)
+    first, last = when[0], when[-1]
+    delta = last - first
+    days = sorted({w.date() for w in when})
+    one = datetime.timedelta(days=1)
+    gaps = [(a + one, b - one, (b - a).days - 1)
+            for a, b in zip(days, days[1:]) if (b - a).days > 1]
+    best_n, best_from, best_to = 0, days[0], days[0]
+    run_from, run_n = days[0], 1
+    for a, b in zip(days, days[1:]):
+        if (b - a).days == 1:
+            run_n += 1
+        else:
+            run_from, run_n = b, 1
+        if run_n > best_n:
+            best_n, best_from, best_to = run_n, run_from, b
+    if best_n == 0:
+        best_n, best_from, best_to = 1, days[0], days[0]
+    merges = int(_git(root, "rev-list", "--count", "--merges", base).strip())
+    total = int(_git(root, "rev-list", "--count", base).strip())
+    out = {
+        "first": first.strftime("%Y-%m-%d %H:%M"),
+        "last": last.strftime("%Y-%m-%d %H:%M"),
+        "first_day": str(first.date()), "last_day": str(last.date()),
+        "elapsed_days": delta.days, "elapsed_hours": delta.seconds // 3600,
+        "calendar_days": (days[-1] - days[0]).days + 1,
+        "commit_days": len(days),
+        "gaps": [(str(a), str(b), n) for a, b, n in gaps],
+        "streak": (best_n, str(best_from), str(best_to)),
+        "commits": total, "merges": merges, "non_merge": total - merges,
+    }
+    shown = _git(root, "show", f"{base}:{LEDGER}", check=False)
+    nums = sorted({int(m.group(1)) for line in shown.split("\n")
+                   for m in [LEDGER_ENTRY_HEADING.match(line)] if m})
+    if nums:
+        out["ledger_entries"] = (len(nums), nums[0], nums[-1])
+    return out
+
+
+def count_captain(attribution_json: str) -> tuple[int, int]:
+    """(entries of category CAPTAIN, all entries) of an attribution ledger."""
+    entries = json.loads(attribution_json).get("entries") or []
+    return sum(1 for e in entries if e.get("category") == "CAPTAIN"), len(entries)
+
+
 def derive_attribution(root: Path, base: str) -> dict:
     """The attribution figures with the ledger as committed at the base."""
     text = _git(root, "show", f"{base}:dogfood/ATTRIBUTION.json")
@@ -259,8 +321,10 @@ def derive_attribution(root: Path, base: str) -> dict:
     nodes = rep["development_nodes"]
     through = rep["nodes_through_the_product"]
     merged = rep["nodes_developed_by_the_product_merged_by_the_orchestrator"]
+    captain, entries = count_captain(text)
     return {"nodes": nodes, "through": through, "merged": merged,
-            "direct": nodes - through - merged}
+            "direct": nodes - through - merged, "captain": captain,
+            "entries": entries}
 
 
 def derive_matrix(root: Path) -> dict:
@@ -327,6 +391,7 @@ def derive_all(root: Path, base: str) -> dict:
     facts = {"base": base}
     facts["git"] = derive_git(root, base)
     facts["attribution"] = derive_attribution(root, base)
+    facts["line"] = derive_line(root, base)
     facts["matrix"] = derive_matrix(root)
     facts["plan"] = derive_plan(root)
     facts["docs"] = derive_docs(root)
@@ -347,6 +412,10 @@ def moved_inputs(root: Path, base: str) -> list[str]:
 # the rows
 # --------------------------------------------------------------------------
 
+def _plural(n: int, word: str) -> str:
+    return f"{n} {word}" if n == 1 else f"{n} {word}s"
+
+
 def _statuses(c: dict, order=("PROVEN", "PARTIAL", "IMPLEMENTED_NOT_PROVEN",
                               "MISSING")) -> str:
     return " + ".join(f"{c.get(k, 0)} {k}" for k in order)
@@ -360,6 +429,7 @@ def build_rows(facts: dict | None) -> list[dict]:
     mx = f.get("matrix", {})
     pl = f.get("plan", {})
     dc = f.get("docs", {})
+    ln = f.get("line", {})
 
     def d(label, fn):
         try:
@@ -746,6 +816,148 @@ def build_rows(facts: dict | None) -> list[dict]:
              what="numbered headings of `docs/LIMITATIONS.md`",
              source="`docs/LIMITATIONS.md`",
              regenerate="count lines matching `^## [0-9]`"),
+        # By addition, 2026-10-09 (ledger O263): the duration, the autonomy and
+        # the scale of the whole development line, which the v0.1.0 campaign
+        # figures ("five calendar days; 3.5 days elapsed") do not describe.
+        dict(tag="V46", r=True,
+             needles=[f"{ln['elapsed_days']} days"] if ln else [],
+             figure=d("line", lambda: f"{ln['first']} to {ln['last']} (+0300): "
+                      f"{ln['elapsed_days']} days {ln['elapsed_hours']} h "
+                      f"({_plural(ln['elapsed_days'] // 7, 'week')} "
+                      f"{_plural(ln['elapsed_days'] % 7, 'day')})"),
+             what="first and latest commit of the development mainline, and "
+                  "the time between them",
+             source="git history",
+             regenerate="`git log <base> --format=%cI` (earliest and latest "
+                        "commit date, read at +0300); the difference in days "
+                        "and whole hours"),
+        dict(tag="V47", r=True,
+             needles=[f"{ln['commit_days']} of the {ln['calendar_days']}",
+                      f"{ln['commit_days']} of {ln['calendar_days']}"]
+             if ln else [],
+             figure=d("line", lambda: f"{ln['commit_days']} of "
+                      f"{ln['calendar_days']} calendar days carry a commit; "
+                      + (("none on " + " or ".join(
+                          f"{a} to {b} ({_plural(n, 'day')})"
+                          for a, b, n in ln["gaps"])) if ln["gaps"]
+                         else "no day without a commit")
+                      + f"; longest run of days with a commit: "
+                      f"{ln['streak'][0]} ({ln['streak'][1]} to "
+                      f"{ln['streak'][2]})"),
+             what="calendar days (commit date at +0300, first to latest day "
+                  "inclusive) with at least one commit, the commit-free runs "
+                  "and the longest run of consecutive days with a commit",
+             source="git history",
+             regenerate="`git log <base> --format=%cI`; the distinct calendar "
+                        "days, the gaps between them and the longest run of "
+                        "consecutive days"),
+        dict(tag="V48", r=True, needles=[f"{ln['commits']:,}"] if ln else [],
+             figure=d("line", lambda: f"{ln['commits']:,} commits = "
+                      f"{ln['non_merge']} non-merge + {ln['merges']} merges"),
+             what="commits reachable from the base",
+             source="git history",
+             regenerate="`git rev-list --count <base>`; with `--merges` for "
+                        "the merges"),
+        dict(tag="V49", r=True,
+             needles=[str(ln["ledger_entries"][0])]
+             if ln.get("ledger_entries") else [],
+             figure=d("line", lambda: f"{ln['ledger_entries'][0]} numbered "
+                      f"entries, O{ln['ledger_entries'][1]} to "
+                      f"O{ln['ledger_entries'][2]}"),
+             what="distinct ledger entry numbers that head an entry "
+                  "(`## On` or `### On`) in the working ledger as committed "
+                  "at the base; O1 to O22 are numbered open items inside the "
+                  "first entries, not entry headings",
+             source="`DOGFOOD_LEDGER.md` at the base",
+             regenerate="`git show <base>:DOGFOOD_LEDGER.md`; count the "
+                        "distinct numbers in lines matching `^#{2,3} O[0-9]+`"),
+        dict(tag="V50", r=False, needles=["117 run directories"],
+             figure="117 run directories, 2026-10-01 to 2026-10-09",
+             what="run directories under the project's runs directory, from "
+                  "the first (2026-10-01 10:22Z) to the latest (2026-10-09 "
+                  "07:29Z); runs of earlier days were kept elsewhere and are "
+                  "not counted (taken on 2026-10-09 at 16:40 +0300; the count "
+                  "grows with every run)",
+             source="ledger O263",
+             regenerate="`ls <state root>/runs` and count the names ending in "
+                        "`-runs`; historical once taken",
+             ledger=[("O263", "117 `*-runs` directories")]),
+        dict(tag="V51", r=False, needles=["459 first-round"],
+             figure="459 first-round reviewer reports (771 report files in "
+                    "all, including re-review rounds), 2026-09-30 to "
+                    "2026-10-09",
+             what="reports of the spec and integration reviewers of the build: "
+                  "first round = files named `*-report.md` minus the "
+                  "re-review files named `*-rN-report.md`; all = files whose "
+                  "name contains `report` and ends in `.md`, re-review rounds "
+                  "(`-rN-report.md`, `-report-rN.md`) and parked copies "
+                  "included (taken on 2026-10-09 at 17:57 +0300, the third "
+                  "taking of this count; the counts grow with every review)",
+             source="ledger O263",
+             regenerate="count the files named `*-report.md`, subtract those "
+                        "named `*-rN-report.md`; and count the files matching "
+                        "`*report*.md`, in the build's review directory; "
+                        "historical once taken",
+             ledger=[("O263", "459 first-round reviewer reports (771 report "
+                      "files in all, including re-review rounds)")]),
+        dict(tag="V52", r=True, needles=["CAPTAIN"],
+             figure=d("attribution", lambda: f"{a['captain']} of "
+                      f"{a['entries']} attribution entries are of category "
+                      "CAPTAIN (a human decision or a human-authored change)"),
+             what="entries of `dogfood/ATTRIBUTION.json` at the base booked to "
+                  "a human; the file is declared by the orchestrating session "
+                  "and checked for tiling and for the run states it cites, "
+                  "not for authorship",
+             source="`dogfood/ATTRIBUTION.json` at the base",
+             regenerate="`git show <base>:dogfood/ATTRIBUTION.json`; count "
+                        "the entries whose `category` is `CAPTAIN`"),
+        dict(tag="V53", r=False,
+             needles=["6 operator directives", "6 directives"],
+             figure="6 operator directives stored verbatim, 2026-09-30 to "
+                    "2026-10-09",
+             what="amendments A1 to A6 of the programme, each with the "
+                  "operator's own words in a file of its own",
+             source="ledger O263",
+             regenerate="`git ls-tree -r --name-only <base> "
+                        "program/v3_3/amendments` and count the files named "
+                        "`*_OPERATOR_DIRECTIVE_*`",
+             ledger=[("O263", "6 verbatim operator directives")]),
+        dict(tag="V54", r=False,
+             needles=["3 acknowledged hand-overs", "handed over 3 times"],
+             figure="4 orchestrator sessions in a row; 3 acknowledged "
+                    "hand-overs (2026-10-07, 2026-10-08, 2026-10-09); a fourth "
+                    "hand-over file (2026-10-08) was written before a machine "
+                    "shutdown and not used",
+             what="orchestrator sessions since the written hand-over protocol "
+                  "began on 2026-10-07; earlier sessions are not itemised",
+             source="ledger O263",
+             regenerate="list the hand-over and acknowledgement files of the "
+                        "build's hand-over directory; historical",
+             ledger=[("O263", "4 orchestrator sessions"),
+                     ("O263", "3 acknowledged hand-overs")]),
+        dict(tag="V55", r=False, needles=["13 stops", "13 quota stops"],
+             figure="13 quota stops (15 markers), 2026-10-03 to 2026-10-07",
+             what="stops of provider work at the account's usage limit, as "
+                  "the orchestrator's running notes mark them; two pairs of "
+                  "markers describe one stop each",
+             source="ledger O263",
+             regenerate="count the lines of the running notes that open with "
+                        "`STATE AT USAGE LIMIT` or `STATE AT WEEKLY LIMIT`; "
+                        "historical",
+             ledger=[("O263", "13 quota stops (15 markers)")]),
+        dict(tag="V56", r=False, needles=["power cut"],
+             figure="power cut 2026-09-10; disk full 2026-09-25; inode "
+                    "exhaustion 2026-10-05; operator-requested WSL shutdown "
+                    "2026-10-08 (about one hour); inode pressure 2026-10-09 "
+                    "(the storage guard at CRITICAL on the inode axis parked "
+                    "two runs until 11:36Z)",
+             what="the other interruptions the ledger and the notes record",
+             source="ledger O263, O88, O238, O252, O258, O262",
+             regenerate="read the entries; historical",
+             ledger=[("O263", "power cut of 2026-09-10"),
+                     ("O263", "operator-requested WSL shutdown of 2026-10-08"),
+                     ("O263", "two runs parked on storage pressure until "
+                      "11:36Z")]),
     ]
     for row in rows:
         row["needles"] = [n for n in row["needles"] if n]

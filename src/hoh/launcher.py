@@ -44,7 +44,7 @@ from .orchestrator import (
 )
 from .failures import AUTOMATIC_KINDS
 from .controller import open_seal_arenas
-from .durable_io import durable_create
+from .durable_io import DurableWriteNotSynced, durable_create
 from .project import ActionClass, TaskNode
 from .stages import violation_unresolved
 from .store import LockBusy, RunStore, StoreError
@@ -352,6 +352,10 @@ class HohRunLauncher(RunLauncher):
                 if not spec_file.exists():      # a dangling link holds the name
                     return (f"the repair specification path {spec_file} is a dangling "
                             f"link; nothing to dispatch for {run_id}")
+            except DurableWriteNotSynced:
+                # The specification is in place and whole; only its directory
+                # entry is not known to be durable.
+                pass
             except OSError as exc:
                 return f"could not write the repair specification {spec_file} for {run_id}: {exc}"
 

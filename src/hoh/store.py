@@ -640,6 +640,18 @@ class RunStore:
                 parts = Path(member.name).parts[1:]
                 if not parts:
                     continue
+                out = (target / Path(*parts)).resolve()
+                if not out.is_relative_to(target_root):
+                    raise StoreError(f"path points out of the target: {member.name!r}")
+                # The lock-file skip below looks at the first component of the
+                # name as written, so a name that reaches a lock file by a
+                # detour (`x/../.lock`) or through a link would slip past it.
+                if ".." in parts:
+                    raise StoreError(f"backup member {member.name} has a '..' "
+                                     "component; refusing to restore it")
+                if member.issym() or member.islnk():
+                    raise StoreError(f"backup member {member.name} is a link; "
+                                     "refusing to restore it")
                 if parts[0] in (".lock", ".process.lock"):
                     continue
                 if (member.isreg() and not member.mode & 0o400) or (
@@ -648,9 +660,6 @@ class RunStore:
                         f"backup member {member.name} has mode "
                         f"{member.mode & 0o7777:#o}, which the owner cannot read "
                         "back; refusing to restore it")
-                out = (target / Path(*parts)).resolve()
-                if not out.is_relative_to(target_root):
-                    raise StoreError(f"path points out of the target: {member.name!r}")
                 member.name = str(Path(*parts))
                 members.append(member)
                 if member.isreg():
@@ -662,6 +671,13 @@ class RunStore:
             try:
                 staging.mkdir(parents=True)
                 tar.extractall(staging, members=members, filter="tar")
+                # Last line of defence: whatever a member name did, a staged
+                # lock file is never published over the live one.
+                for lock in (".lock", ".process.lock"):
+                    if os.path.lexists(staging / lock):
+                        raise StoreError(
+                            f"the staged tree holds {lock}; a lock file is never "
+                            "restored (staging left in place)")
             except OSError as exc:
                 if exc.errno in (errno.ENOSPC, errno.EDQUOT, errno.EFBIG):
                     raise durable_io.DiskFullError(

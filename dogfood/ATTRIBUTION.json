@@ -2546,6 +2546,195 @@
     "403088aae52684e32efdf852a4446949a5bd7820"
    ],
    "why_not_the_product": "The v0.3.0a2 documentation checkpoint, third commit: the MINORs of the release reviews rela2rev-a and rela2rev-b folded into the release notes, the regenerated changelog section, the README, the limitations and the second paper, the figures taken again at 41c86dc6, claim entries re-anchored and added, and the ledger revision 2 of O260. Text and generated documents only, written by a Sonnet 5.5 drafter under the orchestrator's brief (the trailer names Opus 5.5 as the orchestrating session); no run could have produced a document about the product's own history. A commit cannot name itself, so its attribution is this entry, written in the next, ledger-only commit. Review: NOT_RUN at the time of writing."
+  },
+  {
+   "id": "o261-pin",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "ed66ee01e145a91f48b53c772842c0c7aaf7214b"
+   ],
+   "why_not_the_product": "The spec-only pin of the p241s2 run (P2-41 closure, slice 2): a single commit that adds dogfood/p241-durable-s2/spec.md (Revision 3a, spec sha256 13e71967...) on a4e8fbad after the spec review pair released it (p241s2spec-a and -b, round 2 yes/yes). The pin of a run is the orchestrator's act and carries the Co-Authored-By trailer. Ledger O261."
+  },
+  {
+   "id": "p241-durable-s2",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "91ad3c54bf0abda3e7c84dd888503334cfec3784",
+    "0985ecb9ec6e65a44ddf1cd2d73adc4645cfa741"
+   ],
+   "run_state": "dogfood/p241-durable-s2/20261009T0009Z/run-evidence/state.json",
+   "candidate_id": "20261009t0009z-p241s2-i1-a1",
+   "why_not_the_product": "The product moved the dispatcher's leaf write, audit append and recorded answer onto the durable-write primitives (a dir_fd form of the primitives, a before_replace hook, create_mode), closed the lock-file filter of restore and the S3 follow-ups, and added ENOSPC, EIO and zero-byte tests of the two OWN_DURABLE helpers storage_host._write_new and archive_bundle._write_new, which found a zero-byte spin in archive_bundle._write_new (three-line guard) in run 20261009t0009z-p241s2 from dogfood/p241-durable-s2/spec.md (S2 of three, Revision 3a; accepted in iteration 1 at 2026-10-09T00:37:40Z; import refs/imports/p241s2 = 91ad3c54). The orchestrator wrote the spec, pinned it, imported the candidate, had two Herdr agents review it and merged it after tools/merge_gate.py found MERGE_ELIGIBLE (receipt digest in the merge message 0985ecb9). P2-41 is lifted to PROVEN with stated limits by the records entry O261, not by this run. Evidence in dogfood/p241-durable-s2/20261009T0009Z/. Ledger O261."
+  },
+  {
+   "id": "rel-a2-merge",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "d364a1272a22fc87fe85ef20ec9411e0fba14954"
+   ],
+   "why_not_the_product": "Merge of the v0.3.0a2 release documentation branch (refs/imports/rel-a2 = 95d9f267, a fast-forward of a4e8fbad) into the line after the release reviews rela2rev-a and rela2rev-b (round 2) released it yes/yes and tools/merge_gate.py found MERGE_ELIGIBLE (receipt integ-rela2/merge-receipt.json, sha256 139d3e07..., in the merge message). The content merged is attributed in the entries rel-a2-docs, rel-a2-docs-2, rel-a2-docs-3, o260-records, o260-revision-1 and o260-canonical-merge. Ledger O261."
+  },
+  {
+   "id": "export-sync-base-v030a2",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": false,
+   "commits": [
+    "add47274a8a9eafb21da9ccb2d6ab5b4fe84ac85"
+   ],
+   "why_not_the_product": "The export-sync base recorded at the public export e95e09a0 of v0.3.0a2: the output of tools/export_sync.py record --export-commit origin/main (dogfood/export-sync/EXPORT_SYNC_STATE.json), nothing else. Tool output after the night-mode publish authority of the operator (2026-10-08); not development work. Ledger O261."
+  },
+  {
+   "id": "o261-evidence",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "36607b70e769fe319a49d01a9a14dd5e71a1353c"
+   ],
+   "why_not_the_product": "O261 part 1: the run evidence of the p241s2 run, its two integration reviews and its four spec-review reports, copied into dogfood/p241-durable-s2/20261009T0009Z/ by build_evidence_o261.py (additions only, 99 files). Records only, written by a Sonnet 5.5 drafter under the orchestrator's brief. A commit cannot name itself, so the attribution of the remaining O261 records commits is an entry of the next commit. Ledger O261."
+  },
+  {
+   "id": "o261-records",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "dd5be58bb9461df53b9f5c01e2bb6d9c4bc6c27b"
+   ],
+   "why_not_the_product": "O261: the v0.3.0a2 merge and publication, the export base, the P2-41 slice-2 merge and the lift of P2-41 to PROVEN by addition (ledger entry O261): the register note with the stated limits and the integration reviews' wording corrections, the P2-42 note, the derived documents regenerated offline, a dated paragraph in the README and a dated section in docs/LIMITATIONS.md, the two newly exported test paths classified, the export manifest re-derived and five attribution entries. Records and text only, written by a Sonnet 5.5 drafter under the orchestrator's brief; no run could have produced a document about the product's own history. A commit cannot name itself, so its attribution is this entry, written in the next commit. Ledger O261."
+  },
+  {
+   "id": "o261-revision-1",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "e98653a8fc2f428c42d93ae47bcb5b0f686c4aeb"
+   ],
+   "why_not_the_product": "O261 Revision 1: the figures of the second paper taken again (tools/docs_numbers.py render at the records commit, the audit block re-written), a dated section 16 by addition in paper/POSITION_PAPER_V2.md, ten claims and five not_claims bound (seven table-row not_claims re-anchored), the attribution entry of the records commit, the baseline documents regenerated and the ledger revision. Text and generated documents only, written by a Sonnet 5.5 drafter under the orchestrator's brief; no run could have produced a document about the product's own history. Ledger O261."
+  },
+  {
+   "id": "o261-revision-2",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "2f7dbbd45e354d9e435baa0bf2935f43e86104af"
+   ],
+   "why_not_the_product": "O261 Revision 2: a ledger-only commit that records the third reclaim of the night (121 reviews trees, re-read and its payload digest re-computed on the cold store) and the machine state after it, by addition. Records only, written by a Sonnet 5.5 drafter under the orchestrator's brief. Ledger O261."
+  },
+  {
+   "id": "o261-merge",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "0b9f95d6553eb842853d7867762c9c6cb6d72a9d"
+   ],
+   "why_not_the_product": "The merge of the O261 records branch (refs/imports/o261 = e8464db0, a fast-forward of 0985ecb9) after the review pair o261rev-a (TRUTH) and o261rev-b (MECHANICS) released it yes/yes with 0 BLOCKING and tools/merge_gate.py found MERGE_ELIGIBLE (receipt digest in the merge message). The content merged is attributed in the entries o261-evidence, o261-records, o261-revision-1 and o261-revision-2. The seven text MINORs of the reviews are corrected by addition in the ledger entry O262. Ledger O262."
+  },
+  {
+   "id": "p243-recovery-c-pin",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "631427976ad42556793230d5577a916f1a9a9c47"
+   ],
+   "why_not_the_product": "The spec-only pin of the p243c run (P2-43 slice c): a single commit that adds dogfood/p243-recovery-c/spec.md (Revision 2, spec sha256 b84681a7...) on 0b9f95d6 after the spec review pair released it (p243cspec-a and -b, both yes). The pin of a run is the orchestrator's act and carries the Co-Authored-By trailer. Ledger O262."
+  },
+  {
+   "id": "p243-recovery-c",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "93a0569a6ef19150a51db7fbbf8993c5db900fce",
+    "b86b09e9cfaf4cb0afb3a6a2477b762b6d24c0fe"
+   ],
+   "run_state": "dogfood/p243-recovery-c/20261009T0256Z/run-evidence/state.json",
+   "candidate_id": "20261009t0256z-p243c-i1-a1",
+   "why_not_the_product": "The product made the resume side enforce the park binding of a failed provider dispatch (dispatchrecovery.verify_binding recomputes a park's id from the live state, the pinned contract and the declared master and is called by every automatic resume path; a stale, foreign, altered, copied or already-resumed park is refused; a stale master cannot declare; a resume writes a claim; a given-up park leaves an escalation; the four scenarios of amendment A5 are tests) in run 20261009t0256z-p243c from dogfood/p243-recovery-c/spec.md (P2-43 slice c, Revision 2; accepted in iteration 1 at 2026-10-09T03:20:15Z; import refs/imports/p243c = 93a0569a). The orchestrator wrote the spec, pinned it, imported the candidate, had two Herdr agents review it and merged it after tools/merge_gate.py found MERGE_ELIGIBLE (receipt digest in the merge message b86b09e9). P2-43 is lifted to PROVEN with stated limits by the records entry O262, not by this run. Evidence in dogfood/p243-recovery-c/20261009T0256Z/. Ledger O262."
+  },
+  {
+   "id": "p243d-pin",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "7b5cedc7fada9df038384e7a56aea64670ba7982"
+   ],
+   "why_not_the_product": "The spec-only pin of the p243d run (P2-43 slice d): a single commit that adds dogfood/p243d/spec.md (Revision 2, spec sha256 4757897c...) on b86b09e9 after the spec review (p243dspec-a no then yes in the narrow round 2, p243dspec-b yes). The pin of a run is the orchestrator's act and carries the Co-Authored-By trailer. Ledger O262."
+  },
+  {
+   "id": "p243d",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "e0d9f85a63a2d677643b18ac0d8842260df387a5",
+    "393480422a0531db9f4738173841cb5c9a977a10"
+   ],
+   "run_state": "dogfood/p243d/20261009T0452Z/run-evidence/state.json",
+   "candidate_id": "20261009t0452z-p243d-i1-a1",
+   "why_not_the_product": "The product made a developer turn that ends on a provider's usage- or rate-limit screen a failed dispatch of its class (failures.final_screen_limit reads only the recorded banner shapes, whole, in the last twelve lines of the pane; HerdrDispatcher._refuse_a_limit_screen raises a dispatch error that the existing path of the earlier slices parks with a receipt, a timer and the provider's own reset time) in run 20261009t0452z-p243d from dogfood/p243d/spec.md (P2-43 slice d, Revision 2; accepted in iteration 1 at 2026-10-09T05:10:01Z; import refs/imports/p243d = e0d9f85a). The orchestrator wrote the spec, pinned it, imported the candidate, had two Herdr agents review it and merged it after tools/merge_gate.py found MERGE_ELIGIBLE (receipt digest in the merge message 39348042). P2-43 is lifted to PROVEN with stated limits by the records entry O262, not by this run. Evidence in dogfood/p243d/20261009T0452Z/. Ledger O262."
+  },
+  {
+   "id": "o262-evidence",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "3d3a158cd287528aae78cce99149be6e42413c76"
+   ],
+   "why_not_the_product": "O262 part 1: the run evidence of the p243c and p243d runs with their integration and spec reviews, the four release-review reports of v0.3.0a2 and the evidence files of amendment A6 (the TODO mining and the inode censuses), copied by build_evidence_o262.py (additions only, 232 files). Records only, written by a Sonnet 5.5 drafter under the orchestrator's brief. A commit cannot name itself, so the attribution of the remaining O262 records commits is an entry of the next commit. Ledger O262."
+  },
+  {
+   "id": "o262-records",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "a9a57ca071e6efa0e231f8b1be5bc6cb9522a40b"
+   ],
+   "why_not_the_product": "O262 records: amendment A6 (the agent-session orchestration surface) registered with its authority, overlap record and evidence files, eight new requirements P5-36 to P5-43 pulled forward and the 93 items of the TODO mining dispositioned; P2-43 lifted to PROVEN with its limits by addition (slices c and d), the P2-41 head sentence corrected, dated notes on six P2 rows; the seven text corrections to O261; derived documents regenerated offline; README and LIMITATIONS by dated addition; CLAIMS, EXPORT_MANIFEST and attribution entries; the ledger entry O262. Written by a Sonnet 5.5 drafter under the orchestrator's brief (records, text and offline tools; one test file extended for A6 and one session identifier replaced in a merged test). Ledger O262."
+  },
+  {
+   "id": "o262-revision-1",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "294122f6bcb309b51a98a53ad4af310130e13270"
+   ],
+   "why_not_the_product": "O262 Revision 1: the figures of the second paper taken again (the numbers table re-rendered at the records commit, its audit block written, a dated section 17 added), the claims that bind the new lines, the attribution entry of the records commit, the baseline documents regenerated offline, and the ledger Revision 1. Records and text only, written by a Sonnet 5.5 drafter under the orchestrator's brief. Ledger O262."
+  },
+  {
+   "id": "o262-revision-2",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "b09673fdd0e57bb3eb280416b8ed6a2b3b2d4846"
+   ],
+   "why_not_the_product": "O262 Revision 2: the ledger entry only - the completed group-A deletion re-read, and the line references of the P2-43 note made exact, by addition. Records and text only, written by a Sonnet 5.5 drafter under the orchestrator's brief. Ledger O262."
+  },
+  {
+   "id": "o263-docs-refresh",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "db5b81077c9f968f79784567a2f9f0bb2b5b9c4c"
+   ],
+   "why_not_the_product": "O263 public description refresh: README, docs/LIMITATIONS.md and the v0.1 paper's errata brought to the measured state by dated additions (the duration, autonomy and scale of the whole development line, named interruptions, the parts of the product with their register states, two stale figures updated in place by a dated parenthetical), tools/docs_numbers.py extended with derive_line and the rows V46 to V56 with seven tests, the numbers table and its audit block rendered, the claims that bind the new lines, and the ledger entry O263. Records, text and one offline tool, written by a Sonnet 5.5 drafter under the orchestrator's brief. Ledger O263."
+  },
+  {
+   "id": "o263-revision-1",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "b3e719750658ed9be1d4f0d3ac06faadacecd905"
+   ],
+   "why_not_the_product": "O263 Revision 1: the fold of the review pair docsrev-a and docsrev-b (both release yes, 0 blocking) into the public description refresh, by addition: inode pressure instead of exhaustion for 2026-10-09, both review counts stated and derived by the numbers table, 'by count of nodes', the lead phrase 'developed under its own orchestration', the dated P2 figures, the zero-gap wording and tighter needles of the numbers rows (two tests), re-rendered numbers and audit, re-bound claims, the ledger Revision 1. Records and text and one offline tool, written by a Sonnet 5.5 drafter under the orchestrator's brief. Ledger O263."
+  },
+  {
+   "id": "o263-revision-2",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "148352a61be3293ff9667424fd6a414e28adfd57"
+   ],
+   "why_not_the_product": "O263 Revision 2: the label of the review count corrected after the second review round (459 first-round reviewer reports, 771 report files in all including re-review rounds, instead of '495 first-round'): README row, row V51 of the numbers table, the numbers table re-rendered by the tool, two claims re-anchored, the ledger Revision 2. Records and text and one row of an offline tool, written by a Sonnet 5.5 drafter under the orchestrator's brief. Ledger O263."
   }
  ]
 }

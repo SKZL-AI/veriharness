@@ -465,3 +465,94 @@ def test_restore_command_full_disk_is_a_message_and_exit_2(tmp_path, monkeypatch
     assert rc == 2
     assert "NEEDS_YOU" in capsys.readouterr().err
     assert sorted(str(p.relative_to(store.root)) for p in store.root.rglob("*")) == before
+
+
+# ==== P2-41 closure S2: the follow-ups of the S3 integration reviews ===============
+
+def test_run_full_disk_creating_the_approval_directory_stops_the_run(
+        tmp_path, monkeypatch, capsys):
+    """Catches (p241s3int-a/-b, finding 2): a `mkdir` of `approval/` outside
+    `_write_record`'s handler, so a full disk there escapes `cli.main` as a
+    traceback instead of `NEEDS_YOU`, exit 2. Control: the same command with the
+    real `mkdir` is `test_run_with_room_writes_its_records`."""
+    _storage_root(tmp_path, monkeypatch)
+    store, _repo = _run(tmp_path)
+    real_mkdir = Path.mkdir
+
+    def mkdir(self, *args, **kwargs):
+        if self.name == "approval":
+            raise OSError(errno.ENOSPC, os.strerror(errno.ENOSPC), str(self))
+        return real_mkdir(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "mkdir", mkdir)
+    assert _hoh_run(tmp_path, "--approval-policy", _policy_file(tmp_path)) == 2
+    assert "NEEDS_YOU" in capsys.readouterr().err
+    assert not (store.dir / "approval").exists()
+
+
+def test_run_pin_that_fails_for_another_reason_also_stops_the_run(
+        tmp_path, monkeypatch, capsys):
+    """Catches (p241s3int-a/-b, finding 3): a handler around `bind` that knows
+    only `DiskFullError`. An EIO at the fsync of the pin is just as much a
+    contract that was not pinned, and was a traceback."""
+    _storage_root(tmp_path, monkeypatch)
+    store, _repo = _run(tmp_path)
+    _install(monkeypatch, fsync=_file_fsync_error(".contract.json.tmp."))
+    assert _hoh_run(tmp_path, "--autonomy", _contract_file(tmp_path)) == 2
+    assert "could not be pinned" in capsys.readouterr().err
+    assert _litter(store.dir / "approval") == []
+
+
+def test_repair_specification_directory_sync_failure_keeps_the_specification(
+        tmp_path, monkeypatch):
+    """Catches (p241s3int-a, finding 5): a `DurableWriteNotSynced` from
+    `durable_create` answered by "could not write the repair specification". The
+    specification is in place and whole; only its directory entry is unsynced,
+    so `prepare` goes on to the dispatch (the stub `_run_cli`)."""
+    launcher, calls = _launcher(tmp_path, monkeypatch)
+    spec_file = tmp_path / "n1" / "repair-n1.md"
+    _install(monkeypatch, fsync=_dir_fsync_error("n1"))
+    with pytest.raises(RuntimeError, match="stop"):
+        launcher.prepare(_repair_node())
+    assert len(calls) == 1
+    assert spec_file.read_text(encoding="utf-8").startswith("# Repair: n1")
+
+
+def test_records_follow_the_umask(tmp_path, monkeypatch):
+    """Catches (p241s3int-a, finding 4): a record written with a fixed mode
+    (`mode=0o644`) instead of `mode=None`, which the old `write_text` did not do.
+    Under umask 0o027 the four writers of S3 give 0o640."""
+    _storage_root(tmp_path, monkeypatch)
+    store, _repo = _run(tmp_path)
+    launcher, _calls = _launcher(tmp_path, monkeypatch)
+    old = os.umask(0o027)
+    try:
+        assert _hoh_run(tmp_path, "--approval-policy", _policy_file(tmp_path)) == 0
+        _close_store(tmp_path, monkeypatch, [])
+        assert cli._integrity_close(store, {"inventory": []}) is True
+        with pytest.raises(RuntimeError, match="stop"):
+            launcher.prepare(_repair_node())
+    finally:
+        os.umask(old)
+    approval = store.dir / "approval"
+    for record in (approval / "policy.json", approval / "integrity-before.json",
+                   approval / "integrity.json", tmp_path / "n1" / "repair-n1.md"):
+        assert stat.S_IMODE(record.stat().st_mode) == 0o640, record.name
+
+
+def test_two_stale_records_set_aside_in_one_second_do_not_overwrite_each_other(
+        tmp_path, monkeypatch):
+    """Catches (p241s3int-a, finding 4): a counter in `_park_stale_record` that
+    starts every time at the same name, so the second record set aside within a
+    second replaces the first. With the clock frozen, a good close, a failed
+    close, a good close and a failed close leave two versioned records."""
+    monkeypatch.setattr("hoh.contracts.utcnow", lambda: "2026-10-09T00:00:00Z")
+    store = _close_store(tmp_path, monkeypatch, [])
+    approval = store.dir / "approval"
+    for _round in range(2):
+        monkeypatch.setattr(durable_io, "os", os)
+        assert cli._integrity_close(store, {"inventory": []}) is True
+        _install(monkeypatch, write=_err_write_for(".integrity.json.tmp."))
+        assert cli._integrity_close(store, {"inventory": []}) is False
+    parked = sorted(p.name for p in approval.iterdir() if p.name.startswith("integrity.json.v"))
+    assert len(parked) == 2, parked

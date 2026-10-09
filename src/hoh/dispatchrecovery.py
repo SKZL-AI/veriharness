@@ -29,24 +29,50 @@ say so, so that P3's broker has something to extend rather than to replace.
   passes `--master-session` and `--master-epoch`. Inventing a pseudo-master
   for a bare run would be a fiction; this records only what was declared.
 
-This slice **writes** the binding. Enforcing it on resume (a stale master, two
-masters, a foreign park) is the next slice; nothing here refuses a resume.
+Slice b **wrote** the binding; slice c **enforces** it, in `hoh.resumeloop`:
+
+* **`verify_binding`** recomputes a park's id from the live state, the pinned
+  contract and the declared master, and compares it with the receipt that
+  describes the park (`retry_at` is the join). A park that no receipt
+  describes, or whose run, iteration, attempt, stage, candidate, programme or
+  master has moved since, is **refused**, not resumed. A park a governed run
+  made without a valid receipt is refused; a park of a bare run that never had
+  one is a legacy park (slice a's) and resumes as before.
+* **`master_standing`** asks the project that owns the run -- its epoch chain
+  and its lease, the only authority there is -- whether the declared master is
+  real. A master the chain never held is foreign (refused); a master that was
+  superseded by a successor is inherited by that successor (the park is still
+  its predecessor's, and durable recovery means the successor resumes it); a
+  master holding a **live** lease keeps the work (a consumer defers to it, as
+  the project pass does).
+* **`declare_master`** asks the same question of a master that launches a run:
+  a stale master -- a superseded epoch, a released or lapsed lease -- cannot
+  resume (relaunch) work. The check is against staleness and confusion, not
+  against a hostile process of the same user, as the lease itself is.
+* **`claim_park`** is the receipt of a resume, written after the park was
+  lifted: one file per park, never replaced, so the same park is lifted once
+  even if a state is restored from a copy. Concurrency is the run lock's job
+  (both consumers hold it); the claim is not a mutex and says so.
+* **`escalate_exhaustion`** appends the `RETRIES_EXHAUSTED` escalation when the
+  resume loop gives a park up.
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 from dataclasses import dataclass, field
+from enum import StrEnum
 from pathlib import Path
 from typing import Literal
 
 from pydantic import ConfigDict, Field, StrictInt, field_validator, model_validator
 
-from .contracts import Role, Strict, utcnow
-from .durable_io import durable_append, durable_write
-from .failures import NormalizedFailure
+from .contracts import Condition, Role, RunState, Strict, utcnow
+from .durable_io import durable_append, durable_create, durable_write
+from .failures import AUTOMATIC_KINDS, NormalizedFailure, blocked_kind
 from .telemetry import NOT_AVAILABLE
 
 SCHEMA_VERSION = 1
@@ -62,6 +88,7 @@ UNSPECIFIED = "UNSPECIFIED"
 RECOVERY_DIR = "recovery"
 ROUTING_FILE = "routing.jsonl"
 MASTER_FILE = "master.json"
+CLAIMS_DIR = "claims"
 
 #: What each role needs of a route. P2 has one route, so this is a statement of
 #: what the product's own role contracts already demand; P3 matches it against
@@ -264,9 +291,20 @@ _SESSION_OK = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:@/\-]{0,127}")
 
 def check_session_id(value: str) -> str:
     """A master's session id is a name (a UUID is fine): refused, not echoed, when
-    it has other characters or starts like a credential."""
+    it has other characters, starts like a credential, names one, or has the
+    shape of a key (a long mixed letter-and-digit run, a very long word).
+
+    The shape rules are those of `check_account_handle` that a session id can
+    keep: a UUID (groups of at most twelve) and a timestamped id such as
+    `resume-20261009T090000Z-4242` pass; a digit run alone is allowed here
+    because session ids carry timestamps.
+    """
     s = str(value).strip()
-    if not _SESSION_OK.fullmatch(s) or "//" in s or _SECRET_PREFIX.search(s):
+    refused = (not _SESSION_OK.fullmatch(s) or "//" in s or _SECRET_PREFIX.search(s)
+               or _SECRET_WORD.search(s) or re.search(r"[A-Za-z]{30,}", s)
+               or any(re.search(r"\d", run) and re.search(r"[A-Za-z]", run)
+                      for run in _LONG_RUN.findall(s)))
+    if refused:
         raise RecoveryError("--master-session takes a plain session id (letters, digits "
                             "and ._:@/-; the value is not shown)")
     return s
@@ -288,6 +326,19 @@ def check_master_args(session: str | None, epoch: int | None) -> MasterBinding |
                             "positive integer") from exc
 
 
+def _parked_on_a_provider_wait(run_dir: Path) -> bool:
+    """Is the run BLOCKED on a wait of the classes whose parks carry receipts?
+    Read from the state file without migrating it; a state that cannot be read
+    here is not a parked state as far as a declaration can tell (`hoh run` read
+    it before it got this far)."""
+    try:
+        state = RunState.model_validate_json((run_dir / "state.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError, RecursionError):
+        return False
+    return (state.condition is Condition.BLOCKED
+            and state.blocked_kind in AUTOMATIC_KINDS | {"usage_limit"})
+
+
 def declare_master(run_dir: Path | str, *, session: str | None = None,
                    epoch: int | None = None) -> MasterBinding:
     """Record the master this invocation of `hoh run` declares, and return what
@@ -299,6 +350,24 @@ def declare_master(run_dir: Path | str, *, session: str | None = None,
     master -- recorded as `NONE` when nothing is recorded yet, and an existing
     declaration is **kept** (a bare resume of a governed run must not launder
     its master away). Exactly one of the two is refused.
+
+    **A stale master cannot resume work (P2-43c).** When a project has a node
+    for this run, a governed declaration is also asked of that project's epoch
+    chain and lease: the declared epoch must be the current one, held by that
+    session, under a lease that names it, is not released and has not lapsed
+    (`stale_master_reason`). A superseded master, a foreign one and a master that
+    gave its lease up are refused with nothing written. With no owning project
+    there is nothing to ask and the declaration is recorded as before (it says
+    only what was declared).
+
+    **A declaration cannot move the master of a parked run.** While the run is
+    BLOCKED on a provider wait, a declaration that would change the master
+    recorded under that park is refused, whoever asks: the receipt names the
+    master the park was made under, so rewriting the file would make
+    `verify_binding` refuse the very park the current master is entitled to
+    inherit. The park is lifted first (`hoh resume-quota`, or a person's
+    `hoh unblock`); the declaration follows on the unblocked run. Declaring the
+    master that is already recorded changes nothing and is accepted.
     """
     run_dir = Path(run_dir)
     governed = check_master_args(session, epoch)
@@ -319,6 +388,16 @@ def declare_master(run_dir: Path | str, *, session: str | None = None,
             if binding.epoch == existing.epoch and binding.session != existing.session:
                 raise RecoveryError(
                     f"master epoch {existing.epoch} is already declared by another session")
+        stale = stale_master_reason(run_dir, binding)
+        if stale is not None:
+            raise RecoveryError(stale)
+        if binding != (existing if existing is not None else NO_MASTER) \
+                and _parked_on_a_provider_wait(run_dir):
+            raise RecoveryError(
+                "this run is parked on a provider wait, and a declaration that changes its "
+                "master would strand the park (the receipt names the master it was made "
+                "under); lift the park first ('hoh resume-quota', or 'hoh unblock'), then "
+                "declare")
     durable_write(_recovery_dir(run_dir) / MASTER_FILE,
                   json.dumps({"declared_at": utcnow(), **binding.model_dump()},
                              indent=2, sort_keys=True) + "\n")
@@ -335,7 +414,7 @@ def read_master(run_dir: Path | str, *, recorded_only: bool = False) -> MasterBi
         raw = json.loads(path.read_text(encoding="utf-8"))
         raw.pop("declared_at", None)
         return MasterBinding.model_validate(raw)
-    except (OSError, ValueError) as exc:
+    except (OSError, ValueError, RecursionError) as exc:
         raise RecoveryError(f"the master record {path} is unreadable: {exc}") from exc
 
 
@@ -407,7 +486,9 @@ class RoutingEscalation(_Receipt):
     """The run needs a person; no timer will wake it."""
 
     kind: Literal["ROUTING_ESCALATION"] = "ROUTING_ESCALATION"
-    escalation: Literal["OPERATOR_REQUIRED", "HELD_BY_VIOLATION"]
+    #: `RETRIES_EXHAUSTED` (slice c): the resume loop gave the park up after
+    #: `MAX_RESUME_ATTEMPTS` unsuccessful resumes; only a person lifts it now.
+    escalation: Literal["OPERATOR_REQUIRED", "HELD_BY_VIOLATION", "RETRIES_EXHAUSTED"]
 
 
 def _digest_of(body: dict) -> str:
@@ -447,6 +528,330 @@ def read_records(run_dir: Path | str
             cls = {"ROUTING_DECISION": RoutingDecision,
                    "ROUTING_ESCALATION": RoutingEscalation}[raw["kind"]]
             records.append(cls.model_validate(raw))
-        except (ValueError, KeyError, TypeError) as exc:
+        except (ValueError, KeyError, TypeError, RecursionError) as exc:
+            # RecursionError: a deeply nested line (a hand-written file) is a
+            # problem, not a crash of the resume pass.
             problems.append(f"line {n}: {type(exc).__name__}: {str(exc)[:120]}")
     return records, problems
+
+
+# --------------------------------------------------------------------------- #
+# Who holds the work (P2-43c): the owning project's epoch chain and lease
+# --------------------------------------------------------------------------- #
+
+@dataclass(frozen=True)
+class MasterStanding:
+    """What the epoch chain and the lease of the project that owns a run say
+    about a declared master. Read-only: nothing is acquired, written or renewed."""
+
+    #: The project with a node for this run, or None (no project, or several).
+    owner: str | None
+    #: Why the standing cannot be read ("" when it can).
+    problem: str = ""
+    #: The declared (session, epoch) is a row of the project's epoch chain.
+    held: bool = False
+    current_epoch: int | None = None
+    #: `MasterAuthority.holder_state`: NONE, RELEASED, LOST or LIVE.
+    lease: str = "NONE"
+    lease_session: str | None = None
+    lease_epoch: int | None = None
+
+
+def master_standing(run_dir: Path | str, master: MasterBinding, *,
+                    now: str | None = None) -> MasterStanding:
+    """Ask the project that owns `run_dir` whether `master` is real.
+
+    The owner is the project whose node runs this run (`node.run_id or
+    node.id`, the launcher's own rule) among the projects under the run's
+    root. Its epoch chain says who held which epoch and which epoch is
+    current; its lease says whether anyone holds it now. A project state that
+    cannot be read is not an owner (a damaged neighbour must not stop the
+    masters of the others).
+    """
+    from .projectstore import ProjectStore, list_projects
+    from .succession import MasterAuthority, utc_now
+
+    run_dir = Path(run_dir)
+    run_id, root = run_dir.name, run_dir.parent
+    owners: list[str] = []
+    for pid in list_projects(root):
+        try:
+            project = ProjectStore(root, pid).read_state()
+        except Exception:                                # noqa: BLE001 - not an owner
+            continue
+        if any((n.run_id or n.id) == run_id for n in project.nodes):
+            owners.append(pid)
+    if len(owners) > 1:
+        return MasterStanding(owner=None, problem="more than one project has a node "
+                                                  "for this run, so which one governs it "
+                                                  "is not known")
+    if not owners:
+        return MasterStanding(owner=None)
+    project_dir = ProjectStore(root, owners[0]).dir
+    authority = MasterAuthority(project_dir, "park-verifier")
+    try:
+        chain = authority.epochs.chain()
+        lease = authority.read_lease()
+        lease_state, _ = authority.holder_state(lease, now or utc_now())
+    except Exception as exc:                             # noqa: BLE001 - said, fail closed
+        return MasterStanding(owner=owners[0], problem="the project's epoch chain or "
+                              f"lease cannot be read ({type(exc).__name__})")
+    held = any(e.epoch == master.epoch and e.master_id == master.session for e in chain)
+    return MasterStanding(
+        owner=owners[0], held=held, current_epoch=chain[-1].epoch if chain else None,
+        lease=lease_state, lease_session=lease.leader_session_id if lease else None,
+        lease_epoch=lease.master_epoch if lease else None)
+
+
+def stale_master_reason(run_dir: Path | str, master: MasterBinding, *,
+                        now: str | None = None) -> str | None:
+    """Why `master` may not launch work on this run, or None.
+
+    None for a run with no master and for a governed master of a run that no
+    project has a node for (nothing to ask). Otherwise the master must be the
+    current epoch of its project, held by that session, under a lease that
+    names it and is live. Fixed text; no session id is echoed.
+    """
+    if master.kind != "GOVERNED":
+        return None
+    s = master_standing(run_dir, master, now=now)
+    if s.problem:
+        return f"the declared master cannot be confirmed: {s.problem}"
+    if s.owner is None:
+        return None
+    if not s.held:
+        return (f"epoch {master.epoch} of project {s.owner} was never held by this "
+                f"session; a master the epoch chain does not know cannot resume work")
+    if s.current_epoch != master.epoch:
+        return (f"stale master: epoch {master.epoch} was superseded, project {s.owner} "
+                f"is at epoch {s.current_epoch}; only the current master resumes work")
+    if s.lease != "LIVE":
+        return (f"stale master: the lease of project {s.owner} is {s.lease}, not live; "
+                f"a master that gave its lease up or lost it acquires again first")
+    if s.lease_session != master.session or s.lease_epoch != master.epoch:
+        return (f"the lease of project {s.owner} names another master at epoch "
+                f"{s.lease_epoch}, not the declared one")
+    return None
+
+
+# --------------------------------------------------------------------------- #
+# Verifying a park before it is resumed (P2-43c)
+# --------------------------------------------------------------------------- #
+
+class ParkVerdict(StrEnum):
+    #: A receipt describes this park and the live state still matches it.
+    BOUND = "BOUND"
+    #: No receipt, no declared master: a park of slice a, resumed as it always was.
+    LEGACY_UNBOUND = "LEGACY_UNBOUND"
+    #: A live master holds the work; not now, not by a consumer.
+    DEFERRED = "DEFERRED"
+    #: Stale, foreign, altered, already resumed or unprovable: not resumed.
+    REFUSED = "REFUSED"
+
+
+@dataclass(frozen=True)
+class ParkCheck:
+    """The outcome of `verify_binding`."""
+
+    verdict: ParkVerdict
+    reason: str
+    park_id: str | None = None
+    record: RoutingDecision | None = None
+    master: MasterBinding = field(default_factory=lambda: NO_MASTER)
+
+    @property
+    def resumes(self) -> bool:
+        return self.verdict in (ParkVerdict.BOUND, ParkVerdict.LEGACY_UNBOUND)
+
+
+def claim_path(run_dir: Path | str, park: str) -> Path:
+    return Path(run_dir) / RECOVERY_DIR / CLAIMS_DIR / f"{park}.json"
+
+
+def read_claim(run_dir: Path | str, park: str) -> dict | None:
+    """The receipt of a resume of this park, or None."""
+    path = claim_path(run_dir, park)
+    if not os.path.lexists(path):
+        return None
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError, RecursionError):
+        return {"unreadable": True}
+    return raw if isinstance(raw, dict) else {"unreadable": True}
+
+
+def claim_park(run_dir: Path | str, check: ParkCheck, *, resumer: str, attempt: int) -> Path:
+    """Write the receipt that this park was lifted: one file per park, never
+    replaced (`FileExistsError` when the park was lifted before). Written
+    **after** the lift, under the run's lock: a claim taken before the lift
+    would strand the park when the resumer dies between the two, which the
+    crash invariant of `hoh.resumeloop` forbids. Concurrency is the run lock's
+    job; this file is what survives a restored state."""
+    if check.record is None:
+        raise ValueError("only a park that a receipt describes can be claimed")
+    body = {"schema_version": SCHEMA_VERSION, "kind": "PARK_RESUMED",
+            "park_id": check.record.park_id, "resumed_at": utcnow(),
+            "resumer": resumer, "pid": os.getpid(), "resume_attempt": int(attempt),
+            "master": check.master.model_dump()}
+    path = claim_path(run_dir, check.record.park_id)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    durable_create(path, json.dumps(body, indent=2, sort_keys=True) + "\n")
+    return path
+
+
+def escalate_exhaustion(run_dir: Path | str, check: ParkCheck) -> RoutingEscalation | None:
+    """Append the `RETRIES_EXHAUSTED` escalation of a park the resume loop gave
+    up, once per park. None for a park no receipt describes (nothing to extend).
+    Raises what `append_record` raises."""
+    rec = check.record
+    if rec is None:
+        return None
+    records, _ = read_records(run_dir)
+    for earlier in records:
+        if (isinstance(earlier, RoutingEscalation) and earlier.park_id == rec.park_id
+                and earlier.escalation == "RETRIES_EXHAUSTED"):
+            return earlier
+    esc = RoutingEscalation(park_id=rec.park_id, reason=rec.reason, binding=rec.binding,
+                            provenance=rec.provenance, escalation="RETRIES_EXHAUSTED")
+    append_record(run_dir, esc)
+    return esc
+
+
+def _refused(reason: str) -> ParkCheck:
+    return ParkCheck(ParkVerdict.REFUSED, reason)
+
+
+def _mismatch(rec: RoutingDecision, live: ParkBinding, state) -> str | None:
+    """Why `rec` does not describe the live park, or None when it does."""
+    try:
+        failure = NormalizedFailure(rec.reason)
+        kind = blocked_kind(failure)
+    except ValueError:
+        return "the receipt names a class that is not an automatic wait"
+    if state.blocked_kind != kind:
+        return (f"the state is parked as {state.blocked_kind!r}, the receipt is for "
+                f"{failure.value} ({kind!r})")
+    if rec.binding != live:
+        moved = [f"{name} (receipt {getattr(rec.binding, name)!r}, state "
+                 f"{getattr(live, name)!r})"
+                 for name in ParkBinding.model_fields
+                 if getattr(rec.binding, name) != getattr(live, name)]
+        return "changed since the park: " + "; ".join(moved)[:300]
+    if rec.park_id != park_id(live, failure, state.retry_after):
+        return "the receipt's park id is not the one its own binding and class give"
+    return None
+
+
+def _without_receipt(master: MasterBinding, decisions: list, problems: list[str],
+                     wanted: str | None) -> ParkCheck:
+    if master.kind == "GOVERNED":
+        return _refused("the run declares a master but no valid receipt describes this "
+                        f"park (retry_after {wanted}); a governed park without its "
+                        "receipt is not resumed on a guess")
+    if problems:
+        return _refused(f"the routing receipts hold {len(problems)} unreadable line(s) "
+                        f"and none describes this park (retry_after {wanted})")
+    if decisions:
+        return _refused(f"the run's receipts describe {len(decisions)} other wait(s), "
+                        f"none with retry_after {wanted}: the state is not a park this "
+                        "run made")
+    return ParkCheck(ParkVerdict.LEGACY_UNBOUND,
+                     "no routing receipt and no declared master: a park of slice a, "
+                     "resumed as before", master=master)
+
+
+def verify_binding(run_dir: Path | str, state, *, now: str | None = None) -> ParkCheck:
+    """May this park be resumed? Read-only; fail closed.
+
+    The park is the blocked `state` of the run in `run_dir`. Its receipt is the
+    newest valid `RoutingDecision` whose `retry_at` is the state's
+    `retry_after`. The park's id is **recomputed** from the live state, the
+    pinned contract and the declared master, never taken from the receipt: a
+    receipt is a digest-bound line, which is integrity, not authenticity (a
+    self-consistent forgery validates), so what makes a receipt worth anything
+    is that the state still says the same thing. Then, for a governed park,
+    the owning project's epoch chain and lease (`master_standing`).
+
+    * the state names another run than the directory it is in (a restored or
+      renamed copy keeps its `run_id`): REFUSED; a park is resumed in the run
+      that made it;
+    * no receipt describes the park: a governed run, an unreadable receipts
+      file, or receipts for other waits only are REFUSED; a bare run that never
+      had a receipt is LEGACY_UNBOUND;
+    * the receipt differs in run, programme, epoch, iteration, attempt, stage,
+      candidate or master, or the class differs from the state's: REFUSED;
+    * the park was lifted before (`read_claim`): REFUSED;
+    * the declared master was never held by its project (a foreign master), or
+      the run is governed and no project has a node for it: REFUSED;
+    * a live master holds the project: DEFERRED (also if it is a successor);
+    * otherwise BOUND, with a note when the declared master was superseded (its
+      successor inherits the park).
+    """
+    try:
+        return _verify(Path(run_dir), state, now)
+    except Exception as exc:                             # noqa: BLE001 - fail closed
+        return _refused(f"the park could not be verified ({type(exc).__name__}); "
+                        "nothing is resumed on a guess")
+
+
+def _verify(run_dir: Path, state, now: str | None) -> ParkCheck:
+    from .governance import ContractRefused, bind
+
+    here = run_dir.resolve().name
+    if str(state.run_id) != here:
+        return _refused(f"the state says run {state.run_id} but this directory is {here}: "
+                        "a copy of a run (a restored one, a renamed one) is not the run, "
+                        "and a park is resumed in the run that made it")
+    try:
+        master = read_master(run_dir)
+        assert master is not None
+    except (RecoveryError, AttributeError, TypeError) as exc:
+        return _refused(f"the master record cannot be read: {str(exc)[:120]}")
+    try:
+        governor = bind(run_dir)
+    except ContractRefused as exc:
+        return _refused(f"the pinned contract cannot be read: {str(exc)[:120]}")
+    records, problems = read_records(run_dir)
+    decisions = [r for r in records if isinstance(r, RoutingDecision)]
+    wanted = state.retry_after
+    matching = [r for r in decisions if wanted and r.retry_at == wanted]
+    if not matching:
+        return _without_receipt(master, decisions, problems, wanted)
+    live = park_binding(state, governor=governor, master=master)
+    chosen, newest_why = None, None
+    for rec in reversed(matching):
+        why = _mismatch(rec, live, state)
+        if why is None:
+            chosen = rec
+            break
+        newest_why = newest_why or why
+    if chosen is None:
+        return _refused(f"stale or foreign park: {newest_why}")
+    earlier = read_claim(run_dir, chosen.park_id)
+    if earlier is not None:
+        return ParkCheck(ParkVerdict.REFUSED,
+                         f"this park was already resumed ({earlier.get('resumed_at', '?')} "
+                         f"by {earlier.get('resumer', '?')}); one park is lifted once, "
+                         "and a person decides about a second time (hoh unblock)",
+                         chosen.park_id, chosen, master)
+    note = "the receipt matches the live state"
+    if master.kind == "GOVERNED":
+        s = master_standing(run_dir, master, now=now)
+        if s.problem:
+            return _refused(f"the declared master cannot be confirmed: {s.problem}")
+        if s.owner is None:
+            return _refused("the run declares a master but no project has a node for it, "
+                            "so no epoch chain or lease can confirm that master; a person "
+                            "decides (hoh unblock)")
+        if not s.held:
+            return _refused(f"foreign master: epoch {master.epoch} of project {s.owner} "
+                            "was never held by the session the park names")
+        if s.lease == "LIVE":
+            return ParkCheck(ParkVerdict.DEFERRED,
+                             f"a live master holds project {s.owner} (epoch {s.lease_epoch}); "
+                             "the work is its, and a consumer does not resume it",
+                             chosen.park_id, chosen, master)
+        if s.current_epoch != master.epoch:
+            note = (f"the park's master (epoch {master.epoch}) was superseded by epoch "
+                    f"{s.current_epoch}; the current master inherits the park")
+    return ParkCheck(ParkVerdict.BOUND, note, chosen.park_id, chosen, master)

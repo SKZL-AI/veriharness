@@ -33,7 +33,6 @@ import hashlib
 import json
 import os
 import re
-import secrets
 import stat
 import subprocess
 import time
@@ -41,7 +40,7 @@ from pathlib import Path
 from time import monotonic as _real_monotonic
 from typing import NamedTuple
 
-from . import herdr, pane_ledger, procs
+from . import durable_io, failures, herdr, pane_ledger, procs
 from .agentcontrol import (OWNED_FILE, AgentControlAdapter, AgentInfo, HerdrAgentControl,
                            OwnedAgentControl, OwnedAgentRegistry, ProgramAgentRole)
 from .contracts import Role, RunState, utcnow
@@ -258,15 +257,21 @@ def _write_leaf(dir_fd: int, name: str, data: bytes, where: str) -> str | None:
     """Make `data` the content of `name` (relative to `dir_fd`) without losing
     what was there, and without following a link at any name.
 
-    Order: the current name is examined (`_check_leaf`); the new content goes
-    to a fresh temp file (`O_EXCL | O_NOFOLLOW`, fsynced); an existing current
-    file is hard-linked to a version name -- timestamp plus a counter, so
-    several writes within one second each keep their own version; only then is
-    the temp file `os.replace`d onto the name and the directory fsynced.
-    `os.link` never creates over an existing name, a taken version name moves
-    on to the next counter, and any other link failure fails the dispatch:
-    there is no copy fallback. Nothing is unlinked -- a temp file left by a
-    failure stays, and the error names it.
+    Order: the current name is examined (`_check_leaf`); `durable_io.durable_write`
+    then writes the new content to a fresh temp file relative to `dir_fd`
+    (`O_EXCL`, fsynced); an existing current file is hard-linked to a version
+    name -- timestamp plus a counter, so several writes within one second each
+    keep their own version -- in the hook `durable_write` calls once the new
+    bytes are written and fsynced, so nothing is parked for bytes that are not
+    safe; only then is the temp file `os.replace`d onto the name and the
+    directory fsynced. `os.link` never creates over an existing name, a taken
+    version name moves on to the next counter, and any other link failure fails
+    the dispatch: there is no copy fallback.
+
+    A failure at any step leaves the current name as it was and removes the temp
+    file this call created (`durable_write` abandons its own temp, proving by
+    inode that the name is still the file it created). A crash between the link
+    and the replace leaves the interrupted versioning `_check_leaf` accepts.
 
     **The condition that carries this:** the current file is never written in
     place. A hard link shares the inode, so an in-place write would change the
@@ -275,30 +280,10 @@ def _write_leaf(dir_fd: int, name: str, data: bytes, where: str) -> str | None:
     to park.
     """
     state = _check_leaf(dir_fd, name, where)
-    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW
-    while True:
-        tmp = f".{name}.{secrets.token_hex(8)}.tmp"
-        try:
-            fd = os.open(tmp, flags, 0o600, dir_fd=dir_fd)
-            break
-        except FileExistsError:
-            continue
-        except OSError as exc:
-            raise _refuse(f"dispatch: no temp file for {name!r} in {where}: "
-                          f"{exc}") from exc
-    try:
-        view = memoryview(data)
-        while view:
-            view = view[os.write(fd, view):]
-        os.fsync(fd)
-    except OSError as exc:
-        raise _refuse(f"dispatch: writing the temp file {tmp!r} in {where} for "
-                      f"{name!r} failed (left in place): {exc}") from exc
-    finally:
-        os.close(fd)
-
     parked = None if state in ("absent", "present") else state
-    if state == "present":
+
+    def park() -> None:
+        nonlocal parked
         stamp = utcnow()
         counter = 1
         while True:
@@ -313,54 +298,44 @@ def _write_leaf(dir_fd: int, name: str, data: bytes, where: str) -> str | None:
             except OSError as exc:
                 raise _refuse(
                     f"dispatch: parking {name!r} in {where} as {candidate!r} "
-                    f"failed: {exc}. No copy fallback; the temp file {tmp!r} "
-                    "is left in place.") from exc
+                    f"failed: {exc}. No copy fallback; {name!r} is unchanged."
+                ) from exc
             parked = candidate
-            break
+            return
+
     try:
-        os.replace(tmp, name, src_dir_fd=dir_fd, dst_dir_fd=dir_fd)
-        os.fsync(dir_fd)
+        durable_io.durable_write(Path(name), data, mode=0o600, dir_fd=dir_fd,
+                                 before_replace=park if state == "present" else None)
+    except durable_io.DurableWriteNotSynced as exc:
+        raise _refuse(f"dispatch: {name!r} in {where} was written, but its "
+                      f"directory entry may not be durable: {exc}") from exc
     except OSError as exc:
-        raise _refuse(f"dispatch: replacing {name!r} in {where} with the temp "
-                      f"file {tmp!r} failed (left in place): {exc}") from exc
+        raise _refuse(f"dispatch: writing {name!r} in {where} failed ({exc}); "
+                      f"{name!r} is unchanged.") from exc
     return parked
 
 
 def _append_audit(dir_fd: int, record: dict, where: str) -> None:
     """Append one JSON line to the run's prompt-binding audit file.
 
-    Opened link-free relative to the run directory and refused unless it is a
-    regular file with exactly one link, so a hard link to a file elsewhere is
-    never appended to. `O_NONBLOCK` keeps a planted FIFO from blocking.
+    `durable_io.durable_append` opens it link-free relative to the run directory
+    and refuses it unless it is a regular file with exactly one link, so a hard
+    link to a file elsewhere is never appended to; a missing file is created
+    owner-only. A short or failed append leaves a torn tail that the next
+    append starts past.
     """
-    flags = (os.O_WRONLY | os.O_APPEND | os.O_CREAT | os.O_NOFOLLOW
-             | os.O_NONBLOCK)
+    line = json.dumps(record, sort_keys=True) + "\n"
     try:
-        fd = os.open(PROMPT_BINDINGS, flags, 0o600, dir_fd=dir_fd)
-    except OSError as exc:
-        raise _refuse(f"dispatch: refusing {PROMPT_BINDINGS!r} in {where}: "
-                      f"{exc}") from exc
-    try:
-        st = os.fstat(fd)
-        if not stat.S_ISREG(st.st_mode) or st.st_nlink != 1:
-            raise _refuse(
-                f"dispatch: refusing {PROMPT_BINDINGS!r} in {where}: not a "
-                f"regular file with exactly one link (links: {st.st_nlink}). "
-                "Nothing was appended.")
-        line = (json.dumps(record, sort_keys=True) + "\n").encode("utf-8")
-        view = memoryview(line)
-        while view:
-            view = view[os.write(fd, view):]
-        os.fsync(fd)
+        durable_io.durable_append(Path(PROMPT_BINDINGS), line, single_link=True,
+                                  dir_fd=dir_fd, create_mode=0o600)
+    except durable_io.UnsafeRecordFile as exc:
+        raise _refuse(
+            f"dispatch: refusing {PROMPT_BINDINGS!r} in {where}: not a regular "
+            f"file with exactly one link ({exc.why}). Nothing was appended."
+        ) from exc
     except OSError as exc:
         raise _refuse(f"dispatch: appending to {PROMPT_BINDINGS!r} in {where} "
                       f"failed: {exc}") from exc
-    finally:
-        os.close(fd)
-    try:
-        os.fsync(dir_fd)
-    except OSError as exc:
-        raise _refuse(f"dispatch: fsync of {where} failed: {exc}") from exc
 
 
 def _check_audit(dir_fd: int, where: str) -> None:
@@ -1078,7 +1053,12 @@ class HarnessDispatcher(_Base):
 
         # Record the answer -- it is evidence even when it arrived over stdout.
         answer_path = self._answer_path(role, state)
-        answer_path.write_text(text or "(no text)", encoding="utf-8")
+        try:
+            durable_io.durable_write(answer_path, text or "(no text)", mode=None)
+        except OSError as exc:
+            raise DispatchError(
+                f"{role.value} on {harness} answered, but the answer could not "
+                f"be recorded at {answer_path}: {exc}") from exc
         return text or "(no text)"
 
 
@@ -2850,6 +2830,12 @@ class HerdrDispatcher(_Base):
             destination = self.role_cwd.get(role) or getattr(self, "cwd", None)
             if destination:
                 earlier = tree_digest(Path(destination))
+        # The pane as the prompt finds it, for the developer's verdict: a banner it
+        # already shows is an earlier limit's (`_refuse_a_limit_screen`). Never
+        # raises (`_pane_view`); a pane that cannot be read here is no baseline.
+        before = None
+        if sending and role not in STRUCTURED_ROLES:
+            before = self._pane_view(target)
         if not sending:
             # The stalled send's turn, awaited to its end: judged with that
             # send's time and that send's tree digest, never re-sent.
@@ -2930,6 +2916,7 @@ class HerdrDispatcher(_Base):
             self._note_blocked_but_answered[role] = data.pane_id
 
         if role not in STRUCTURED_ROLES:
+            self._refuse_a_limit_screen(role, target, state, before)
             return f"developer run finished (status {status})"
 
         # The file can appear shortly after the end of the turn.
@@ -2958,6 +2945,48 @@ class HerdrDispatcher(_Base):
             prompt_bytes=len(full_bytes),
             prompt_file=prompt_name if through_file else None, sent_at=sent_at)
 
+
+    def _refuse_a_limit_screen(self, role: Role, target: str, state: RunState,
+                               before: str | None = None) -> None:
+        """A developer turn that ended on a provider's limit screen is a failed
+        dispatch, not a finished turn (A5 clause 2: a usage or rate limit in any
+        role is never a candidate failure).
+
+        Herdr reports such a pane as an ordinary end of turn, and the developer's
+        answer is the artifact in the tree, so nothing else says the turn was cut:
+        the candidate went on to QA, where it could fail. The pane is read once,
+        after the turn, and only its final screen counts
+        (`failures.final_screen_limit`: a line that is exactly one of the recorded
+        banner shapes among the last lines, never a role's sentence). `before` is
+        the pane as it was when the prompt was sent (`_dispatch`): a banner it
+        already showed is an earlier limit's -- a pane that outlived the wait keeps
+        it in its scrollback -- and is not this turn's, so a short good re-run is
+        not parked again and again. The harness's status-area line is the exception
+        (`failures.final_screen_banners`): it is drawn only while a limit holds, so a
+        pane that is still limited when the prompt is sent stays a failed dispatch.
+        The `DispatchError` carries the lines read as
+        the banner and nothing else on the screen, so the controller classifies it
+        by the same rules as every other failed dispatch and reads the provider's
+        reset time from those lines. A pane that cannot be read proves nothing and
+        changes nothing: the turn is booked as finished, and the run history says
+        that the screen was not read. A baseline that could not be read is none:
+        every banner counts, as before it existed.
+        """
+        view = self._pane_view(target)
+        if failures.final_screen_limit(view, before=before) is None:
+            seen = failures.final_screen(view)
+            if len(seen) == 1 and seen[0].startswith("(pane not readable"):
+                state.note(f"{role.value}: the final screen could not be read; the "
+                           "turn is booked as finished, as without the check")
+            elif failures.final_screen_limit(view) is not None:
+                state.note(f"{role.value}: a banner on the final screen was already on "
+                           "the pane before the prompt; the turn is booked as finished")
+            return
+        banners = "\n".join(failures.final_screen_banners(view, before=before))
+        raise DispatchError(
+            f"{role.value} ended its turn on a provider's limit screen; it is not "
+            f"counted as a finished turn\n--- Visible in pane ---\n{banners}\n"
+            "-----------------------")
 
     # -- Idle is not done: one follow-up ------------------------------------ #
 

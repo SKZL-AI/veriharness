@@ -82,13 +82,20 @@ backup, creates the missing ones owner-only and gives them the backup's modes
 only after the last replace, and refuses a directory it cannot write into
 before it replaces anything.
 
-Still remaining:
+Migrated by P2-41 closure S2 (2026-10). `dispatchers._write_leaf` (the versioned
+write of prompt files and markers), `dispatchers._append_audit` (the
+prompt-binding audit file) and the recorded answer of `HarnessDispatcher.dispatch`
+go through the three functions. Those writers act relative to a directory
+descriptor opened with `O_NOFOLLOW`, so the three functions gained a `dir_fd`
+form: with a descriptor `path` must be a bare name, and every step (the space
+check, the temp file, the publish, the existence check, the directory fsync) is
+relative to the descriptor, which stays open and belongs to the caller. Without
+a descriptor nothing changes. `durable_write` also takes a `before_replace` hook,
+called once the temp file is written and fsynced and immediately before the
+replace, for a caller that must touch the old target only when the new bytes are
+safe (the version link of `_write_leaf`); `durable_append` takes a `create_mode`.
 
-* `dispatchers.py`: `HarnessDispatcher.dispatch`
-* `dispatchers.py`: `_append_audit`
-* `dispatchers.py`: `_write_leaf`
-
-P2-41 is not PROVEN while these remain.
+No writer remains in the list of the register's `equivalent`: the writer scan of `tests/test_durable_writers.py` has no DEFERRED and no MIGRATE_LATER row, and fails when a raw write call appears that is not classified there.
 """
 from __future__ import annotations
 
@@ -200,8 +207,44 @@ def read_single_link(path: Path | str) -> bytes | None:
     return b"".join(chunks)
 
 
+def _place(path: Path | str, dir_fd: int | None) -> tuple[Path, dict, Path]:
+    """Where a primitive writes: `(path, keywords, parent)`.
+
+    Without a descriptor the path form: `keywords` is empty, `parent` is
+    `path.parent`, and every `os.*` call is made exactly as it always was. With
+    a descriptor `path` must be a bare name (no separator, not `.`, `..` or
+    empty): the kernel would resolve anything else from the descriptor and could
+    leave the directory that was checked, so it is `ValueError` before anything
+    is touched. `keywords` is then `{"dir_fd": dir_fd}` and `parent` is `.`.
+    """
+    raw = os.fspath(path)
+    path = Path(raw)
+    if dir_fd is None:
+        return path, {}, path.parent
+    if not raw or raw in (".", "..") or "/" in raw or "\0" in raw:
+        raise ValueError(f"with dir_fd the path must be a bare name, not {raw!r}")
+    return path, {"dir_fd": dir_fd}, Path(".")
+
+
+def _temp_name(path: Path, parent: Path) -> Path:
+    return parent / f".{path.name}.tmp.{os.getpid()}.{secrets.token_hex(8)}"
+
+
+def _lexists(path: Path, keywords: dict) -> bool:
+    """`os.path.lexists(path)`, or, with a descriptor, a no-follow `stat` of the
+    bare name relative to it."""
+    if not keywords:
+        return os.path.lexists(path)
+    try:
+        os.stat(path, follow_symlinks=False, **keywords)
+    except FileNotFoundError:
+        return False
+    return True
+
+
 def durable_write(path: Path, payload: bytes | str, *, mode: int | None = 0o644,
-                  min_free_bytes: int = 1 << 20) -> None:
+                  min_free_bytes: int = 1 << 20, dir_fd: int | None = None,
+                  before_replace=None) -> None:
     """Replace `path` with `payload`, or leave it exactly as it was.
 
     Does not create directories: `path.parent` must exist. Raises
@@ -212,22 +255,36 @@ def durable_write(path: Path, payload: bytes | str, *, mode: int | None = 0o644,
 
     `mode=None` creates the temp file with 0o666 and sets no mode, so the
     umask decides, exactly as `open(..., "w")` does.
+
+    `dir_fd`: an open directory descriptor, owned by the caller and never
+    closed here. `path` is then a bare name inside that directory and every
+    step (the space check, the temp file, the replace, the directory fsync) is
+    relative to the descriptor, so a directory swapped for a link after the
+    caller checked it cannot redirect the write. `ValueError` for a name that
+    is not bare.
+
+    `before_replace`: called with no arguments after the temp file is written
+    and fsynced and immediately before the replace, for a caller that must do
+    something to the old target only when the new bytes are safe. It is a
+    failure before the replace like any other: the temp file is abandoned, the
+    target is untouched and the exception propagates unchanged (an `OSError`
+    with a space errno becomes `DiskFullError`). It is not called when the
+    space pre-check refuses.
     """
-    path = Path(path)
+    path, kw, parent = _place(path, dir_fd)
     data = payload.encode("utf-8") if isinstance(payload, str) else bytes(payload)
-    parent = path.parent
 
     # Before anything is created: a refusal here leaves the directory as it was.
-    st = os.statvfs(parent)
+    st = os.statvfs(dir_fd if dir_fd is not None else parent)
     free = st.f_bavail * st.f_frsize
     needed = len(data) + min_free_bytes
     if free < needed:
         raise DiskFullError(path, needed, free, "refused before writing")
 
-    tmp_path = parent / f".{path.name}.tmp.{os.getpid()}.{secrets.token_hex(8)}"
+    tmp_path = _temp_name(path, parent)
     try:
         fd = os.open(tmp_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY,
-                     0o666 if mode is None else 0o600)
+                     0o666 if mode is None else 0o600, **kw)
     except OSError as exc:
         # Nothing was created, so there is nothing to abandon.
         if exc.errno in _SPACE_ERRNOS:
@@ -239,11 +296,16 @@ def durable_write(path: Path, payload: bytes | str, *, mode: int | None = 0o644,
         if mode is not None:
             os.fchmod(fd, mode)
         os.fsync(fd)
+        if before_replace is not None:
+            before_replace()
         # The fd stays open across the replace so that an abandon after a
         # failed replace can still prove, by inode, which file it created.
-        os.replace(tmp_path, path)
+        if dir_fd is None:
+            os.replace(tmp_path, path)
+        else:
+            os.replace(tmp_path, path, src_dir_fd=dir_fd, dst_dir_fd=dir_fd)
     except BaseException as exc:
-        _abandon_own_temp(fd, tmp_path)
+        _abandon_own_temp(fd, tmp_path, dir_fd=dir_fd)
         if isinstance(exc, OSError) and not isinstance(exc, DiskFullError) \
                 and exc.errno in _SPACE_ERRNOS:
             raise DiskFullError(path, len(data), None, os.strerror(exc.errno)) from exc
@@ -252,14 +314,7 @@ def durable_write(path: Path, payload: bytes | str, *, mode: int | None = 0o644,
 
     # After the replace the target holds the new bytes; nothing is abandoned
     # from here on. What can still fail is the durability of the rename.
-    try:
-        dir_fd = os.open(parent, os.O_RDONLY | os.O_DIRECTORY)
-        try:
-            os.fsync(dir_fd)
-        finally:
-            os.close(dir_fd)
-    except OSError as exc:
-        raise DurableWriteNotSynced(path, exc) from exc
+    _fsync_parent(path, dir_fd=dir_fd, parent=parent)
 
 
 def _write_all(fd: int, data: bytes, path: Path) -> None:
@@ -274,28 +329,35 @@ def _write_all(fd: int, data: bytes, path: Path) -> None:
         done += n
 
 
-def _precheck(path: Path, needed: int, when: str) -> None:
-    """Free-space pre-check, `f_bavail * f_frsize`, before anything is created."""
-    st = os.statvfs(path.parent)
+def _precheck(path: Path, needed: int, when: str, *, dir_fd: int | None = None) -> None:
+    """Free-space pre-check, `f_bavail * f_frsize`, before anything is created.
+    With a descriptor the filesystem of that descriptor is asked."""
+    st = os.statvfs(dir_fd if dir_fd is not None else path.parent)
     free = st.f_bavail * st.f_frsize
     if free < needed:
         raise DiskFullError(path, needed, free, when)
 
 
-def _fsync_parent(path: Path) -> None:
-    """fsync `path`'s directory; a failure is `DurableWriteNotSynced`."""
+def _fsync_parent(path: Path, *, dir_fd: int | None = None,
+                  parent: Path | None = None) -> None:
+    """fsync `path`'s directory (the descriptor itself, when one is given); a
+    failure is `DurableWriteNotSynced`."""
     try:
-        dir_fd = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
-        try:
+        if dir_fd is not None:
             os.fsync(dir_fd)
+            return
+        d = os.open(path.parent if parent is None else parent,
+                    os.O_RDONLY | os.O_DIRECTORY)
+        try:
+            os.fsync(d)
         finally:
-            os.close(dir_fd)
+            os.close(d)
     except OSError as exc:
         raise DurableWriteNotSynced(path, exc) from exc
 
 
 def durable_create(path: Path, payload: bytes | str, *, mode: int | None = 0o644,
-                   min_free_bytes: int = 1 << 20) -> bool:
+                   min_free_bytes: int = 1 << 20, dir_fd: int | None = None) -> bool:
     """Publish `payload` under `path`, which must not exist. Never replaces.
 
     Does not create directories. An existing name (even a dangling symlink)
@@ -317,18 +379,22 @@ def durable_create(path: Path, payload: bytes | str, *, mode: int | None = 0o644
     Returns True when the temp name was dropped, False when it could not be:
     the published file is whole either way, and the temp name left is only a
     second link to the same inode (no extra bytes).
+
+    `dir_fd`: as for `durable_write` -- a bare name inside the caller's open
+    directory, every step relative to it (the existence check is a no-follow
+    `stat` of the name).
     """
-    path = Path(path)
+    path, kw, parent = _place(path, dir_fd)
     data = payload.encode("utf-8") if isinstance(payload, str) else bytes(payload)
-    if os.path.lexists(path):
+    if _lexists(path, kw):
         raise FileExistsError(errno.EEXIST,
                               "a durable create never replaces an existing file", str(path))
-    _precheck(path, len(data) + min_free_bytes, "refused before writing")
+    _precheck(path, len(data) + min_free_bytes, "refused before writing", **kw)
 
-    tmp_path = path.parent / f".{path.name}.tmp.{os.getpid()}.{secrets.token_hex(8)}"
+    tmp_path = _temp_name(path, parent)
     try:
         fd = os.open(tmp_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY,
-                     0o666 if mode is None else 0o600)
+                     0o666 if mode is None else 0o600, **kw)
     except OSError as exc:
         if exc.errno in _SPACE_ERRNOS:
             raise DiskFullError(path, len(data), None, os.strerror(exc.errno)) from exc
@@ -339,9 +405,12 @@ def durable_create(path: Path, payload: bytes | str, *, mode: int | None = 0o644
         if mode is not None:
             os.fchmod(fd, mode)
         os.fsync(fd)
-        os.link(tmp_path, path)
+        if dir_fd is None:
+            os.link(tmp_path, path)
+        else:
+            os.link(tmp_path, path, src_dir_fd=dir_fd, dst_dir_fd=dir_fd)
     except BaseException as exc:
-        _abandon_own_temp(fd, tmp_path)
+        _abandon_own_temp(fd, tmp_path, dir_fd=dir_fd)
         if isinstance(exc, OSError) and not isinstance(exc, DiskFullError) \
                 and exc.errno in _SPACE_ERRNOS:
             raise DiskFullError(path, len(data), None, os.strerror(exc.errno)) from exc
@@ -349,13 +418,14 @@ def durable_create(path: Path, payload: bytes | str, *, mode: int | None = 0o644
 
     # Published: `path` and the temp name are two links to one inode. Dropping
     # the temp name removes no bytes. `_abandon_own_temp` closes `fd`.
-    dropped = _abandon_own_temp(fd, tmp_path)
-    _fsync_parent(path)
+    dropped = _abandon_own_temp(fd, tmp_path, dir_fd=dir_fd)
+    _fsync_parent(path, dir_fd=dir_fd, parent=parent)
     return dropped
 
 
 def durable_append(path: Path, line: bytes | str, *,
-                   min_free_bytes: int = 1 << 20, single_link: bool = False) -> None:
+                   min_free_bytes: int = 1 << 20, single_link: bool = False,
+                   dir_fd: int | None = None, create_mode: int = 0o666) -> None:
     """Append one complete line to `path`, or raise.
 
     With `single_link` the file is opened with `O_NOFOLLOW` and then checked
@@ -365,8 +435,9 @@ def durable_append(path: Path, line: bytes | str, *,
     appends must never reach a file outside the run). Without it nothing
     changes for the other callers (telemetry, the succession log).
 
-    Does not create directories (a missing file is created, mode as
-    `open(path, "a")` gives it). A newline is added if missing. The
+    Does not create directories (a missing file is created with `create_mode`
+    before the umask, `0o666` as `open(path, "a")` gives it). A newline is
+    added if missing. The
     free-space pre-check runs before the file is opened, so a refusal leaves
     it untouched (not even created). If the file ends in a torn tail (no
     final newline, left by an earlier failed append), the line is prefixed
@@ -376,22 +447,25 @@ def durable_append(path: Path, line: bytes | str, *,
     its directory; a directory-fsync failure is `DurableWriteNotSynced` (the
     line is in place). Nothing is truncated; earlier lines are never touched.
 
+    `dir_fd`: as for `durable_write` -- a bare name inside the caller's open
+    directory, the file opened relative to it.
+
     Precondition: the torn-tail check and the write are two system calls, so
     the guard is exact only for a single appender or under the caller's lock.
     With concurrent appenders each record is still one `O_APPEND` write and
     never interleaves inside, but a record racing a torn fragment can still
     be glued onto it.
     """
-    path = Path(path)
+    path, kw, parent = _place(path, dir_fd)
     data = line.encode("utf-8") if isinstance(line, str) else bytes(line)
     if not data.endswith(b"\n"):
         data += b"\n"
-    _precheck(path, len(data) + 1 + min_free_bytes, "refused before opening")
+    _precheck(path, len(data) + 1 + min_free_bytes, "refused before opening", **kw)
     flags = os.O_RDWR | os.O_APPEND | os.O_CREAT | os.O_CLOEXEC
     if single_link:
         flags |= os.O_NOFOLLOW          # (a FIFO opens O_RDWR without waiting; the check refuses it)
     try:
-        fd = os.open(path, flags, 0o666)
+        fd = os.open(path, flags, create_mode, **kw)
     except OSError as exc:
         if single_link and exc.errno == errno.ELOOP:
             raise UnsafeRecordFile(path, "is a symbolic link", errno.ELOOP) from exc
@@ -417,23 +491,25 @@ def durable_append(path: Path, line: bytes | str, *,
             raise
     finally:
         os.close(fd)
-    _fsync_parent(path)
+    _fsync_parent(path, dir_fd=dir_fd, parent=parent)
 
 
-def require_room(directory: Path, needed_bytes: int, *,
+def require_room(directory: Path | int, needed_bytes: int, *,
                  min_free_bytes: int = 1 << 20) -> None:
     """Refuse, before anything is created, when `directory` has too little room.
 
     `f_bavail * f_frsize` of `os.statvfs(directory)` against `needed_bytes`
     plus a reserve: the formula of `durable_write`'s pre-check, for a caller
     that is about to write a tree. A refusal is `DiskFullError`; nothing is
-    created either way.
+    created either way. `directory` may be an open directory descriptor; the
+    refusal then names `/proc/self/fd/<n>`.
     """
     st = os.statvfs(directory)
     free = st.f_bavail * st.f_frsize
     needed = needed_bytes + min_free_bytes
     if free < needed:
-        raise DiskFullError(directory, needed, free, "refused before writing")
+        where = f"/proc/self/fd/{directory}" if isinstance(directory, int) else directory
+        raise DiskFullError(where, needed, free, "refused before writing")
 
 
 def _raise_walk_error(exc: OSError) -> None:
@@ -678,7 +754,7 @@ def durable_publish_tree(staging: Path, target: Path, *, merge: bool = False,
         raise DurableWriteNotSynced(target, exc) from exc
 
 
-def _abandon_own_temp(fd: int, tmp_path: Path) -> bool:
+def _abandon_own_temp(fd: int, tmp_path: Path, *, dir_fd: int | None = None) -> bool:
     """Abort a failed write: remove the temp file this call created, if it is
     still the one at `tmp_path`. Closes `fd`. Never raises.
 
@@ -693,7 +769,9 @@ def _abandon_own_temp(fd: int, tmp_path: Path) -> bool:
     `os.stat(name, dir_fd=..., follow_symlinks=False)` (what the directory
     entry names now); only on the same device and inode is the entry unlinked,
     relative to the same directory fd. A different file swapped in at that name
-    is kept.
+    is kept. With `dir_fd` (the caller's own, already checked directory) the
+    parent of the temp is not opened by path at all: the comparison and the
+    unlink are relative to that descriptor, which is left open.
 
     Residual race, stated plainly: between that comparison and the unlink, a
     process with write access to the same directory could swap the entry, and
@@ -709,10 +787,11 @@ def _abandon_own_temp(fd: int, tmp_path: Path) -> bool:
     Returns True when the temp file was removed.
     """
     removed = False
-    dir_fd = None
+    opened = None
     try:
         name = tmp_path.name
-        dir_fd = os.open(tmp_path.parent, os.O_RDONLY | os.O_DIRECTORY)
+        if dir_fd is None:
+            opened = dir_fd = os.open(tmp_path.parent, os.O_RDONLY | os.O_DIRECTORY)
         own = os.fstat(fd)
         current = os.stat(name, dir_fd=dir_fd, follow_symlinks=False)
         if (own.st_dev, own.st_ino) == (current.st_dev, current.st_ino):
@@ -722,7 +801,7 @@ def _abandon_own_temp(fd: int, tmp_path: Path) -> bool:
         # Abandoning must never hide the error that caused it.
         pass
     finally:
-        for f in (fd, dir_fd):
+        for f in (fd, opened):
             if f is not None:
                 try:
                     os.close(f)

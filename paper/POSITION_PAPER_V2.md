@@ -818,3 +818,62 @@ and every limit.
   and was not regenerated, no real reboot (DS2) has been run, no coding-agent session
   has been shown to use `hoh agent-setup`, and nothing was run on a real NixOS or
   macOS host.
+
+## 16. Update after v0.3.0a2 (added 2026-10-09, ledger O261)
+
+The preceding section is the update for the cut of `v0.3.0a2` and stays as written.
+Since the cut one more run has been merged, the third slice of the disk-full-safe-writes
+closure, and the register has been read again. The figures marked **R** were taken
+again at the base named in `paper/NUMBERS_V2.md`; the value of section 15 or of
+the narrative stands in parentheses.
+
+* **Disk-full safety (§13 and §15).** The statement of section 15 that two more
+  slices are merged and leave the row PARTIAL no longer holds: the third and last
+  slice is merged and the register reads P2-41 PROVEN. Read it as narrowly as the
+  register note scopes it: the matrix measures an import statement, the writer scan
+  is lexical, the storage modules keep their own temp-fsync-publish helpers, which
+  are tested for a full disk to different degrees, and a long unattended run through
+  a full disk is not claimed. "12 writers remain" `[V44]` is the figure of the first
+  alpha and is not re-derived.
+* **The register and the gate.** The register holds 227 requirements, 60 of them
+  PROVEN and 10 PARTIAL `[V10]` **R** (59 and 11 at the cut); 33 of P2's
+  requirements read PROVEN `[V10c]` **R** (32 at the cut; 26 as measured on
+  2026-10-07); the P2 gate has 10 requirements blocking and open `[V12]` **R** (11
+  at the cut).
+* **The honest ratio.** The attribution check counts 195 nodes after its anchor
+  `[V06]` **R** (189 at the cut), of which one `[V06a]` ran through the shipped
+  control plane end to end, 92 `[V06b]` **R** were developed by the product and merged
+  by the orchestrating session after review (91 at the cut), and 102 `[V06c]` **R**
+  are the orchestrating session's direct work (97 at the cut). The ratio is
+  unchanged in kind: the merge decision stays with the orchestrating session.
+
+## 17. Update after v0.3.0a2, second part (added 2026-10-09, ledger O262)
+
+The preceding section and the sections before it stay as written. Since that section two more product runs have been merged
+(the park binding of a failed provider dispatch is enforced on every automatic resume, and a developer turn that ends
+on a provider's limit screen is a failed dispatch of its class), a sixth amendment has been registered, and the
+register has been read again. The figures marked **R** were taken again at the base named in
+`paper/NUMBERS_V2.md`; the value of the preceding section stands in parentheses.
+
+* **Provider usage limits (§12 and §13).** The statement of section 15 that P2-43 reads MISSING and that its third
+  slice is not merged no longer holds: the register reads P2-43 PROVEN `[V40]` **R**. Read it as narrowly as the
+  register note scopes it. The matrix measures a symbol, a collected test and an import statement, not an execution.
+  Only the recorded shapes of the provider's banner are read, whole, and no developer pane has ever been recorded on a
+  real limit; no real rate-limit body was recorded either, so that branch is driven by synthetic text. A short good
+  re-run after a wait is parked again and again until the resume limit and is then handed to a person; the fix is
+  specified and in a run, and not merged. A live run that meets a real provider limit is NOT_RUN.
+* **The register and the gate.** The register holds 235 requirements, 61 of them PROVEN and 10 PARTIAL `[V10]` **R**
+  (227, 60 and 10 in section 16; the difference in the total is the eight requirements of the new amendment, registered
+  and MISSING, planned and not built); 34 of P2's requirements read PROVEN `[V10c]` **R** (33); the P2 gate has 9
+  requirements blocking and open `[V12]` **R** (10), with 174 open requirements, 157 of them behind a phase gate; of
+  the requirements registered for P3 to P12, 158 of 176 read MISSING `[V11b]` **R** (150 of 168). The new amendment adds
+  none to the P2 gate; its eight requirements belong to the gate of P5.
+* **The honest ratio.** The attribution check counts 204 nodes after its anchor `[V06]` **R** (195), of which one
+  `[V06a]` ran through the shipped control plane end to end, 94 `[V06b]` **R** were developed by the product and merged
+  by the orchestrating session after review (92), and 109 `[V06c]` **R** are the orchestrating session's direct work
+  (102). The ratio is unchanged in kind: the merge decision stays with the orchestrating session.
+* **What the new amendment is.** It registers eight capabilities of the orchestration layer that this build ran by hand
+  (a merge gate, the start of review pairs and drafters, pins and imports, closing a run's own terminal tabs, a per-run
+  storage account, a scoped reclaim, a detached run, an event wait) as planned work. None is built. The finding that
+  prompted it is a limit of the harness as used: finished runs read as active while idle shells of their launcher tabs
+  stayed open, and storage had to be scanned because nothing accounted it per run.

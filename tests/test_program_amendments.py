@@ -464,10 +464,20 @@ def test_this_repositorys_amendments_are_pinned_and_mapped():
     assert a["problems"] == []
     # O252: A5 (provider / model routing) registered; the exact set grows by one
     # and must equal the authoritative pin index, entry for entry.
-    assert [x["id"] for x in a["amendments"]] == ["A1", "A2", "A3", "A4", "A5"]
+    # O262: A6 (the agent-session orchestration surface) registered; the set grows by one again.
+    assert [x["id"] for x in a["amendments"]] == ["A1", "A2", "A3", "A4", "A5", "A6"]
     pinned = json.loads((ROOT / "program/v3_3/amendments/AMENDMENTS.json").read_text())
-    assert [x["id"] for x in pinned["amendments"]] == ["A1", "A2", "A3", "A4", "A5"]
+    assert [x["id"] for x in pinned["amendments"]] == ["A1", "A2", "A3", "A4", "A5", "A6"]
     assert a["pulled_forward"]["A5"] == []
+    # A6 pulls its eight capabilities of P5 forward, adds no exit condition, and is claimed
+    # by exactly the requirements P5-36 .. P5-43 (O262).
+    a6 = [i for i in a["items"] if i["amendment"] == "A6"]
+    assert len(a6) == 8 and {i["phase"] for i in a6} == {"P5"}
+    assert not [i for i in a6 if i["kind"] in bp._GATE_KINDS]
+    assert sorted(a["pulled_forward"]["A6"]) == sorted(i["id"] for i in a6)
+    a6_reqs = sorted(r["id"] for r in json.loads((ROOT / "program/v3_3/REQUIREMENTS.json").read_text())["requirements"]
+                     if ".a6." in str(r.get("authoritative_item", "")))
+    assert a6_reqs == [f"P5-{n}" for n in range(36, 44)]
     # A5 adds no exit condition either: one capability in each of P2, P3, P10,
     # P11 and P12, each claimed by exactly the requirement O252 registered.
     a5 = [i for i in a["items"] if i["amendment"] == "A5"]
@@ -530,8 +540,10 @@ def test_the_repositorys_pull_forward_set_is_pinned_and_complete():
     register = json.loads((ROOT / "program/v3_3/REQUIREMENTS.json").read_text())
     marked = sorted(r["authoritative_item"] for r in register["requirements"]
                     if r.get("pulled_forward"))
-    assert marked == sorted(a["pulled_forward"]["A1"])
-    assert len(marked) == 10
+    # O262: A6 pulls eight further items forward; A1's ten are unchanged.
+    assert marked == sorted(a["pulled_forward"]["A1"] + a["pulled_forward"]["A6"])
+    assert len(a["pulled_forward"]["A1"]) == 10 and len(a["pulled_forward"]["A6"]) == 8
+    assert len(marked) == 18
 
 
 # --------------------------------------------------------------------------- #

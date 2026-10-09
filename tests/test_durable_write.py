@@ -817,13 +817,14 @@ def test_source_scan_refuses_indirect_os_attribute():
             assert mindirect, label
 
 
-def test_docstring_names_remaining_writers():
-    """Catches: a module docstring that drops a writer not yet routed through
-    durable_write, or claims P2-41 PROVEN -- the remaining gap must stay
-    visible."""
+def test_docstring_keeps_the_history_of_the_writers():
+    """Catches: a module docstring that drops the writers it once listed as
+    unmigrated (the history stays readable), or that makes a status claim about
+    the matrix -- "PROVEN" may appear only inside "not PROVEN"."""
     doc = durable_io.__doc__ or ""
     for writer in ("projectstore.py", "epoch.py", "telemetry.py", "succession.py",
                    "trust.py", "goalbook.py", "migrations.py",
                    "RunStore._park", '"xb"', "RunStore.backup"):
         assert writer in doc, writer
-    assert "not PROVEN" in doc
+    assert doc.count("PROVEN") == doc.count("not PROVEN") + doc.count("not **PROVEN**")
+    assert "PROVEN" not in doc.replace("not **PROVEN**", "").replace("not PROVEN", "")

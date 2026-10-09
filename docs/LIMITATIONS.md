@@ -232,6 +232,33 @@ is not the same claim as demonstrated multi-month reliability under it. Anyone
 evaluating HoH for long-horizon use should treat that gap as open, and should
 not read "five days orchestrated" as evidence for the month that follows.
 
+### Addition, 2026-10-09: the duration is now measured on the whole development line
+
+Everything above in this entry is the text of the `v0.1.0` campaign -- five calendar days and three and a half days of
+elapsed wall-clock -- and stays as written. "Five days" was never the age of the project, and after the tag it stopped
+being its size. Measured on the development line at the base commit of `paper/NUMBERS_V2.md` (the O262 records commit): the first
+commit is of 2026-09-07 and the latest of 2026-10-09, 32 days 15 hours apart `[V46]`; 23 of the 33 calendar days carry
+a commit, none on 2026-09-15 to 2026-09-20 and none on 2026-09-26 to 2026-09-29, and each of the last ten days does
+`[V47]`; there are 1,088 commits `[V48]`, 69 product-run merges `[V01]` and 234 numbered ledger entries `[V49]`. For the
+line as a whole the multi-day statement in this entry's title is therefore a multi-week one. Three things stay as they
+were, and the sentence "long-duration operation without intervention is not" keeps its truth:
+
+* *Not without a person.* The orchestrating session is an agent session. The operator directed it (6 directives stored
+  verbatim `[V53]`), added work, approved every publication and decided the storage and policy questions. The operator
+  was reachable and was asked. Operation with no person involved is not shown.
+* *Not without stopping.* The line stopped: 13 quota stops between 2026-10-03 and 2026-10-07 `[V55]`, a full disk on
+  2026-09-25 (977 GiB of a 1 TiB volume) `[V16]` that left four days without a commit, inode exhaustion on 2026-10-05
+  (67,107,099 of 67,108,864 inodes used) `[V35]`, inode pressure on 2026-10-09 (the product's storage guard reached
+  CRITICAL on the inode axis and parked two runs), a power cut, and an operator-requested machine shutdown of about one
+  hour on 2026-10-08 `[V56]`. The six days after the tag, 2026-09-15 to 2026-09-20, have no commit and no recorded
+  reason.
+* *Not by the product's own runtime.* The orchestrating session was handed over 3 times `[V54]` by files the outgoing
+  session wrote, not by the product's rollover protocol, which has not run live (P2-14 reads PARTIAL). The five exit
+  conditions of phase P2 that a long unattended run would prove, P2-33 to P2-37, read IMPLEMENTED_NOT_PROVEN, and crash
+  and reboot recovery (P2-11) has never been exercised on a real reboot. Of the development nodes after the attribution
+  anchor, 109 were written by the orchestrating session directly `[V06c]`, and 94 were developed by product runs and
+  merged by the orchestrating session after review `[V06b]`.
+
 ## 2. A baseline now exists, and it does not favour the harness
 
 This limitation used to read: no baseline of any kind exists. One does now,
@@ -1827,3 +1854,63 @@ ancestors or what it started.
   fails safe: the panes stay open). The program scope of the registry's role
   type is exercised by one test only: no product path starts a program-scope
   agent yet. A live run and a restored pane against a real Herdr are NOT_RUN.
+
+## Update after v0.3.0a2, 2026-10-09: disk-full-safe writes read PROVEN, on text-level evidence and with limits
+
+The row "Disk-full-safe writes are partial" in the table at the top of this file
+and the sentence of the first alpha that only part of the writers are disk-full
+safe are the text of the first alpha and of `v0.3.0a2`; they stay as written. On
+the development line the third and last slice of the P2-41 closure is merged and
+the capability matrix reads P2-41 PROVEN (ledger entry O261). What that rests on,
+and what it does not:
+
+* *What the evidence is.* The writer scan (`tests/test_durable_writers.py`) fails
+  on any raw write call that it does not classify, and the fault-injecting tests
+  of the durable primitives and of the migrated writers inject a full disk, an I/O
+  error and short or zero-byte writes. The scan is lexical: it does not see an
+  aliased call, `getattr`, `codecs.open` or `io.FileIO`. The matrix itself
+  measures an import statement and a collected test, not an execution.
+* *Helpers that keep their own code.* The storage modules write with their own
+  temp-fsync-publish helpers (the scan's `OWN_DURABLE` class), not with
+  `durable_write`. The host helper and the bundle helper have the full-disk tests
+  of this closure; the host helper has no zero-byte test, and the bundle helper
+  has no fsync-error test (removing its fsync goes unnoticed). The coordinator and
+  the relocation helpers have an ENOSPC injected at their own write function. The
+  registry writer has a test of a failed replace and none of a full disk. The copy
+  helper of the archive target, the tar stream and the no-replace link of the
+  bundle code have no test of a full disk at all. A failed directory fsync in the
+  bundle code is silent by design (best effort).
+* *Not claimed.* A long unattended run that survives a full disk end to end (park
+  and resume on storage pressure belongs to P2-40). A backup that holds a
+  hard-link member cannot be restored (restore refuses it). The leaf write, the
+  audit append and the recorded answer of the dispatcher are now refused under the
+  one-mebibyte free-space reserve, which the recorded answer did not obey before.
+  Some behaviours of the new code are unpinned by a test and tracked in the ledger
+  entry.
+
+## Update after v0.3.0a2, 2026-10-09 (ledger O262): P2-43 reads PROVEN, with limits that matter
+
+The rows and paragraphs above that say P2-43 reads MISSING, that the third slice is not merged, that nothing checks the
+binding on resume, and that developer-side limit detection is not built are the text of the first alpha and of
+`v0.3.0a2`; they stay as written. On the development line the third and fourth slices of P2-43 are merged and the
+capability matrix reads P2-43 PROVEN (ledger entry O262). What that rests on, and what it does not:
+
+* *What the evidence is.* One test file drives the real controller and resume loop, on fakes, through the four scenarios
+  of amendment A5 (a limit in QA, an expired credential, a stale master, two masters); a second drives the real
+  dispatcher, controller and resume loop on a recorded real limit screen and on a developer whose own words mention
+  limits. The matrix itself measures a symbol, a collected test file and an import statement, not an execution.
+* *What the detection reads.* Only the recorded shapes of the provider's banner, whole. A banner in another wording (a
+  hyphenated hour limit, a weekly limit, a bare phrase, German text, the form with the word again alone) is not read, and
+  the turn reaches QA as it did before. A line of a role's own words that is exactly a recorded banner, glyph and all,
+  among the last twelve lines is read as the banner.
+* *The stale-banner re-park (open).* The pane of a developer is reused and keeps the old limit line in its scrollback. A
+  short good re-run after the wait leaves that line among the last twelve lines, is read as a limit again and is parked
+  again and again until the resume limit, and is then handed to a person. It fails safe: nothing is accepted wrongly. The
+  fix (ignore a banner that was already on the pane before the prompt was sent) is specified and in a run, and not merged.
+* *Never recorded.* No developer pane has been recorded on a real limit; the status area is the harness's, so the screen
+  is inferred to be the same. No real rate-limit body was recorded, so that branch is driven by synthetic text. The
+  non-Herdr adapter reads a limit on an empty standard output only.
+* *A person's escape hatch.* `hoh unblock` and `hoh resume --force` lift a park without the verification and without a
+  claim, by design.
+* *NOT_RUN.* A live developer turn that meets a real provider limit, a live rate-limit body, a live resume against a pane
+  that continued by itself, a live race of two resuming processes, and a live run that meets a real limit with receipts.

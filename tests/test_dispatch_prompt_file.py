@@ -620,7 +620,7 @@ def test_interrupted_versioning_recovered(tmp_path, monkeypatch, which):
 
 def test_link_failure_fails_closed(tmp_path, monkeypatch):
     """`os.link` failing with anything but EEXIST fails the dispatch: no copy
-    fallback, and the temp file is left in place and named."""
+    fallback, no temp file left behind."""
     d, cli = _dispatcher(tmp_path, monkeypatch)
     state = _state()
     _dispatch(d, cli, Role.DEVELOPER, _long_prompt(seed="[1] "), state)
@@ -636,9 +636,8 @@ def test_link_failure_fails_closed(tmp_path, monkeypatch):
     monkeypatch.undo()
     assert caught.value.transient is False
     assert len(cli.calls) == 1
-    left = sorted(_listing(d.answers_dir) - before)
-    assert len(left) == 1 and left[0].endswith(".tmp"), left
-    assert left[0] in str(caught.value)
+    assert sorted(_listing(d.answers_dir) - before) == []
+    assert "parking" in str(caught.value) and "unchanged" in str(caught.value)
     # No copy was made under a version name, and the current file is the
     # first prompt, unchanged.
     assert not list(d.answers_dir.glob("*.v*"))

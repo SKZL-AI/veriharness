@@ -385,6 +385,8 @@ def _write_new(path: Path, data: bytes) -> None:
         view = memoryview(data)
         while view:
             written = os.write(fd, view)
+            if written <= 0:
+                raise OSError(errno.ENOSPC, "write made no progress", str(path))
             view = view[written:]
         os.fsync(fd)
     finally:

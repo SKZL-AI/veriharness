@@ -1511,28 +1511,13 @@ CLASSIFIED: dict[tuple[str, str, str], tuple[str, int, str]] = {
         "PRIMITIVE", 3, "the primitives' temp files (durable_write, durable_create) and the "
         "append (durable_append, added by H-a)"),
     ("durable_io.py", "*", "os.replace"): (
-        "PRIMITIVE", 2, "durable_write's publish and durable_publish_tree's merge (S1)"),
+        "PRIMITIVE", 3, "durable_write's publish (path form and, S2, dir_fd form) and "
+        "durable_publish_tree's merge (S1)"),
     ("durable_io.py", "*", "os.rename"): (
         "PRIMITIVE", 1, "durable_publish_tree's whole-tree publish (S1)"),
     ("durable_io.py", "*", "os.link"): (
-        "PRIMITIVE", 1, "durable_create's publish without replacing (added by H-a)"),
-    # -- DEFERRED: files reserved by other strands, for S2 --------------------
-    ("dispatchers.py", "HarnessDispatcher.dispatch", "write_text"): (
-        "DEFERRED", 1, "role answer recorded as evidence; dispatchers.py reserved "
-        "(dispatch-robustness)"),
-    ("dispatchers.py", "_append_audit", "os.open(write)"): (
-        "DEFERRED", 1, "prompt-binding audit append (flags in a local): write loop retries "
-        "short writes, no torn-tail guard, spins on a zero-byte write (tracked defect); "
-        "dispatchers.py reserved"),
-    ("dispatchers.py", "_write_leaf", "os.link"): (
-        "DEFERRED", 1, "versioned leaf write; write loop `view[os.write(fd, view):]` spins "
-        "on a zero-byte write (tracked defect); dispatchers.py reserved"),
-    ("dispatchers.py", "_write_leaf", "os.open(write)"): (
-        "DEFERRED", 1, "temp for the versioned leaf write (flags held in a local); "
-        "dispatchers.py reserved"),
-    ("dispatchers.py", "_write_leaf", "os.replace"): (
-        "DEFERRED", 1, "versioned leaf write; write loop `view[os.write(fd, view):]` spins "
-        "on a zero-byte write (tracked defect); dispatchers.py reserved"),
+        "PRIMITIVE", 2, "durable_create's publish without replacing (added by H-a; path form "
+        "and, S2, dir_fd form)"),
     ("store.py", "RunStore._restore", "extractall"): (
         "STAGED_EXTRACT", 1, "extracts into <root>/_restore/<staging> after a room check; "
         "published by durable_publish_tree"),
@@ -1617,6 +1602,9 @@ CLASSIFIED: dict[tuple[str, str, str], tuple[str, int, str]] = {
         "RENAME_ONLY", 1, "a stale integrity record set aside by a versioned rename; "
         "needs no free space"),
     # -- PARK_LINK / IN_MEMORY --------------------------------------------------
+    ("dispatchers.py", "_write_leaf.park", "os.link"): (
+        "PARK_LINK", 1, "the version name of the current file, a second name for the same "
+        "inode; no bytes written; the new bytes go through `durable_write`"),
     ("store.py", "RunStore._park", "os.link"): (
         "PARK_LINK", 1, "no bytes written; inode condition documented in _park"),
     ("store.py", "RunStore.backup", "tarfile.open(fileobj)"): (
@@ -1695,6 +1683,12 @@ MIGRATED = {
     ("launcher.py", "HohRunLauncher.prepare", "write_text"),
     ("cli.py", "_cmd_run", "write_text"),
     ("cli.py", "_integrity_close", "write_text"),
+    # P2-41 closure S2:
+    ("dispatchers.py", "HarnessDispatcher.dispatch", "write_text"),
+    ("dispatchers.py", "_append_audit", "os.open(write)"),
+    ("dispatchers.py", "_write_leaf", "os.link"),
+    ("dispatchers.py", "_write_leaf", "os.open(write)"),
+    ("dispatchers.py", "_write_leaf", "os.replace"),
 }
 
 
@@ -1871,20 +1865,28 @@ def test_scan_resolves_flags_and_fails_closed(tmp_path):
     })
 
 
-def test_docstring_remaining_matches_scan():
-    """Catches a durable_io docstring whose "Still remaining" list drifts from
-    the scan's DEFERRED and MIGRATE_LATER rows -- what the register's
-    `equivalent` will name -- or claims P2-41 PROVEN."""
+def test_no_deferred_or_migrate_later_row_remains():
+    """Catches a CLASSIFIED row that still defers a writer: after P2-41 closure
+    S2 the scan has no DEFERRED and no MIGRATE_LATER row, which is what the
+    register's `equivalent` named."""
+    left = sorted(k for k, (c, _n, _r) in CLASSIFIED.items()
+                  if c in ("DEFERRED", "MIGRATE_LATER"))
+    assert left == []
+
+
+def test_docstring_names_the_migrations_and_no_remaining_writer():
+    """Catches a durable_io docstring that still lists remaining writers, drops
+    one of the migration sections or their order, or loses W1..W15."""
     doc = durable_io.__doc__ or ""
-    assert "Still remaining" in doc
-    assert "P2-41 is not PROVEN while these remain" in doc
-    tail = doc.split("Still remaining", 1)[1]
-    listed = re.findall(r"^\* `([^`]+)`: `([^`]+)`\s*$", tail, flags=re.M)
-    wanted = {(f, q) for (f, q, _k), (c, _n, _r) in CLASSIFIED.items()
-              if c in ("DEFERRED", "MIGRATE_LATER")}
-    assert sorted(listed) == sorted(wanted)
-    # The kept paragraph and the new sections, in that order.
+    assert "Still remaining" not in doc
+    assert "while these remain" not in doc
+    closing = "No writer remains in the list of the register's `equivalent`"
+    assert closing in doc
     kept = doc.index("*(As written on 2026-10-01; superseded by the next sections.)*")
-    assert kept < doc.index("Migrated by P2-41b H-a (2026-10)") < doc.index("Still remaining")
-    migrated = doc[doc.index("Migrated by P2-41b H-a"):doc.index("Still remaining")]
+    order = [doc.index(h) for h in ("Migrated by P2-41b H-a (2026-10)",
+                                    "Migrated by P2-41 closure S1",
+                                    "Migrated by P2-41 closure S3",
+                                    "Migrated by P2-41 closure S2")]
+    assert kept < order[0] < order[1] < order[2] < order[3] < doc.index(closing)
+    migrated = doc[order[0]:order[1]]
     assert all(re.search(rf"\bW{i}\b", migrated) for i in range(1, 16))

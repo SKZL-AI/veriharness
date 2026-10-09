@@ -39,6 +39,20 @@ Three rules decide what it may touch, and each is a refusal first:
   that project (its own loop will see its own timer), and a stale epoch cannot
   write because the store refuses it.
 
+* **A park is resumed only if it is the park the receipts say it is (P2-43c).**
+  Before a provider wait of `QUOTA_CLASSES` is lifted -- by a timer, by the
+  `retry_after` fallback, and at the project level before a node whose run is
+  still parked is resumed -- `hoh.dispatchrecovery.verify_binding` recomputes
+  the park's id from the live state, the pinned contract and the declared
+  master and compares it with the receipt. A stale or foreign park, a master the
+  project's epoch chain never held, a park already resumed (its claim) and a
+  governed park without its receipt are `refused`, state and timer untouched; a
+  live master holding the project means `held_by_live_master` (a consumer does
+  not take work a live master has); a park of slice a (no receipt, no master)
+  is resumed as before and says `LEGACY_UNBOUND`. A resume writes its claim
+  after the lift. When the attempts run out the loop appends a
+  `RETRIES_EXHAUSTED` escalation (once per park) and reports `given_up`.
+
 **The crash invariant**, the same on both sides of a wait:
 
     a parked state is never durable without its wake-up;
@@ -64,8 +78,9 @@ consumer, `resume_storage` (`hoh resume-storage`); the quota functions keep
 `QUOTA_CLASSES` and report a `storage_pressure` wait `CLASS_NOT_OWNED`, and
 `resume_storage` touches nothing but `storage_pressure`. It resumes a parked
 run or project node only when a due `STORAGE_RECHECK` timer speaks for it
-*and* the observed state is better than CRITICAL *and* a `role_run` would be
-admitted now (`StorageAdmission.would_admit`); otherwise it arms a new timer
+*and* the observed state is better than CRITICAL *and* a `role_run` together with
+the iteration's temporary workspace would be admitted now
+(`StorageAdmission.would_admit`, `_capacity`); otherwise it arms a new timer
 first, disarms the superseded one by id, and leaves the branch parked. There
 is no `retry_after` fallback for this class: a storage park without an armed
 timer is reported, never resumed.
@@ -83,6 +98,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from . import dispatchrecovery
 from .contracts import Condition
 from .failures import AUTOMATIC_KINDS
 from .resumption import Resumption, ResumptionError, Verdict, consume, due_resumptions, normalise_now
@@ -237,19 +253,83 @@ def _hold_refusal(st, rec: dict, by: str) -> dict:
     return rec
 
 
+def _check_park(store, st):
+    """The binding check of a provider wait; None for a block of another class
+    (not a park this module's receipts describe)."""
+    if st.blocked_kind not in QUOTA_CLASSES:
+        return None
+    return dispatchrecovery.verify_binding(store.dir, st)
+
+
+def _binding_fields(check) -> dict:
+    if check is None:
+        return {}
+    out = {"binding": check.verdict.value}
+    if check.park_id:
+        out["park_id"] = check.park_id
+    return out
+
+
+def _barred(check) -> dict | None:
+    """The result record of a park that must not be resumed now, or None."""
+    if check is None or check.resumes:
+        return None
+    action = ("held_by_live_master"
+              if check.verdict is dispatchrecovery.ParkVerdict.DEFERRED else "refused")
+    return {"action": action, "why": check.reason, **_binding_fields(check)}
+
+
+def _binding_note(check) -> str:
+    if check is None:
+        return ""
+    if check.verdict is dispatchrecovery.ParkVerdict.LEGACY_UNBOUND:
+        return " (legacy park: no routing receipt)"
+    return f" (park {(check.park_id or '')[:12]} verified: {check.reason})"
+
+
+def _exhausted(store, st, check, rec: dict) -> dict:
+    """`given_up`, with the escalation receipt of a park a receipt describes."""
+    rec.update(action="given_up",
+               why=f"{st.resume_attempts} unsuccessful resume attempts; "
+                   "'hoh unblock' is the captain's decision",
+               **_binding_fields(check))
+    if check is not None and check.record is not None:
+        try:
+            esc = dispatchrecovery.escalate_exhaustion(store.dir, check)
+            rec["escalation"] = {"escalation": esc.escalation, "park_id": esc.park_id}
+        except Exception as exc:                          # noqa: BLE001 - said, not raised
+            rec["escalation"] = f"NOT written ({type(exc).__name__})"
+    return rec
+
+
+def _claim(store, st, check) -> dict:
+    """The receipt of the resume, written after the park was lifted."""
+    if check is None or check.record is None:
+        return {}
+    try:
+        dispatchrecovery.claim_park(store.dir, check, resumer="hoh resume-quota (runs)",
+                                    attempt=st.resume_attempts)
+    except Exception as exc:                              # noqa: BLE001 - said, not raised
+        return {"claim": f"NOT written ({type(exc).__name__})"}
+    return {"claim": "written"}
+
+
 def _resume_run(store, st, d: Resumption, timers_store, moment, stages, quota) -> dict:
     if stages.violation_unresolved(st):
         return _hold_refusal(st, {}, "a timer")
+    check = _check_park(store, st)
+    barred = _barred(check)
+    if barred is not None:
+        return barred
     if st.resume_attempts >= quota.MAX_RESUME_ATTEMPTS:
-        return {"action": "given_up",
-                "why": f"{st.resume_attempts} unsuccessful resume attempts; "
-                       "'hoh unblock' is the captain's decision"}
+        return _exhausted(store, st, check, {})
     st.resume_attempts += 1
     stages.unblock(st, f"resumed by the resume loop: timer {d.timer_id} due "
-                       f"{d.due_at}, attempt {st.resume_attempts}")
+                       f"{d.due_at}, attempt {st.resume_attempts}{_binding_note(check)}")
     store.write_state(st)
     rec = {"action": "resumed", "attempt": st.resume_attempts,
-           "next_step": f"hoh --root {store.root} run {store.run_id}"}
+           "next_step": f"hoh --root {store.root} run {store.run_id}",
+           **_binding_fields(check), **_claim(store, st, check)}
     try:
         consume(timers_store, d, now=moment)
     except ResumptionError as exc:
@@ -267,18 +347,23 @@ def _legacy_run(store, st, rid, stages, quota) -> dict:
         # `usage_limit`, a reason that names the violation) or a caller that
         # widened `classes` must not lift a hold with its retry_after.
         return _hold_refusal(st, rec, "a retry_after")
-    if st.resume_attempts >= quota.MAX_RESUME_ATTEMPTS:
-        rec.update(action="given_up", why=f"{st.resume_attempts} unsuccessful resume "
-                   "attempts; 'hoh unblock' is the captain's decision")
+    check = _check_park(store, st)
+    barred = _barred(check)
+    if barred is not None:
+        rec.update(barred)
         return rec
+    if st.resume_attempts >= quota.MAX_RESUME_ATTEMPTS:
+        return _exhausted(store, st, check, rec)
     if not quota.is_due(st.retry_after):
         rec.update(action="waiting", why=f"retry after {st.retry_after}")
         return rec
     st.resume_attempts += 1
-    stages.unblock(st, f"quota retry {st.resume_attempts} (retry_after, no timer)")
+    stages.unblock(st, f"quota retry {st.resume_attempts} (retry_after, no timer)"
+                       f"{_binding_note(check)}")
     store.write_state(st)
     rec.update(action="resumed_without_timer", attempt=st.resume_attempts,
-               next_step=f"hoh --root {store.root} run {rid}")
+               next_step=f"hoh --root {store.root} run {rid}",
+               **_binding_fields(check), **_claim(store, st, check))
     return rec
 
 
@@ -303,6 +388,41 @@ def node_view(node: Any, program_generation: int) -> dict:
     return {"condition": condition, "blocked_kind": node.blocked_kind,
             "blocked_reason": node.note, "retry_after": node.retry_after,
             "program_epoch": program_generation}
+
+
+def _run_park_gate(root: Path, node: Any) -> dict | None:
+    """The refusal or deferral of a node whose run is still parked on a park that
+    does not verify, or None when the node may be resumed.
+
+    Checked before the master is acquired, so a refused park spends no epoch and
+    drives nothing. Fail-closed: the only cases that proceed are the ones with
+    nothing to check -- a name no run can have, no state file, a run that is not
+    BLOCKED any more (the run pass lifted it) and a park of another class. A
+    state that exists and cannot be read **here** (damaged, or of an older schema
+    that only a locked `RunStore.read_state` migrates) is a refusal: the node
+    stays BLOCKED and the next pass, after the run pass has read the state under
+    its lock, decides. The read is a plain parse of `state.json`: this gate
+    writes nothing, not even a migration.
+    """
+    from .contracts import RunState
+    from .store import RunStore, StoreError
+
+    try:
+        store = RunStore(root, node.run_id or node.id)
+    except StoreError:
+        return None                       # not a name a run can have
+    if not os.path.lexists(store.state_path):
+        return None                       # no run record: a project-only park
+    try:
+        st = RunState.model_validate_json(store.state_path.read_text(encoding="utf-8"))
+    except Exception as exc:                              # noqa: BLE001 - fail closed
+        return {"action": "refused", "binding": "REFUSED",
+                "why": f"the state of run {store.run_id} cannot be read here "
+                       f"({type(exc).__name__}); the node is not resumed on a guess -- "
+                       "the run pass reads it under its lock, and the next pass decides"}
+    if st.condition is not Condition.BLOCKED:
+        return None
+    return _barred(_check_park(store, st))
 
 
 DriveFn = Callable[[Any, Any], Any]
@@ -392,9 +512,13 @@ def _resume_one_project(root: Path, pid: str, *, moment: str, classes, drive,
             rec = {"scope": "project", "target": pid, "node": n.id, "timer_id": None,
                    "verdict": "PARKED_WITHOUT_TIMER"}
             if n.retry_after and n.retry_after <= moment:
-                rec.update(action="pending", why=f"no armed timer; retry_after "
-                           f"{n.retry_after} has passed (fallback)")
-                fallback.append(n.id)
+                barred = _run_park_gate(root, n)
+                if barred is not None:
+                    rec.update(barred)
+                else:
+                    rec.update(action="pending", why=f"no armed timer; retry_after "
+                               f"{n.retry_after} has passed (fallback)")
+                    fallback.append(n.id)
             else:
                 rec.update(action="waiting", why=f"no armed timer; retry_after "
                            f"{n.retry_after or 'missing'}")
@@ -408,8 +532,12 @@ def _resume_one_project(root: Path, pid: str, *, moment: str, classes, drive,
                 rec["why"] = (f"{node.blocked_kind!r} is not a class this consumer owns "
                               f"({sorted(classes)}); the timer stays armed")
             elif d.resumes:
-                rec["action"] = "pending"
-                todo.append(d)
+                barred = _run_park_gate(root, node) if node is not None else None
+                if barred is not None:
+                    rec.update(barred)
+                else:
+                    rec["action"] = "pending"
+                    todo.append(d)
             else:
                 rec["action"] = "refused"
             out.append(rec)
@@ -531,6 +659,10 @@ def drive_governed(store, authority, factory, **controller_kw):
         # P2-43b: the runs this master launches are bound to it.
         bind_master = getattr(launcher, "bind_master", None)
         if callable(bind_master) and authority.epoch is not None:
+            # A session id that has the shape of a key is refused by every
+            # `hoh run` it would be passed to (exit 2, no verdict); say so once,
+            # here, as the drive's own halt reason.
+            dispatchrecovery.check_session_id(authority.session_id)
             bind_master(authority.session_id, authority.epoch)
         result = ProjectController(store, launcher, gates, authority=authority,
                                    **controller_kw).run()
@@ -718,13 +850,25 @@ def _moment(now: datetime | str | None) -> datetime:
 
 
 def _capacity(admission) -> tuple[bool, str, str]:
-    """(a role run would be admitted now, state, effective free) -- observed
-    through the admission, under its lock; nothing is reserved or recorded."""
+    """(what a resumed iteration asks for first would be admitted now, state,
+    effective free) -- observed through the admission, under its lock; nothing
+    is reserved or recorded.
+
+    What a resumed iteration asks for first is its temporary workspace
+    (``tmp_workspace``, P2-42) and, while that reservation is held, the planner's
+    ``role_run``: the **sum** of the two estimates, not the ``role_run`` alone.
+    Asking for the ``role_run`` alone unparked a run in the band of free space
+    between the two, where the iteration was parked again at the planner, charged
+    again, and the escalation count of the park started over (an unpark / re-park
+    loop). A run of a project that holds no workspace reservation is held back by
+    that one workspace estimate more than it needs: conservative, never a loop."""
     from .storage_pressure import PressureState
 
     obs, pstate = admission.observe()
     free = f"{obs.effective_free_bytes} B"
-    ok = pstate is not PressureState.CRITICAL and admission.would_admit("role_run")
+    need = admission.estimate("role_run") + admission.estimate("tmp_workspace")
+    ok = pstate is not PressureState.CRITICAL and admission.would_admit(
+        "role_run", estimate_bytes=need)
     return ok, pstate.value, free
 
 
@@ -790,8 +934,10 @@ def resume_storage(root: Path | str, *, admission=None, state_root: Path | str |
     whose `STORAGE_RECHECK` timer is due (`due_resumptions` decides epoch,
     kill list, parked-ness and due time):
 
-    * state better than CRITICAL **and** `would_admit("role_run")`: the
-      unparked state is persisted, then the timer consumed (`resumed`);
+    * state better than CRITICAL **and** `would_admit` of a `role_run` held
+      together with the iteration's temporary workspace (the sum of their two
+      estimates, `_capacity`): the unparked state is persisted, then the timer
+      consumed (`resumed`);
     * otherwise a new timer is armed first, the superseded one disarmed by
       id, and the branch stays parked (`rearmed`, ``recheck: still <state>,
       <free>``); from `park_policy.needs_you_after` rechecks on (counted in

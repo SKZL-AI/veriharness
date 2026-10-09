@@ -357,3 +357,106 @@ def test_a_skipped_row_is_blanked_in_both_texts_before_they_are_compared():
     assert dn._blank(a, set()) != dn._blank(b, set())
     assert dn._blank(a, {"V12"}) != dn._blank(b, {"V12"})
 
+
+
+# --------------------------------------------------------------------------
+# the shape of the development line (added 2026-10-09, ledger O263)
+# --------------------------------------------------------------------------
+
+def _line_repo(repo: Path) -> str:
+    """Commit days 10 (the fixture's root), 11, (gap 12-13), 14, 15, 16, then a
+    commit made on the 17th at 23:30 in a zone five hours west of UTC, which falls
+    on the 18th at +0300 (so the 17th is a gap day), all others at 10:00 +0300."""
+    for day in ("11", "14", "15", "16"):
+        commit(repo, f"c{day}", f"2026-09-{day}T10:00:00+0300")
+    commit(repo, "c17", "2026-09-17T23:30:00-0500")
+    return git(repo, "rev-parse", "HEAD")
+
+
+def test_the_line_has_dates_gaps_and_the_longest_run_at_plus_three(repo):
+    base = _line_repo(repo)
+    line = dn.derive_line(repo, base)
+    assert line["first"] == "2026-09-10 10:00"
+    assert line["last"] == "2026-09-18 07:30"          # 17th 23:30 at -0500
+    assert (line["elapsed_days"], line["elapsed_hours"]) == (7, 21)
+    assert line["calendar_days"] == 9 and line["commit_days"] == 6
+    assert line["gaps"] == [("2026-09-12", "2026-09-13", 2),
+                            ("2026-09-17", "2026-09-17", 1)]
+    assert line["streak"] == (3, "2026-09-14", "2026-09-16")
+    assert (line["commits"], line["merges"], line["non_merge"]) == (6, 0, 6)
+
+
+def test_the_longest_run_is_the_longest_not_the_first_or_the_last(repo):
+    for day in ("11", "14", "15", "16", "17"):
+        commit(repo, f"c{day}", f"2026-09-{day}T10:00:00+0300")
+    base = git(repo, "rev-parse", "HEAD")
+    line = dn.derive_line(repo, base)
+    assert line["streak"] == (4, "2026-09-14", "2026-09-17")
+    assert line["gaps"] == [("2026-09-12", "2026-09-13", 2)]
+
+
+def test_a_single_day_line_is_a_run_of_one(repo):
+    line = dn.derive_line(repo, git(repo, "rev-parse", "HEAD"))
+    assert line["streak"] == (1, "2026-09-10", "2026-09-10")
+    assert line["gaps"] == [] and line["calendar_days"] == 1
+
+
+def test_the_ledger_entry_headings_are_counted_once_each_at_the_base(repo):
+    ledger = ("# Ledger\n\n### O23 -- a\n\n### O23 -- the same number again\n\n"
+              "## O25 — b\n\n#### O30 -- too deep\n\n### O26a -- no boundary\n"
+              "\nText with O99 in it.\n\n### O40 -- last\n")
+    commit(repo, "ledger", "2026-09-11T10:00:00+0300", {dn.LEDGER: ledger})
+    base = git(repo, "rev-parse", "HEAD")
+    assert dn.derive_line(repo, base)["ledger_entries"] == (3, 23, 40)
+    # a ledger added after the base is not read
+    commit(repo, "more", "2026-09-12T10:00:00+0300",
+           {dn.LEDGER: ledger + "\n### O41 -- later\n"})
+    assert dn.derive_line(repo, base)["ledger_entries"] == (3, 23, 40)
+
+
+def test_a_line_without_a_ledger_has_no_entry_count(repo):
+    assert "ledger_entries" not in dn.derive_line(repo, git(repo, "rev-parse", "HEAD"))
+
+
+def test_captain_entries_are_counted_by_category():
+    text = ('{"entries": [{"category": "CAPTAIN"}, {"category": "VERIHARNESS_RUN"},'
+            ' {"category": "captain"}, {"id": "no category"}]}')
+    assert dn.count_captain(text) == (1, 4)
+    assert dn.count_captain('{"entries": []}') == (0, 0)
+    assert dn.count_captain("{}") == (0, 0)
+
+
+def test_the_new_rows_state_what_the_line_derivation_found(repo):
+    base = _line_repo(repo)
+    rows = {r["tag"]: r for r in dn.build_rows({"line": dn.derive_line(repo, base)})}
+    assert rows["V46"]["figure"].endswith("7 days 21 h (1 week 0 days)")
+    assert rows["V46"]["needles"] == ["7 days"]
+    assert rows["V47"]["figure"].startswith("6 of 9 calendar days carry a commit; none on ")
+    assert "2026-09-12 to 2026-09-13 (2 days)" in rows["V47"]["figure"]
+    assert "2026-09-17 to 2026-09-17 (1 day)" in rows["V47"]["figure"]
+    assert rows["V48"]["figure"] == "6 commits = 6 non-merge + 0 merges"
+    # a row that cannot be derived says so instead of inventing a figure
+    bare = {r["tag"]: r for r in dn.build_rows({})}
+    assert bare["V46"]["figure"] == "<line: not derived>" and bare["V46"]["needles"] == []
+    assert bare["V52"]["figure"] == "<attribution: not derived>"
+
+
+def test_a_line_without_a_gap_is_described_without_an_empty_gap(repo):
+    commit(repo, "next day", "2026-09-11T10:00:00+0300")
+    line = dn.derive_line(repo, git(repo, "rev-parse", "HEAD"))
+    assert line["gaps"] == [] and line["streak"] == (2, "2026-09-10", "2026-09-11")
+    figure = {r["tag"]: r for r in dn.build_rows({"line": line})}["V47"]["figure"]
+    assert figure == ("2 of 2 calendar days carry a commit; no day without a commit; "
+                      "longest run of days with a commit: 2 (2026-09-10 to 2026-09-11)")
+    assert "none on ;" not in figure
+
+
+def test_the_ledger_sourced_rows_of_the_duration_figures_have_no_bare_number_needle():
+    """A needle that is a bare number matches anywhere in a block (the tag check is a
+    substring test), so it cannot catch a figure that drifted; the rows of the build's
+    duration, autonomy and scale name the words around the number."""
+    rows = {r["tag"]: r for r in dn.build_rows(None)}
+    for tag in ("V50", "V51", "V53", "V54", "V55"):
+        assert rows[tag]["needles"], tag
+        assert not any(n.isdigit() or n in {"six", "four", "thirteen"}
+                       for n in rows[tag]["needles"]), (tag, rows[tag]["needles"])

@@ -9,7 +9,7 @@ on resume. A prompt stall and a role that outlived its time budget were
 routed to the digest as decisions nobody had to take.
 
 This module is the vocabulary and the classifier, nothing else. It decides
-*what a failure was*; the controller decides what to do about it. Three
+*what a failure was*; the controller decides what to do about it. Four
 distinctions carry the design:
 
 * **A wait is not a decision.** A usage limit, a rate limit, an unavailable
@@ -32,6 +32,17 @@ distinctions carry the design:
   not recognise is `UNCLASSIFIED`, and that is *not* a wait: the existing
   route stays. A limit worded in a way this module does not know is therefore
   still lost as before -- a tracked gap, not a closed one.
+* **A turn that ended normally is read more strictly than one that failed.**
+  `classify_text` reads the screen of a dispatch that already failed, where a
+  role-written `Rate limit.` costs a bounded wait. `final_screen_limit` decides
+  about a developer turn that *finished* (Herdr reports a pane that ran into a
+  limit as an ordinary end of turn, P2-43d), where a wrong answer parks good
+  work: only a line that is exactly one of the recorded banner shapes among the
+  last `FINAL_SCREEN_LINES` lines counts, and the failed dispatch carries those
+  lines and nothing else of the screen. A banner counts only if it is new: one
+  the pane already showed when the prompt was sent (`before`, P2-43e) belongs to
+  an earlier turn -- except the harness's status-area line (`⚠`), which a pane
+  draws only while a limit holds: that one is about now, and is never spent.
 
 No routing, no provider or model selection, no failover: those are P3.
 """
@@ -39,6 +50,7 @@ No routing, no provider or model selection, no failover: those are P3.
 from __future__ import annotations
 
 import re
+from collections import Counter
 from datetime import datetime, timedelta, timezone
 from enum import StrEnum
 
@@ -395,6 +407,163 @@ def classify_text(text: str, *, first_line: bool = True) -> NormalizedFailure | 
         if cls in found:
             return cls
     return None
+
+
+# --------------------------------------------------------------------------- #
+# The final screen of a turn that ended normally (P2-43d)
+# --------------------------------------------------------------------------- #
+
+#: How many of a pane's last non-blank lines are "the final screen". A harness
+#: that stops a turn on a limit prints the banner into the scrollback *and*
+#: keeps it in its status area at the bottom. In the 771 recorded pane blocks
+#: that carry the status-area banner (`⚠ Usage limit reached · limit resets
+#: 3:20am`) it is the 3rd line from the end (725 blocks) or the 4th (46), and the
+#: `⎿  You've hit your session limit · resets 3:20am (Europe/Istanbul)` line,
+#: which names the zone of the reset, the 9th, 8th or 12th: twelve is the
+#: smallest window that reaches all of them. A role's own words are above that
+#: area, and only the last lines of a finished turn are the screen it ended on.
+FINAL_SCREEN_LINES = 12
+
+#: The two classes A5 clause 2 names for every role. Other provider classes on a
+#: finished developer turn are a tracked gap, not read here.
+_LIMIT_CLASSES = (_N.USAGE_LIMIT, _N.RATE_LIMIT)
+
+#: What starts a recorded banner line: at most four columns of indent (spaces or
+#: the non-breaking space the harness prints), one of the three glyphs of the
+#: recorded banners -- `●` the inline banner, `⎿` its second line, `⚠` the status
+#: area -- and a space. Nothing else leads a banner: a bullet, a box edge, a code
+#: block's indent or a role's sentence does not (the reader of a failed turn
+#: strips every non-ASCII glyph, `_LEAD`; this one must not).
+_BANNER_LEAD = r"[ \u00a0]{0,4}[\u25cf\u23bf\u26a0][ \u00a0]*"
+_CLOCK = r"\d{1,2}(?::\d{2})?(?:am|pm)"
+_ZONE = r"\([A-Za-z][A-Za-z_]*(?:/[A-Za-z0-9_+\-]+)+\)"
+#: The provider's own metadata after the phrase, a closed set and never a free
+#: sentence: `continuing automatically at 3:20am`, `esc to cancel`, `resets
+#: 3:20am (Europe/Istanbul)`, `limit resets 3:20am`, `clau.de/wrap-up`, each
+#: also as far as a narrow pane wrapped it (`continuing`, `esc to`, `resets`).
+_SEGMENT = (
+    r"(?:continuing(?: automatically(?: at " + _CLOCK + r")?)?"
+    r"|esc(?: to(?: cancel)?)?"
+    r"|(?:limit )?resets(?: " + _CLOCK + r"(?: " + _ZONE + r")?)?"
+    r"|clau\.de/[\w\-/]+)"
+)
+#: The whole line: lead, one of the two recorded phrases, then one or more
+#: ` · <segment>` and nothing after (a role's `Usage limit reached · resets 5pm,
+#: so ...` is a sentence, not a banner).
+_USAGE_BANNER = re.compile(
+    r"^" + _BANNER_LEAD
+    + r"(?:usage limit reached|you['\u2019]?ve hit your (?:\w+ )?limit)"
+    + r"(?:\s*\u00b7\s*" + _SEGMENT + r")+\s*$", re.I)
+#: The structured error body Claude Code prints for an HTTP error (the shape
+#: pinned for a 529 in `tests/test_failure_classes.py`: `API Error: 529
+#: {"type":"error",...}`), here for a 429. Not recorded for a 429 itself.
+_RATE_BANNER = re.compile(
+    r"^" + _BANNER_LEAD + r'API Error:\s*429\s+\{\s*"type"\s*:\s*"error"', re.I)
+
+
+def _pane_block(lines: list[str]) -> list[str]:
+    """The lines between the first `--- Visible in pane ---` and the **last**
+    closing rule: a role's own line of the same twenty-three dashes inside the
+    block is content, not the end of it."""
+    start = next(i for i, ln in enumerate(lines) if ln.strip() == _PANE_OPEN) + 1
+    ends = [i for i in range(start, len(lines)) if lines[i].strip() == _PANE_CLOSE]
+    return lines[start:ends[-1]] if ends else lines[start:]
+
+
+def _screen_lines(view: str | None) -> list[str]:
+    """The non-blank lines of a pane view's `--- Visible in pane ---` block (the
+    whole text if it has no markers)."""
+    lines = (view or "").splitlines()
+    if any(ln.strip() == _PANE_OPEN for ln in lines):
+        lines = _pane_block(lines)
+    return [ln for ln in lines if ln.strip()]
+
+
+def final_screen(view: str) -> list[str]:
+    """The final screen of a pane view: the last `FINAL_SCREEN_LINES` non-blank
+    lines of its `--- Visible in pane ---` block (the whole text if it has no
+    markers)."""
+    return _screen_lines(view)[-FINAL_SCREEN_LINES:]
+
+
+def _limit_banner(line: str) -> NormalizedFailure | None:
+    if _USAGE_BANNER.match(line):
+        return _N.USAGE_LIMIT
+    if _RATE_BANNER.match(line):
+        return _N.RATE_LIMIT
+    return None
+
+
+def _banner_key(line: str) -> str:
+    """A banner line by its words: the indent a pane view strips from its first
+    line, and the spacing a redraw may change, are not part of it."""
+    return " ".join(line.split())
+
+
+def _status_line(line: str) -> bool:
+    """A banner line of the harness's status area (`⚠ Usage limit reached ...`).
+    The harness draws it at the bottom of the screen only while a limit holds, so
+    it says something about the pane now and never about an earlier turn."""
+    return _banner_key(line).startswith("\u26a0")
+
+
+def final_screen_banners(view: str, *, before: str | None = None) -> list[str]:
+    """The lines of the final screen that `final_screen_limit` read as a limit
+    banner, in order and nothing else. This is what a failed dispatch carries as
+    its evidence: the lines the decision was made on, so that no other word of a
+    role on the screen can change the class the rest of the product reads off the
+    message, or the reset time it takes from it.
+
+    `before` is the pane view read just before the prompt was sent. A banner the
+    pane already showed then is the last limit's, not this turn's (a pane that
+    outlived the wait keeps it in its scrollback, and a short good turn leaves it
+    among the last lines): every banner line of the **whole** `before` block is
+    spent once against an equal line of the final screen, oldest first, and only
+    what is left is read. Counted, not positioned: a banner shown more often than
+    before is new. The status-area line (`⚠`) is never spent: it is drawn only
+    while a limit holds, so a pane that still shows it when the prompt is sent is
+    still limited and is not a healed pane that kept an old banner. Without
+    `before` (None, or a view with no banner) every banner counts, as in P2-43d."""
+    spent = Counter(_banner_key(ln) for ln in _screen_lines(before)
+                    if _limit_banner(ln) is not None and not _status_line(ln))
+    fresh = []
+    for ln in final_screen(view):
+        if _limit_banner(ln) is None:
+            continue
+        key = _banner_key(ln)
+        if spent[key] > 0:
+            spent[key] -= 1
+            continue
+        fresh.append(ln)
+    return fresh
+
+
+def final_screen_limit(view: str, *, before: str | None = None) -> NormalizedFailure | None:
+    """`USAGE_LIMIT` or `RATE_LIMIT` when the **final screen** of a pane whose
+    turn ended normally shows a provider's limit banner, else None.
+
+    Stricter than `classify_text`, on purpose. That reads the screen of a turn
+    that already *failed*, where a role-written `Rate limit.` costs a bounded
+    wait; this one decides about a turn that *finished*, where a wrong answer
+    parks good work (a missed banner only sends the candidate to QA, as before).
+    A line counts only when (1) it is among the last `FINAL_SCREEN_LINES`
+    non-blank lines and (2) it **is** one of the recorded banner shapes, whole:
+    a recorded glyph, the phrase `usage limit reached` or `you've hit your ...
+    limit`, and only the provider's own ` · <metadata>` segments after it
+    (`_USAGE_BANNER`); or it opens with `API Error: 429 {"type":"error"` (the
+    structured body of a rate limit). Prose that merely starts with the same
+    words (`Rate limit (60 rpm) added`, `Quota exceeded -- now raises`, `Rate
+    limited... retried`), a bare phrase, a bullet, a code block's indent, a
+    quotation and everything above the final screen say nothing. Residual, pinned
+    by tests: a role's own line that is *exactly* a banner (`● Usage limit
+    reached · resets 5pm`) among the last lines is read as the banner, and so is
+    a banner that stays in view after the turn went on by itself during the turn.
+    A banner the pane already showed before the prompt (`before`, see
+    `final_screen_banners`) is none of these: it says nothing about this turn.
+    """
+    found = {cls for line in final_screen_banners(view, before=before)
+             if (cls := _limit_banner(line)) is not None}
+    return next((cls for cls in _LIMIT_CLASSES if cls in found), None)
 
 
 #: This project's own sentences in a failure's first line. Checked before any

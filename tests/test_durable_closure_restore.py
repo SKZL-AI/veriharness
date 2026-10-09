@@ -508,3 +508,104 @@ def test_restore_refuses_a_member_the_owner_cannot_read_back_as_a_store_error(
                             [_file_member("run1/secret.txt", b"x", mode=0o400)])
     store.restore(control, overwrite=True)
     assert (store.dir / "secret.txt").read_bytes() == b"x"
+
+
+# ==== P2-41 closure S2: the lock-file filter, normalised ===========================
+
+def _plant_locks(store: RunStore) -> dict[str, int]:
+    """Both lock files exist; their inodes."""
+    with store.process_marker():
+        pass
+    with store.lock():
+        pass
+    return {name: os.stat(store.dir / name).st_ino for name in (".lock", ".process.lock")}
+
+
+def _locks_untouched(store: RunStore, inodes: dict[str, int], planted: bytes) -> None:
+    for name, inode in inodes.items():
+        assert os.stat(store.dir / name).st_ino == inode, name
+        assert planted not in (store.dir / name).read_bytes(), name
+
+
+@pytest.mark.parametrize("name", ["run1/x/../.lock", "run1/receipts/../.process.lock"])
+def test_a_member_that_reaches_a_lock_file_through_dotdot_is_refused(tmp_path, store, name):
+    """Catches (p241s3int-a/-b, finding 1): a lock-file skip that looks at the
+    first component of the name as written, so `x/../.lock` was not skipped and
+    an overwrite restore replaced the live lock file with a new inode. Refused
+    by name before anything is created."""
+    inodes = _plant_locks(store)
+    archive = _archive_with(store.backup(tmp_path / "backups"), tmp_path / "bad.tar.gz",
+                            [_file_member(name, b"planted")])
+    before = _tree(store.root)
+    with pytest.raises(StoreError, match="'..' component"):
+        store.restore(archive, overwrite=True)
+    assert _tree(store.root) == before
+    assert not (store.root / "_restore").exists()
+    _locks_untouched(store, inodes, b"planted")
+
+
+@pytest.mark.parametrize("kind", ["symbolic", "hard"])
+def test_a_link_member_is_refused_whatever_it_points_at(tmp_path, store, kind):
+    """Catches (p241s3int-a/-b, finding 1): a link member `lk` -> `.` that lets
+    `lk/.process.lock` reach the live lock file, and a hard-link member, which
+    crashed `restore` with a raw `KeyError` (its `linkname` still carries the run
+    id). Both are a `StoreError`, before anything is created."""
+    inodes = _plant_locks(store)
+    link = tarfile.TarInfo("run1/lk")
+    if kind == "symbolic":
+        link.type = tarfile.SYMTYPE
+        link.linkname = "."
+    else:
+        link.type = tarfile.LNKTYPE
+        link.linkname = "run1/state.json"
+    archive = _archive_with(store.backup(tmp_path / "backups"), tmp_path / "bad.tar.gz",
+                            [(link, b""), _file_member("run1/lk/.process.lock", b"planted")])
+    before = _tree(store.root)
+    with pytest.raises(StoreError, match="is a link"):
+        store.restore(archive, overwrite=True)
+    assert _tree(store.root) == before
+    assert not (store.root / "_restore").exists()
+    _locks_untouched(store, inodes, b"planted")
+
+
+def test_a_staged_tree_that_holds_a_lock_file_is_refused_before_it_is_published(
+        tmp_path, store, monkeypatch):
+    """Catches: the last line of defence missing. Whatever a member name did, if
+    the extraction left a lock file in the staging tree, publishing it would give
+    the live lock file a new inode. The extraction is wrapped to leave one."""
+    inodes = _plant_locks(store)
+    archive = store.backup(tmp_path / "backups")
+    real = tarfile.TarFile.extractall
+
+    def extractall(self, path=".", *args, **kwargs):
+        real(self, path, *args, **kwargs)
+        (Path(path) / ".process.lock").write_text("planted")
+
+    monkeypatch.setattr(tarfile.TarFile, "extractall", extractall)
+    with pytest.raises(StoreError, match="staged tree holds"):
+        store.restore(archive, overwrite=True)
+    _locks_untouched(store, inodes, b"planted")
+
+
+@needs_unprivileged_user
+def test_merge_refuses_a_live_directory_without_search_permission_before_replacing_anything(
+        tmp_path, store):
+    """Catches (p241s3int-a, finding 4): a merge that meets a live directory it
+    cannot search only when it reaches it. `logs/` sorts before `zz-closed/`, so
+    a restore that got there late would already have replaced `logs/big.txt`.
+    (A dropped `os.X_OK` in the writability check is equivalent here: the
+    destination check stats inside the directory first and raises the same
+    `PermissionError`.)"""
+    archive = store.backup(tmp_path / "backups")
+    closed = store.dir / "zz-closed"
+    closed.mkdir()
+    os.chmod(closed, 0o600)
+    try:
+        archive = _archive_with(archive, tmp_path / "closed.tar.gz",
+                                [_file_member("run1/zz-closed/f.txt", b"inside")])
+        (store.logs_dir / "big.txt").write_text("changed")
+        with pytest.raises(PermissionError):
+            store.restore(archive, overwrite=True)
+        assert (store.logs_dir / "big.txt").read_text() == "changed"
+    finally:
+        _open_up(tmp_path)

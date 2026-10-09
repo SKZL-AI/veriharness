@@ -1090,3 +1090,10 @@ source and the command that regenerates it, in `paper/NUMBERS_V2.md`.
   iteration (`docs/LIMITATIONS.md`).
 * **E9 -- "findings are numbered to O167".** The development ledger, which the
   export does not carry, now runs to O255.
+* **E10 -- the duration in the first limitation ("five calendar days" and the elapsed wall-clock beside it).** Added
+  2026-10-09. The figures describe the campaign of the release, measured on 2026-09-14, and stay. The development
+  line to 2026-10-09 spans 32 days 15 hours from its first to its latest commit `[V46]`, with a commit on 23 of 33
+  calendar days `[V47]`; it was driven by an agent session with the operator directing it, and it stopped several
+  times (`docs/LIMITATIONS.md`, limit 1, last subsection; `README.md`, "Duration, autonomy and scale of the build").
+  "Multi-day" is therefore, for the line as a whole, multi-week; "without intervention" is still not shown. E9
+  above: the ledger now runs to O262, with 234 numbered entries `[V49]`.

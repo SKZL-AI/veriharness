@@ -6028,9 +6028,9 @@
     },
     {
       "id": "C-514",
-      "text": "| **Long-term roadmap** | Phases P0 to P12, v0.2 through v2.0 | A registered plan, not a promise. P1 was completed as an internal development milestone. No public v0.2 release was cut; the latest stable public release remains v0.1.0 while the development line continues through P2. Of the requirements registered for P3 to P12, 150 of 168 read MISSING `[V11b]`; ten of the 11 that read PROVEN are storage-lifecycle items that amendment A1 placed there and that were built early. |",
-      "where": "README.md:25",
-      "anchor_digest": "2f0a7e385b1c65d46398540c24f73f63d36beb1c507800572ff04324710d8fea",
+      "text": "| **Long-term roadmap** | Phases P0 to P12, v0.2 through v2.0 | A registered plan, not a promise. P1 was completed as an internal development milestone. No public v0.2 release was cut; the latest stable public release remains v0.1.0 while the development line continues through P2. Of the requirements registered for P3 to P12, 150 of 168 read MISSING `[V11b]`; ten of the 11 that read PROVEN are storage-lifecycle items that amendment A1 placed there and that were built early. (Updated 2026-10-09 at the O262 base: 158 of 176 read MISSING `[V11b]`, because amendment A6 registered eight more requirements for phase P5; see *The parts, and what each has and has not shown*.) |",
+      "where": "README.md:34",
+      "anchor_digest": "08a70710665ee23e6cea960e8d846ccdcaf03b915b8cc7bc4a28c4d9ee1500af",
       "status": "SUPPORTED",
       "evidence": [
         "file:paper/NUMBERS_V2.md:35"
@@ -6130,9 +6130,9 @@
     },
     {
       "id": "C-521",
-      "text": "PROVEN `[V10c]` `[V10b]` (26 as measured on 2026-10-07), and P2 is **not** closed.",
-      "where": "README.md:69",
-      "anchor_digest": "053640d2f2ace090aa7125e6b13d070ffc8cc8dc91792b1037a3698bf0329a1c",
+      "text": "PROVEN `[V10c]` `[V10b]` (26 as measured on 2026-10-07) [dated figures, added 2026-10-09: 26 of 43 on 2026-10-07 for the",
+      "where": "README.md:135",
+      "anchor_digest": "4da81c918bafe82d1c4b48187073b3216d37534273c4459e0cdab9c5ff6d8a4e",
       "status": "SUPPORTED",
       "evidence": [
         "file:paper/NUMBERS_V2.md:32",
@@ -8748,6 +8748,759 @@
         "file:DOGFOOD_LEDGER.md:19580"
       ],
       "note": "Ledger O260, Revision 2, M3: measured in the INCLUDE-only tree of the candidate (rel_a2_incltree.py): docs_numbers check exit 3 (environment gap), check_claims check all exit 1, export_manifest check exit 1, capability_matrix exit 3, build_plan exit 3 (the requirement register is not exported)."
+    },
+    {
+      "id": "C-737",
+      "text": "a full disk is not claimed. \"12 writers remain\" `[V44]` is the figure of the first",
+      "where": "paper/POSITION_PAPER_V2.md:836",
+      "anchor_digest": "23270a0e0e744cbb62c58a6dc8fcc88756c32cd3b2a63c077ac022e80f31875a",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:67"
+      ],
+      "note": "Figure(s) V44 of paper/NUMBERS_V2.md: each is re-derived by a tool at the recorded base (R rows) or found in the ledger entry the row names (the others) by `python3 tools/docs_numbers.py check`, which also checks that the figure stands in the paragraph that carries the tag."
+    },
+    {
+      "id": "C-738",
+      "text": "* **The register and the gate.** The register holds 227 requirements, 60 of them",
+      "where": "paper/POSITION_PAPER_V2.md:838",
+      "anchor_digest": "82a73496ef79ff42043895a967dbc8f7a04255f3f7fc0b9b604579fdde55e814",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:67",
+        "file:paper/NUMBERS_V2.md:30",
+        "file:paper/NUMBERS_V2.md:32",
+        "file:paper/NUMBERS_V2.md:36",
+        "file:paper/NUMBERS_V2.md:21",
+        "file:paper/NUMBERS_V2.md:22",
+        "file:paper/NUMBERS_V2.md:23",
+        "file:paper/NUMBERS_V2.md:24"
+      ],
+      "note": "A figure stated on a line of a paragraph whose tags (V44, V10, V10c, V12, V06, V06a, V06b, V06c) name the rows of paper/NUMBERS_V2.md that carry it; each row is re-derived by a tool or found in its ledger entry by `python3 tools/docs_numbers.py check`, and the tool checks that the figure stands in the paragraph. Bound at the paragraph's tags because the tag sits on a neighbouring line of the same sentence or list item."
+    },
+    {
+      "id": "C-739",
+      "text": "PROVEN and 10 PARTIAL `[V10]` **R** (59 and 11 at the cut); 33 of P2's",
+      "where": "paper/POSITION_PAPER_V2.md:839",
+      "anchor_digest": "6af73f2583dfd8f9696b5824038884d4f3b87618f6b39f6e7e1c22b486b93466",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:30"
+      ],
+      "note": "Figure(s) V10 of paper/NUMBERS_V2.md: each is re-derived by a tool at the recorded base (R rows) or found in the ledger entry the row names (the others) by `python3 tools/docs_numbers.py check`, which also checks that the figure stands in the paragraph that carries the tag."
+    },
+    {
+      "id": "C-740",
+      "text": "requirements read PROVEN `[V10c]` **R** (32 at the cut; 26 as measured on",
+      "where": "paper/POSITION_PAPER_V2.md:840",
+      "anchor_digest": "a2a3e2fd0985c45bcb31cc890c27d18d0e97dcb41e02af47089e0c3d5235b556",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:32"
+      ],
+      "note": "Figure(s) V10c of paper/NUMBERS_V2.md: each is re-derived by a tool at the recorded base (R rows) or found in the ledger entry the row names (the others) by `python3 tools/docs_numbers.py check`, which also checks that the figure stands in the paragraph that carries the tag."
+    },
+    {
+      "id": "C-741",
+      "text": "2026-10-07); the P2 gate has 10 requirements blocking and open `[V12]` **R** (11",
+      "where": "paper/POSITION_PAPER_V2.md:841",
+      "anchor_digest": "268359150db3ff22c2a0fd0e41a1ab13eeff5abd4061458d1317d83c52715f72",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:36"
+      ],
+      "note": "Figure(s) V12 of paper/NUMBERS_V2.md: each is re-derived by a tool at the recorded base (R rows) or found in the ledger entry the row names (the others) by `python3 tools/docs_numbers.py check`, which also checks that the figure stands in the paragraph that carries the tag."
+    },
+    {
+      "id": "C-742",
+      "text": "* **The honest ratio.** The attribution check counts 195 nodes after its anchor",
+      "where": "paper/POSITION_PAPER_V2.md:843",
+      "anchor_digest": "81b5ceb8b4407ddadec3bfa0dc0bb82f585849c821d8646abe61d0b7030668d6",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:67",
+        "file:paper/NUMBERS_V2.md:30",
+        "file:paper/NUMBERS_V2.md:32",
+        "file:paper/NUMBERS_V2.md:36",
+        "file:paper/NUMBERS_V2.md:21",
+        "file:paper/NUMBERS_V2.md:22",
+        "file:paper/NUMBERS_V2.md:23",
+        "file:paper/NUMBERS_V2.md:24"
+      ],
+      "note": "A figure stated on a line of a paragraph whose tags (V44, V10, V10c, V12, V06, V06a, V06b, V06c) name the rows of paper/NUMBERS_V2.md that carry it; each row is re-derived by a tool or found in its ledger entry by `python3 tools/docs_numbers.py check`, and the tool checks that the figure stands in the paragraph. Bound at the paragraph's tags because the tag sits on a neighbouring line of the same sentence or list item."
+    },
+    {
+      "id": "C-743",
+      "text": "`[V06]` **R** (189 at the cut), of which one `[V06a]` ran through the shipped",
+      "where": "paper/POSITION_PAPER_V2.md:844",
+      "anchor_digest": "0c4b8aa984caacc96fe24961e4dade25c71ab7e90f42b3108d348f89d5ce05d9",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:21",
+        "file:paper/NUMBERS_V2.md:22"
+      ],
+      "note": "Figure(s) V06, V06a of paper/NUMBERS_V2.md: each is re-derived by a tool at the recorded base (R rows) or found in the ledger entry the row names (the others) by `python3 tools/docs_numbers.py check`, which also checks that the figure stands in the paragraph that carries the tag."
+    },
+    {
+      "id": "C-744",
+      "text": "control plane end to end, 92 `[V06b]` **R** were developed by the product and merged",
+      "where": "paper/POSITION_PAPER_V2.md:845",
+      "anchor_digest": "b08142b0760a454aaad35804fa7bea2b3a1fbbf3280c36ccbec0ce7e3d1affe4",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:23"
+      ],
+      "note": "Figure(s) V06b of paper/NUMBERS_V2.md: each is re-derived by a tool at the recorded base (R rows) or found in the ledger entry the row names (the others) by `python3 tools/docs_numbers.py check`, which also checks that the figure stands in the paragraph that carries the tag."
+    },
+    {
+      "id": "C-745",
+      "text": "by the orchestrating session after review (91 at the cut), and 102 `[V06c]` **R**",
+      "where": "paper/POSITION_PAPER_V2.md:846",
+      "anchor_digest": "197b3d9242134cd00b76541eb4082cf8f7926e458dba7208da42a5e056205088",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:24"
+      ],
+      "note": "Figure(s) V06c of paper/NUMBERS_V2.md: each is re-derived by a tool at the recorded base (R rows) or found in the ledger entry the row names (the others) by `python3 tools/docs_numbers.py check`, which also checks that the figure stands in the paragraph that carries the tag."
+    },
+    {
+      "id": "C-746",
+      "text": "are the orchestrating session's direct work (97 at the cut). The ratio is",
+      "where": "paper/POSITION_PAPER_V2.md:847",
+      "anchor_digest": "132320675be9366d24a827477b1f119e2b5cd54b3efd4b900518054afd7ca7d2",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:67",
+        "file:paper/NUMBERS_V2.md:30",
+        "file:paper/NUMBERS_V2.md:32",
+        "file:paper/NUMBERS_V2.md:36",
+        "file:paper/NUMBERS_V2.md:21",
+        "file:paper/NUMBERS_V2.md:22",
+        "file:paper/NUMBERS_V2.md:23",
+        "file:paper/NUMBERS_V2.md:24"
+      ],
+      "note": "A figure stated on a line of a paragraph whose tags (V44, V10, V10c, V12, V06, V06a, V06b, V06c) name the rows of paper/NUMBERS_V2.md that carry it; each row is re-derived by a tool or found in its ledger entry by `python3 tools/docs_numbers.py check`, and the tool checks that the figure stands in the paragraph. Bound at the paragraph's tags because the tag sits on a neighbouring line of the same sentence or list item."
+    },
+    {
+      "id": "C-747",
+      "text": "slice is not merged no longer holds: the register reads P2-43 PROVEN `[V40]` **R**. Read it as narrowly as the",
+      "where": "paper/POSITION_PAPER_V2.md:859",
+      "anchor_digest": "4f667c867b4a5538f32cc426959c77295771fcacb4357562a98aef3bf142be00",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:65"
+      ],
+      "note": "Figure(s) V40 of paper/NUMBERS_V2.md: each is re-derived by a tool at the recorded base (R rows) or found in the ledger entry the row names (the others) by `python3 tools/docs_numbers.py check`, which also checks that the figure stands in the paragraph that carries the tag."
+    },
+    {
+      "id": "C-748",
+      "text": "* **The register and the gate.** The register holds 235 requirements, 61 of them PROVEN and 10 PARTIAL `[V10]` **R**",
+      "where": "paper/POSITION_PAPER_V2.md:865",
+      "anchor_digest": "229def1364a6860a943585e46b9437a2d952fd42c63474b45c6325cbd3f65854",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:30"
+      ],
+      "note": "Figure(s) V10 of paper/NUMBERS_V2.md: each is re-derived by a tool at the recorded base (R rows) or found in the ledger entry the row names (the others) by `python3 tools/docs_numbers.py check`, which also checks that the figure stands in the paragraph that carries the tag."
+    },
+    {
+      "id": "C-749",
+      "text": "(227, 60 and 10 in section 16; the difference in the total is the eight requirements of the new amendment, registered",
+      "where": "paper/POSITION_PAPER_V2.md:866",
+      "anchor_digest": "14127e5817a0f0d4266919c23ce79987cc43e1826e7025c1aecb4cda0726b357",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:65",
+        "file:paper/NUMBERS_V2.md:30",
+        "file:paper/NUMBERS_V2.md:32",
+        "file:paper/NUMBERS_V2.md:36",
+        "file:paper/NUMBERS_V2.md:35",
+        "file:paper/NUMBERS_V2.md:21",
+        "file:paper/NUMBERS_V2.md:22",
+        "file:paper/NUMBERS_V2.md:23",
+        "file:paper/NUMBERS_V2.md:24"
+      ],
+      "note": "A figure stated on a line of a paragraph whose tags (V40, V10, V10c, V12, V11b, V06, V06a, V06b, V06c) name the rows of paper/NUMBERS_V2.md that carry it; each row is re-derived by a tool or found in its ledger entry by `python3 tools/docs_numbers.py check`, and the tool checks that the figure stands in the paragraph. Bound at the paragraph's tags because the tag sits on a neighbouring line of the same sentence or list item."
+    },
+    {
+      "id": "C-750",
+      "text": "and MISSING, planned and not built); 34 of P2's requirements read PROVEN `[V10c]` **R** (33); the P2 gate has 9",
+      "where": "paper/POSITION_PAPER_V2.md:867",
+      "anchor_digest": "e7fa25c6c66c35ce9701284ef3c3476d00a155c62da34946c4f41c902c227ca1",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:32"
+      ],
+      "note": "Figure(s) V10c of paper/NUMBERS_V2.md: each is re-derived by a tool at the recorded base (R rows) or found in the ledger entry the row names (the others) by `python3 tools/docs_numbers.py check`, which also checks that the figure stands in the paragraph that carries the tag."
+    },
+    {
+      "id": "C-751",
+      "text": "requirements blocking and open `[V12]` **R** (10), with 174 open requirements, 157 of them behind a phase gate; of",
+      "where": "paper/POSITION_PAPER_V2.md:868",
+      "anchor_digest": "5c084313dd3a009ac988dafe4804d6203a27b3170861643de6bc22348bf84668",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:36"
+      ],
+      "note": "Figure(s) V12 of paper/NUMBERS_V2.md: each is re-derived by a tool at the recorded base (R rows) or found in the ledger entry the row names (the others) by `python3 tools/docs_numbers.py check`, which also checks that the figure stands in the paragraph that carries the tag."
+    },
+    {
+      "id": "C-752",
+      "text": "the requirements registered for P3 to P12, 158 of 176 read MISSING `[V11b]` **R** (150 of 168). The new amendment adds",
+      "where": "paper/POSITION_PAPER_V2.md:869",
+      "anchor_digest": "fedcac74b1f76ad2cd43aa41b494d6c9efa238e74cf99927f91139c3e461b783",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:35"
+      ],
+      "note": "Figure(s) V11b of paper/NUMBERS_V2.md: each is re-derived by a tool at the recorded base (R rows) or found in the ledger entry the row names (the others) by `python3 tools/docs_numbers.py check`, which also checks that the figure stands in the paragraph that carries the tag."
+    },
+    {
+      "id": "C-753",
+      "text": "* **The honest ratio.** The attribution check counts 204 nodes after its anchor `[V06]` **R** (195), of which one",
+      "where": "paper/POSITION_PAPER_V2.md:871",
+      "anchor_digest": "369987975c336a5644b3698f15787c01cae7d4ba2f02da83277fda323e15833e",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:21"
+      ],
+      "note": "Figure(s) V06 of paper/NUMBERS_V2.md: each is re-derived by a tool at the recorded base (R rows) or found in the ledger entry the row names (the others) by `python3 tools/docs_numbers.py check`, which also checks that the figure stands in the paragraph that carries the tag."
+    },
+    {
+      "id": "C-754",
+      "text": "`[V06a]` ran through the shipped control plane end to end, 94 `[V06b]` **R** were developed by the product and merged",
+      "where": "paper/POSITION_PAPER_V2.md:872",
+      "anchor_digest": "809a3786c51094232c70786faea62ca51bb84a1ebe8c3a6c6f6d79f721499c88",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:22",
+        "file:paper/NUMBERS_V2.md:23"
+      ],
+      "note": "Figure(s) V06a, V06b of paper/NUMBERS_V2.md: each is re-derived by a tool at the recorded base (R rows) or found in the ledger entry the row names (the others) by `python3 tools/docs_numbers.py check`, which also checks that the figure stands in the paragraph that carries the tag."
+    },
+    {
+      "id": "C-755",
+      "text": "by the orchestrating session after review (92), and 109 `[V06c]` **R** are the orchestrating session's direct work",
+      "where": "paper/POSITION_PAPER_V2.md:873",
+      "anchor_digest": "293bbe2714aae4c6eb9bb2211275505e2865e51c76ff9124c2b3ac1b89ef9495",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:24"
+      ],
+      "note": "Figure(s) V06c of paper/NUMBERS_V2.md: each is re-derived by a tool at the recorded base (R rows) or found in the ledger entry the row names (the others) by `python3 tools/docs_numbers.py check`, which also checks that the figure stands in the paragraph that carries the tag."
+    },
+    {
+      "id": "C-756",
+      "text": "(102). The ratio is unchanged in kind: the merge decision stays with the orchestrating session.",
+      "where": "paper/POSITION_PAPER_V2.md:874",
+      "anchor_digest": "ae678ceaba6231120aae198c057526d33010a2199c931566df928735b6b47c6b",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:65",
+        "file:paper/NUMBERS_V2.md:30",
+        "file:paper/NUMBERS_V2.md:32",
+        "file:paper/NUMBERS_V2.md:36",
+        "file:paper/NUMBERS_V2.md:35",
+        "file:paper/NUMBERS_V2.md:21",
+        "file:paper/NUMBERS_V2.md:22",
+        "file:paper/NUMBERS_V2.md:23",
+        "file:paper/NUMBERS_V2.md:24"
+      ],
+      "note": "A figure stated on a line of a paragraph whose tags (V40, V10, V10c, V12, V11b, V06, V06a, V06b, V06c) name the rows of paper/NUMBERS_V2.md that carry it; each row is re-derived by a tool or found in its ledger entry by `python3 tools/docs_numbers.py check`, and the tool checks that the figure stands in the paragraph. Bound at the paragraph's tags because the tag sits on a neighbouring line of the same sentence or list item."
+    },
+    {
+      "id": "C-757",
+      "text": "to PyPI. The development line (phase P2) is in progress: 34 of its 43 registered requirements read PROVEN `[V10c]` `[V10b]`,",
+      "where": "README.md:17",
+      "anchor_digest": "5b197598cbb328135ca1d76461bcfd3ea9c51c43728b1cf0657f28669253703c",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:32",
+        "file:paper/NUMBERS_V2.md:31"
+      ],
+      "note": "Figure(s) V10c, V10b of paper/NUMBERS_V2.md: each is re-derived by a tool at the recorded base (R rows) or found in the ledger entry the row names (the others) by `python3 tools/docs_numbers.py check`, which also checks that the figure stands in the paragraph that carries the tag."
+    },
+    {
+      "id": "C-758",
+      "text": "and 9 blocking items of its gate are open `[V12]`. The line has been developed under its own orchestration since",
+      "where": "README.md:18",
+      "anchor_digest": "3d9980c5a9a3193999e8896b37ae38a69b43449955cbb842bda2e928e0895ee5",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:36"
+      ],
+      "note": "Figure(s) V12 of paper/NUMBERS_V2.md: each is re-derived by a tool at the recorded base (R rows) or found in the ledger entry the row names (the others) by `python3 tools/docs_numbers.py check`, which also checks that the figure stands in the paragraph that carries the tag."
+    },
+    {
+      "id": "C-759",
+      "text": "and that stopped several times, over 32 days 15 hours `[V46]`; the account, the figures and the interruptions are under",
+      "where": "README.md:20",
+      "anchor_digest": "3b71b571d7730c4fe32b5ca396c9ccccf17a5d988b2edd473c08b0ed01fb7d57",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:69"
+      ],
+      "note": "Figure(s) V46 of paper/NUMBERS_V2.md: each is re-derived by a tool at the recorded base (R rows) or found in the ledger entry the row names (the others) by `python3 tools/docs_numbers.py check`, which also checks that the figure stands in the paragraph that carries the tag."
+    },
+    {
+      "id": "C-760",
+      "text": "| Span | First commit 2026-09-07, latest commit 2026-10-09: 32 days 15 hours, four weeks and four days `[V46]` |",
+      "where": "README.md:60",
+      "anchor_digest": "5f41f995887e34b67df6fd81439d9ef8c099f7cec2e2055e3920d8cae9b13c34",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:69"
+      ],
+      "note": "Figure(s) V46 of paper/NUMBERS_V2.md: each is re-derived by a tool at the recorded base (R rows) or found in the ledger entry the row names (the others) by `python3 tools/docs_numbers.py check`, which also checks that the figure stands in the paragraph that carries the tag."
+    },
+    {
+      "id": "C-761",
+      "text": "| Days with a commit | 23 of the 33 calendar days; no commit on 2026-09-15 to 2026-09-20 or on 2026-09-26 to 2026-09-29; a commit on each of the 10 days from 2026-09-30 to 2026-10-09 `[V47]` |",
+      "where": "README.md:61",
+      "anchor_digest": "e9bad208784d893bdbab6d86ab2944c1d569d1ec01e776f78f3c1b058f14daa6",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:70"
+      ],
+      "note": "Figure(s) V47 of paper/NUMBERS_V2.md: each is re-derived by a tool at the recorded base (R rows) or found in the ledger entry the row names (the others) by `python3 tools/docs_numbers.py check`, which also checks that the figure stands in the paragraph that carries the tag."
+    },
+    {
+      "id": "C-762",
+      "text": "| History | 1,088 commits, 144 of them merges `[V48]`; 234 numbered ledger entries, O23 to O262 `[V49]` |",
+      "where": "README.md:62",
+      "anchor_digest": "4f217e6073df9950c302714db7aea9e35e881f98a6643372a0f2e05d84705f8c",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:71",
+        "file:paper/NUMBERS_V2.md:72"
+      ],
+      "note": "Figure(s) V48, V49 of paper/NUMBERS_V2.md: each is re-derived by a tool at the recorded base (R rows) or found in the ledger entry the row names (the others) by `python3 tools/docs_numbers.py check`, which also checks that the figure stands in the paragraph that carries the tag."
+    },
+    {
+      "id": "C-763",
+      "text": "| Product runs | 69 product-run merges since 2026-09-25 `[V01]`; 117 run directories from 2026-10-01 on, counted on 2026-10-09 `[V50]` |",
+      "where": "README.md:63",
+      "anchor_digest": "b97265b371769abe039b1b2613c7e432487dd4f6cabdc3e7f4a3600bd0f66d44",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:17",
+        "file:paper/NUMBERS_V2.md:73"
+      ],
+      "note": "Figure(s) V01, V50 of paper/NUMBERS_V2.md: each is re-derived by a tool at the recorded base (R rows) or found in the ledger entry the row names (the others) by `python3 tools/docs_numbers.py check`, which also checks that the figure stands in the paragraph that carries the tag."
+    },
+    {
+      "id": "C-764",
+      "text": "| Independent review | 459 first-round reviewer reports (771 report files in all, including re-review rounds) since 2026-09-30, counted on 2026-10-09 `[V51]` |",
+      "where": "README.md:65",
+      "anchor_digest": "a3614578436c0cc1a23be7bf23b44c7cac26d364c4ac8058348baed0c2187b62",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:74"
+      ],
+      "note": "Figure(s) V51 of paper/NUMBERS_V2.md: each is re-derived by a tool at the recorded base (R rows) or found in the ledger entry the row names (the others) by `python3 tools/docs_numbers.py check`, which also checks that the figure stands in the paragraph that carries the tag."
+    },
+    {
+      "id": "C-765",
+      "text": "| Who wrote the code | Of 204 development nodes after the attribution anchor `[V06]`, 1 went through the shipped control plane end to end `[V06a]`, 94 were developed by a product run and merged by the orchestrating session after review `[V06b]`, and 109 were written by the orchestrating session directly `[V06c]`. The attribution file books none to a human, category `CAPTAIN` `[V52]`; it is declared by the orchestrating session and checked for tiling and for the run states it cites, not for authorship |",
+      "where": "README.md:65",
+      "anchor_digest": "14ae3cf0d38c61301eaf493ddf733eb7624877d630bd62f2c1ab14b471be30d7",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:21",
+        "file:paper/NUMBERS_V2.md:22",
+        "file:paper/NUMBERS_V2.md:23",
+        "file:paper/NUMBERS_V2.md:24",
+        "file:paper/NUMBERS_V2.md:75"
+      ],
+      "note": "Figure(s) V06, V06a, V06b, V06c, V52 of paper/NUMBERS_V2.md: each is re-derived by a tool at the recorded base (R rows) or found in the ledger entry the row names (the others) by `python3 tools/docs_numbers.py check`, which also checks that the figure stands in the paragraph that carries the tag."
+    },
+    {
+      "id": "C-766",
+      "text": "| Direction | 6 operator directives stored verbatim, 2026-09-30 to 2026-10-09 `[V53]` |",
+      "where": "README.md:66",
+      "anchor_digest": "b5bbffd65e65e3b3becbebb0b2c1d98aefb62852655d70ee2d6a47911a971a4e",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:76"
+      ],
+      "note": "Figure(s) V53 of paper/NUMBERS_V2.md: each is re-derived by a tool at the recorded base (R rows) or found in the ledger entry the row names (the others) by `python3 tools/docs_numbers.py check`, which also checks that the figure stands in the paragraph that carries the tag."
+    },
+    {
+      "id": "C-767",
+      "text": "| Orchestrator sessions | 4 in a row since the written hand-over began on 2026-10-07, with 3 acknowledged hand-overs `[V54]` |",
+      "where": "README.md:67",
+      "anchor_digest": "fb6a95d981e5cfcfc79d06630bb7ec8b426b0f87e28c106283e31c1dac889d1b",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:77"
+      ],
+      "note": "Figure(s) V54 of paper/NUMBERS_V2.md: each is re-derived by a tool at the recorded base (R rows) or found in the ledger entry the row names (the others) by `python3 tools/docs_numbers.py check`, which also checks that the figure stands in the paragraph that carries the tag."
+    },
+    {
+      "id": "C-768",
+      "text": "* A power cut on 2026-09-10 (ledger entry O88): the project content was re-measured and found intact, and some",
+      "where": "README.md:84",
+      "anchor_digest": "7fbc9c654fbacfc6dbab3995cea86d8665acd4d91e34ca69f41a223c7a8e7ecc",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:79",
+        "file:paper/NUMBERS_V2.md:40",
+        "file:paper/NUMBERS_V2.md:78",
+        "file:paper/NUMBERS_V2.md:60"
+      ],
+      "note": "A figure stated on a line of a paragraph whose tags (V56, V16, V55, V35) name the rows of paper/NUMBERS_V2.md that carry it; each row is re-derived by a tool or found in its ledger entry by `python3 tools/docs_numbers.py check`, and the tool checks that the figure stands in the paragraph. Bound at the paragraph's tags because the tag sits on a neighbouring line of the same sentence or list item."
+    },
+    {
+      "id": "C-769",
+      "text": "operator tools kept in volatile storage were lost `[V56]`.",
+      "where": "README.md:85",
+      "anchor_digest": "b9e177568c29db1da870c4fc51058cd607daa257ca98ada10259344ea55dcc1a",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:79"
+      ],
+      "note": "Figure(s) V56 of paper/NUMBERS_V2.md: each is re-derived by a tool at the recorded base (R rows) or found in the ledger entry the row names (the others) by `python3 tools/docs_numbers.py check`, which also checks that the figure stands in the paragraph that carries the tag."
+    },
+    {
+      "id": "C-770",
+      "text": "* The disk under the development machine filled on 2026-09-25 (977 GiB of a 1 TiB volume) `[V16]`; no commit from",
+      "where": "README.md:86",
+      "anchor_digest": "3edff53556667ba6691ef6469a0501f1772e30691c9ebe1d7c6fa6f9a8f46dd1",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:40"
+      ],
+      "note": "Figure(s) V16 of paper/NUMBERS_V2.md: each is re-derived by a tool at the recorded base (R rows) or found in the ledger entry the row names (the others) by `python3 tools/docs_numbers.py check`, which also checks that the figure stands in the paragraph that carries the tag."
+    },
+    {
+      "id": "C-771",
+      "text": "* Provider quota: 13 stops between 2026-10-03 and 2026-10-07 `[V55]`, one of them the weekly limit on 2026-10-06, which",
+      "where": "README.md:88",
+      "anchor_digest": "aa9fead995a93eb19239c28692025bd68d86ab3f6f0fe944ba66d68a11c59d34",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:78"
+      ],
+      "note": "Figure(s) V55 of paper/NUMBERS_V2.md: each is re-derived by a tool at the recorded base (R rows) or found in the ledger entry the row names (the others) by `python3 tools/docs_numbers.py check`, which also checks that the figure stands in the paragraph that carries the tag."
+    },
+    {
+      "id": "C-772",
+      "text": "* Inode exhaustion on 2026-10-05 (67,107,099 of 67,108,864 inodes used) `[V35]`. On 2026-10-09 it was inode pressure, not",
+      "where": "README.md:92",
+      "anchor_digest": "0f3083bd82c9ac9e78ab716fc93ba45accdf75282904ac50d740d411c185d316",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:60"
+      ],
+      "note": "Figure(s) V35 of paper/NUMBERS_V2.md: each is re-derived by a tool at the recorded base (R rows) or found in the ledger entry the row names (the others) by `python3 tools/docs_numbers.py check`, which also checks that the figure stands in the paragraph that carries the tag."
+    },
+    {
+      "id": "C-773",
+      "text": "deletions allowed the product's own resume `[V56]`.",
+      "where": "README.md:94",
+      "anchor_digest": "bf4e81a7dfd3dc1bc1a254905e1ced09886e913f9626e0ba8a55e283d5af1e90",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:79"
+      ],
+      "note": "Figure(s) V56 of paper/NUMBERS_V2.md: each is re-derived by a tool at the recorded base (R rows) or found in the ledger entry the row names (the others) by `python3 tools/docs_numbers.py check`, which also checks that the figure stands in the paragraph that carries the tag."
+    },
+    {
+      "id": "C-774",
+      "text": "* An operator-requested WSL shutdown and disk compaction on 2026-10-08, about one hour `[V56]`.",
+      "where": "README.md:93",
+      "anchor_digest": "eba39fd3ec5dfa8d657f9bcaf0867c541e8d2b68811c4e67dba4bd2c5ddd7e29",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:79"
+      ],
+      "note": "Figure(s) V56 of paper/NUMBERS_V2.md: each is re-derived by a tool at the recorded base (R rows) or found in the ledger entry the row names (the others) by `python3 tools/docs_numbers.py check`, which also checks that the figure stands in the paragraph that carries the tag."
+    },
+    {
+      "id": "C-775",
+      "text": "running: there was no commit on ten of the 33 calendar days `[V47]`. It does not show that the product's own durable",
+      "where": "README.md:99",
+      "anchor_digest": "c4f541375683c220533f2f45c724c3790a6d95b3646f11695274bad894e50f04",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:70"
+      ],
+      "note": "Figure(s) V47 of paper/NUMBERS_V2.md: each is re-derived by a tool at the recorded base (R rows) or found in the ledger entry the row names (the others) by `python3 tools/docs_numbers.py check`, which also checks that the figure stands in the paragraph that carries the tag."
+    },
+    {
+      "id": "C-776",
+      "text": "`paper/NUMBERS_V2.md`.* The register holds 235 requirements `[V10]`. `PROVEN` is the register's word for an",
+      "where": "README.md:278",
+      "anchor_digest": "787c4eb169b6a3ab0ede547bf3420a114b3861f5e906a3a1227f9abd44d47b07",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:30"
+      ],
+      "note": "Figure(s) V10 of paper/NUMBERS_V2.md: each is re-derived by a tool at the recorded base (R rows) or found in the ledger entry the row names (the others) by `python3 tools/docs_numbers.py check`, which also checks that the figure stands in the paragraph that carries the tag."
+    },
+    {
+      "id": "C-777",
+      "text": "| The per-run loop | Plan, develop in an isolated worktree, independent QA against a frozen copy, receipts from a deterministic runner, acceptance only when every criterion passes and one was red before the change, replanning from a rejection with its evidence. Exercised on the `v0.1.0` campaign and in the product runs since | The 16 requirements of phase P1: 16 of 16 PROVEN `[V11]` |",
+      "where": "README.md:285",
+      "anchor_digest": "2ecdb9ea508e9fff6ffe7ede65443e460f7e249021d09f33016a42a20e919d6d",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:34"
+      ],
+      "note": "Figure(s) V11 of paper/NUMBERS_V2.md: each is re-derived by a tool at the recorded base (R rows) or found in the ledger entry the row names (the others) by `python3 tools/docs_numbers.py check`, which also checks that the figure stands in the paragraph that carries the tag."
+    },
+    {
+      "id": "C-778",
+      "text": "| Everything after P2 | Phases P3 to P12 of the registered plan | 158 of the 176 requirements read MISSING `[V11b]` |",
+      "where": "README.md:294",
+      "anchor_digest": "188cdf5d773783a96902e29b9c9a7377dacd4c5e174ea675c325fcbf44154425",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:35"
+      ],
+      "note": "Figure(s) V11b of paper/NUMBERS_V2.md: each is re-derived by a tool at the recorded base (R rows) or found in the ledger entry the row names (the others) by `python3 tools/docs_numbers.py check`, which also checks that the figure stands in the paragraph that carries the tag."
+    },
+    {
+      "id": "C-779",
+      "text": "Phase P2 is **not** closed. Of its 43 requirements, 34 read PROVEN `[V10c]` `[V10b]` and the gate has 9 blocking items",
+      "where": "README.md:296",
+      "anchor_digest": "2384ac438fb77efff4c14392fba77f0f7ea946df9b9c465e48d2a2ebed664a73",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:32",
+        "file:paper/NUMBERS_V2.md:31"
+      ],
+      "note": "Figure(s) V10c, V10b of paper/NUMBERS_V2.md: each is re-derived by a tool at the recorded base (R rows) or found in the ledger entry the row names (the others) by `python3 tools/docs_numbers.py check`, which also checks that the figure stands in the paragraph that carries the tag."
+    },
+    {
+      "id": "C-780",
+      "text": "open `[V12]`. The counts of P2 and of the later phases that are stated further up are those of the `v0.3.0a2`",
+      "where": "README.md:297",
+      "anchor_digest": "0d5d9c4be50129c20523976be6649d1e8ad2bad4da0f96ce13601629c286a431",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:36"
+      ],
+      "note": "Figure(s) V12 of paper/NUMBERS_V2.md: each is re-derived by a tool at the recorded base (R rows) or found in the ledger entry the row names (the others) by `python3 tools/docs_numbers.py check`, which also checks that the figure stands in the paragraph that carries the tag."
+    },
+    {
+      "id": "C-781",
+      "text": "measured at 32 days 15 hours `[V46]`, driven by an agent session with the operator directing it, and with named",
+      "where": "README.md:760",
+      "anchor_digest": "ef9e530f0d998d6e7be06d64b25b703d8ab03f4e63a4c9c265c68e448385df2b",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:69"
+      ],
+      "note": "Figure(s) V46 of paper/NUMBERS_V2.md: each is re-derived by a tool at the recorded base (R rows) or found in the ledger entry the row names (the others) by `python3 tools/docs_numbers.py check`, which also checks that the figure stands in the paragraph that carries the tag."
+    },
+    {
+      "id": "C-782",
+      "text": "commit is of 2026-09-07 and the latest of 2026-10-09, 32 days 15 hours apart `[V46]`; 23 of the 33 calendar days carry",
+      "where": "docs/LIMITATIONS.md:240",
+      "anchor_digest": "34afb06cb300f7694cf6c6e6514699edefa9253c89551ea530cfaaa6def99677",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:69"
+      ],
+      "note": "Figure(s) V46 of paper/NUMBERS_V2.md: each is re-derived by a tool at the recorded base (R rows) or found in the ledger entry the row names (the others) by `python3 tools/docs_numbers.py check`, which also checks that the figure stands in the paragraph that carries the tag."
+    },
+    {
+      "id": "C-783",
+      "text": "`[V47]`; there are 1,088 commits `[V48]`, 69 product-run merges `[V01]` and 234 numbered ledger entries `[V49]`. For the",
+      "where": "docs/LIMITATIONS.md:242",
+      "anchor_digest": "a825e415c60862eb708e46b5d9d105959b2a0e3f0930c23723bf2feae7f50ba4",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:70",
+        "file:paper/NUMBERS_V2.md:71",
+        "file:paper/NUMBERS_V2.md:17",
+        "file:paper/NUMBERS_V2.md:72"
+      ],
+      "note": "Figure(s) V47, V48, V01, V49 of paper/NUMBERS_V2.md: each is re-derived by a tool at the recorded base (R rows) or found in the ledger entry the row names (the others) by `python3 tools/docs_numbers.py check`, which also checks that the figure stands in the paragraph that carries the tag."
+    },
+    {
+      "id": "C-784",
+      "text": "* *Not without a person.* The orchestrating session is an agent session. The operator directed it (6 directives stored",
+      "where": "docs/LIMITATIONS.md:246",
+      "anchor_digest": "771ea3766680ad9bbf91db5743b14ecd480f612279e78dee5f51fba8796b30d3",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:76",
+        "file:paper/NUMBERS_V2.md:78",
+        "file:paper/NUMBERS_V2.md:40",
+        "file:paper/NUMBERS_V2.md:60",
+        "file:paper/NUMBERS_V2.md:79",
+        "file:paper/NUMBERS_V2.md:77",
+        "file:paper/NUMBERS_V2.md:24",
+        "file:paper/NUMBERS_V2.md:23"
+      ],
+      "note": "A figure stated on a line of a paragraph whose tags (V53, V55, V16, V35, V56, V54, V06c, V06b) name the rows of paper/NUMBERS_V2.md that carry it; each row is re-derived by a tool or found in its ledger entry by `python3 tools/docs_numbers.py check`, and the tool checks that the figure stands in the paragraph. Bound at the paragraph's tags because the tag sits on a neighbouring line of the same sentence or list item."
+    },
+    {
+      "id": "C-785",
+      "text": "verbatim `[V53]`), added work, approved every publication and decided the storage and policy questions. The operator",
+      "where": "docs/LIMITATIONS.md:247",
+      "anchor_digest": "89c0fdec22697130107d7cc4a08467567e18d05b32fb8de4d1d4b74749a8d061",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:76"
+      ],
+      "note": "Figure(s) V53 of paper/NUMBERS_V2.md: each is re-derived by a tool at the recorded base (R rows) or found in the ledger entry the row names (the others) by `python3 tools/docs_numbers.py check`, which also checks that the figure stands in the paragraph that carries the tag."
+    },
+    {
+      "id": "C-786",
+      "text": "* *Not without stopping.* The line stopped: 13 quota stops between 2026-10-03 and 2026-10-07 `[V55]`, a full disk on",
+      "where": "docs/LIMITATIONS.md:249",
+      "anchor_digest": "01d70052d6e9a9b77c9e6d729ce247c14e119e6164d54b1d1fe7d6003c4e586a",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:78"
+      ],
+      "note": "Figure(s) V55 of paper/NUMBERS_V2.md: each is re-derived by a tool at the recorded base (R rows) or found in the ledger entry the row names (the others) by `python3 tools/docs_numbers.py check`, which also checks that the figure stands in the paragraph that carries the tag."
+    },
+    {
+      "id": "C-787",
+      "text": "2026-09-25 (977 GiB of a 1 TiB volume) `[V16]` that left four days without a commit, inode exhaustion on 2026-10-05",
+      "where": "docs/LIMITATIONS.md:250",
+      "anchor_digest": "087247deaf0155c5b4c09fc36c3aed56afdbf15a3edb125657bd717964c83e96",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:40"
+      ],
+      "note": "Figure(s) V16 of paper/NUMBERS_V2.md: each is re-derived by a tool at the recorded base (R rows) or found in the ledger entry the row names (the others) by `python3 tools/docs_numbers.py check`, which also checks that the figure stands in the paragraph that carries the tag."
+    },
+    {
+      "id": "C-788",
+      "text": "(67,107,099 of 67,108,864 inodes used) `[V35]`, inode pressure on 2026-10-09 (the product's storage guard reached",
+      "where": "docs/LIMITATIONS.md:251",
+      "anchor_digest": "7163f66366b86c45e07e6bbf40e20ca254150a58326cb44f824c6f2397ab4cb0",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:60"
+      ],
+      "note": "Figure(s) V35 of paper/NUMBERS_V2.md: each is re-derived by a tool at the recorded base (R rows) or found in the ledger entry the row names (the others) by `python3 tools/docs_numbers.py check`, which also checks that the figure stands in the paragraph that carries the tag."
+    },
+    {
+      "id": "C-789",
+      "text": "hour on 2026-10-08 `[V56]`. The six days after the tag, 2026-09-15 to 2026-09-20, have no commit and no recorded",
+      "where": "docs/LIMITATIONS.md:253",
+      "anchor_digest": "99e436d1e3005e1f86e505f53294f2c17de230c75895981f4a8bebcf3d59adb2",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:79"
+      ],
+      "note": "Figure(s) V56 of paper/NUMBERS_V2.md: each is re-derived by a tool at the recorded base (R rows) or found in the ledger entry the row names (the others) by `python3 tools/docs_numbers.py check`, which also checks that the figure stands in the paragraph that carries the tag."
+    },
+    {
+      "id": "C-790",
+      "text": "* *Not by the product's own runtime.* The orchestrating session was handed over 3 times `[V54]` by files the outgoing",
+      "where": "docs/LIMITATIONS.md:254",
+      "anchor_digest": "6be62d7e08eca54cd83bb3abac2e19ac162114684c66b2fadbfd172c1eacde15",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:77"
+      ],
+      "note": "Figure(s) V54 of paper/NUMBERS_V2.md: each is re-derived by a tool at the recorded base (R rows) or found in the ledger entry the row names (the others) by `python3 tools/docs_numbers.py check`, which also checks that the figure stands in the paragraph that carries the tag."
+    },
+    {
+      "id": "C-791",
+      "text": "anchor, 109 were written by the orchestrating session directly `[V06c]`, and 94 were developed by product runs and",
+      "where": "docs/LIMITATIONS.md:258",
+      "anchor_digest": "1f8e9269389808d05e26bcee68346ed30ccb4e609595434e053cd7967adb0398",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:24"
+      ],
+      "note": "Figure(s) V06c of paper/NUMBERS_V2.md: each is re-derived by a tool at the recorded base (R rows) or found in the ledger entry the row names (the others) by `python3 tools/docs_numbers.py check`, which also checks that the figure stands in the paragraph that carries the tag."
+    },
+    {
+      "id": "C-792",
+      "text": "merged by the orchestrating session after review `[V06b]`.",
+      "where": "docs/LIMITATIONS.md:259",
+      "anchor_digest": "af07879065baad87ac454534e5bbb0368eb695620f4b38edfc1fcebad50c5667",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:23"
+      ],
+      "note": "Figure(s) V06b of paper/NUMBERS_V2.md: each is re-derived by a tool at the recorded base (R rows) or found in the ledger entry the row names (the others) by `python3 tools/docs_numbers.py check`, which also checks that the figure stands in the paragraph that carries the tag."
+    },
+    {
+      "id": "C-793",
+      "text": "* **E10 -- the duration in the first limitation (\"five calendar days\" and the elapsed wall-clock beside it).** Added",
+      "where": "paper/POSITION_PAPER.md:1093",
+      "anchor_digest": "705397092cf2ef044b8eedb50f339f02b5ac882283237e1d02a81e05974ca129",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:68",
+        "file:paper/NUMBERS_V2.md:18",
+        "file:paper/NUMBERS_V2.md:17",
+        "file:paper/NUMBERS_V2.md:69",
+        "file:paper/NUMBERS_V2.md:70",
+        "file:paper/NUMBERS_V2.md:72"
+      ],
+      "note": "A figure stated on a line of a paragraph whose tags (V45, V02, V01, V46, V47, V49) name the rows of paper/NUMBERS_V2.md that carry it; each row is re-derived by a tool or found in its ledger entry by `python3 tools/docs_numbers.py check`, and the tool checks that the figure stands in the paragraph. Bound at the paragraph's tags because the tag sits on a neighbouring line of the same sentence or list item."
+    },
+    {
+      "id": "C-794",
+      "text": "line to 2026-10-09 spans 32 days 15 hours from its first to its latest commit `[V46]`, with a commit on 23 of 33",
+      "where": "paper/POSITION_PAPER.md:1095",
+      "anchor_digest": "939a7154d31461fe3d82828978bc7e307ea2c525e6b3a23801b7768e30fd8d7a",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:69"
+      ],
+      "note": "Figure(s) V46 of paper/NUMBERS_V2.md: each is re-derived by a tool at the recorded base (R rows) or found in the ledger entry the row names (the others) by `python3 tools/docs_numbers.py check`, which also checks that the figure stands in the paragraph that carries the tag."
+    },
+    {
+      "id": "C-795",
+      "text": "calendar days `[V47]`; it was driven by an agent session with the operator directing it, and it stopped several",
+      "where": "paper/POSITION_PAPER.md:1096",
+      "anchor_digest": "bd564203d69cea379b4ec8cffe1d132551ecaba13a7e72fe062a13dc62afdb84",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:70"
+      ],
+      "note": "Figure(s) V47 of paper/NUMBERS_V2.md: each is re-derived by a tool at the recorded base (R rows) or found in the ledger entry the row names (the others) by `python3 tools/docs_numbers.py check`, which also checks that the figure stands in the paragraph that carries the tag."
+    },
+    {
+      "id": "C-796",
+      "text": "above: the ledger now runs to O262, with 234 numbered entries `[V49]`.",
+      "where": "paper/POSITION_PAPER.md:1099",
+      "anchor_digest": "4d8b8cbad9d833bc365865793ad73d35100e53c727dfb7e14829e37010c5b7a4",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:72"
+      ],
+      "note": "Figure(s) V49 of paper/NUMBERS_V2.md: each is re-derived by a tool at the recorded base (R rows) or found in the ledger entry the row names (the others) by `python3 tools/docs_numbers.py check`, which also checks that the figure stands in the paragraph that carries the tag."
+    },
+    {
+      "id": "C-797",
+      "text": "2026-09-07, with 69 product-run merges since 2026-09-25 `[V01]`, by an agent-orchestrated loop that an operator directs",
+      "where": "README.md:19",
+      "anchor_digest": "2715613208c6ba919d24c9574295fe7679f003ee3b9b1ccf31fbe54f22adbac3",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:17"
+      ],
+      "note": "Figure(s) V01 of paper/NUMBERS_V2.md: each is re-derived by a tool at the recorded base (R rows) or found in the ledger entry the row names (the others) by `python3 tools/docs_numbers.py check`, which also checks that the figure stands in the paragraph that carries the tag."
+    },
+    {
+      "id": "C-798",
+      "text": "first alpha, 32 at the `v0.3.0a2` checkpoint, 34 at the O262 base on 2026-10-09, after the lifts of P2-41 and P2-43],",
+      "where": "README.md:136",
+      "anchor_digest": "ff3ea000e8a85402d108c1901506ce256bfef7639d8aeb635285dbd62f43ef2b",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:18",
+        "file:paper/NUMBERS_V2.md:17",
+        "file:paper/NUMBERS_V2.md:27",
+        "file:paper/NUMBERS_V2.md:32",
+        "file:paper/NUMBERS_V2.md:31",
+        "file:paper/NUMBERS_V2.md:57",
+        "file:paper/NUMBERS_V2.md:51"
+      ],
+      "note": "A figure stated on a line of a paragraph whose tags (V02, V01, V07t, V10c, V10b, V33, V26) name the rows of paper/NUMBERS_V2.md that carry it; each row is re-derived by a tool or found in its ledger entry by `python3 tools/docs_numbers.py check`, and the tool checks that the figure stands in the paragraph. Bound at the paragraph's tags because the tag sits on a neighbouring line of the same sentence or list item."
     }
   ],
   "not_claims": [
@@ -17011,10 +17764,10 @@
     },
     {
       "id": "N-1127",
-      "text": "| V10 | derived by a tool | RESOLVED | re-derived by the tool at the base |",
+      "text": "| V10 | derived by a tool | MISMATCH | see `python3 tools/docs_numbers.py check` |",
       "where": "paper/AUDIT_V2.md:47",
       "reason": "a row of the generated mechanical audit: the tool's own verdict for one tag, written by `tools/docs_numbers.py audit --write` and verified by `check`; no measurement of its own",
-      "anchor_digest": "ef3a6489d5a82891b823a3b896c27b16b37d3525811e6764388f56d7fa51183e"
+      "anchor_digest": "df8bfee0dd855ddac0a6156a78932a8bffb33a525a6a7ba6eaba99882719d3e6"
     },
     {
       "id": "N-1128",
@@ -17256,10 +18009,10 @@
     },
     {
       "id": "N-1162",
-      "text": "| V40 | derived by a tool | RESOLVED | re-derived by the tool at the base |",
+      "text": "| V40 | derived by a tool | MISMATCH | see `python3 tools/docs_numbers.py check` |",
       "where": "paper/AUDIT_V2.md:82",
       "reason": "a row of the generated mechanical audit: the tool's own verdict for one tag, written by `tools/docs_numbers.py audit --write` and verified by `check`; no measurement of its own",
-      "anchor_digest": "275a322e7721b36c5f1c8b7de2fa97780977a7254dfb7dfb7c7db65cb96fbb56"
+      "anchor_digest": "f56bd2b0c7b98584328bd234948079fb6ca2cf52a8aa8f821f93ac6a79061c81"
     },
     {
       "id": "N-1163",
@@ -17438,10 +18191,10 @@
     },
     {
       "id": "N-1188",
-      "text": "The base is the commit named above (O260 Revision 1: flake.nix is exported (release review rela2rev-a B1), register corrections by addition, ledger revision; committed 2026-10-09 02:48:54 +0300). Dates are the commits' own (`+0300`); give `git log` explicit times with that offset, because a bare date is read with the current time of day. A figure derived by a tool is derived from the working tree except where the row says it reads the base: the tool refuses to check a table whose base differs from the working tree in the files those derivations read.",
+      "text": "The base is the commit named above (O262: amendment A6 (agent-session orchestration surface) and the TODO mining integrated into the plan; P2-43 PROVEN with stated limits; O261 text corrections; slips and the inode release of the night; committed 2026-10-09 15:46:30 +0300). Dates are the commits' own (`+0300`); give `git log` explicit times with that offset, because a bare date is read with the current time of day. A figure derived by a tool is derived from the working tree except where the row says it reads the base: the tool refuses to check a table whose base differs from the working tree in the files those derivations read.",
       "where": "paper/NUMBERS_V2.md:9",
       "reason": "names the base commit's own subject and commit time as git records them; no measurement of its own, and `tools/docs_numbers.py check` re-renders the line",
-      "anchor_digest": "42f0caf33485977c26d26a614dbef36bd0cb1022d93fc8f2b9386c236b64066c"
+      "anchor_digest": "ca991505a95f6ddabd05aabd37b0c0198442c47cd935363fe1e4bd07c01149b9"
     },
     {
       "id": "N-1189",
@@ -17473,10 +18226,10 @@
     },
     {
       "id": "N-1193",
-      "text": "| V06 | 189 | development nodes after the attribution anchor, with the ledger as committed at the base | `tools/attribution.py` | `python3 tools/attribution.py --json --ledger <dogfood/ATTRIBUTION.json at the base>` -> `development_nodes` | R |",
+      "text": "| V06 | 204 | development nodes after the attribution anchor, with the ledger as committed at the base | `tools/attribution.py` | `python3 tools/attribution.py --json --ledger <dogfood/ATTRIBUTION.json at the base>` -> `development_nodes` | R |",
       "where": "paper/NUMBERS_V2.md:21",
       "reason": "a row of the generated numbers table: it names the source and the regeneration command of a figure; the figure is bound as a claim where the prose states it, not at this row, and `tools/docs_numbers.py check` compares the whole table with a fresh derivation",
-      "anchor_digest": "a4842014493d20cf706448a50c4dca4a6eef9d453d3f4e449d4d85e78e528a81"
+      "anchor_digest": "318f0e33124c960bf80541ebe92626f22ec4b80746f4f481b88180a0255c8af4"
     },
     {
       "id": "N-1194",
@@ -17487,17 +18240,17 @@
     },
     {
       "id": "N-1195",
-      "text": "| V06b | 91 | of V06, nodes the product developed and the orchestrating session merged after review (counted in neither V06a nor V06c) | as V06 | -> `nodes_developed_by_the_product_merged_by_the_orchestrator` | R |",
+      "text": "| V06b | 94 | of V06, nodes the product developed and the orchestrating session merged after review (counted in neither V06a nor V06c) | as V06 | -> `nodes_developed_by_the_product_merged_by_the_orchestrator` | R |",
       "where": "paper/NUMBERS_V2.md:23",
       "reason": "a row of the generated numbers table: it names the source and the regeneration command of a figure; the figure is bound as a claim where the prose states it, not at this row, and `tools/docs_numbers.py check` compares the whole table with a fresh derivation",
-      "anchor_digest": "3954de0da186656e461e30332be50c0a998474aea62d35624c9fe5f755d22cb7"
+      "anchor_digest": "70b0942272d6e4b9c4c15fd1ba829c33a7fbd46bea383b500a87dd3ec0845428"
     },
     {
       "id": "N-1196",
-      "text": "| V06c | 97 | of V06, the orchestrating session's direct work | as V06 | V06 minus V06a minus V06b | R |",
+      "text": "| V06c | 109 | of V06, the orchestrating session's direct work | as V06 | V06 minus V06a minus V06b | R |",
       "where": "paper/NUMBERS_V2.md:24",
       "reason": "a row of the generated numbers table: it names the source and the regeneration command of a figure; the figure is bound as a claim where the prose states it, not at this row, and `tools/docs_numbers.py check` compares the whole table with a fresh derivation",
-      "anchor_digest": "6d843f836be799e45b2b25dc1ce887c0a971dc76b8a3df3039b3316339794c41"
+      "anchor_digest": "f6bf9b5de7bef0da02abf3219c2ab24830e46e34f939fa997f0a1ee721898a7c"
     },
     {
       "id": "N-1197",
@@ -17536,10 +18289,10 @@
     },
     {
       "id": "N-1202",
-      "text": "| V10 | 227 = 59 PROVEN + 11 PARTIAL + 6 IMPLEMENTED_NOT_PROVEN + 151 MISSING | requirements in the capability register, by derived status (the board's row omits IMPLEMENTED_NOT_PROVEN) | `tools/capability_matrix.py` | `python3 tools/capability_matrix.py --json` -> `counts` | R |",
+      "text": "| V10 | 235 = 61 PROVEN + 10 PARTIAL + 6 IMPLEMENTED_NOT_PROVEN + 158 MISSING | requirements in the capability register, by derived status (the board's row omits IMPLEMENTED_NOT_PROVEN) | `tools/capability_matrix.py` | `python3 tools/capability_matrix.py --json` -> `counts` | R |",
       "where": "paper/NUMBERS_V2.md:30",
       "reason": "a row of the generated numbers table: it names the source and the regeneration command of a figure; the figure is bound as a claim where the prose states it, not at this row, and `tools/docs_numbers.py check` compares the whole table with a fresh derivation",
-      "anchor_digest": "12d6575d4dbbce4a9a55038a6a6504d3aafe66c1296d51150ab16364ebaf7d04"
+      "anchor_digest": "784ed535e9d7cc212694b50fb7b64c0558d4436b2e36da1a9e3e15dd05169504"
     },
     {
       "id": "N-1203",
@@ -17550,10 +18303,10 @@
     },
     {
       "id": "N-1204",
-      "text": "| V10c | 32 PROVEN (4 PARTIAL, 6 IMPLEMENTED_NOT_PROVEN, 1 MISSING) | of V10b, by status | as V10 | as V10b, by status | R |",
+      "text": "| V10c | 34 PROVEN (3 PARTIAL, 6 IMPLEMENTED_NOT_PROVEN, 0 MISSING) | of V10b, by status | as V10 | as V10b, by status | R |",
       "where": "paper/NUMBERS_V2.md:32",
       "reason": "a row of the generated numbers table: it names the source and the regeneration command of a figure; the figure is bound as a claim where the prose states it, not at this row, and `tools/docs_numbers.py check` compares the whole table with a fresh derivation",
-      "anchor_digest": "622196e382a5b8003da678e89de369fa5d014ed15e2f20ace645ca2af78d4d39"
+      "anchor_digest": "271aa07d5e0c4669b3883e4c654d4dd7baeb654b6e8f6e93761255913cdfa90d"
     },
     {
       "id": "N-1205",
@@ -17571,17 +18324,17 @@
     },
     {
       "id": "N-1207",
-      "text": "| V11b | 150 of 168 MISSING (7 PARTIAL, 11 PROVEN) | requirements registered for P3 to P12, by status | as V10 | count `capabilities` whose `target_phase` is not P0, P1 or P2, by status | R |",
+      "text": "| V11b | 158 of 176 MISSING (7 PARTIAL, 11 PROVEN) | requirements registered for P3 to P12, by status | as V10 | count `capabilities` whose `target_phase` is not P0, P1 or P2, by status | R |",
       "where": "paper/NUMBERS_V2.md:35",
       "reason": "a row of the generated numbers table: it names the source and the regeneration command of a figure; the figure is bound as a claim where the prose states it, not at this row, and `tools/docs_numbers.py check` compares the whole table with a fresh derivation",
-      "anchor_digest": "c8aa0345327aa0e4f8d15b67c509bbb24930e697b71aab15f26ed609f3e1340f"
+      "anchor_digest": "dcaeccfcbeaf5186e4550fe0ac2df458036486a6f3105f5daabf4ed4f1c5c988"
     },
     {
       "id": "N-1208",
-      "text": "| V12 | 11 blocking open; 5 exit conditions bound to requirements not PROVEN; 3 exit conditions nothing measures yet; 168 open requirements, 157 behind a phase gate | the P2 gate and the build plan | `tools/build_plan.py` | `python3 tools/build_plan.py` | R |",
+      "text": "| V12 | 9 blocking open; 5 exit conditions bound to requirements not PROVEN; 3 exit conditions nothing measures yet; 174 open requirements, 157 behind a phase gate | the P2 gate and the build plan | `tools/build_plan.py` | `python3 tools/build_plan.py` | R |",
       "where": "paper/NUMBERS_V2.md:36",
       "reason": "a row of the generated numbers table: it names the source and the regeneration command of a figure; the figure is bound as a claim where the prose states it, not at this row, and `tools/docs_numbers.py check` compares the whole table with a fresh derivation",
-      "anchor_digest": "fcb115bcd4f2544b32ece6351b9d53cef16d61c01ab7baa02c0de1798045b7a4"
+      "anchor_digest": "ce503224875861358e9d1147ee701f5bd331e2562ac7285e781f03f9c6cd82bd"
     },
     {
       "id": "N-1209",
@@ -17781,10 +18534,10 @@
     },
     {
       "id": "N-1237",
-      "text": "| V40 | 5 requirements: P2-43 MISSING, P3-41 MISSING, P10-17 MISSING, P11-02 MISSING, P12-06 MISSING | amendment A5's requirements, one per phase | as V10 | `python3 tools/capability_matrix.py --json` -> `capabilities`, ids P2-43, P3-41, P10-17, P11-02, P12-06 | R |",
+      "text": "| V40 | 5 requirements: P2-43 PROVEN, P3-41 MISSING, P10-17 MISSING, P11-02 MISSING, P12-06 MISSING | amendment A5's requirements, one per phase | as V10 | `python3 tools/capability_matrix.py --json` -> `capabilities`, ids P2-43, P3-41, P10-17, P11-02, P12-06 | R |",
       "where": "paper/NUMBERS_V2.md:65",
       "reason": "a row of the generated numbers table: it names the source and the regeneration command of a figure; the figure is bound as a claim where the prose states it, not at this row, and `tools/docs_numbers.py check` compares the whole table with a fresh derivation",
-      "anchor_digest": "3a1387faf97bd4b61c39defd30fd80d4262442683a76ebf8d5a853a8a01554bb"
+      "anchor_digest": "f474b95972797fdc7e8ab131437141c79ab5da811dd976c24bd3fc52e2af1f02"
     },
     {
       "id": "N-1238",
@@ -19472,6 +20225,524 @@
       "where": "RELEASE_NOTES.md:341",
       "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
       "anchor_digest": "9ffe67b025a3f8a1904453318b3afc2919def0fcfdf9096c91a8e8678df47793"
+    },
+    {
+      "id": "N-1485",
+      "text": "**Update, 2026-10-09, after `v0.3.0a2` (ledger entry O261).** Two statements",
+      "where": "README.md:163",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "8222aa84fae0847898155605f1d12e2fdfc7313c801c58b899951f2a8afdac59"
+    },
+    {
+      "id": "N-1486",
+      "text": "part of the writers (P2-41, PARTIAL)\" and \"More writers are disk-full safe; P2-41",
+      "where": "README.md:165",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "767fa2e9865a70d6b75174017a61016b34a26bf29f62a57042d966767b1861b1"
+    },
+    {
+      "id": "N-1487",
+      "text": "is PARTIAL still\". The third and last slice of the P2-41 closure is merged, and",
+      "where": "README.md:166",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "18f254eefeebbac867325146566315839d1750ee2dfc855394aba62486e3b26c"
+    },
+    {
+      "id": "N-1488",
+      "text": "the capability matrix reads P2-41 PROVEN. Read that as narrowly as it is scoped:",
+      "where": "README.md:167",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "971687cf89ba309ad6c66384326bfc0639f796e0cfa76de7eb65ed55e4c25a29"
+    },
+    {
+      "id": "N-1489",
+      "text": "are in the register note of P2-41 and in the ledger entry O261. Nothing above",
+      "where": "README.md:176",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "b229bc1daa4e2badce206ee39a33074d30a81d9bf81e924e715c96b207ed3d52"
+    },
+    {
+      "id": "N-1490",
+      "text": "## Update after v0.3.0a2, 2026-10-09: disk-full-safe writes read PROVEN, on text-level evidence and with limits",
+      "where": "docs/LIMITATIONS.md:1831",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "35087a29dcb871264f5744cb0eee15ffca256d5761e86b8d2259d74a39a0e6ed"
+    },
+    {
+      "id": "N-1491",
+      "text": "safe are the text of the first alpha and of `v0.3.0a2`; they stay as written. On",
+      "where": "docs/LIMITATIONS.md:1835",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "dd1fca355d84c48c6a5711c49e7d37ba55604b368613259aa6f4274351ebd1e1"
+    },
+    {
+      "id": "N-1492",
+      "text": "the development line the third and last slice of the P2-41 closure is merged and",
+      "where": "docs/LIMITATIONS.md:1836",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "5a8e5c02c713893a27d833dcd7e7fd709625edececf576fc69895523297eb2f6"
+    },
+    {
+      "id": "N-1493",
+      "text": "the capability matrix reads P2-41 PROVEN (ledger entry O261). What that rests on,",
+      "where": "docs/LIMITATIONS.md:1837",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "b1f7473666236681cc8ba5607f578d348e0753a18acf63b02ba7b70e8735bb90"
+    },
+    {
+      "id": "N-1494",
+      "text": "and resume on storage pressure belongs to P2-40). A backup that holds a",
+      "where": "docs/LIMITATIONS.md:1857",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "6086023d7e03033c39630c7f95386b644f2f37bbca0bb3054256525a7b4211e3"
+    },
+    {
+      "id": "N-1495",
+      "text": "## 16. Update after v0.3.0a2 (added 2026-10-09, ledger O261)",
+      "where": "paper/POSITION_PAPER_V2.md:822",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "fe5d4655fe8394916883e18dfa89dc88a7b9c0bc5b2531ecffe21da1db7eabf2"
+    },
+    {
+      "id": "N-1496",
+      "text": "The preceding section is the update for the cut of `v0.3.0a2` and stays as written.",
+      "where": "paper/POSITION_PAPER_V2.md:824",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "ce087fb7cc298d22424d6e3b0bfaa1508d180dfaa3a8051a85d99f7cedbccf91"
+    },
+    {
+      "id": "N-1497",
+      "text": "again at the base named in `paper/NUMBERS_V2.md`; the value of section 15 or of",
+      "where": "paper/POSITION_PAPER_V2.md:827",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "f1b06e2b512a01d23dc0736320239e97ea23b6fc70257d39b1c06796d571280e"
+    },
+    {
+      "id": "N-1498",
+      "text": "* **Disk-full safety (§13 and §15).** The statement of section 15 that two more",
+      "where": "paper/POSITION_PAPER_V2.md:830",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "50d13d28603d2675092209de3dc87044dd42b04c334bc5064b31d40d8920cab1"
+    },
+    {
+      "id": "N-1499",
+      "text": "slice is merged and the register reads P2-41 PROVEN. Read it as narrowly as the",
+      "where": "paper/POSITION_PAPER_V2.md:832",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "9bcbda334ea0c3603f21a67f44f1c00b0a7c90a4e75416f8e6e161fdac0d42e5"
+    },
+    {
+      "id": "N-1500",
+      "text": "**Update, 2026-10-09, after `v0.3.0a2` (ledger entry O262).** Two statements above no longer hold on the",
+      "where": "README.md:179",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "19254a31ba596433c0639bbbc0666ba538e7ade51a736c3a95f8243bd6889e00"
+    },
+    {
+      "id": "N-1501",
+      "text": "`docs/LIMITATIONS.md` already says. Second, the list of the pre-release says that P2-43 still reads MISSING and that its",
+      "where": "README.md:183",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "b036c7fd7319b664779bb8073840b5d92dec3007db4e9107dc5644944adbdd2d"
+    },
+    {
+      "id": "N-1502",
+      "text": "turn) are merged, and the capability matrix reads P2-43 PROVEN. Read that as narrowly as it is scoped: the matrix",
+      "where": "README.md:186",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "d5d822dbad6222f9edc36ea48c6cc35756162c2238d6f79deb33e6817e7efc93"
+    },
+    {
+      "id": "N-1503",
+      "text": "register note of P2-43 and in the ledger entry O262.",
+      "where": "README.md:191",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "09f04b12ce17fb80670b908feec8394d6f447cda1c8e39dd480b605c45228d3d"
+    },
+    {
+      "id": "N-1504",
+      "text": "## Update after v0.3.0a2, 2026-10-09 (ledger O262): P2-43 reads PROVEN, with limits that matter",
+      "where": "docs/LIMITATIONS.md:1864",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "8b93d7bb1a5c466f5e63b7d90d8f3138ac1dbc4f2bd205aa0bbe8c1f9e74b12d"
+    },
+    {
+      "id": "N-1505",
+      "text": "The rows and paragraphs above that say P2-43 reads MISSING, that the third slice is not merged, that nothing checks the",
+      "where": "docs/LIMITATIONS.md:1866",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "898f996f412051814b0f6427ff9dfab54a8224628a329e0f68f74cfd84c2a873"
+    },
+    {
+      "id": "N-1506",
+      "text": "`v0.3.0a2`; they stay as written. On the development line the third and fourth slices of P2-43 are merged and the",
+      "where": "docs/LIMITATIONS.md:1868",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "24344dd1f01c7a236342f1827412b5c63d2950e68e21e021028983068e46e792"
+    },
+    {
+      "id": "N-1507",
+      "text": "capability matrix reads P2-43 PROVEN (ledger entry O262). What that rests on, and what it does not:",
+      "where": "docs/LIMITATIONS.md:1869",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "894e029750b76ce028d0f065ed0917447874186caf36ec3a23d92db9e0795940"
+    },
+    {
+      "id": "N-1508",
+      "text": "of amendment A5 (a limit in QA, an expired credential, a stale master, two masters); a second drives the real",
+      "where": "docs/LIMITATIONS.md:1872",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "ec8efe5938541e60ceb1b332618812f24c8b67cedef0a966523e09a44a5de11d"
+    },
+    {
+      "id": "N-1509",
+      "text": "## 17. Update after v0.3.0a2, second part (added 2026-10-09, ledger O262)",
+      "where": "paper/POSITION_PAPER_V2.md:850",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "663f3b883eebdbd4f6e1f8f9b54c4b3774b181f5f63d1643e1724e5d6d6845e2"
+    },
+    {
+      "id": "N-1510",
+      "text": "* **Provider usage limits (§12 and §13).** The statement of section 15 that P2-43 reads MISSING and that its third",
+      "where": "paper/POSITION_PAPER_V2.md:858",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "3dda321eadace33d2775608681ba3bcc18022f1f60407618bf8abca9c46e8e05"
+    },
+    {
+      "id": "N-1511",
+      "text": "none to the P2 gate; its eight requirements belong to the gate of P5.",
+      "where": "paper/POSITION_PAPER_V2.md:870",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "11c2e87074c1ce490bfa4f1404d522229d08fd67d4e795b06aca3600dacd05f0"
+    },
+    {
+      "id": "N-1512",
+      "text": "current pre-release is `v0.3.0a2`, an alpha and a research preview, installed from the tagged source and not published",
+      "where": "README.md:16",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "ddcce015854b9477989f4d50fd181d9496bd6d8c828172bfc42be75127dc3c3b"
+    },
+    {
+      "id": "N-1513",
+      "text": "development line follow, at the base commit of `paper/NUMBERS_V2.md` (the O262 records commit, committed on 2026-10-09)",
+      "where": "README.md:55",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "de5049179137a929fd7af897297e9460c607a73ffc2f37e848295ea675592b0b"
+    },
+    {
+      "id": "N-1514",
+      "text": "rejected iteration (P2-43, whose limits are stated in `docs/LIMITATIONS.md`).",
+      "where": "README.md:90",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "66df785ef06dfc12da74d96ed001e675e2c6161a4df2cca72479b8dfcd3918d3"
+    },
+    {
+      "id": "N-1515",
+      "text": "runtime kept the build alive: the five exit conditions P2-33 to P2-37 read IMPLEMENTED_NOT_PROVEN, crash and reboot",
+      "where": "README.md:100",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "ad03b38ed02adeca09a7b240568331a71b7c9343b94a702706d5083c51e9b6d1"
+    },
+    {
+      "id": "N-1516",
+      "text": "recovery (P2-11) has never been exercised on a real reboot, and the orchestrating session was handed over by files the",
+      "where": "README.md:101",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "e07af57bf12f4bd5ddd024a15d6c4d55e79628392d523e6214640d9c5211a868"
+    },
+    {
+      "id": "N-1517",
+      "text": "outgoing session wrote, not by the product's rollover protocol, which has not run live (P2-14 reads PARTIAL).",
+      "where": "README.md:102",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "56aafacf4d3bf29b982b542460ee9c3b7110fba2f8febd4084b17b13b156af3c"
+    },
+    {
+      "id": "N-1518",
+      "text": "`docs/LIMITATIONS.md`, limit 1, keeps the full account.",
+      "where": "README.md:103",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "a693cc7f74700e30416c58592ebb3d99c717491f355e59af38c79d2108b4c4bc"
+    },
+    {
+      "id": "N-1519",
+      "text": "and P2 is **not** closed.",
+      "where": "README.md:137",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "e4ac18473b1c803a0f10baf50c0fda34830f29e5d676d3fa4f973c63f76c5c6f"
+    },
+    {
+      "id": "N-1520",
+      "text": "| Durable programme runtime | An event ledger, materialized programme state, run, session, provider and evidence state, durable timers, a sentinel, a never-stuck check, migrations and compact task state; session succession with a master epoch and a leader lease | PROVEN: P2-01 to P2-09, P2-12, P2-13. Crash and reboot recovery, P2-11, is IMPLEMENTED_NOT_PROVEN: a real reboot has not been run |",
+      "where": "README.md:286",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "01b901cc2fb47930852369deb325d8201baaeee9fbedd971870ebf0924d86366"
+    },
+    {
+      "id": "N-1521",
+      "text": "| Handing the orchestrating session over | Four commands (hold, rollover, rollover-verify, rollover-accept) that freeze a capsule the successor must re-derive, with a fence for a stale predecessor | PARTIAL: P2-14 and P2-20. Tested with fakes; no live succession has run |",
+      "where": "README.md:287",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "57f04a4718c746152349200ac1cc071a4441ba199d3d4fa1d27cc2d63cb74af2"
+    },
+    {
+      "id": "N-1522",
+      "text": "| Recovery of failed provider dispatches | A failed dispatch is classified with its provenance, a park is bound to what it stands on and the binding is enforced on resume, and a developer turn that ends on a provider limit screen is a failed dispatch | P2-43 PROVEN with stated limits; a live run that meets a real provider limit is NOT_RUN |",
+      "where": "README.md:288",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "a85bc54d864705c97c1cf175768f85c7b08a358fe65ce36185219f74d1fd8fb1"
+    },
+    {
+      "id": "N-1523",
+      "text": "| Autonomy governance | A user intent ledger, an autonomy contract and its profile compiler, a needs-you handling policy, a programme horizon and budget guard | PROVEN: P2-10, P2-22 to P2-25 |",
+      "where": "README.md:289",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "527bafa9238bc637b524369c52fcc154df0b25b0851d96f2d63c9ec8251ca08d"
+    },
+    {
+      "id": "N-1524",
+      "text": "| Programme control and checklist | The separation of programme logic from activities, a controller transition gate, a programme checklist with a reconciler, a supervisor agent with findings, an fsck and the phase-gate binding | PROVEN: P2-15, P2-16, P2-26 to P2-28 |",
+      "where": "README.md:290",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "309d66c59a8e06cc317e7d859fa58fbbcafe8bd399753df46cfe1d16f1283257"
+    },
+    {
+      "id": "N-1525",
+      "text": "| Adapters and interfaces | Owned control of the agents HoH starts, an MCP gateway base, a decision exploration base with a decision fsck, the project contract, the state ownership contract, digital-thread identifiers and the evidence-claim schema | PROVEN: P2-17 to P2-19, P2-21, P2-29 to P2-32 |",
+      "where": "README.md:291",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "1a8f6b04b7a0a91e9f8b93502d4bc023152d46d1515db6e1ebf83ee760b3e35d"
+    },
+    {
+      "id": "N-1526",
+      "text": "| Storage lifecycle | An ownership registry, admission by reservation, a durable park and resume under pressure, disk-full-safe durable writes for the migrated writers, verified archive bundles, `VERIFIED_RELOCATION`, a steward, registered ephemeral temporary roots | PROVEN: P2-38 to P2-41, P3-40, P5-25 to P5-33. P2-42 is PARTIAL |",
+      "where": "README.md:292",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "16d02fff45e9d455c6937fbb61fcaf9942ff833866bfd3a96cd6759d036ee4f9"
+    },
+    {
+      "id": "N-1527",
+      "text": "| The exit conditions of phase P2 | The unattended test, no human attached, controller and session replacement, automatic continuation, no lost state | P2-33 to P2-37 are IMPLEMENTED_NOT_PROVEN: the end-to-end evidence went stale when the code changed |",
+      "where": "README.md:293",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "71b689f98576658978b6a11c2c4b2354fbde618646e803d6d18779c44c5d9f1e"
+    },
+    {
+      "id": "N-1528",
+      "text": "checkpoint and stay where they were stated; the lifts of P2-41 and P2-43 and the eight requirements that amendment A6",
+      "where": "README.md:298",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "633d6dc36d4ca0da39c80d973d173f5198d7c396bbe9b43354a23eb1d708925b"
+    },
+    {
+      "id": "N-1529",
+      "text": "registered for phase P5 have changed them since.",
+      "where": "README.md:299",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "dcda5a1727c61d32560d69c478778183a096a0e15993779714bab96fc9434e3c"
+    },
+    {
+      "id": "N-1530",
+      "text": "person involved at all is still not shown; `docs/LIMITATIONS.md`, limit 1, keeps the account.*",
+      "where": "README.md:762",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "028ea6181ff482c40a184d3e6d5e784433693a68920b1ac6be9887dbb55d0479"
+    },
+    {
+      "id": "N-1531",
+      "text": "being its size. Measured on the development line at the base commit of `paper/NUMBERS_V2.md` (the O262 records commit): the first",
+      "where": "docs/LIMITATIONS.md:239",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "559d6ed2c711cbc9d7a3db1402b308f5253b31c920a40a4c7cd86fcfcfdf69ea"
+    },
+    {
+      "id": "N-1532",
+      "text": "session wrote, not by the product's rollover protocol, which has not run live (P2-14 reads PARTIAL). The five exit",
+      "where": "docs/LIMITATIONS.md:255",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "78868e883ea1f16e825ec1a8982e8da93685df2563c838ad7f867e643fbbaa44"
+    },
+    {
+      "id": "N-1533",
+      "text": "conditions of phase P2 that a long unattended run would prove, P2-33 to P2-37, read IMPLEMENTED_NOT_PROVEN, and crash",
+      "where": "docs/LIMITATIONS.md:256",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "d8e8c93ac3dd9536a828a122b7c5f7992aabc61c25c53d6af2e0a92b7bd912fc"
+    },
+    {
+      "id": "N-1534",
+      "text": "and reboot recovery (P2-11) has never been exercised on a real reboot. Of the development nodes after the attribution",
+      "where": "docs/LIMITATIONS.md:257",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "cc86b90fa608e738c073f703290d06b6fc23ecfb48ffe70a9f24374615b65945"
+    },
+    {
+      "id": "N-1535",
+      "text": "| V46 | derived by a tool | RESOLVED | re-derived by the tool at the base |",
+      "where": "paper/AUDIT_V2.md:86",
+      "reason": "a row of the generated mechanical audit: the tool's own verdict for one tag, written by `tools/docs_numbers.py audit --write` and verified by `check`; no measurement of its own",
+      "anchor_digest": "134113b1065c7c249b6219af5ecb37e3c3791f224845bfa2f5fc572c95c7f3a3"
+    },
+    {
+      "id": "N-1536",
+      "text": "| V47 | derived by a tool | RESOLVED | re-derived by the tool at the base |",
+      "where": "paper/AUDIT_V2.md:87",
+      "reason": "a row of the generated mechanical audit: the tool's own verdict for one tag, written by `tools/docs_numbers.py audit --write` and verified by `check`; no measurement of its own",
+      "anchor_digest": "53c3856cf2a88e68ff9ba3eabb9a109e1518e38115cf3c9f7b8169aa99903680"
+    },
+    {
+      "id": "N-1537",
+      "text": "| V48 | derived by a tool | RESOLVED | re-derived by the tool at the base |",
+      "where": "paper/AUDIT_V2.md:88",
+      "reason": "a row of the generated mechanical audit: the tool's own verdict for one tag, written by `tools/docs_numbers.py audit --write` and verified by `check`; no measurement of its own",
+      "anchor_digest": "11805e658fc8fc011284a477164e4ceac715ba1617832235ecaaec9023feea3a"
+    },
+    {
+      "id": "N-1538",
+      "text": "| V49 | derived by a tool | RESOLVED | re-derived by the tool at the base |",
+      "where": "paper/AUDIT_V2.md:89",
+      "reason": "a row of the generated mechanical audit: the tool's own verdict for one tag, written by `tools/docs_numbers.py audit --write` and verified by `check`; no measurement of its own",
+      "anchor_digest": "c9406b23ce0630d323be0a5eeb8c3ef0fb8ec1e75410e4086a3c3eba395f709c"
+    },
+    {
+      "id": "N-1539",
+      "text": "| V50 | ledger text | RESOLVED | ledger text present in the entry |",
+      "where": "paper/AUDIT_V2.md:90",
+      "reason": "a row of the generated mechanical audit: the tool's own verdict for one tag, written by `tools/docs_numbers.py audit --write` and verified by `check`; no measurement of its own",
+      "anchor_digest": "59c74ccec58a7d03b3c7192a26467d4d8420fffabfa727f045ed335f613230b4"
+    },
+    {
+      "id": "N-1540",
+      "text": "| V51 | ledger text | RESOLVED | ledger text present in the entry |",
+      "where": "paper/AUDIT_V2.md:91",
+      "reason": "a row of the generated mechanical audit: the tool's own verdict for one tag, written by `tools/docs_numbers.py audit --write` and verified by `check`; no measurement of its own",
+      "anchor_digest": "3313ee862512530a0f530dd2821b2460fe1933934060714463ff25930b508bbc"
+    },
+    {
+      "id": "N-1541",
+      "text": "| V52 | derived by a tool | RESOLVED | re-derived by the tool at the base |",
+      "where": "paper/AUDIT_V2.md:92",
+      "reason": "a row of the generated mechanical audit: the tool's own verdict for one tag, written by `tools/docs_numbers.py audit --write` and verified by `check`; no measurement of its own",
+      "anchor_digest": "b0e96a8ba7185c3320a23078f7775791913af566474e4ceee9012e047f8d193b"
+    },
+    {
+      "id": "N-1542",
+      "text": "| V53 | ledger text | RESOLVED | ledger text present in the entry |",
+      "where": "paper/AUDIT_V2.md:93",
+      "reason": "a row of the generated mechanical audit: the tool's own verdict for one tag, written by `tools/docs_numbers.py audit --write` and verified by `check`; no measurement of its own",
+      "anchor_digest": "a96e76546d5b2bc608bb24c0992b39c5d0abd14f481bdc8b85a92f241a074dce"
+    },
+    {
+      "id": "N-1543",
+      "text": "| V54 | ledger text | RESOLVED | ledger text present in the entry |",
+      "where": "paper/AUDIT_V2.md:94",
+      "reason": "a row of the generated mechanical audit: the tool's own verdict for one tag, written by `tools/docs_numbers.py audit --write` and verified by `check`; no measurement of its own",
+      "anchor_digest": "2fe8e14a435ea1b0817ebdff44823a0298e69985a458b0a1f3998b8ade351bd8"
+    },
+    {
+      "id": "N-1544",
+      "text": "| V55 | ledger text | RESOLVED | ledger text present in the entry |",
+      "where": "paper/AUDIT_V2.md:95",
+      "reason": "a row of the generated mechanical audit: the tool's own verdict for one tag, written by `tools/docs_numbers.py audit --write` and verified by `check`; no measurement of its own",
+      "anchor_digest": "45d9a4df42bbd6a2ea6e1bfc3561fa61bd39591c2fc0bc56c1ed587c04fe432c"
+    },
+    {
+      "id": "N-1545",
+      "text": "| V56 | ledger text | RESOLVED | ledger text present in the entry |",
+      "where": "paper/AUDIT_V2.md:96",
+      "reason": "a row of the generated mechanical audit: the tool's own verdict for one tag, written by `tools/docs_numbers.py audit --write` and verified by `check`; no measurement of its own",
+      "anchor_digest": "21421a05f702d29a2515beaca2f061d448d772833e8ab9b0b56e327e5c49db26"
+    },
+    {
+      "id": "N-1546",
+      "text": "| V46 | 2026-09-07 00:19 to 2026-10-09 15:46 (+0300): 32 days 15 h (4 weeks 4 days) | first and latest commit of the development mainline, and the time between them | git history | `git log <base> --format=%cI` (earliest and latest commit date, read at +0300); the difference in days and whole hours | R |",
+      "where": "paper/NUMBERS_V2.md:69",
+      "reason": "a row of the generated numbers table: it names the source and the regeneration command of a figure; the figure is bound as a claim where the prose states it, not at this row, and `tools/docs_numbers.py check` compares the whole table with a fresh derivation",
+      "anchor_digest": "1d0c6b9ac9301c455716eb3142714fdd1ccb6e009a51f4bd6dfebe8eb593e282"
+    },
+    {
+      "id": "N-1547",
+      "text": "| V47 | 23 of 33 calendar days carry a commit; none on 2026-09-15 to 2026-09-20 (6 days) or 2026-09-26 to 2026-09-29 (4 days); longest run of days with a commit: 10 (2026-09-30 to 2026-10-09) | calendar days (commit date at +0300, first to latest day inclusive) with at least one commit, the commit-free runs and the longest run of consecutive days with a commit | git history | `git log <base> --format=%cI`; the distinct calendar days, the gaps between them and the longest run of consecutive days | R |",
+      "where": "paper/NUMBERS_V2.md:70",
+      "reason": "a row of the generated numbers table: it names the source and the regeneration command of a figure; the figure is bound as a claim where the prose states it, not at this row, and `tools/docs_numbers.py check` compares the whole table with a fresh derivation",
+      "anchor_digest": "bbe1b589b385266285c961a7c7bbb99bd4e53bcef0b16a09b74bbeeb6c17a12b"
+    },
+    {
+      "id": "N-1548",
+      "text": "| V48 | 1,088 commits = 944 non-merge + 144 merges | commits reachable from the base | git history | `git rev-list --count <base>`; with `--merges` for the merges | R |",
+      "where": "paper/NUMBERS_V2.md:71",
+      "reason": "a row of the generated numbers table: it names the source and the regeneration command of a figure; the figure is bound as a claim where the prose states it, not at this row, and `tools/docs_numbers.py check` compares the whole table with a fresh derivation",
+      "anchor_digest": "84372f63cbf585b56a5231ebf62e04b15576f5c7e9fe642da5d4e850fd0b57b9"
+    },
+    {
+      "id": "N-1549",
+      "text": "| V49 | 234 numbered entries, O23 to O262 | distinct ledger entry numbers that head an entry (`## On` or `### On`) in the working ledger as committed at the base; O1 to O22 are numbered open items inside the first entries, not entry headings | `DOGFOOD_LEDGER.md` at the base | `git show <base>:DOGFOOD_LEDGER.md`; count the distinct numbers in lines matching `^#{2,3} O[0-9]+` | R |",
+      "where": "paper/NUMBERS_V2.md:72",
+      "reason": "a row of the generated numbers table: it names the source and the regeneration command of a figure; the figure is bound as a claim where the prose states it, not at this row, and `tools/docs_numbers.py check` compares the whole table with a fresh derivation",
+      "anchor_digest": "e9a50d427b079ef9b070f74e07979b1f82ecdcf4147eec4a1c622f975a83632e"
+    },
+    {
+      "id": "N-1550",
+      "text": "| V50 | 117 run directories, 2026-10-01 to 2026-10-09 | run directories under the project's runs directory, from the first (2026-10-01 10:22Z) to the latest (2026-10-09 07:29Z); runs of earlier days were kept elsewhere and are not counted (taken on 2026-10-09 at 16:40 +0300; the count grows with every run) | ledger O263 (O263 line 19829) | `ls <state root>/runs` and count the names ending in `-runs`; historical once taken |  |",
+      "where": "paper/NUMBERS_V2.md:73",
+      "reason": "a row of the generated numbers table: it names the source and the regeneration command of a figure; the figure is bound as a claim where the prose states it, not at this row, and `tools/docs_numbers.py check` compares the whole table with a fresh derivation",
+      "anchor_digest": "6b57e168331b034bf752bad0a8024ab7f4171b45f1d7da98deaaf2bc9d014fdf"
+    },
+    {
+      "id": "N-1551",
+      "text": "| V51 | 459 first-round reviewer reports (771 report files in all, including re-review rounds), 2026-09-30 to 2026-10-09 | reports of the spec and integration reviewers of the build: first round = files named `*-report.md` minus the re-review files named `*-rN-report.md`; all = files whose name contains `report` and ends in `.md`, re-review rounds (`-rN-report.md`, `-report-rN.md`) and parked copies included (taken on 2026-10-09 at 17:57 +0300, the third taking of this count; the counts grow with every review) | ledger O263 (O263 line 19838) | count the files named `*-report.md`, subtract those named `*-rN-report.md`; and count the files matching `*report*.md`, in the build's review directory; historical once taken |  |",
+      "where": "paper/NUMBERS_V2.md:74",
+      "reason": "a row of the generated numbers table: it names the source and the regeneration command of a figure; the figure is bound as a claim where the prose states it, not at this row, and `tools/docs_numbers.py check` compares the whole table with a fresh derivation",
+      "anchor_digest": "e7bcd236f8ceda935c6a78f6b7082ae7e6cf63b46a5499162098d13b3de07cb7"
+    },
+    {
+      "id": "N-1552",
+      "text": "| V52 | 0 of 243 attribution entries are of category CAPTAIN (a human decision or a human-authored change) | entries of `dogfood/ATTRIBUTION.json` at the base booked to a human; the file is declared by the orchestrating session and checked for tiling and for the run states it cites, not for authorship | `dogfood/ATTRIBUTION.json` at the base | `git show <base>:dogfood/ATTRIBUTION.json`; count the entries whose `category` is `CAPTAIN` | R |",
+      "where": "paper/NUMBERS_V2.md:75",
+      "reason": "a row of the generated numbers table: it names the source and the regeneration command of a figure; the figure is bound as a claim where the prose states it, not at this row, and `tools/docs_numbers.py check` compares the whole table with a fresh derivation",
+      "anchor_digest": "c6cd4d29396fa99c34021b5f607f78b94a4ffeda1c0c0c1416abf408740cf111"
+    },
+    {
+      "id": "N-1553",
+      "text": "| V53 | 6 operator directives stored verbatim, 2026-09-30 to 2026-10-09 | amendments A1 to A6 of the programme, each with the operator's own words in a file of its own | ledger O263 (O263 line 19829) | `git ls-tree -r --name-only <base> program/v3_3/amendments` and count the files named `*_OPERATOR_DIRECTIVE_*` |  |",
+      "where": "paper/NUMBERS_V2.md:76",
+      "reason": "a row of the generated numbers table: it names the source and the regeneration command of a figure; the figure is bound as a claim where the prose states it, not at this row, and `tools/docs_numbers.py check` compares the whole table with a fresh derivation",
+      "anchor_digest": "5f6e912b53db2e3afdf1a3f8806858d1bb7b05d635bef2e16fc221a563d48fa6"
+    },
+    {
+      "id": "N-1554",
+      "text": "| V54 | 4 orchestrator sessions in a row; 3 acknowledged hand-overs (2026-10-07, 2026-10-08, 2026-10-09); a fourth hand-over file (2026-10-08) was written before a machine shutdown and not used | orchestrator sessions since the written hand-over protocol began on 2026-10-07; earlier sessions are not itemised | ledger O263 (O263 line 19829) | list the hand-over and acknowledgement files of the build's hand-over directory; historical |  |",
+      "where": "paper/NUMBERS_V2.md:77",
+      "reason": "a row of the generated numbers table: it names the source and the regeneration command of a figure; the figure is bound as a claim where the prose states it, not at this row, and `tools/docs_numbers.py check` compares the whole table with a fresh derivation",
+      "anchor_digest": "63f5c39440afb3912c4d05890116293d5950e4dac2b47722c5b5e75a50366e30"
+    },
+    {
+      "id": "N-1555",
+      "text": "| V55 | 13 quota stops (15 markers), 2026-10-03 to 2026-10-07 | stops of provider work at the account's usage limit, as the orchestrator's running notes mark them; two pairs of markers describe one stop each | ledger O263 (O263 line 19830) | count the lines of the running notes that open with `STATE AT USAGE LIMIT` or `STATE AT WEEKLY LIMIT`; historical |  |",
+      "where": "paper/NUMBERS_V2.md:78",
+      "reason": "a row of the generated numbers table: it names the source and the regeneration command of a figure; the figure is bound as a claim where the prose states it, not at this row, and `tools/docs_numbers.py check` compares the whole table with a fresh derivation",
+      "anchor_digest": "5039567c41603d7d5a53bb6ed354c5fff6462b7855f30613a847f93f2b3befc4"
+    },
+    {
+      "id": "N-1556",
+      "text": "| V56 | power cut 2026-09-10; disk full 2026-09-25; inode exhaustion 2026-10-05; operator-requested WSL shutdown 2026-10-08 (about one hour); inode pressure 2026-10-09 (the storage guard at CRITICAL on the inode axis parked two runs until 11:36Z) | the other interruptions the ledger and the notes record | ledger O263, O88, O238, O252, O258, O262 (O263 line 19830) | read the entries; historical |  |",
+      "where": "paper/NUMBERS_V2.md:79",
+      "reason": "a row of the generated numbers table: it names the source and the regeneration command of a figure; the figure is bound as a claim where the prose states it, not at this row, and `tools/docs_numbers.py check` compares the whole table with a fresh derivation",
+      "anchor_digest": "bfd8208745a955bb4f6d626d4892e96557fa1a5a93bf41d4c01d009650d1daa7"
+    },
+    {
+      "id": "N-1557",
+      "text": "times (`docs/LIMITATIONS.md`, limit 1, last subsection; `README.md`, \"Duration, autonomy and scale of the build\").",
+      "where": "paper/POSITION_PAPER.md:1097",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "52d723d195608a43c6ac7fc997f3b3c3af8ed7039c4ab39d121a30a833b7d4a8"
+    },
+    {
+      "id": "N-1558",
+      "text": "\"Multi-day\" is therefore, for the line as a whole, multi-week; \"without intervention\" is still not shown. E9",
+      "where": "paper/POSITION_PAPER.md:1098",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "e6f25f8244f878953ad9054c524d95451243d808916aa58831f16eaebd0f6af2"
     }
   ],
   "claim_surfaces": [
@@ -21345,6 +22616,26 @@
       "path": "flake.nix",
       "reason": "package-metadata",
       "why": "the Nix packaging of the package (a package, an app and a dev shell), classified with pyproject.toml as part of the package by tools/export_manifest.py since the v0.3.0a2 release review: Nix expressions, not prose; what the README and the release notes say about it (never evaluated or built, NOT_RUN) is claimed there, and tests/test_nix_packaging_static.py checks the file statically"
+    },
+    {
+      "path": "tests/test_durable_closure_dispatch.py",
+      "reason": "source-code",
+      "why": "source or test code under src/hoh/, tests/, or tools/; claims about its behaviour live in docs/** and are covered there, not by re-declaring the source itself as a claim surface"
+    },
+    {
+      "path": "tests/test_durable_closure_own.py",
+      "reason": "source-code",
+      "why": "source or test code under src/hoh/, tests/, or tools/; claims about its behaviour live in docs/** and are covered there, not by re-declaring the source itself as a claim surface"
+    },
+    {
+      "path": "tests/test_dispatch_recovery.py",
+      "reason": "source-code",
+      "why": "source or test code under src/hoh/, tests/, or tools/; claims about its behaviour live in docs/** and are covered there, not by re-declaring the source itself as a claim surface"
+    },
+    {
+      "path": "tests/test_developer_limit_screen.py",
+      "reason": "source-code",
+      "why": "source or test code under src/hoh/, tests/, or tools/; claims about its behaviour live in docs/** and are covered there, not by re-declaring the source itself as a claim surface"
     }
   ]
 }

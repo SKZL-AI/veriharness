@@ -12,6 +12,15 @@ deterministic runner produced, not on a model's own report that its work is
 done. `docs/EVIDENCE_MODEL.md` makes the full case for why that distinction
 matters; this file is the map of the rest.
 
+**State on 2026-10-09 (added; the opening paragraph above is unchanged).** The latest stable release is `v0.1.0`. The
+current pre-release is `v0.3.0a2`, an alpha and a research preview, installed from the tagged source and not published
+to PyPI. The development line (phase P2) is in progress: 34 of its 43 registered requirements read PROVEN `[V10c]` `[V10b]`,
+and 9 blocking items of its gate are open `[V12]`. The line has been developed under its own orchestration since
+2026-09-07, with 69 product-run merges since 2026-09-25 `[V01]`, by an agent-orchestrated loop that an operator directs
+and that stopped several times, over 32 days 15 hours `[V46]`; the account, the figures and the interruptions are under
+*Duration, autonomy and scale of the build* below, and the parts and their states are under *The parts, and what each
+has and has not shown*.
+
 ## Where the project stands: release, pre-release, development, roadmap
 
 Four things are easy to run together here, and this repository keeps them
@@ -23,7 +32,7 @@ apart on purpose.
 | **Pre-release** | `v0.3.0a1` -- **PRE-RELEASE**, an alpha and a research preview, **prepared, not yet cut** | Prepared at a documentation checkpoint, not at the end of a phase. Its integrity gate is met for the paths its reviewers replayed (the qaw-followup merge `ab41589f` closed the three findings that had held it; one residual is stated in `docs/LIMITATIONS.md`), and the cut waits for the operator's decision on the exact commit. Once cut, it is installed from the tagged source and is not published to PyPI: the distribution workflow of this repository accepts only the audited `v0.1.0`. `pyproject.toml` carries `0.3.0a1`. `RELEASE_NOTES.md` opens with its account; its open gates are listed as NOT_YET_PROVEN there and in `docs/LIMITATIONS.md`. (Correction, 2026-10-09: `v0.3.0a1` was cut on 2026-10-08; "prepared, not yet cut" and "the cut waits for the operator's decision" are the text of the checkpoint before the cut and are kept here. `pyproject.toml` now carries the next pre-release, in the next row.) |
 | **Newer pre-release** | `v0.3.0a2` -- **PRE-RELEASE**, an alpha and a research preview, tagged `v0.3.0a2` | Prepared at a documentation checkpoint after the ledger entries O256 to O260, not at the end of a phase. It adds a NixOS-first portability patch, `hoh agent-setup`, owned control of the agents HoH starts, more disk-full-safe writers, a classification of failed provider dispatches with its provenance and park binding, `hoh migrate` and `hoh decision check`, and the five P0 measurements; none of it was run on a real NixOS or macOS host or in a live coding-agent session. It is installed from the tagged source and is not published to PyPI. `pyproject.toml` carries `0.3.0a2`. `RELEASE_NOTES.md` opens with its account; its open gates are listed as NOT_YET_PROVEN there and in `docs/LIMITATIONS.md`. |
 | **Current development** | Phase P2, *v0.3 Durable Program Runtime + Autonomy Contract Base* -- **IN PROGRESS** | Not closed. The pre-release is a snapshot of this line, and a clone of the default branch may be ahead of the tag. |
-| **Long-term roadmap** | Phases P0 to P12, v0.2 through v2.0 | A registered plan, not a promise. P1 was completed as an internal development milestone. No public v0.2 release was cut; the latest stable public release remains v0.1.0 while the development line continues through P2. Of the requirements registered for P3 to P12, 150 of 168 read MISSING `[V11b]`; ten of the 11 that read PROVEN are storage-lifecycle items that amendment A1 placed there and that were built early. |
+| **Long-term roadmap** | Phases P0 to P12, v0.2 through v2.0 | A registered plan, not a promise. P1 was completed as an internal development milestone. No public v0.2 release was cut; the latest stable public release remains v0.1.0 while the development line continues through P2. Of the requirements registered for P3 to P12, 150 of 168 read MISSING `[V11b]`; ten of the 11 that read PROVEN are storage-lifecycle items that amendment A1 placed there and that were built early. (Updated 2026-10-09 at the O262 base: 158 of 176 read MISSING `[V11b]`, because amendment A6 registered eight more requirements for phase P5; see *The parts, and what each has and has not shown*.) |
 
 The board that says what holds today is `docs/READINESS.md`; at its last
 committed measurement it reads `TECHNICALLY_STABLE_READY = no`, and that holds
@@ -37,6 +46,63 @@ not regenerated at the cut, because regenerating it needs the network (the
 Figures below that carry a bracketed tag are listed,
 with their source and the command that regenerates them, in
 `paper/NUMBERS_V2.md`.
+
+### Duration, autonomy and scale of the build, measured on 2026-10-09
+
+*Added 2026-10-09; nothing above or below this block was edited.* The campaign figures further down this file,
+including their wall-clock row (five calendar days, three and a half days elapsed), are the measurement of the
+`v0.1.0` campaign, taken when that release was tagged on 2026-09-14. They are correct for that campaign, they stay
+where they are, and they are not the age or the size of the project. The same kinds of figure for the whole
+development line follow, at the base commit of `paper/NUMBERS_V2.md` (the O262 records commit, committed on 2026-10-09)
+unless a row says it was counted later.
+
+| What | Figure |
+|---|---|
+| Span | First commit 2026-09-07, latest commit 2026-10-09: 32 days 15 hours, four weeks and four days `[V46]` |
+| Days with a commit | 23 of the 33 calendar days; no commit on 2026-09-15 to 2026-09-20 or on 2026-09-26 to 2026-09-29; a commit on each of the 10 days from 2026-09-30 to 2026-10-09 `[V47]` |
+| History | 1,088 commits, 144 of them merges `[V48]`; 234 numbered ledger entries, O23 to O262 `[V49]` |
+| Product runs | 69 product-run merges since 2026-09-25 `[V01]`; 117 run directories from 2026-10-01 on, counted on 2026-10-09 `[V50]` |
+| Independent review | 459 first-round reviewer reports (771 report files in all, including re-review rounds) since 2026-09-30, counted on 2026-10-09 `[V51]` |
+| Who wrote the code | Of 204 development nodes after the attribution anchor `[V06]`, 1 went through the shipped control plane end to end `[V06a]`, 94 were developed by a product run and merged by the orchestrating session after review `[V06b]`, and 109 were written by the orchestrating session directly `[V06c]`. The attribution file books none to a human, category `CAPTAIN` `[V52]`; it is declared by the orchestrating session and checked for tiling and for the run states it cites, not for authorship |
+| Direction | 6 operator directives stored verbatim, 2026-09-30 to 2026-10-09 `[V53]` |
+| Orchestrator sessions | 4 in a row since the written hand-over began on 2026-10-07, with 3 acknowledged hand-overs `[V54]` |
+
+**What "autonomous" means here, and what it does not.** The orchestrating session is an agent session (a Claude Code
+session) that drives VeriHarness through its own command line. In this build it wrote the specifications, started the
+product runs, had every product-run candidate reviewed by two independent reviewer agents before its merge (from
+2026-09-25 on), ran the global gates, and kept the ledger and these documents. The operator set the direction and
+added work as it went (the directives above and the day-to-day items), approved, or delegated for a stated window,
+every irreversible external action such as publishing a release, decided the storage and policy questions that only a
+person may decide (which folders may be deleted, for one), and shut WSL down once on purpose to compact the disk. That
+is *orchestrated*, not *unattended*: the operator was reachable and was asked, and the line also stopped, as the next
+list names. The product's own runs carried the first two groups of the *Who wrote the code* row; the third, the
+larger group by count of nodes, the orchestrating session wrote directly.
+
+**Interruptions, named.** The line did not run without stopping:
+
+* No commit from 2026-09-15 to 2026-09-20, after the `v0.1.0` tag (the publication to PyPI on 2026-09-15 is not a
+  commit); the ledger gives no reason for the pause.
+* A power cut on 2026-09-10 (ledger entry O88): the project content was re-measured and found intact, and some
+  operator tools kept in volatile storage were lost `[V56]`.
+* The disk under the development machine filled on 2026-09-25 (977 GiB of a 1 TiB volume) `[V16]`; no commit from
+  2026-09-26 to 2026-09-29, and work resumed on 2026-09-30 under the storage lifecycle that the operator directed.
+* Provider quota: 13 stops between 2026-10-03 and 2026-10-07 `[V55]`, one of them the weekly limit on 2026-10-06, which
+  the operator reset. The product now classifies a provider limit it can read as a failed dispatch rather than a
+  rejected iteration (P2-43, whose limits are stated in `docs/LIMITATIONS.md`).
+* Inode exhaustion on 2026-10-05 (67,107,099 of 67,108,864 inodes used) `[V35]`. On 2026-10-09 it was inode pressure, not
+  exhaustion: the product's storage guard reached CRITICAL on the inode axis and parked two runs until the operator's
+  deletions allowed the product's own resume `[V56]`.
+* An operator-requested WSL shutdown and disk compaction on 2026-10-08, about one hour `[V56]`.
+
+**What this does and does not show.** It shows that an agent-orchestrated build, with independent review of its
+product-run candidates before their merge, kept a repository moving for more than four weeks of calendar time, through
+quota stops and storage blocks, and that there was a commit on each of the last ten days of the measurement. It does
+not show unattended operation: a person directed the work, was reachable and answered. It does not show continuous
+running: there was no commit on ten of the 33 calendar days `[V47]`. It does not show that the product's own durable
+runtime kept the build alive: the five exit conditions P2-33 to P2-37 read IMPLEMENTED_NOT_PROVEN, crash and reboot
+recovery (P2-11) has never been exercised on a real reboot, and the orchestrating session was handed over by files the
+outgoing session wrote, not by the product's rollover protocol, which has not run live (P2-14 reads PARTIAL).
+`docs/LIMITATIONS.md`, limit 1, keeps the full account.
 
 ## What changed after v0.1.0
 
@@ -66,7 +132,9 @@ prepared from. `paper/POSITION_PAPER_V2.md` gives the full account.
   limits `RELEASE_NOTES.md` states); a resume loop that acts on due timers; an
   autonomy contract; and a programme checklist whose phase gate an independent
   supervisor review has to pass. 32 of P2's 43 registered requirements read
-  PROVEN `[V10c]` `[V10b]` (26 as measured on 2026-10-07), and P2 is **not** closed.
+  PROVEN `[V10c]` `[V10b]` (26 as measured on 2026-10-07) [dated figures, added 2026-10-09: 26 of 43 on 2026-10-07 for the
+  first alpha, 32 at the `v0.3.0a2` checkpoint, 34 at the O262 base on 2026-10-09, after the lifts of P2-41 and P2-43],
+  and P2 is **not** closed.
 * **The orchestrating session can be rolled over under a protocol (Layer A,
   merged, not yet exercised live).** Four commands (`hoh project hold`,
   `rollover`, `rollover-verify`, `rollover-accept`) freeze a capsule whose
@@ -160,6 +228,36 @@ statements, and `RELEASE_NOTES.md` has the account and every limit:
   (P2-17 reads PROVEN, with limits), the NixOS-first portability patch (never run
   on a real NixOS or macOS host), and the five P0 measurements.
 
+**Update, 2026-10-09, after `v0.3.0a2` (ledger entry O261).** Two statements
+above no longer hold on the development line: "Disk-full-safe writes cover only
+part of the writers (P2-41, PARTIAL)" and "More writers are disk-full safe; P2-41
+is PARTIAL still". The third and last slice of the P2-41 closure is merged, and
+the capability matrix reads P2-41 PROVEN. Read that as narrowly as it is scoped:
+the writers of run, project and receipt state that the writer scan lists as
+migrated go through one disk-full-safe write primitive (`durable_write`,
+`durable_create`, `durable_append`), and the scan fails on any raw write call it
+does not classify; the storage modules keep their own temp-fsync-publish helpers
+(the scan's `OWN_DURABLE` class), which are tested for a full disk to different
+degrees, three of the eight functions not at all; the scan does not see aliased
+calls; the matrix measures an import statement, not an execution; and a long
+unattended run that survives a full disk end to end is not claimed. The limits
+are in the register note of P2-41 and in the ledger entry O261. Nothing above
+this paragraph was edited.
+
+**Update, 2026-10-09, after `v0.3.0a2` (ledger entry O262).** Two statements above no longer hold on the
+development line, or were worded too narrowly; nothing above this paragraph was edited. First, the previous paragraph says
+that three of the eight functions that keep their own temp-fsync-publish helper are not tested for a full disk at all;
+the count is four, because the registry writer has a test of a failed replace and none of a full disk, as
+`docs/LIMITATIONS.md` already says. Second, the list of the pre-release says that P2-43 still reads MISSING and that its
+third slice is not merged. The third slice (the park binding is enforced on every automatic resume) and a fourth (a
+developer turn that ends on a provider's usage- or rate-limit screen is a failed dispatch of its class, not a finished
+turn) are merged, and the capability matrix reads P2-43 PROVEN. Read that as narrowly as it is scoped: the matrix
+measures a symbol, a collected test and an import statement, not an execution; only the recorded shapes of the provider's
+banner are read, whole, and no developer pane has ever been recorded on a real limit; a short good re-run after a wait is
+parked again and again until the resume limit and is then handed to a person, and the fix is specified and not merged;
+no real rate-limit body was ever recorded; a live run that meets a real provider limit is NOT_RUN. The limits are in the
+register note of P2-43 and in the ledger entry O262.
+
 ## What this actually is
 
 A specification goes in. A planner role turns it into a development plan
@@ -176,6 +274,32 @@ trash.
 `docs/ARCHITECTURE.md` draws the exact lines: what Herdr owns
 (sessions, panes, worktrees, restore) and what HoH owns (the plan, the
 evidence, acceptance, replanning, and objectives that span multiple runs).
+
+### The parts, and what each has and has not shown
+
+*Added 2026-10-09, from the capability register (`tools/capability_matrix.py`) at the base commit of
+`paper/NUMBERS_V2.md`.* The register holds 235 requirements `[V10]`. `PROVEN` is the register's word for an
+implementation, a test, positive evidence and a discriminating control where one applies, each found by a probe the
+repository can run (a symbol, a collected test, a readiness row). It is not a claim that the capability has run in a
+live session, and `docs/LIMITATIONS.md` states the limits row by row.
+
+| Part | What it is | State in the register |
+|---|---|---|
+| The per-run loop | Plan, develop in an isolated worktree, independent QA against a frozen copy, receipts from a deterministic runner, acceptance only when every criterion passes and one was red before the change, replanning from a rejection with its evidence. Exercised on the `v0.1.0` campaign and in the product runs since | The 16 requirements of phase P1: 16 of 16 PROVEN `[V11]` |
+| Durable programme runtime | An event ledger, materialized programme state, run, session, provider and evidence state, durable timers, a sentinel, a never-stuck check, migrations and compact task state; session succession with a master epoch and a leader lease | PROVEN: P2-01 to P2-09, P2-12, P2-13. Crash and reboot recovery, P2-11, is IMPLEMENTED_NOT_PROVEN: a real reboot has not been run |
+| Handing the orchestrating session over | Four commands (hold, rollover, rollover-verify, rollover-accept) that freeze a capsule the successor must re-derive, with a fence for a stale predecessor | PARTIAL: P2-14 and P2-20. Tested with fakes; no live succession has run |
+| Recovery of failed provider dispatches | A failed dispatch is classified with its provenance, a park is bound to what it stands on and the binding is enforced on resume, and a developer turn that ends on a provider limit screen is a failed dispatch | P2-43 PROVEN with stated limits; a live run that meets a real provider limit is NOT_RUN |
+| Autonomy governance | A user intent ledger, an autonomy contract and its profile compiler, a needs-you handling policy, a programme horizon and budget guard | PROVEN: P2-10, P2-22 to P2-25 |
+| Programme control and checklist | The separation of programme logic from activities, a controller transition gate, a programme checklist with a reconciler, a supervisor agent with findings, an fsck and the phase-gate binding | PROVEN: P2-15, P2-16, P2-26 to P2-28 |
+| Adapters and interfaces | Owned control of the agents HoH starts, an MCP gateway base, a decision exploration base with a decision fsck, the project contract, the state ownership contract, digital-thread identifiers and the evidence-claim schema | PROVEN: P2-17 to P2-19, P2-21, P2-29 to P2-32 |
+| Storage lifecycle | An ownership registry, admission by reservation, a durable park and resume under pressure, disk-full-safe durable writes for the migrated writers, verified archive bundles, `VERIFIED_RELOCATION`, a steward, registered ephemeral temporary roots | PROVEN: P2-38 to P2-41, P3-40, P5-25 to P5-33. P2-42 is PARTIAL |
+| The exit conditions of phase P2 | The unattended test, no human attached, controller and session replacement, automatic continuation, no lost state | P2-33 to P2-37 are IMPLEMENTED_NOT_PROVEN: the end-to-end evidence went stale when the code changed |
+| Everything after P2 | Phases P3 to P12 of the registered plan | 158 of the 176 requirements read MISSING `[V11b]` |
+
+Phase P2 is **not** closed. Of its 43 requirements, 34 read PROVEN `[V10c]` `[V10b]` and the gate has 9 blocking items
+open `[V12]`. The counts of P2 and of the later phases that are stated further up are those of the `v0.3.0a2`
+checkpoint and stay where they were stated; the lifts of P2-41 and P2-43 and the eight requirements that amendment A6
+registered for phase P5 have changed them since.
 
 ## Installation
 
@@ -352,6 +476,10 @@ figures are stated here rather than linked:
 | Recorded findings | **127** |
 | Human governance decisions | **7** |
 | Wall-clock | five calendar days; 3.5 days elapsed |
+
+*Label added 2026-10-09: the table above is the `v0.1.0` campaign, measured when that release was tagged on
+2026-09-14. The same measurement for the whole development line, from 2026-09-07 to 2026-10-09, is under
+"Duration, autonomy and scale of the build" near the top of this file.*
 
 The findings are the point of that table more than the run count is. A
 campaign that produces 127 recorded findings against its own harness is not a
@@ -630,6 +758,11 @@ acceptance-check commands is a tripwire against accidents rather than a
 security boundary, and that multi-day orchestrated operation is
 demonstrated while long-duration operation without any human intervention
 is not.
+
+*Added 2026-10-09: "multi-day" in the sentence above is the `v0.1.0` campaign. The development line has since been
+measured at 32 days 15 hours `[V46]`, driven by an agent session with the operator directing it, and with named
+interruptions (see "Duration, autonomy and scale of the build" near the top of this file). Operation with no
+person involved at all is still not shown; `docs/LIMITATIONS.md`, limit 1, keeps the account.*
 
 ## Existing internal documents
 

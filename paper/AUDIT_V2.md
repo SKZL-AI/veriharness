@@ -44,7 +44,7 @@ One row per tag of `paper/NUMBERS_V2.md`. `RESOLVED` means a tool-derived figure
 | V07t | git or table | RESOLVED | derived from git history and compared |
 | V08 | git or table | RESOLVED | derived from git history and compared |
 | V09 | ledger text | RESOLVED | ledger text present in the entry |
-| V10 | derived by a tool | RESOLVED | re-derived by the tool at the base |
+| V10 | derived by a tool | MISMATCH | see `python3 tools/docs_numbers.py check` |
 | V10b | derived by a tool | RESOLVED | re-derived by the tool at the base |
 | V10c | derived by a tool | RESOLVED | re-derived by the tool at the base |
 | V10d | derived by a tool | RESOLVED | re-derived by the tool at the base |
@@ -79,10 +79,21 @@ One row per tag of `paper/NUMBERS_V2.md`. `RESOLVED` means a tool-derived figure
 | V37 | ledger text | RESOLVED | ledger text present in the entry |
 | V38 | ledger text | RESOLVED | ledger text present in the entry |
 | V39 | ledger text | RESOLVED | ledger text present in the entry |
-| V40 | derived by a tool | RESOLVED | re-derived by the tool at the base |
+| V40 | derived by a tool | MISMATCH | see `python3 tools/docs_numbers.py check` |
 | V43 | ledger text | RESOLVED | ledger text present in the entry |
 | V44 | ledger text | RESOLVED | ledger text present in the entry |
 | V45 | derived by a tool | RESOLVED | re-derived by the tool at the base |
+| V46 | derived by a tool | RESOLVED | re-derived by the tool at the base |
+| V47 | derived by a tool | RESOLVED | re-derived by the tool at the base |
+| V48 | derived by a tool | RESOLVED | re-derived by the tool at the base |
+| V49 | derived by a tool | RESOLVED | re-derived by the tool at the base |
+| V50 | ledger text | RESOLVED | ledger text present in the entry |
+| V51 | ledger text | RESOLVED | ledger text present in the entry |
+| V52 | derived by a tool | RESOLVED | re-derived by the tool at the base |
+| V53 | ledger text | RESOLVED | ledger text present in the entry |
+| V54 | ledger text | RESOLVED | ledger text present in the entry |
+| V55 | ledger text | RESOLVED | ledger text present in the entry |
+| V56 | ledger text | RESOLVED | ledger text present in the entry |
 
 <!-- END GENERATED: tools/docs_numbers.py audit -->
 
