@@ -23,13 +23,14 @@ import time
 import uuid
 from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass, field
+from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING, NoReturn, Protocol
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from . import sandbox as sandbox_mod
 
-from . import dispatchrecovery, failures, roles, stages
+from . import dispatchrecovery, failures, roles, spec_criteria, stages
 from .contracts import (
     AcceptanceCheck,
     Budgets,
@@ -702,8 +703,12 @@ class Controller:
                 )
             stages.accept_checkpoint(state, candidate)
             self.store.write_state(state)
+            reason = "all criteria demonstrated"
+            if getattr(self, "_fidelity_not_run", False):
+                # an unrun check is NOT_RUN, never passed: the acceptance says it
+                reason += f" -- {spec_criteria.NOT_DECLARED}"
             return LoopOutcome(
-                iteration, True, "all criteria demonstrated", candidate.candidate_id,
+                iteration, True, reason, candidate.candidate_id,
                 result.verdicts,
             )
 
@@ -772,6 +777,18 @@ class Controller:
             run_id=state.run_id,
             reopened=getattr(self, "_reopened", None),
         )
+        # The specification's own criteria, read before any role starts: a block
+        # that cannot be read ends the iteration here, with nothing dispatched. A
+        # specification without one is not compared, and the state says so -- and so
+        # does the acceptance, should it come (`_fidelity_not_run`).
+        declared = spec_criteria.declared_criteria(spec_text)
+        fidelity = None
+        self._fidelity_not_run = not declared
+        if declared:
+            fidelity = partial(spec_criteria.assert_faithful, declared,
+                               frozen=set(self.store.read_checks()))
+        else:
+            state.note(spec_criteria.NOT_DECLARED)
         self._begin_count()
         started_at = utcnow()
         # 'ok' is earned only once the plan has answered, schema-parsed, AND
@@ -780,7 +797,7 @@ class Controller:
         # (see `_assert_plan_bound`), and a telemetry record claiming success
         # for it would contradict the very rejection it describes.
         try:
-            raw = self._dispatch_with_repair(Role.PLANNER, prompt, state)
+            raw = self._dispatch_with_repair(Role.PLANNER, prompt, state, plan_check=fidelity)
             plan = roles.parse_plan(raw)
             self._assert_plan_bound(plan, state, base)
         except Exception as exc:
@@ -2787,10 +2804,21 @@ class Controller:
                 return
             previous = tempfile.tempdir
             tempfile.tempdir = str(path)
+            dispatcher = getattr(self, "dispatcher", None)
+            bind = getattr(dispatcher, "bind_role_scratch", None)
             try:
+                # The roles' scratch (the `TMPDIR` of their panes) is made inside this workspace,
+                # before the first dispatch of the iteration and out of the arena root: a
+                # registered, admitted, leased directory that this iteration removes. A refusal
+                # is a `DispatchError` (the iteration's own handling), never a fall-back.
+                if callable(bind):
+                    bind(path)
                 yield
             finally:
                 tempfile.tempdir = previous
+                unbind = getattr(dispatcher, "unbind_role_scratch", None)
+                if callable(unbind):
+                    unbind()
 
     def _dispatch(self, role: Role, prompt: str, state: RunState) -> str:
         reservation = self._storage_gate(state)
@@ -3010,7 +3038,9 @@ class Controller:
                     raise found from exc
                 raise
 
-    def _dispatch_with_repair(self, role: Role, prompt: str, state: RunState) -> str:
+    def _dispatch_with_repair(
+        self, role: Role, prompt: str, state: RunState, *, plan_check=None
+    ) -> str:
         """Exactly one schema repair per role output (handoff §8).
 
         The repaired output is validated as well -- otherwise a role run just
@@ -3022,7 +3052,9 @@ class Controller:
 
         def validate(text: str) -> None:
             if role is Role.PLANNER:
-                roles.parse_plan(text)
+                parsed = roles.parse_plan(text)
+                if plan_check is not None:
+                    plan_check(parsed)
             else:
                 roles.extract_json(text)
 

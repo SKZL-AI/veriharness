@@ -175,6 +175,29 @@ def staging_dirt(repo: Path) -> dict[str, str]:
     return dirt
 
 
+def read_and_scan(paths: list[str]) -> tuple[dict[str, bytes], list[dict]]:
+    """Read each file about to be exported ONCE and scan those bytes: a listed
+    private session/scratch id, or a UUID-shaped session id that is not on the
+    synthetic allowlist, in the content or the name; a file that cannot be read
+    is a finding too. Returns the bytes (what is then written) and the findings.
+    The lists live in `tools/export_manifest.py`, the one place."""
+    here = str(Path(__file__).resolve().parent)
+    if here not in sys.path:
+        sys.path.insert(0, here)
+    import export_manifest
+    payload: dict[str, bytes] = {}
+    findings: list[dict] = []
+    for p in paths:
+        try:
+            data = (HOH / p).read_bytes()
+        except OSError:
+            findings.append({"type": "unreadable", "path": p})
+            continue
+        payload[p] = data
+        findings += export_manifest.scan_path_and_bytes(p, data)
+    return payload, findings
+
+
 def staging_check(repo: Path, head: str, write_ops: list[str]) -> list[str]:
     """Reasons the staging checkout is not safe to write into right now.
 
@@ -348,11 +371,25 @@ def export(push: bool) -> int:
               "will be reset, stashed or removed from here.")
         return 1
 
+    payload, leaks = read_and_scan(to_write)
+    if leaks:
+        print()
+        print("STOP -- nothing was written. A file about to be exported holds "
+              "a private session or scratch id, or a UUID-shaped id that is not "
+              "on the synthetic allowlist, or cannot be read (the id itself is "
+              "not printed):")
+        for f in leaks[:20]:
+            print(f"  {f['type']}: {f['path']}")
+        if len(leaks) > 20:
+            print(f"  ... and {len(leaks) - 20} more")
+        return 1
+
     written = 0
     for path in to_write:
         target = staging() / path
         target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(HOH / path, target)
+        target.write_bytes(payload[path])      # the bytes that were scanned
+        shutil.copymode(HOH / path, target)
         written += 1
     print(f"\nwrote {written} file(s) into the staging checkout")
     if plan["verschwunden"]:

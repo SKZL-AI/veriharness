@@ -479,3 +479,22 @@ def test_the_read_gate_refuses_a_record_no_parser_takes_with_a_store_error(tmp_p
         except BaseException as exc:
             failures.append(f"{label} hoh list: {type(exc).__name__}")
     assert not failures, "\n".join(failures)
+
+
+def test_f06_a_record_swapped_for_one_no_encoder_takes_during_the_apply_is_a_refusal_not_a_traceback(
+        tmp_path, capsys, monkeypatch):
+    _runs_one_version_up(monkeypatch)
+    root = _estate_with_a_forward_run(tmp_path)
+    _v1_project(root, "demo")
+    real = RunStore.running_process
+
+    def swap_the_project_record(self):
+        found = real(self)
+        (root / "projects" / "demo" / "project.json").write_text(LONE_SURROGATE, encoding="utf-8")
+        return found
+
+    monkeypatch.setattr(RunStore, "running_process", swap_the_project_record)
+    rc, report, err = _migrate(root, capsys, "--apply", "--now", NOW)
+    assert rc == 2 and report is None
+    assert err.startswith("migrate refused:") and "already migrated: ['run ok']" in err
+    assert "rerun resumes" in err

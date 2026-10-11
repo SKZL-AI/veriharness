@@ -122,8 +122,8 @@ def pinned_path(run_dir: Path | str) -> Path:
 
 
 def bind(run_dir: Path | str, *, contract: AutonomyContract | None = None,
-         program_epoch: int | None = None) -> Governor | None:
-    """The contract this run is under.
+         program_epoch: int | None = None, write: bool = True) -> Governor | None:
+    """The contract this run is under (`write=False`: decide only, write nothing).
 
     First call with a contract pins it; later calls read the pinned one back.
     Offering a *different* contract to a bound run is refused: a run that
@@ -219,6 +219,10 @@ def bind(run_dir: Path | str, *, contract: AutonomyContract | None = None,
             f"the pinned file, offer the contract the run was bound to, or start a "
             f"new run.")
     governor = Governor(contract=pinned, run_dir=Path(run_dir))
+    if not write:
+        # A caller that only asks "would this be accepted" (`hoh run --detach` before it opens a
+        # tab): every refusal above is the same, nothing is pinned and nothing is witnessed.
+        return governor
     # The witness is written here, not by the caller: a run pinned a moment ago
     # has no routing yet, so a caller that wrote it afterwards left a window in
     # which a swapped pin had nothing to be compared against. And it is written

@@ -362,6 +362,71 @@ def test_other_mount_refused(world):
                                 children={}), match="another mount")
 
 
+def test_root_that_is_a_mount_refused(world):
+    """LGS-F2 E3. Catches: a mount point adopted as a legacy root (what is
+    below it need not belong to the state root). Mutant E3: `or
+    self._mount_check(target)` dropped in `register_legacy_root`. Control: the
+    same anchor registers once the path is no longer a mount."""
+    anchor = world.anchor(designations=[world.brief()], reports=[world.report()])
+    world.fake.mounts.add(world.root)
+    refused(world, anchor, match="is not a plain directory or is a mount")
+    world.fake.mounts.discard(world.root)
+    entry = world.reg.register_legacy_root("a", world.root, "legacy_review", anchor)
+    assert entry["state"] == sr.REGISTERED
+    assert world.reg.owner_of(world.root / "tree" / "README").status == OWNED
+
+
+def test_foreign_uid_on_a_child_directory_refused(world, monkeypatch):
+    """LGS-F2 E4. Catches: a direct child directory of another uid adopted,
+    because the survey checked the entries below it and not the directory
+    itself. Mutant E4: `st.st_uid != uid or` dropped for a directory child in
+    `legacy_survey_root`. The anchor binds the true content, so the mutant
+    would register the root."""
+    victim = world.root / "tree"
+    real = os.lstat
+
+    class Foreign:
+        """The real `lstat` result of `victim` with another uid (every other
+        field is the real one, `st_blocks` included, so nothing but the uid
+        check can refuse it)."""
+
+        def __init__(self, result):
+            self._result = result
+            self.st_uid = result.st_uid + 1
+
+        def __getattr__(self, name):
+            return getattr(self._result, name)
+
+    def lstat(path, *a, **kw):
+        result = real(path, *a, **kw)
+        return Foreign(result) if Path(path) == victim else result
+
+    monkeypatch.setattr(sr, "_legacy_lstat", lstat)
+    refused(world, world.anchor(designations=[world.brief()], reports=[world.report()]),
+            match="foreign or on another mount")
+
+
+@pytest.mark.parametrize("when", ["at_registration", "after_registration"])
+def test_a_hard_link_on_a_direct_file_of_the_root_refused(world, when):
+    """LGS-F2 E9. Catches: a regular file directly in the root with a second
+    name (which may be foreign) accepted; the entries below a child directory
+    are covered by `test_hardlink_or_escaping_symlink_refused`. Mutant E9: the
+    `st_nlink > 1` refusal dropped in `_legacy_single`. Registration refuses it;
+    after registration the same refusal is drift (HOT)."""
+    note = world.root / "notes.md"
+    note.write_text("first round\n", encoding="utf-8")
+    if when == "at_registration":
+        os.link(note, world.tmp / "elsewhere")
+        refused(world, world.anchor(designations=[world.brief()], reports=[world.report()]),
+                match="hard links")
+        return
+    world.register()
+    assert world.reg.legacy_entry_digest(world.root, note)          # control: measurable
+    os.link(note, world.tmp / "elsewhere")
+    with pytest.raises(StorageOwnershipError, match="hard links"):
+        world.reg.legacy_entry_digest(world.root, note)
+
+
 def test_swapped_root_inode_unknown(world):
     """Catches: a replaced root keeps its adoption. Mutant M8: `_root_intact`
     skipped in `_legacy_verdict`."""

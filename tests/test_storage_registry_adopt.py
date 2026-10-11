@@ -67,7 +67,7 @@ MARKER = ".vh-owner.json"
 VERSIONED = ".vh-owner.json.v0.20261003T000000000000Z"
 KINDS = ("receipts", "runs", "scratch")
 BOOT = "boot-1"
-SESSION = "80f56617"
+SESSION = "s-adopt-01"      # a neutral session id; the hygiene test refuses real ones
 
 
 @pytest.fixture

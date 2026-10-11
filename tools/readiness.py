@@ -1237,12 +1237,13 @@ def row_program_scope() -> Row:
 def row_acceptance() -> Row:
     """Do the end-to-end acceptances in the register still hold?
 
-    Every requirement whose probe is `evidence` (P1-16 today) is judged exactly
-    as the capability matrix judges it: the record must exist, re-derive from
-    its preserved run, *and* say the requirement is satisfied. Reviewer B: the
-    first version passed on re-derivation alone, so a record that honestly
-    said "not satisfied" made this row green while the matrix said
-    IMPLEMENTED_NOT_PROVEN -- and it hard-coded the paths the register holds.
+    Every requirement whose probe is `evidence` (P1-16 and the P2 end-to-end
+    items) is judged exactly as the capability matrix judges it: the record
+    must exist, re-derive from its preserved run, *and* say the requirement is
+    satisfied. Reviewer B: the first version passed on re-derivation alone, so
+    a record that honestly said "not satisfied" made this row green while the
+    matrix said IMPLEMENTED_NOT_PROVEN -- and it hard-coded the paths the
+    register holds. Two evidence-probed entries with one id fail the row.
     """
     command = ("python3 tools/acceptance_record.py --evidence <dir> --out <record> --check, "
                "for each evidence probe in the register, via tools/capability_matrix.py")
@@ -1263,6 +1264,15 @@ def row_acceptance() -> Row:
     if not probes:
         return Row("acceptance", NOT_RUN, "no evidence-probed requirement in the register",
                    command, "nothing to judge")
+    # Two entries with one id would collapse into one result below, and the one
+    # that is not kept would never be judged (kbr review).
+    ids = [rid for rid, _ in probes]
+    repeated = sorted({rid for rid in ids if ids.count(rid) > 1})
+    if repeated:
+        return Row("acceptance", FAIL, "duplicate requirement id in the register: "
+                   + ", ".join(repeated), command,
+                   "an acceptance is judged per requirement; one id on two entries "
+                   "leaves one of them unjudged")
     # Each probe is judged with the register entry that carries it, as the
     # matrix's `classify` does: without it a P2-33 line keyed `P2-35` read
     # PROVEN here while the matrix said NOT_DETERMINABLE (pkeybind review).
@@ -1400,7 +1410,8 @@ def row_export() -> Row:
     # make publishing actively harmful.
     lecks = [z for z in out.splitlines()
              if any(k in z for k in ("home-path", "private-address",
-                                     "token-shaped"))]
+                                     "token-shaped", "private-id found",
+                                     "session-uuid found", "unreadable found"))]
     state = PASS if rc == 0 and not rest and not u2b else FAIL
     return Row(
         "export_manifest", state,

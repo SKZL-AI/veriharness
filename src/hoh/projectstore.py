@@ -46,7 +46,14 @@ from .store import LockBusy, StaleWrite, StoreError, _atomic_write
 #: would make the longest-lived state the most easily pruned.
 PROJECTS_DIRNAME = "projects"
 
-_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
+#: `\Z`, not `$`: `$` also matches before a final newline, so `"p1\n"` was a valid id
+#: and named the directory `projects/p1\n`.
+_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}\Z")
+
+
+class UnsafeProjectId(StoreError):
+    """The id is not a name the project store may build a path from: its directory
+    would not be a direct child of `<root>/projects/`, spelled exactly as the id."""
 
 
 def _stamp() -> str:
@@ -54,8 +61,8 @@ def _stamp() -> str:
 
 
 def _check_name(name: str) -> str:
-    if not _NAME_RE.match(name or ""):
-        raise StoreError(
+    if not isinstance(name, str) or not _NAME_RE.match(name):
+        raise UnsafeProjectId(
             f"Invalid project id {name!r}: expected [A-Za-z0-9][A-Za-z0-9._-]{{0,63}}"
         )
     return name
@@ -68,6 +75,14 @@ class ProjectStore:
         self.root = Path(root).expanduser().resolve()
         self.project_id = _check_name(project_id)
         self.dir = self.root / PROJECTS_DIRNAME / self.project_id
+        # Whatever the pattern admits, nothing is read or made unless the directory is
+        # a direct child of `<root>/projects/`, spelled exactly as the id.
+        norm = Path(os.path.normpath(self.dir))
+        if norm.parent != self.root / PROJECTS_DIRNAME or norm.name != self.project_id:
+            raise UnsafeProjectId(
+                f"Invalid project id {project_id!r}: its directory is not a direct child "
+                f"of {self.root / PROJECTS_DIRNAME}"
+            )
         self.state_path = self.dir / "project.json"
         self.lock_path = self.dir / ".lock"
 

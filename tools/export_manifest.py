@@ -159,6 +159,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -743,6 +744,44 @@ _TOKEN_RE = re.compile(r"[A-Za-z0-9+]{24,}={0,2}")
 _HEX_ONLY_RE = re.compile(r"^[0-9a-fA-F]+$")
 
 
+#: An ordered character-set literal -- the alphabet of an identifier or of a
+#: base-N encoder, e.g. `"abcdefghijklmnopqrstuvwxyz0123456789"` -- is not a
+#: secret, but it is exactly what the needle above takes for one (the
+#: agent-name alphabet of `src/hoh/rollover.py` blocked every export). A
+#: candidate token is such a literal when ALL of these hold (content only; no
+#: path, file or literal is listed anywhere):
+#:   1. no character occurs twice (an alphabet names each symbol once);
+#:   2. split at `+` (the base64 symbol) and with trailing `=` padding removed,
+#:      every piece is made entirely of *ascending consecutive-code-point
+#:      segments* (`a-z`, `A-Z`, `0-9`, or any run `c, c+1, c+2, ...`), in any
+#:      order and concatenation, and every maximal segment is at least
+#:      `_ORDERED_MIN_SEGMENT` characters long.
+#: The bound is the length of the shortest standard class (`0-9`). A random
+#: token is nowhere near this: each next character continues the run with
+#: probability 1/62, so even the shortest admissible 24-character token would
+#: need 12+ coincidences in a row. A token that merely CONTAINS an ordered run
+#: ("abc", "0123", "xyz789", even a whole `a-z`) is not covered by it and is
+#: still found; so are a swapped character, a reversed alphabet, an alphabet
+#: with a random head or tail, and a repeated alphabet.
+_ORDERED_MIN_SEGMENT = 10
+
+
+def is_ordered_alphabet(token: str) -> bool:
+    """True when `token` is an ordered character-set literal (see above)."""
+    body = token.rstrip("=")
+    chars = body.replace("+", "")
+    if not chars or len(set(chars)) != len(chars):
+        return False
+    for piece in body.split("+"):
+        start = 0
+        for i in range(1, len(piece) + 1):
+            if i == len(piece) or ord(piece[i]) != ord(piece[i - 1]) + 1:
+                if i - start < _ORDERED_MIN_SEGMENT:
+                    return False
+                start = i
+    return True
+
+
 def find_token_shaped(text: str) -> str | None:
     for m in _TOKEN_RE.finditer(text):
         s = m.group(0)
@@ -750,8 +789,137 @@ def find_token_shaped(text: str) -> str | None:
             continue
         if not (any(c.isdigit() for c in s) and any(c.isalpha() for c in s)):
             continue
+        if is_ordered_alphabet(s):
+            continue
         return s
     return None
+
+
+# --------------------------------------------------------------------------
+# Private session / scratch ids (leakid). The INCLUDE-set scan above knows
+# paths, addresses and 24-character secrets; it did not know the names of the
+# orchestrator sessions' private scratch directories (8 hex characters) or a
+# real session UUID, and both had been written into tracked files.
+# --------------------------------------------------------------------------
+
+#: SHA-256 (lower-case hex) of the 8-hex-character ids that must never be
+#: exported: orchestrator session prefixes and the names of their private
+#: scratch and job directories (and the first group of a session UUID). The
+#: ids themselves are NOT written anywhere in the repository. A digest of eight
+#: hex characters can be brute-forced in seconds, so this is obfuscation, not
+#: secrecy; its only job is that no published file writes the id it forbids.
+#: To add one: python3 -c "import hashlib; print(hashlib.sha256(b'<id>').hexdigest())"
+#: The one denylist: tests/test_source_hygiene.py reads this set.
+PRIVATE_ID_DIGESTS = frozenset({
+    "df393794f5b4977cf0a084d4252aeda87b7341663fc5d125169e0655fcae5199",
+    "8225c626925f86ff0beb5b49cda1bac5f3b6fd3ad2c426fc3e034f1339b02bd1",
+    "7336d8c280075a4bbd348a4bf469503944220c353b838b673e4500dc8419b171",
+    "a616a488ae0f2029c705a5551f76075e8d2b613c45f0b006fe6b792112007be6",
+    "932cf771871161199d741896d6f0b18f1d4c45a5924190858ab9a92e5e33984f",
+    "0ee9c6b31aaaf86b7fcd167e67cd339a7e0fce1a2450fbef556b8df5109fa1f3",
+    "74365e1c25e655310b11c3a6217a8099b790cced8e8a3cfde633ed7c2743ab1c",
+    "939022fec3f278a5d22c43d1f2faa9789308c1df4b8ea434847be205bab33e53",
+    "258ad7d9cb244ccfc9db90125fae7b1b871148ca200b26ef8809b4565f561ccc",
+    "7dca78702a86173cc5cdb3da16fde72ac8afa4344345e38d8c12e63a5881f307",
+    "e562ac7aab4d34d4c028d8329c19e3baea680acf08cb8b1699c94acd1446fbba",
+    "8b788a59a61e5b2175083c82afb9e57611c9cd035fa51df43481e04ce4b7e3e2",
+    "4ab768b2628b021d773d8f5b5c81ed1aa9d97e74183791734945180ae01602dc",
+    "e19144e81b5c1a7c8e2b27fadb1f65dd98e2515018ef72cf490f66a8bb8711eb",
+    "22f91aecc75a19f63f21fe169419ca5c5528a62721b446f2ef1c8647d30d42c6",
+    "96f3c1c474c7cc23cefb65703d44a82e0c7c25234f213af5f0017f912b7886e4",
+})
+
+#: UUID-shaped strings that are known to be made up and may be exported
+#: (lower-case): the nil and max UUIDs and the fixtures of the dispatch tests.
+#: Any other UUID-shaped token in an exported file is refused, because a real
+#: session id is a UUID. Add a synthetic stand-in here, in clear, after review.
+SYNTHETIC_SESSION_UUIDS = frozenset({
+    "00000000-0000-0000-0000-000000000000",
+    "ffffffff-ffff-ffff-ffff-ffffffffffff",
+    "3f2b8a1c-9d4e-4b7a-8c1d-5e6f7a8b9c0d",
+    "0b8f3a52-9c41-4d27-a6e0-5f1d7c2e9a38",
+})
+
+#: A whole token of eight hex characters (a bare id, `scratch/<id>/x`, the
+#: first group of a UUID); a longer hex run or a word that merely contains
+#: eight hex letters is not one. Patterns are over BYTES: a file is scanned as
+#: it is, whatever its encoding.
+_PRIVATE_ID_TOKEN_RE = re.compile(rb"(?<![0-9A-Za-z])[0-9a-fA-F]{8}(?![0-9A-Za-z])")
+#: A UUID needs no boundary: its dashes anchor it, so `agent<uuid>` and
+#: `<uuid>0` are found too.
+_SESSION_UUID_RE = re.compile(
+    rb"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
+
+
+def _as_bytes(data: bytes | str) -> bytes:
+    return data if isinstance(data, bytes) else data.encode("utf-8", "surrogateescape")
+
+
+def has_private_id(data: bytes | str, digests: frozenset[str] | None = None) -> bool:
+    """True when `data` holds a whole 8-hex token whose digest is listed. The
+    set is read at call time (a test can stand in its own)."""
+    listed = PRIVATE_ID_DIGESTS if digests is None else digests
+    return any(hashlib.sha256(m.group(0).lower()).hexdigest() in listed
+               for m in _PRIVATE_ID_TOKEN_RE.finditer(_as_bytes(data)))
+
+
+def has_unlisted_session_uuid(data: bytes | str, allowed: frozenset[str] | None = None) -> bool:
+    """True when `data` holds a UUID-shaped token (any case) that is not on the
+    allowlist of synthetic ids."""
+    ok = SYNTHETIC_SESSION_UUIDS if allowed is None else allowed
+    return any(m.group(0).decode("ascii").lower() not in ok
+               for m in _SESSION_UUID_RE.finditer(_as_bytes(data)))
+
+
+def _utf16_views(data: bytes) -> list[bytes]:
+    """`data` read as UTF-16, little and big endian (the byte order mark, if
+    any, is just a character; a lone surrogate becomes U+FFFD, which is not
+    ASCII, so it cannot glue an id to the next letter), each re-encoded as
+    UTF-8. Text that is UTF-16 is thereby seen as text: an id next to a
+    non-ASCII character is a whole token exactly as it is in UTF-8 (the bytes
+    with NULs removed keep an alphanumeric byte of the neighbour glued to the
+    id). Only the alignment at offset 0 is read: at an odd offset the decoding
+    would hide a glued ASCII letter."""
+    chunk = data[: len(data) // 2 * 2]
+    return [chunk.decode(codec, "replace").encode("utf-8")
+            for codec in ("utf-16-le", "utf-16-be")]
+
+
+def scan_path_and_bytes(path: str, data: bytes,
+                        digests: frozenset[str] | None = None,
+                        allowed: frozenset[str] | None = None) -> list[dict]:
+    """Findings for one file whose bytes are `data`: `private-id` and
+    `session-uuid`, at most one of each. The file name, the raw bytes and the
+    UTF-16 reading of it (`_utf16_views`) are all looked at, whatever the
+    encoding; the bytes with every NUL removed are one more view (ASCII text in
+    UTF-32 is seen through it). A finding never carries the token or any text."""
+    haystacks = (_as_bytes(path), data, data.replace(b"\x00", b""), *_utf16_views(data))
+    out: list[dict] = []
+    if any(has_private_id(h, digests) for h in haystacks):
+        out.append({"type": "private-id", "path": path})
+    if any(has_unlisted_session_uuid(h, allowed) for h in haystacks):
+        out.append({"type": "session-uuid", "path": path})
+    return out
+
+
+def scan_for_private_ids(entries: list[dict], root: Path,
+                         digests: frozenset[str] | None = None,
+                         allowed: frozenset[str] | None = None) -> list[dict]:
+    """Findings `{"type": "private-id" | "session-uuid" | "unreadable", "path"}`
+    for every INCLUDE entry, whatever its rule. Fails closed: a file that cannot
+    be read at all (missing, a dangling link, no permission) is an `unreadable`
+    finding, not a pass. The token is never put in a finding."""
+    findings: list[dict] = []
+    for e in entries:
+        if e["decision"] != "INCLUDE":
+            continue
+        try:
+            data = (root / e["path"]).read_bytes()
+        except OSError:
+            findings.append({"type": "unreadable", "path": e["path"]})
+            continue
+        findings += scan_path_and_bytes(e["path"], data, digests, allowed)
+    return findings
 
 
 # --------------------------------------------------------------------------
@@ -1327,6 +1495,7 @@ def scan_include_for_leaks(entries: list[dict], root: Path) -> list[dict]:
         token = find_token_shaped(text)
         if token:
             findings.append({"type": "token-shaped", "path": e["path"]})
+    findings.extend(scan_for_private_ids(entries, root))
     return findings
 
 

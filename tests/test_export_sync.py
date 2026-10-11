@@ -460,3 +460,154 @@ def test_the_timestamp_comes_from_the_standard_library():
             )
     assert "datetime.now(UTC)" in source
 
+
+
+# --------------------------------------------------------------------------- #
+# leakid -- the export refuses a file that holds a private id
+# --------------------------------------------------------------------------- #
+
+
+def test_an_export_with_a_private_id_stops_before_the_first_write(monkeypatch):
+    """A listed private session id, or a UUID-shaped id that is not on the
+    synthetic allowlist, in a file about to be exported stops the run before
+    anything is written: the staging file is byte for byte what it was and the
+    id is not printed. Controls: the same file without it, and with a
+    synthetic UUID, is written."""
+    import hashlib
+
+    sys.path.insert(0, str(ROOT / "tools"))
+    import export_manifest as em
+
+    made_up = "c0ffee11"
+    unlisted = "-".join(["1badc0de", "1234", "4abc", "8def", "0123456789ab"])
+    monkeypatch.setattr(em, "PRIVATE_ID_DIGESTS",
+                        frozenset({hashlib.sha256(made_up.encode()).hexdigest()}))
+
+    def carrying(text):
+        return lambda st, internal_, g: (internal_ / "f.txt").write_text(text)
+
+    for label, text in (("id", f"from session {made_up}\n"), ("uuid", f"id {unlisted}\n")):
+        with tempfile.TemporaryDirectory() as tmp:
+            rc, out, st = _export_in_fixture(Path(tmp), carrying(text))
+            assert rc == 1, (label, out)
+            assert (st / "f.txt").read_text() == "base\n", f"{label}: written despite the refusal"
+            assert "f.txt" in out and "nothing was written" in out
+            assert made_up not in out and unlisted not in out
+    for label, text in (("clean", "internal change\n"),
+                        ("synthetic", f"id {sorted(em.SYNTHETIC_SESSION_UUIDS)[-1]}\n")):
+        with tempfile.TemporaryDirectory() as tmp:
+            rc, out, st = _export_in_fixture(Path(tmp), carrying(text))
+            assert rc == 0, (label, out)
+            assert (st / "f.txt").read_text() == text
+
+    # A file that is not UTF-8 text, and one that cannot be read, stop it too.
+    def undecodable(st, internal_, g):
+        (internal_ / "f.txt").write_bytes(("caf\xe9 " + made_up).encode("latin-1"))
+    with tempfile.TemporaryDirectory() as tmp:
+        rc, out, st = _export_in_fixture(Path(tmp), undecodable)
+        assert rc == 1 and "private-id: f.txt" in out and made_up not in out
+        assert (st / "f.txt").read_text() == "base\n"
+
+    def many(st, internal_, g):                    # 25 carriers: at most 20 lines, then a count
+        import json as _json
+        entries = [{"path": "f.txt", "decision": "INCLUDE"}]
+        for i in range(25):
+            (internal_ / f"n{i:02d}.txt").write_text(f"from session {made_up}\n")
+            entries.append({"path": f"n{i:02d}.txt", "decision": "INCLUDE"})
+        entries.append({"path": "EXPORT_MANIFEST.json", "decision": "INCLUDE"})
+        (internal_ / "EXPORT_MANIFEST.json").write_text(_json.dumps({"entries": entries}))
+    with tempfile.TemporaryDirectory() as tmp:
+        rc, out, st = _export_in_fixture(Path(tmp), many)
+        assert rc == 1
+        assert sum(1 for ln in out.splitlines() if ln.startswith("  private-id: ")) == 20, out
+        assert "... and 5 more" in out
+        assert not (st / "n00.txt").exists()
+
+
+def test_the_bytes_that_were_scanned_are_the_bytes_that_are_written(monkeypatch):
+    """The scan and the copy read the file once: a file that changes after it
+    was scanned does not reach the public checkout with other bytes, and the
+    mode (here executable) is kept."""
+    sys.path.insert(0, str(ROOT / "tools"))
+    import export_manifest as em    # same module object the tool loads
+
+    real_scan = em.scan_path_and_bytes
+    internal = {}
+
+    def scan_then_change(path, data, *a, **k):
+        result = real_scan(path, data, *a, **k)
+        if path == "f.txt":
+            (internal["dir"] / "f.txt").write_text("changed after the scan\n")
+        return result
+    monkeypatch.setattr(em, "scan_path_and_bytes", scan_then_change)
+
+    def prepare(st, internal_, g):
+        internal["dir"] = internal_
+        (internal_ / "f.txt").write_text("scanned bytes\n")
+        (internal_ / "f.txt").chmod(0o755)
+    with tempfile.TemporaryDirectory() as tmp:
+        rc, out, st = _export_in_fixture(Path(tmp), prepare)
+        assert rc == 0, out
+        assert (st / "f.txt").read_text() == "scanned bytes\n"
+        assert (st / "f.txt").stat().st_mode & 0o111, "the mode of the source was lost"
+
+
+def test_a_file_that_cannot_be_read_after_the_comparison_stops_the_export(monkeypatch):
+    """leakidf. A file that is gone (or unreadable) between the comparison and
+    the scan is an `unreadable` finding: the run stops, nothing is written --
+    not even the files that could be read -- and there is no KeyError."""
+    import json as _json
+    import os
+
+    real_check = es.staging_check
+    where = {}
+
+    def check_then_lose_the_file(repo, head, write_ops):
+        result = real_check(repo, head, write_ops)
+        os.replace(where["dir"] / "f.txt", where["dir"] / "f.moved")
+        return result
+    monkeypatch.setattr(es, "staging_check", check_then_lose_the_file)
+
+    def prepare(st, internal_, g):
+        where["dir"] = internal_
+        (internal_ / "a.txt").write_text("readable and clean\n")
+        (internal_ / "EXPORT_MANIFEST.json").write_text(_json.dumps({"entries": [
+            {"path": "f.txt", "decision": "INCLUDE"},
+            {"path": "a.txt", "decision": "INCLUDE"},
+            {"path": "EXPORT_MANIFEST.json", "decision": "INCLUDE"}]}))
+    with tempfile.TemporaryDirectory() as tmp:
+        rc, out, st = _export_in_fixture(Path(tmp), prepare)
+        assert rc == 1, out
+        assert "unreadable: f.txt" in out and "nothing was written" in out
+        assert (st / "f.txt").read_text() == "base\n"
+        assert not (st / "a.txt").exists(), "a readable file was written although the run stopped"
+
+
+def test_an_id_in_a_directory_name_stops_the_export(monkeypatch):
+    """leakidf. The name that is scanned is the whole path, not the last
+    component: an id in a directory name, and one in a file name, each stop the
+    run with nothing written (the path is printed, as the spec's L8 says)."""
+    import hashlib
+    import json as _json
+
+    sys.path.insert(0, str(ROOT / "tools"))
+    import export_manifest as em
+
+    made_up = "c0ffee11"
+    monkeypatch.setattr(em, "PRIVATE_ID_DIGESTS",
+                        frozenset({hashlib.sha256(made_up.encode()).hexdigest()}))
+    for carrier in (f"scratch/{made_up}/notes.txt", f"{made_up}.txt"):
+        def prepare(st, internal_, g, carrier=carrier):
+            target = internal_ / carrier
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text("clean content\n")
+            (internal_ / "EXPORT_MANIFEST.json").write_text(_json.dumps({"entries": [
+                {"path": "f.txt", "decision": "INCLUDE"},
+                {"path": carrier, "decision": "INCLUDE"},
+                {"path": "EXPORT_MANIFEST.json", "decision": "INCLUDE"}]}))
+        with tempfile.TemporaryDirectory() as tmp:
+            rc, out, st = _export_in_fixture(Path(tmp), prepare)
+            assert rc == 1, (carrier, out)
+            assert f"private-id: {carrier}" in out and "nothing was written" in out
+            assert (st / "f.txt").read_text() == "base\n"
+            assert not (st / carrier).exists()

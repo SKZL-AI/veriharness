@@ -256,9 +256,11 @@ def _key_not_bound(probe: dict, key, requirement: dict, data: dict) -> str:
     entry = entries.get(key) if isinstance(entries, dict) and isinstance(key, str) else None
     theirs = entry.get("authoritative_item") if isinstance(entry, dict) else None
     ours = requirement.get("authoritative_item")
-    # Missing is absent, None or "" on either side; two missing items are not
-    # a match (`None == None` bound in the pkeybind review's mutant).
-    record_lacks, register_lacks = theirs in (None, ""), ours in (None, "")
+    # Missing is absent, None, "" or any other falsy value (0, False, [], {}) on
+    # either side, as on the pin (`not theirs`); two missing items are not a
+    # match (`None == None` bound in the pkeybind review's mutant). A truthy
+    # non-string (5, True, ["x"]) is compared as it is (Revision 3a).
+    record_lacks, register_lacks = not theirs, not ours
     if record_lacks and register_lacks:
         return (f"neither the record entry for {key!r} nor the register entry for "
                 f"{rid} names an authoritative_item; a probe reads only its own "

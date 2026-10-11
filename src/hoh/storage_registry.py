@@ -157,7 +157,7 @@ CREATED = "CREATED"
 REGISTERED = "REGISTERED"
 _ACCEPTED_ROOT_STATES = (CREATED, REGISTERED)
 
-_ID = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}$")
+_ID = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}\Z")   # \Z: `$` also matches before a final newline
 _COMMIT = re.compile(r"^[0-9a-f]{7,64}$")
 
 _OWNER_FILE = "OWNER.json"
@@ -973,7 +973,8 @@ class StorageRegistry:
         return record
 
     def register_project(
-        self, project_id: str, project_root: os.PathLike[str] | str
+        self, project_id: str, project_root: os.PathLike[str] | str, *,
+        fresh_target: bool = False
     ) -> dict[str, Any]:
         """Record `projects/<p>/PROJECT.json` for an existing directory.
 
@@ -988,13 +989,38 @@ class StorageRegistry:
         path alone and git discovery never reaches an enclosing repository. A
         separate clone is a different repository and may be registered. A
         partial clone is refused as a trust root (`_refuse_partial_clone`).
+
+        **`fresh_target=True`** (`hoh storage register-project`): the root is a
+        target clone this registry created (`create_external_root`, kind
+        `target_clone`), and the project is new. Every rule below refuses and
+        nothing is written; the order is not a contract, but it is this: the
+        path is its own resolved form and a directory, git must confirm it as a
+        repository root and it is no partial clone (all three before the lock);
+        then under the lock `_require_fresh_target`: a project directory (valid
+        or not) of this id exists (create-only: the idempotent return below
+        does not apply); the path is exactly the root of a target clone this
+        registry created, i.e. `owner_of` says `PROTECTED` of kind
+        `target_clone` and the owner project's index holds exactly ONE entry
+        for the path, with origin `created` and state `CREATED` (not a path
+        inside it, not a root registered through an anchor, not an entry next
+        to another entry, not a scratch directory, not anything `UNKNOWN`); the
+        root is a repository root whose git directory is its own plain `.git`
+        directory (not a symlink, not a file, common dir equal to it) and
+        borrows no objects (`objects/info/alternates` absent, and
+        `_refuse_git_store_in_layout`: no symlinked name of the git store and no symlink below
+        `objects/`, `refs/` or `reftable/`, as `adopt_project` requires); finally the
+        common "one root, one project" rule. The record then carries
+        `registered_target` (the owner project and the inode of the root).
         """
         self._require_init()
         _check_id(project_id, "project id")
-        try:
-            root = Path(project_root).resolve(strict=True)
-        except (OSError, RuntimeError) as exc:
-            raise StorageOwnershipError(f"project root {project_root} does not exist") from exc
+        if fresh_target:
+            root = self._resolve_exact(project_root, exists=True)
+        else:
+            try:
+                root = Path(project_root).resolve(strict=True)
+            except (OSError, RuntimeError) as exc:
+                raise StorageOwnershipError(f"project root {project_root} does not exist") from exc
         if not root.is_dir():
             raise StorageOwnershipError(f"project root {root} is not a directory")
         identity = self._repo_identity(root)
@@ -1002,6 +1028,9 @@ class StorageRegistry:
             self._refuse_partial_clone(root)
 
         with self._locked():
+            target: dict[str, Any] | None = None
+            if fresh_target:
+                target = self._require_fresh_target(project_id, root, identity)
             self._refuse_other_projects_root(project_id, root, identity)
             pdir = self._project_dir(project_id)
             if os.path.lexists(pdir):
@@ -1027,8 +1056,61 @@ class StorageRegistry:
                     "archive_namespace": project_id,
                     "sequence": self._next_sequence(project_id),
                 }
+                if target is not None:
+                    record["registered_target"] = target
                 _atomic_write_json(pdir / _PROJECT_FILE, record)
             return record
+
+    def _require_fresh_target(self, project_id: str, root: Path,
+                              identity: Path | None) -> dict[str, Any]:
+        """The checks of `register_project(..., fresh_target=True)` that precede
+        the common ones; the caller holds `_locked()`. Returns the
+        `registered_target` datum."""
+        if os.path.lexists(self._project_dir(project_id)):
+            raise StorageOwnershipError(
+                f"project {project_id!r} is already registered (or its directory exists); "
+                f"a fresh target is registered once"
+            )
+        owner = self.owner_of(root)
+        if owner.status != PROTECTED or owner.kind != "target_clone" \
+                or owner.project_id is None:
+            raise StorageOwnershipError(
+                f"{root} is not the root of a target clone this registry created "
+                f"({owner.status}, {owner.reason}); refusing"
+            )
+        # Bound to the entry that proves PROTECTED: the path has exactly one entry in the
+        # owner's index, and it is the one `create_external_root` wrote and finished.
+        entries = [e for e in self._root_entries(owner.project_id)
+                   if e.get("path") == str(root)]
+        if len(entries) != 1 or entries[0].get("origin") != "created" \
+                or entries[0].get("state") != CREATED:
+            raise StorageOwnershipError(
+                f"{root} has no single {CREATED} entry made by `create_external_root` in "
+                f"{_ROOT_INDEX} of project {owner.project_id!r}; refusing"
+            )
+        if identity is None:
+            raise StorageOwnershipError(
+                f"{root} is not a repository root with a working tree; refusing"
+            )
+        git_dir = root / ".git"
+        if git_dir.is_symlink() or not git_dir.is_dir() or identity != git_dir.resolve(strict=True):
+            raise StorageOwnershipError(
+                f"the git directory of {root} is not its own plain .git directory "
+                f"(a linked worktree or a separate git dir is not a clone this registry created); "
+                f"refusing"
+            )
+        if os.path.lexists(git_dir / "objects" / "info" / "alternates"):
+            raise StorageOwnershipError(
+                f"{root} borrows objects from another store (objects/info/alternates), e.g. a "
+                f"`git clone --shared`; it is not a whole clone this registry created; refusing"
+            )
+        # The store rule of `adopt_project`: no name of the git store (objects, refs, HEAD, ...)
+        # is a symlink, nothing below objects/, refs/ or reftable/ leads elsewhere, and no
+        # alternates content: a clone whose store is another repository's is not a whole clone
+        # this registry created, and a later git write in it would land in that store.
+        self._refuse_git_store_in_layout(git_dir, identity)
+        return {"owner_project": owner.project_id, "kind": "target_clone", "path": str(root),
+                "origin": "created", "st_dev": entries[0]["st_dev"], "st_ino": entries[0]["st_ino"]}
 
     def _refuse_other_projects_root(self, project_id: str, root: Path,
                                     identity: Path | None) -> None:

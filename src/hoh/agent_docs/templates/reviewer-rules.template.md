@@ -12,7 +12,7 @@
   claim is lost or overwritten.
 - Scope of verification: <SPEC REVIEW: targeted checks only | INTEGRATION REVIEW: the named mutants,
   an independent replay of the critical criteria, the interaction with the head>.
-- Report at most <WORDS> words. End the file with exactly these five lines, and a last sentence
+- Report at most <WORDS> words. End the file with exactly these six lines, and a last sentence
   "release yes" or "release no" before them ("no" only for BLOCKING):
 
 VERDICT: RELEASE_YES or RELEASE_NO
@@ -20,5 +20,10 @@ CANDIDATE: <full commit you reviewed>
 BASE: <full integration base commit>
 SPEC_SHA256: <sha256 of the specification file you reviewed, from the candidate>
 BLOCKING_OPEN: <number of open BLOCKING findings>
+COMPLETENESS: COMPLETE or PARTIAL
 
 RELEASE_YES requires BLOCKING_OPEN 0. Without the footer the merge gate refuses the report.
+COMPLETENESS is PARTIAL if any part of your scope was not done or you were cut off; a PARTIAL report
+is no verdict, whatever else it says. Write the footer last and do not touch the report afterwards:
+the merge gate refuses a report modified in the last minute, a footer that is not the last lines of
+the report, and a footer line that is missing, repeated or unknown.

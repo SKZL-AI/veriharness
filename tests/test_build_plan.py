@@ -327,8 +327,10 @@ def test_the_command_line_measures_the_bound_gate_items(tmp_path, monkeypatch, c
 def test_the_real_exit_includes_are_bound_and_the_checklist_gates_are_not():
     """The positive control over the real inventory and register, nothing stubbed:
     P2's five exit-includes are bound to P2-33..37, its three checklist gates to
-    nothing -- so even with everything PROVEN, P2's external gate stays shut on
-    exactly those three (DECISIONS Q2)."""
+    nothing -- no requirement claims them, and none may (DECISIONS Q2). They are
+    not "unmeasured" either: the programme's own instruments measure them
+    (`tests/test_build_plan_checklist_gate.py`), so what the gate says about them
+    is a measured reason, or a met condition once the closure has happened."""
     needs_evidence(PROGRAM_REGISTER)
     scope = bp._scope()
     requirements = bp._register_requirements()
@@ -343,8 +345,9 @@ def test_the_real_exit_includes_are_bound_and_the_checklist_gates_are_not():
 
     proven = [_row(r["id"], "PROVEN", phase=r["target_phase"]) for r in requirements]
     met, why = bp.phase_gates(proven, requirements)[1]["P2"]
-    assert met is False
-    assert why.startswith("3 exit condition(s) nothing here measures yet"), why
+    assert "nothing here measures yet" not in why, why
+    measures = bp.checklist_gate_measures()
+    assert met is all(answer for answer, _reason in measures.values()), (met, why)
 
 
 # --- the five P0 measurement rows read their status back ----------------------

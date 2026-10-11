@@ -2735,6 +2735,887 @@
     "148352a61be3293ff9667424fd6a414e28adfd57"
    ],
    "why_not_the_product": "O263 Revision 2: the label of the review count corrected after the second review round (459 first-round reviewer reports, 771 report files in all including re-review rounds, instead of '495 first-round'): README row, row V51 of the numbers table, the numbers table re-rendered by the tool, two claims re-anchored, the ledger Revision 2. Records and text and one row of an offline tool, written by a Sonnet 5.5 drafter under the orchestrator's brief. Ledger O263."
+  },
+  {
+   "id": "p242w-pin",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "4ab2f86b4a062c12209dfc46d59fa58afafcc7d2"
+   ],
+   "why_not_the_product": "The spec-only pin of the p242w run (P2-42 controller wiring): a single commit that adds dogfood/p242-wire/ (spec.md, spec sha256 1836fd6d...) on 0b9f95d6 after the spec review pair released it (p242wspec-a no with one BLOCKING, then yes in the narrow round 2; p242wspec-b yes). The pin of a run is the orchestrator's act and carries the Co-Authored-By trailer. Ledger O264."
+  },
+  {
+   "id": "p242w",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "414372a43b2c3b1486bffa2a094ad4881723c3bb"
+   ],
+   "run_state": "dogfood/p242-wire/20261009T0305Z/run-evidence/state.json",
+   "candidate_id": "20261009t0305z-p242w-i1-a1",
+   "why_not_the_product": "The product wired the controller and the CLI to registered ephemeral temporary roots (`hoh run` opens a registry session for a run of a registered project and both run_check sites get scratch= from a per-iteration workspace entered after every iteration gate) in run 20261009t0305z-p242w from dogfood/p242-wire/spec.md (Revision 2; accepted in iteration 1 at 2026-10-09T03:54:44Z; import refs/imports/p242w = 414372a4). Its integration pair released it NO (two BLOCKING: a stale or duplicate `hoh run` wrote PAUSED into a live master's run; `hoh resume-storage` unparked a run in a one-GiB band and it was re-parked again and again); it was merged only together with its repair, entry p242wf (merge 485b6251). P2-42 stays PARTIAL. Evidence in dogfood/p242-wire/20261009T0305Z/. Ledger O264."
+  },
+  {
+   "id": "p242wf-pin",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "fafa296dca817693babd0aeb068ff92ac6591316"
+   ],
+   "why_not_the_product": "The spec-only pin of the p242wf run (repair of p242w): a single commit that adds dogfood/p242wf/ (spec.md, spec sha256 5a6d59c8...) on refs/imports/p242w = 414372a4 after the spec review pair released it yes/yes (MINORs only). The pin of a run is the orchestrator's act and carries the Co-Authored-By trailer. Ledger O264."
+  },
+  {
+   "id": "p242wf",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "6f7d603d5a79045e950cb1963543df07a1cb6f14",
+    "485b6251905bd860acc2b6e3e4d5a26d09ee47fc"
+   ],
+   "run_state": "dogfood/p242wf/20261009T0529Z/run-evidence/state.json",
+   "candidate_id": "20261009t0529z-p242wf-i1-a2",
+   "why_not_the_product": "The product repaired the p242w candidate (the resume gate asks for the role_run and the iteration's temporary workspace together; a session held by a live lease of another process is refused as already being executed, writing nothing; the workspace-stays note reaches the disk) in run 20261009t0529z-p242wf from dogfood/p242wf/spec.md (accepted in iteration 1 attempt 2 at 2026-10-09T12:34:20Z after a storage park on the inode axis and a resume by `hoh resume-storage`; import refs/imports/p242wf = 6f7d603d, which contains 414372a4). The merge 485b6251 brings in p242w and p242wf together; the orchestrator wrote the spec, pinned it, imported the candidate, had the two round-1 reviewers confirm it (p242wint-a-r2 and p242wint-b-r2 release yes/yes) and merged after tools/merge_gate.py found MERGE_ELIGIBLE (receipt digest in the merge message). P2-42 stays PARTIAL. Evidence in dogfood/p242wf/20261009T0529Z/. Ledger O264."
+  },
+  {
+   "id": "p243e-pin",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "e4ffca6866f540a74e97fa0bcc5ccb8469e4a2ea"
+   ],
+   "why_not_the_product": "The spec-only pin of the p243e run (P2-43 pre-turn baseline): a single commit that adds dogfood/p243e/ (spec.md, spec sha256 cc7bbc10...) on 39348042 after the spec review pair (p243espec-a no with one BLOCKING, then yes in the narrow round 2; p243espec-b yes). The pin of a run is the orchestrator's act and carries the Co-Authored-By trailer. Ledger O264."
+  },
+  {
+   "id": "p243e",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "8ea8db77d5f67675406331b02073e54fb61b2258",
+    "8d7f8c0421413189670f4a7d20f79557c25dc8ec"
+   ],
+   "run_state": "dogfood/p243e/20261009T0729Z/run-evidence/state.json",
+   "candidate_id": "20261009t0729z-p243e-i1-a1",
+   "why_not_the_product": "The product made a limit banner that the developer's pane already showed when the prompt was sent not count as this turn's (a pre-turn baseline read once; a status-area line is never spent) in run 20261009t0729z-p243e from dogfood/p243e/spec.md (Revision 2; accepted in iteration 1 at 2026-10-09T12:09:52Z after a storage park and a resume; import refs/imports/p243e = 8ea8db77). The orchestrator wrote the spec, pinned it, imported the candidate, had two Herdr agents review it (p243eint-a and p243eint-b release yes/yes) and merged it after tools/merge_gate.py found MERGE_ELIGIBLE (receipt digest in the merge message 8d7f8c04). P2-43 stays PROVEN; its register note is extended by the records entry O264, not by this run. Evidence in dogfood/p243e/20261009T0729Z/. Ledger O264."
+  },
+  {
+   "id": "o262-merge",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "58d7f7001c4d0e640f9c54d93b5b3cc1aec2beba"
+   ],
+   "why_not_the_product": "The merge of the O262 records branch (refs/imports/o262 = 8b61559e) after the review pair o262rev-a (TRUTH) and o262rev-b (MECHANICS) released it yes/yes with 0 BLOCKING and tools/merge_gate.py found MERGE_ELIGIBLE (receipt digest 2ec7d6dd... in the merge message). The content merged is attributed in the entries o262-evidence, o262-records, o262-revision-1 and o262-revision-2. Ledger O264."
+  },
+  {
+   "id": "o263-merge",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "b352c6675fd92dd4a34262a2c653fa094ce4aa3d"
+   ],
+   "why_not_the_product": "The merge of the O263 documentation-refresh branch (refs/imports/docs-refresh = e8e67f42) after the review pair docsrev-a (PUBLIC TRUTH) and docsrev-b (MECHANICS) released it yes/yes in three rounds with 0 BLOCKING and tools/merge_gate.py found MERGE_ELIGIBLE (receipt digest 34ae83a2... in the merge message). The content merged is attributed in the entries o263-docs-refresh, o263-revision-1 and o263-revision-2. Ledger O264."
+  },
+  {
+   "id": "export-sync-base-a84e4030",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": false,
+   "commits": [
+    "9ce4a5de02efb9663cab7186642c2334198a14f3"
+   ],
+   "why_not_the_product": "The export-sync base recorded at the public export a84e4030 of the documentation refresh: the output of tools/export_sync.py record --export-commit a84e4030 (dogfood/export-sync/EXPORT_SYNC_STATE.json), nothing else. Tool output after the operator's standing publish authority of 2026-10-09; the public repository moved e95e09a0 to a84e4030 by a fast-forward; not a release and not development work. Ledger O264."
+  },
+  {
+   "id": "i3-pin",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "05db37f0ceb331888dfc8e2fd4b0a8c08f8243ec"
+   ],
+   "why_not_the_product": "The spec-only pin of the i3 run (A6 P5-36, the merge gate as a product command): a single commit that adds dogfood/i3/ (spec.md, spec sha256 b6602bb0...) on 8d7f8c04 after the spec review pair (i3spec-a and i3spec-b both no in round 1, both yes in the narrow round 2). The pin of a run is the orchestrator's act and carries the Co-Authored-By trailer. Ledger O264."
+  },
+  {
+   "id": "i3",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "2109d6ea1988dcc9c30004f8d83a9973921fef27",
+    "1be5ac70d21c288386129a1d34d2b7de52d0dd3b"
+   ],
+   "run_state": "dogfood/i3/20261009T1444Z/run-evidence/state.json",
+   "candidate_id": "20261009t1444z-i3-i1-a1",
+   "why_not_the_product": "The product made the merge gate a command (`hoh merge-gate check` and `verify` in src/hoh/mergegate.py: a closed six-line footer with a completeness field, a 60-second stable-mtime double-stat rule, a create-only receipt with the digest of every report, `verify` against the exact pair) in run 20261009t1444z-i3 from dogfood/i3/spec.md (Revision 2; accepted in iteration 1 at 2026-10-09T15:02:31Z; import refs/imports/i3 = 2109d6ea). The orchestrator wrote the spec, pinned it, imported the candidate, had two Herdr agents review it (i3int-a and i3int-b release yes/yes) and merged it after tools/merge_gate.py (the orchestrator's script, not this command) found MERGE_ELIGIBLE (receipt digest in the merge message 1be5ac70). P5-36 reads PARTIAL by the records entry O264, not by this run. Evidence in dogfood/i3/20261009T1444Z/. Ledger O264."
+  },
+  {
+   "id": "hyg-pin",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "7e59957d2c886c556eacf46fba2c4c25ca5cdbd5"
+   ],
+   "why_not_the_product": "The spec-only pin of the hyg run (test and tool hygiene): a single commit that adds dogfood/hyg/ (spec.md, spec sha256 23a1c80c...) on 8d7f8c04 after the spec review pair (hygspec-a and hygspec-b both yes; MINORs folded). The pin of a run is the orchestrator's act and carries the Co-Authored-By trailer. Ledger O264."
+  },
+  {
+   "id": "hyg",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "7bf1904b53d83d79963b2eebf8b2cbb78cb8f0ff",
+    "addb7e0f98738cce9917a39eeecc6acf4340d1d0"
+   ],
+   "run_state": "dogfood/hyg/20261009T1501Z/run-evidence/state.json",
+   "candidate_id": "20261009t1501z-hyg-i1-a1",
+   "why_not_the_product": "The product pinned the legacy-scratch rules E1 to E5 and E9, fixed the age test alone, stopped a falsy non-string item from binding a probe key, added a duplicate-id FAIL to the readiness board, read decorator literals in the German-text gate and added a gate for private session identifiers, in run 20261009t1501z-hyg from dogfood/hyg/spec.md (Revision 2; accepted in iteration 1 at 2026-10-09T15:18:03Z; import refs/imports/hyg = 7bf1904b; five test files, tools/capability_matrix.py, tools/readiness.py; no src/ change). The orchestrator wrote the spec, pinned it, imported the candidate, had two Herdr agents review it (hygint-a and hygint-b release yes/yes) and merged it after tools/merge_gate.py found MERGE_ELIGIBLE (receipt digest in the merge message addb7e0f). Evidence in dogfood/hyg/20261009T1501Z/. Ledger O264."
+  },
+  {
+   "id": "i10a-pin",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "43d12e8fed728fa759fac8cbf43925f5a1f9282c"
+   ],
+   "why_not_the_product": "The spec-only pin of the i10a run (A6 P5-39, the owned-surface reaper): a single commit that adds dogfood/i10a/ (spec.md, spec sha256 7a1e39ab...) on 8d7f8c04 after the spec review pair (i10aspec-a no, no, then yes in the narrow rounds 2 and 3; i10aspec-b yes). The pin of a run is the orchestrator's act and carries the Co-Authored-By trailer. Ledger O264."
+  },
+  {
+   "id": "i10a",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "8559629c717f8c0a5895d2a14f316769a8706ba9"
+   ],
+   "run_state": "dogfood/i10a/20261009T1504Z/run-evidence/state.json",
+   "candidate_id": "20261009t1504z-i10a-i1-a1",
+   "why_not_the_product": "The product built the owned-surface registry and its terminal reaper (`hoh surface open`, `list` and `reap` in src/hoh/surfaces.py, and a reap at the end of `hoh run`) in run 20261009t1504z-i10a from dogfood/i10a/spec.md (Revision 3; accepted in iteration 1 at 2026-10-09T15:28:05Z; import refs/imports/i10a = 8559629c). Its integration pair released it split (i10aint-a yes, i10aint-b NO with one BLOCKING: the reaper raised and wrote standard output on a broken standard error); it was merged only together with its repair, entry i10af (merge fb473c13). Evidence in dogfood/i10a/20261009T1504Z/. Ledger O264."
+  },
+  {
+   "id": "i10af-pin",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "f9f6d2bebc72f21de3d1fe81d197656a5760a098"
+   ],
+   "why_not_the_product": "The spec-only pin of the i10af run (repair of i10a): a single commit that adds dogfood/i10af/ (spec.md, spec sha256 b878d822...) on refs/imports/i10a = 8559629c after the spec review pair (i10afspec-a no, then yes in the narrow round 2; i10afspec-b yes). The pin of a run is the orchestrator's act and carries the Co-Authored-By trailer. Ledger O264."
+  },
+  {
+   "id": "i10af",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "25b49c4b8ee3662c51490e0dab871d595ca885fa",
+    "fb473c13de2489bd1de3d03b94c4e140f6928037"
+   ],
+   "run_state": "dogfood/i10af/20261009T1645Z/run-evidence/state.json",
+   "candidate_id": "20261009t1645z-i10af-i1-a1",
+   "why_not_the_product": "The product repaired the i10a candidate (reap_after_run never raises, never writes standard output and never changes the exit code under any standard-error state; a vacuous criterion strengthened; a lost reap race books no refusal) in run 20261009t1645z-i10af from dogfood/i10af/spec.md (Revision 2a; accepted in iteration 1 at 2026-10-09T16:57:00Z; import refs/imports/i10af = 25b49c4b, which contains 8559629c). The merge fb473c13 brings in i10a and i10af together; the orchestrator wrote the spec, pinned it, imported the candidate, had the two round-1 reviewers confirm it (i10aint-a-r2 and i10aint-b-r2 release yes/yes) and merged after tools/merge_gate.py found MERGE_ELIGIBLE (receipt digest in the merge message). P5-39 reads PARTIAL by the records entry O264, not by this run. Evidence in dogfood/i10af/20261009T1645Z/. Ledger O264."
+  },
+  {
+   "id": "i12-pin",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "9d08ad48184cb8a9a4e5b849b5c7fdd5387bd19b"
+   ],
+   "why_not_the_product": "The spec-only pin of the i12 run (A6 P5-43 slice 1, hoh wait): a single commit that adds dogfood/i12/ (spec.md, spec sha256 274c84b2...) on 9ce4a5de after the spec review pairs (round 1 i12spec-a and -b both no; the fresh pair i12spec2-a no and i12spec2-b yes; i12spec2-a-r3 yes). The pin of a run is the orchestrator's act and carries the Co-Authored-By trailer. Ledger O264."
+  },
+  {
+   "id": "i12",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "bac59decd6204974818af262c07ba225a7f038c0",
+    "577185d1e9b6746488362e782882bd80be791e30"
+   ],
+   "run_state": "dogfood/i12/20261009T1550Z/run-evidence/state.json",
+   "candidate_id": "20261009t1550z-i12-i1-a1",
+   "why_not_the_product": "The product built the read-only wait on a run (`hoh wait RUN` in src/hoh/runwait.py: one JSON line and an exit code per outcome, never writes, never polls faster than a second, never waits unbounded) in run 20261009t1550z-i12 from dogfood/i12/spec.md (Revision 3; accepted in iteration 1 at 2026-10-09T16:25:27Z; import refs/imports/i12 = bac59dec). The orchestrator wrote the spec, pinned it, imported the candidate, had two Herdr agents review it (i12int-a and i12int-b release yes/yes) and merged it after tools/merge_gate.py found MERGE_ELIGIBLE (receipt digest in the merge message 577185d1). P5-43 stays MISSING (slice 1 of nine clauses). Evidence in dogfood/i12/20261009T1550Z/. Ledger O264."
+  },
+  {
+   "id": "cfid-pin",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "319782098119f63ed94b5fe8971d379513ea85c4"
+   ],
+   "why_not_the_product": "The spec-only pin of the cfid run (SL-08 criterion fidelity, slice 1): a single commit that adds dogfood/cfid/ (spec.md, spec sha256 0144da03...) on 9ce4a5de after the spec review pair (cfidspec-a and cfidspec-b both yes; MINORs folded). The pin of a run is the orchestrator's act and carries the Co-Authored-By trailer. Ledger O264."
+  },
+  {
+   "id": "cfid",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "295f04ad555f73e8f151ab11f9fa7bb7b5f714a3"
+   ],
+   "run_state": "dogfood/cfid/20261009T1552Z/run-evidence/state.json",
+   "candidate_id": "20261009t1552z-cfid-i1-a1",
+   "why_not_the_product": "The product made a specification able to declare its criteria in one `criteria` block and the controller refuse a plan that drops, re-types, wraps or deselects a declared criterion (src/hoh/spec_criteria.py, hunks in controller.py and roles.py) in run 20261009t1552z-cfid from dogfood/cfid/spec.md (Revision 2; accepted in iteration 1 at 2026-10-09T16:24:48Z; import refs/imports/cfid = 295f04ad). Its integration pair released it yes/yes, but the orchestrator's local full suite on HEAD plus the candidate had 10 new failures (tests/test_phase2.py reloads hoh.roles); it was merged only together with its repair, entry cfidf (merge f44f90df). Evidence in dogfood/cfid/20261009T1552Z/. Ledger O264."
+  },
+  {
+   "id": "cfidf-pin",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "eb38dc2b076d61d6fd09e324e3960e9840388da0"
+   ],
+   "why_not_the_product": "The spec-only pin of the cfidf run (repair of cfid: the test-isolation defect): a single commit that adds dogfood/cfidf/ (spec.md, spec sha256 d74efcf6...) on refs/imports/cfid = 295f04ad after the spec review pair (cfidfspec-a and cfidfspec-b both yes; MINORs folded). The pin of a run is the orchestrator's act and carries the Co-Authored-By trailer. Ledger O264."
+  },
+  {
+   "id": "cfidf",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "d293027684d79fb7c83d91842d0ec329f8211f17",
+    "f44f90dfa0a84c4f3c0b2b61a42857e0caab5bb1"
+   ],
+   "run_state": "dogfood/cfidf/20261009T1729Z/run-evidence/state.json",
+   "candidate_id": "20261009t1729z-cfidf-i2-a1",
+   "why_not_the_product": "The product repaired the test-isolation defect that the cfid candidate exposed (tests/test_phase2.py no longer reloads the real hoh.roles: it executes a private-name copy; a guard forbids reloading hoh modules in tests) in run 20261009t1729z-cfidf from dogfood/cfidf/spec.md (accepted in iteration 2 at 2026-10-09T17:53:39Z, iteration 1 rightly not accepted; import refs/imports/cfidf = d2930276, which contains 295f04ad). The merge f44f90df brings in cfid and cfidf together; the orchestrator wrote the spec, pinned it, imported the candidate, had the two round-1 reviewers confirm it (cfidint-a-r2 and cfidint-b-r2 release yes/yes) and merged after tools/merge_gate.py found MERGE_ELIGIBLE (receipt digest in the merge message). The register is not lifted by this run. Evidence in dogfood/cfidf/20261009T1729Z/. Ledger O264."
+  },
+  {
+   "id": "o264-evidence",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "a737340ae81739bceba283a276fa5268d70e924e"
+   ],
+   "why_not_the_product": "O264 part 1: the run evidence of the ten product runs merged since O262 with their integration and spec reviews, and the review reports of the O262 and O263 records merges, copied by build_evidence_o264.py (additions only, 1755 files). Records only, written by a Sonnet 5.5 drafter under the orchestrator's brief. A commit cannot name itself, so the attribution of the remaining O264 records commits is an entry of the next commit. Ledger O264."
+  },
+  {
+   "id": "o264-records",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "dff02f086463f6b05d2a6447c42a72ab87eaafb0"
+   ],
+   "why_not_the_product": "O264 records: the register notes of the ten product runs merged after O262 (P2-42 wiring, P2-43 stale-banner limit, P5-36 and P5-39 with equivalents, the P5-43 clause table, hygiene, criterion fidelity), the progress record of amendment A6 (the pinned A6 files stay untouched), the redaction of six private identifier sites, README and LIMITATIONS dated updates, the claims, the export manifest, the regenerated derived documents, the attribution entries and the ledger entry O264. Records and text, written by a Sonnet 5.5 drafter under the orchestrator's brief. A commit cannot name itself, so the attribution of the Revision 1 commit is an entry of the next commit. Ledger O264."
+  },
+  {
+   "id": "o264-revision-1",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "7f111c3b6ce409bd49ed35182e09a9ef217038fc"
+   ],
+   "why_not_the_product": "O264 Revision 1: paper/NUMBERS_V2.md re-rendered at the O264 records commit (nine rows), the dated sentences that carry the moved figures (a README paragraph, a LIMITATIONS paragraph, a new section 18 of the second paper, erratum E11 of the first paper), 22 claims, 7 not_claims and 10 re-anchored entries, the attribution entry of the records commit, and the ledger Revision 1. Records and text, written by a Sonnet 5.5 drafter under the orchestrator's brief. Ledger O264."
+  },
+  {
+   "id": "o264-revision-2",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "20ebe869c76bc329cb0cc1b665197488269b3d13"
+   ],
+   "why_not_the_product": "O264 Revision 2 (ledger only): one precision to the redaction section (the two copied reports that quote a private prefix quote different ones) and the delta shape of the branch. Records only, written by a Sonnet 5.5 drafter under the orchestrator's brief. Ledger O264."
+  },
+  {
+   "id": "o264-revision-3",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "08bb17efbdbdd6e43aa7020243d473c09fd38995"
+   ],
+   "why_not_the_product": "O264 Revision 3: the MINORs of the review pair o264rev-a and o264rev-b folded in one revision (the README sentence on the register corrected, the section references of the progress file, two corrections and one missing slip in the ledger, the deviation of cfid checklist item 5, the wording of the time of the publish authority, the recorded lines of the README claims refreshed). Records and text, written by a Sonnet 5.5 drafter under the orchestrator's brief. Ledger O264."
+  },
+  {
+   "id": "i11-pin",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "5d8d8f14fa71b0c3ac9b6d5b71c0f690fcd4e533"
+   ],
+   "why_not_the_product": "The spec-only pin of the i11 run: a single commit that adds dogfood/i11/ (spec.md, spec sha256 984a2d30...) on 3713a5d8 after the spec review (i11spec-a and i11spec-b both yes). The pin of a run is the orchestrator's act and carries the Co-Authored-By trailer. Ledger O265."
+  },
+  {
+   "id": "i11",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "b1155008ada14c3e030d741a096ee5f4cfb46a98",
+    "cf7c26c2a6d0ec8cf4476d128ba4f14ade81bca8"
+   ],
+   "run_state": "dogfood/i11/20261009T2033Z/run-evidence/state.json",
+   "candidate_id": "20261009t2033z-i11-i1-a1",
+   "why_not_the_product": "The product built the detached run, slice 1 (`hoh run --detach`: a read-only preflight, an owned run-host tab with an allow-listed environment, one typed command, a log and a create-only launch record) in run 20261009t2033z-i11 from dogfood/i11/spec.md (accepted in iteration 1; import refs/imports/i11 = b1155008). The orchestrator wrote the spec, pinned it, imported the candidate, had two review agents review it (i11-a and i11-b, release yes/yes) and merged it after both gates found MERGE_ELIGIBLE (the product's `hoh merge-gate check` as the gate of record where it was one, the orchestrator's script as the cross-check; receipt digests in the merge message cf7c26c2). P5-42 stays MISSING (clauses C1-C5, part of C6 and C8). Evidence in dogfood/i11/20261009T2033Z/. Ledger O265."
+  },
+  {
+   "id": "leakid-pin",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "27e57b82ff1fe84345f257508a1ee1b5ec3b810c"
+   ],
+   "why_not_the_product": "The spec-only pin of the leakid run: a single commit that adds dogfood/leakid/ (spec.md, spec sha256 a88e57ec...) on 3713a5d8 after the spec review (leakidspec-a no, then yes in round 2; leakidspec-b yes). The pin of a run is the orchestrator's act and carries the Co-Authored-By trailer. Ledger O265."
+  },
+  {
+   "id": "leakid",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "38254c9bdd1b88de2d4c5acac8e206657f9c42f2"
+   ],
+   "run_state": "dogfood/leakid/20261009T2015Z/run-evidence/state.json",
+   "candidate_id": "20261009t2015z-leakid-i1-a1",
+   "why_not_the_product": "The product built the export leak scan for private session and scratch identifiers (digests only, a UUID rule with an allowlist, a bytes scan that fails closed, export_sync scans the exact bytes it writes) in run 20261009t2015z-leakid from dogfood/leakid/spec.md (accepted in iteration 1; import refs/imports/leakid = 38254c9b). The orchestrator wrote the spec, pinned it, imported the candidate, had two review agents review it (leakid-a and leakid-b, release yes/yes) and did not merge it alone. Round 1 of its integration pair was split (leakid-a NO: a UTF-16 view next to a non-ASCII character failed open); it was merged only together with its repair, entry leakidf (merge 1869a46a). Evidence in dogfood/leakid/20261009T2015Z/. Ledger O265."
+  },
+  {
+   "id": "leakidf-pin",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "b24c70438ae9990b3d231c42dab7cbea3f963e10"
+   ],
+   "why_not_the_product": "The spec-only pin of the leakidf run: a single commit that adds dogfood/leakidf/ (spec.md, spec sha256 2b95cb48...) on refs/imports/leakid = 38254c9b after the spec review (leakidfspec-a and leakidfspec-b both yes). The pin of a run is the orchestrator's act and carries the Co-Authored-By trailer. Ledger O265."
+  },
+  {
+   "id": "leakidf",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "7456f97805c4e49123b193460332e68b00726fce",
+    "1869a46a08e0d4e584213073f2c72ee5adcc2c01"
+   ],
+   "run_state": "dogfood/leakidf/20261009T2118Z/run-evidence/state.json",
+   "candidate_id": "20261009t2118z-leakidf-i1-a1",
+   "why_not_the_product": "The product built the repair of the leak scan (UTF-16 little and big endian decoded views, readiness reads private-id, session-uuid and unreadable as leaks, two more digests) in run 20261009t2118z-leakidf from dogfood/leakidf/spec.md (accepted in iteration 1; import refs/imports/leakidf = 7456f978). The orchestrator wrote the spec, pinned it, imported the candidate, had two review agents review it (leakid-a and leakid-b (round 2 on 7456f978, base re-bind round 3 on cf7c26c2), release yes/yes) and merged it after both gates found MERGE_ELIGIBLE (the product's `hoh merge-gate check` as the gate of record where it was one, the orchestrator's script as the cross-check; receipt digests in the merge message 1869a46a). The merge 1869a46a brings in leakid and leakidf together. Evidence in dogfood/leakidf/20261009T2118Z/. Ledger O265."
+  },
+  {
+   "id": "i10b-pin",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "d4d39f25f79c779be92eb6b2ff280b0de32e80e9"
+   ],
+   "why_not_the_product": "The spec-only pin of the i10b run: a single commit that adds dogfood/i10b/ (spec.md, spec sha256 dfa37bf9...) on 3713a5d8 after the spec review (i10bspec-a no, then yes in round 2; i10bspec-b yes). The pin of a run is the orchestrator's act and carries the Co-Authored-By trailer. Ledger O265."
+  },
+  {
+   "id": "i10b",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "c19af7d43db6d38bb824e587fffba07682171b78"
+   ],
+   "run_state": "dogfood/i10b/20261009T2008Z/run-evidence/state.json",
+   "candidate_id": "20261009t2008z-i10b-i1-a1",
+   "why_not_the_product": "The product built the per-run storage account, slice 1 (`hoh storage account`: bytes and entries over registry-owned paths, hard links once, UNMEASURED never 0, every walk bounded) in run 20261009t2008z-i10b from dogfood/i10b/spec.md (accepted in iteration 1; import refs/imports/i10b = c19af7d4). The orchestrator wrote the spec, pinned it, imported the candidate, had two review agents review it (i10b-a and i10b-b, release yes/yes) and did not merge it alone. The first run of the strand (20261009t2004z-i10b) was BLOCKED at planning by the capability witness and cancelled by the orchestrator with a reason; this is its relaunch. Round 1 of its integration pair was split (i10b-b NO: the account-level unproven aggregate read 0 while items were UNMEASURED); it was merged only together with its repair, entry i10bf (merge 79ea2a90). Evidence in dogfood/i10b/20261009T2008Z/. Ledger O265."
+  },
+  {
+   "id": "i10bf-pin",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "9dcf2a7cf1c5b90a6899d1a14dd4602e26ac91f0"
+   ],
+   "why_not_the_product": "The spec-only pin of the i10bf run: a single commit that adds dogfood/i10bf/ (spec.md, spec sha256 1d568f05...) on refs/imports/i10b = c19af7d4 after the spec review (i10bfspec-a and i10bfspec-b both yes). The pin of a run is the orchestrator's act and carries the Co-Authored-By trailer. Ledger O265."
+  },
+  {
+   "id": "i10bf",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "a5171b59c42b46048d633a35edeae03f8d5760ac",
+    "79ea2a905cc43283ca41b1b23b55e352ba23bbd1"
+   ],
+   "run_state": "dogfood/i10bf/20261010T1127Z/run-evidence/state.json",
+   "candidate_id": "20261010t1127z-i10bf-i1-a1",
+   "why_not_the_product": "The product built the repair of the storage account (the unproven aggregate reads UNMEASURED with lower bounds, valid JSON for non-UTF-8 names, NOT_INTACT roots named, VALIDATED labels need registry acceptance, bounded PROJECT.json read) in run 20261010t1127z-i10bf from dogfood/i10bf/spec.md (accepted in iteration 1; import refs/imports/i10bf = a5171b59). The orchestrator wrote the spec, pinned it, imported the candidate, had two review agents review it (i10b-a and i10b-b (round 2 on 1869a46a, base re-bind rb1 on 9fd95ff1), release yes/yes) and merged it after both gates found MERGE_ELIGIBLE (the product's `hoh merge-gate check` as the gate of record where it was one, the orchestrator's script as the cross-check; receipt digests in the merge message 79ea2a90). The merge 79ea2a90 brings in i10b and i10bf together. P5-40 stays MISSING. Evidence in dogfood/i10bf/20261010T1127Z/. Ledger O265."
+  },
+  {
+   "id": "hyg2-pin",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "3c6042dc963ad93167b3710b03792021c5dfe9f8"
+   ],
+   "why_not_the_product": "The spec-only pin of the hyg2 run: a single commit that adds dogfood/hyg2/ (spec.md, spec sha256 281bf9f9...) on 1869a46a after the spec review (hyg2spec-a no, then yes in round 2; hyg2spec-b yes). The pin of a run is the orchestrator's act and carries the Co-Authored-By trailer. Ledger O265."
+  },
+  {
+   "id": "hyg2",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "e498c3aeda1d57d1e7709b9daff1e6f0b9fcdd77"
+   ],
+   "run_state": "dogfood/hyg2/20261010T1132Z/run-evidence/state.json",
+   "candidate_id": "20261010t1132z-hyg2-i1-a1",
+   "why_not_the_product": "The product built the hygiene allowlist pinned to file AND literal in both directions, test-only (a binding test and a stale-entry test) in run 20261010t1132z-hyg2 from dogfood/hyg2/spec.md (accepted in iteration 1; import refs/imports/hyg2 = e498c3ae). The orchestrator wrote the spec, pinned it, imported the candidate, had two review agents review it (hyg2-a and hyg2-b, release yes/yes) and did not merge it alone. Round 1 of its integration pair was split (hyg2-a NO: the exactness of the pins was one-sided); it was merged only together with its repair, entry hyg2f (merge c618a0d2). Evidence in dogfood/hyg2/20261010T1132Z/. Ledger O265."
+  },
+  {
+   "id": "hyg2f-pin",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "008101ca76bc0f550c73e1a222314347df94373d"
+   ],
+   "why_not_the_product": "The spec-only pin of the hyg2f run: a single commit that adds dogfood/hyg2f/ (spec.md, spec sha256 9bbdb50e...) on refs/imports/hyg2 = e498c3ae after the spec review (hyg2fspec-a and hyg2fspec-b both yes). The pin of a run is the orchestrator's act and carries the Co-Authored-By trailer. Ledger O265."
+  },
+  {
+   "id": "hyg2f",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "ec46e11e4d8c7b7812a5d3da2bf988fcc49a3c49",
+    "c618a0d28c6d4fff542aeb1566d111dc0edcdc58"
+   ],
+   "run_state": "dogfood/hyg2f/20261010T1610Z/run-evidence/state.json",
+   "candidate_id": "20261010t1610z-hyg2f-i1-a1",
+   "why_not_the_product": "The product built the repair of the hygiene pins (whitespace, case, [:40], method rows and stacked decorators pinned), test-only in run 20261010t1610z-hyg2f from dogfood/hyg2f/spec.md (accepted in iteration 1; import refs/imports/hyg2f = ec46e11e). The orchestrator wrote the spec, pinned it, imported the candidate, had two review agents review it (hyg2-a and hyg2-b (round 2 on 9fd95ff1, base re-bind rb1 on 2b7978d5), release yes/yes) and merged it after both gates found MERGE_ELIGIBLE (the product's `hoh merge-gate check` as the gate of record where it was one, the orchestrator's script as the cross-check; receipt digests in the merge message c618a0d2). The merge c618a0d2 brings in hyg2 and hyg2f together. Evidence in dogfood/hyg2f/20261010T1610Z/. Ledger O265."
+  },
+  {
+   "id": "i3b-pin",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "2345b2bf78babbbffe506923bec0bcd42c985ca4"
+   ],
+   "why_not_the_product": "The spec-only pin of the i3b run: a single commit that adds dogfood/i3b/ (spec.md, spec sha256 9d4ea7bf...) on 1869a46a after the spec review (i3bspec-a and i3bspec-b both yes). The pin of a run is the orchestrator's act and carries the Co-Authored-By trailer. Ledger O265."
+  },
+  {
+   "id": "i3b",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "8dbefb77fb9176272222c2258d3eb4e976e0eb84",
+    "1e633e4628c66af24e90af4ec21d46ce4c9d269f"
+   ],
+   "run_state": "dogfood/i3b/20261010T1133Z/run-evidence/state.json",
+   "candidate_id": "20261010t1133z-i3b-i1-a1",
+   "why_not_the_product": "The product built the guarded report read of the merge gate (O_NONBLOCK, O_NOFOLLOW, fstat, a size bound, a directory-fd walk; ASCII-only gate tests) in run 20261010t1133z-i3b from dogfood/i3b/spec.md (accepted in iteration 1; import refs/imports/i3b = 8dbefb77). The orchestrator wrote the spec, pinned it, imported the candidate, had two review agents review it (i3b-a and i3b-b, release yes/yes) and merged it after both gates found MERGE_ELIGIBLE (the product's `hoh merge-gate check` as the gate of record where it was one, the orchestrator's script as the cross-check; receipt digests in the merge message 1e633e46). P5-36 stays PARTIAL; this is the first merge for which the product command is the gate of record. Evidence in dogfood/i3b/20261010T1133Z/. Ledger O265."
+  },
+  {
+   "id": "i12b-pin",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "add300902a3f09f287de359ec579277ffce77b7b"
+   ],
+   "why_not_the_product": "The spec-only pin of the i12b run: a single commit that adds dogfood/i12b/ (spec.md, spec sha256 8c6c0492...) on 1869a46a after the spec review (i12bspec-a and i12bspec-b both yes). The pin of a run is the orchestrator's act and carries the Co-Authored-By trailer. Ledger O265."
+  },
+  {
+   "id": "i12b",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "d8ff6ad47a53425169d3a1f5a06f3c05f2941fb1",
+    "997a7dd399007c0f22ff54ff348100eb673b75aa"
+   ],
+   "run_state": "dogfood/i12b/20261010T1150Z/run-evidence/state.json",
+   "candidate_id": "20261010t1150z-i12b-i1-a1",
+   "why_not_the_product": "The product built the caveats of `hoh wait` (a candidate-less final stage and a timer-less storage park read held, an accepted run with a died process says so, a closed standard output exits 2) in run 20261010t1150z-i12b from dogfood/i12b/spec.md (accepted in iteration 1; import refs/imports/i12b = d8ff6ad4). The orchestrator wrote the spec, pinned it, imported the candidate, had two review agents review it (i12b-a and i12b-b (rb1 on 1e633e46), release yes/yes) and merged it after both gates found MERGE_ELIGIBLE (the product's `hoh merge-gate check` as the gate of record where it was one, the orchestrator's script as the cross-check; receipt digests in the merge message 997a7dd3). P5-43 stays MISSING. Evidence in dogfood/i12b/20261010T1150Z/. Ledger O265."
+  },
+  {
+   "id": "i10a2-pin",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "5b128e18270b9d244d1ef76ecdbc24457ee6e91b"
+   ],
+   "why_not_the_product": "The spec-only pin of the i10a2 run: a single commit that adds dogfood/i10a2/ (spec.md, spec sha256 c8925f5c...) on 1869a46a after the spec review (i10a2spec-a and i10a2spec-b both yes). The pin of a run is the orchestrator's act and carries the Co-Authored-By trailer. Ledger O265."
+  },
+  {
+   "id": "i10a2",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "24073f2ee1a9950165a69e1667db0eccf7cd4af1",
+    "9fd95ff1d4a193e6d8c26b388ed57e4cce2c4ffe"
+   ],
+   "run_state": "dogfood/i10a2/20261010T1156Z/run-evidence/state.json",
+   "candidate_id": "20261010t1156z-i10a2-i1-a1",
+   "why_not_the_product": "The product built the surface reaper refusing a mount-point cwd and writing one closed line per surface under a run-directory flock gate in run 20261010t1156z-i10a2 from dogfood/i10a2/spec.md (accepted in iteration 1; import refs/imports/i10a2 = 24073f2e). The orchestrator wrote the spec, pinned it, imported the candidate, had two review agents review it (i10a2-a and i10a2-b (rb1 on 997a7dd3), release yes/yes) and merged it after both gates found MERGE_ELIGIBLE (the product's `hoh merge-gate check` as the gate of record where it was one, the orchestrator's script as the cross-check; receipt digests in the merge message 9fd95ff1). P5-39 stays PARTIAL. Evidence in dogfood/i10a2/20261010T1156Z/. Ledger O265."
+  },
+  {
+   "id": "i11b-pin",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "9750529a17a142ba7cd20141eb42987f975d36af"
+   ],
+   "why_not_the_product": "The spec-only pin of the i11b run: a single commit that adds dogfood/i11b/ (spec.md, spec sha256 a68272cc...) on 9fd95ff1 after the spec review (i11bspec-a no, then yes in round 2; i11bspec-b yes). The pin of a run is the orchestrator's act and carries the Co-Authored-By trailer. Ledger O265."
+  },
+  {
+   "id": "i11b",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "0c6ffb8a8e8498c3de17ad859e23ff96be5abe2a",
+    "2b7978d5629152ce9db0c209cdf4fb63e040319a"
+   ],
+   "run_state": "dogfood/i11b/20261010T1607Z/run-evidence/state.json",
+   "candidate_id": "20261010t1607z-i11b-i1-a1",
+   "why_not_the_product": "The product built the refusal of run ids that are not a plain direct child of the runs root (the `..` escape of `hoh run` and `--detach`), and detach typing --flag=value and refusing empty values and leading dashes in run 20261010t1607z-i11b from dogfood/i11b/spec.md (accepted in iteration 1; import refs/imports/i11b = 0c6ffb8a). The orchestrator wrote the spec, pinned it, imported the candidate, had two review agents review it (i11b-a and i11b-b, release yes/yes) and merged it after both gates found MERGE_ELIGIBLE (the product's `hoh merge-gate check` as the gate of record where it was one, the orchestrator's script as the cross-check; receipt digests in the merge message 2b7978d5). P5-42 stays MISSING. Evidence in dogfood/i11b/20261010T1607Z/. Ledger O265."
+  },
+  {
+   "id": "regproj-pin",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "30b45b7dc1e54190900c85522bc020572dab09ee"
+   ],
+   "why_not_the_product": "The spec-only pin of the regproj run: a single commit that adds dogfood/regproj/ (spec.md, spec sha256 ae69b2d9...) on 9fd95ff1 after the spec review (regprojspec-a and regprojspec-b both yes). The pin of a run is the orchestrator's act and carries the Co-Authored-By trailer. Ledger O265."
+  },
+  {
+   "id": "regproj",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "66f80c4528de6d23356bb40d649e489cdcf9d29b"
+   ],
+   "run_state": "dogfood/regproj/20261010T1614Z/run-evidence/state.json",
+   "candidate_id": "20261010t1614z-regproj-i1-a1",
+   "why_not_the_product": "The product built `hoh storage new-target` and `hoh storage register-project` (an owned external target root, a fresh registry-made target clone, create-only, fail closed) in run 20261010t1614z-regproj from dogfood/regproj/spec.md (accepted in iteration 1; import refs/imports/regproj = 66f80c45). The orchestrator wrote the spec, pinned it, imported the candidate, had two review agents review it (regproj-a and regproj-b, release yes/yes) and did not merge it alone. Round 1 of its integration pair was split (regproj-a NO: a symlinked .git/objects or refs registered); it was merged only together with its repair, entry regprojf (merge 01fc9a09). Evidence in dogfood/regproj/20261010T1614Z/. Ledger O265."
+  },
+  {
+   "id": "regprojf-pin",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "420f6d2f5976634c4d0e59b18762dd5fd7b9c829"
+   ],
+   "why_not_the_product": "The spec-only pin of the regprojf run: a single commit that adds dogfood/regprojf/ (spec.md, spec sha256 3eaa7ced...) on refs/imports/regproj = 66f80c45 after the spec review (regprojfspec-a and regprojfspec-b both yes). The pin of a run is the orchestrator's act and carries the Co-Authored-By trailer. Ledger O265."
+  },
+  {
+   "id": "regprojf",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "2509503c8ff8b832cca6c378973e706e1f878958",
+    "01fc9a09f5e92b2ceb5d5c1e46a9fe17bc654b7d"
+   ],
+   "run_state": "dogfood/regprojf/20261010T1942Z/run-evidence/state.json",
+   "candidate_id": "20261010t1942z-regprojf-i1-a1",
+   "why_not_the_product": "The product built the repair of register-project (the fresh-target path applies the git-store rule of adopt_project: a symlinked .git/objects, refs or HEAD is refused) in run 20261010t1942z-regprojf from dogfood/regprojf/spec.md (accepted in iteration 1; import refs/imports/regprojf = 2509503c). The orchestrator wrote the spec, pinned it, imported the candidate, had two review agents review it (regproj-a and regproj-b (round 2 on b3554d15), release yes/yes) and merged it after both gates found MERGE_ELIGIBLE (the product's `hoh merge-gate check` as the gate of record where it was one, the orchestrator's script as the cross-check; receipt digests in the merge message 01fc9a09). The merge 01fc9a09 brings in regproj and regprojf together. P2-42 stays PARTIAL. Evidence in dogfood/regprojf/20261010T1942Z/. Ledger O265."
+  },
+  {
+   "id": "p242r2-pin",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "25d94c59cee664c3f77a16ef65c2a54ab4d8d23c"
+   ],
+   "why_not_the_product": "The spec-only pin of the p242r2 run: a single commit that adds dogfood/p242r2/ (spec.md, spec sha256 d3a9e05c...) on 79ea2a90 after the spec review (p242r2spec-a no, no, then yes in round 3; p242r2spec-b yes). The pin of a run is the orchestrator's act and carries the Co-Authored-By trailer. Ledger O265."
+  },
+  {
+   "id": "p242r2",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "61bfe841dc4019f5180cceb0e07f2a9cbda81c4b",
+    "b3554d15858c4e84c1aaf6fc43beb2ac5ad168ac"
+   ],
+   "run_state": "dogfood/p242r2/20261010T1626Z/run-evidence/state.json",
+   "candidate_id": "20261010t1626z-p242r2-i1-a1",
+   "why_not_the_product": "The product built the role scratch of a registered project run below the iteration workspace (panes whose TMPDIR is not the bound scratch and adopted panes are refused and kept) in run 20261010t1626z-p242r2 from dogfood/p242r2/spec.md (accepted in iteration 1; import refs/imports/p242r2 = 61bfe841). The orchestrator wrote the spec, pinned it, imported the candidate, had two review agents review it (p242r2-a and p242r2-b (rb1 on c618a0d2), release yes/yes) and merged it after both gates found MERGE_ELIGIBLE (the product's `hoh merge-gate check` as the gate of record where it was one, the orchestrator's script as the cross-check; receipt digests in the merge message b3554d15). P2-42 stays PARTIAL. The merge message names Revision 2's digest; the gate bound d3a9e05c (corrected by addition, ledger O265). Evidence in dogfood/p242r2/20261010T1626Z/. Ledger O265."
+  },
+  {
+   "id": "i6-pin",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "11e85f770ce73a56411b99a9a05b8ef8c2824eb3"
+   ],
+   "why_not_the_product": "The spec-only pin of the i6 run: a single commit that adds dogfood/i6/ (spec.md, spec sha256 0b48e850...) on 79ea2a90 after the spec review (i6spec-a no and i6spec-b no in round 1, both yes in round 2). The pin of a run is the orchestrator's act and carries the Co-Authored-By trailer. Ledger O265."
+  },
+  {
+   "id": "i6",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "a133cd8aa4d01d4eb8aa49befb8d75a4e2e7c08a",
+    "91871a5ad593af0a0d2920f1865b2031d21e1207"
+   ],
+   "run_state": "dogfood/i6/20261010T1628Z/run-evidence/state.json",
+   "candidate_id": "20261010t1628z-i6-i1-a1",
+   "why_not_the_product": "The product built `hoh pin` and `hoh import` slice 1 (a spec-only pin by plumbing on a base the product resolved, create-only refs/pins, a Spec-SHA256 trailer, an accepted candidate imported with proof and a receipt) in run 20261010t1628z-i6 from dogfood/i6/spec.md (accepted in iteration 1; import refs/imports/i6 = a133cd8a). The orchestrator wrote the spec, pinned it, imported the candidate, had two review agents review it (i6-a and i6-b (base re-bind by fresh reviewers on 7240719f), release yes/yes) and merged it after both gates found MERGE_ELIGIBLE (the product's `hoh merge-gate check` as the gate of record where it was one, the orchestrator's script as the cross-check; receipt digests in the merge message 91871a5a). P5-38 stays MISSING. Evidence in dogfood/i6/20261010T1628Z/. Ledger O265."
+  },
+  {
+   "id": "w43b-pin",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "5e344153359cfef01b8211f9c6f8401457f9c86c"
+   ],
+   "why_not_the_product": "The spec-only pin of the w43b run: a single commit that adds dogfood/w43b/ (spec.md, spec sha256 cef3ce58...) on 79ea2a90 after the spec review (w43bspec-a yes; w43bspec-b no, then yes in round 2). The pin of a run is the orchestrator's act and carries the Co-Authored-By trailer. Ledger O265."
+  },
+  {
+   "id": "w43b",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "063041bf74e31986de52c128c1c0f814d86c3cf9",
+    "7240719f15cf1f2fe5dabf28aa24c5eef4459a83"
+   ],
+   "run_state": "dogfood/w43b/20261010T1716Z/run-evidence/state.json",
+   "candidate_id": "20261010t1716z-w43b-i1-a1",
+   "why_not_the_product": "The product built `hoh wait --report` and `hoh wait --pid` (a wait on a review report with the footer check and the stable-age rule, a wait on a process id by id and start time) in run 20261010t1716z-w43b from dogfood/w43b/spec.md (accepted in iteration 1; import refs/imports/w43b = 063041bf). The orchestrator wrote the spec, pinned it, imported the candidate, had two review agents review it (w43b-a and w43b-b (rb1 on 2b7978d5, rb2 by fresh reviewers on 01fc9a09), release yes/yes) and merged it after both gates found MERGE_ELIGIBLE (the product's `hoh merge-gate check` as the gate of record where it was one, the orchestrator's script as the cross-check; receipt digests in the merge message 7240719f). P5-43 stays MISSING (C7 and C9 open). Evidence in dogfood/w43b/20261010T1716Z/. Ledger O265."
+  },
+  {
+   "id": "f06-pin",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "9b124072d7c69af5c3e9144b8d92a447a989e9fa"
+   ],
+   "why_not_the_product": "The spec-only pin of the f06 run: a single commit that adds dogfood/f06/ (spec.md, spec sha256 984f0c86...) on 79ea2a90 after the spec review (f06spec-a yes; f06spec-b no, then yes in round 2). The pin of a run is the orchestrator's act and carries the Co-Authored-By trailer. Ledger O265."
+  },
+  {
+   "id": "f06",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "ef9ddf11e4c918d1dbc8e11d69d94f756fb0fee4"
+   ],
+   "run_state": "dogfood/f06/20261010T1735Z/run-evidence/state.json",
+   "candidate_id": "20261010t1735z-f06-i1-a1",
+   "why_not_the_product": "The product built the rollover and migrate residue (interval and poll validated before anything acts, a dying hold gives its lease back, `predecessor_is_master` pinned, migrate refuses an unparseable record) in run 20261010t1735z-f06 from dogfood/f06/spec.md (accepted in iteration 1; import refs/imports/f06 = ef9ddf11). The orchestrator wrote the spec, pinned it, imported the candidate, had two review agents review it (f06-a and f06-b, release yes/yes) and did not merge it alone. Round 1 of its integration pair was split (f06-a NO: the hold_lease rule was pinned only for sleep()); it was merged only together with its test-only repair, entry f06f (merge 3199ac32). Evidence in dogfood/f06/20261010T1735Z/. Ledger O265."
+  },
+  {
+   "id": "f06f-pin",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "d042923288e45d9b41f3b2a8926ee8c303bf026c"
+   ],
+   "why_not_the_product": "The spec-only pin of the f06f run: a single commit that adds dogfood/f06f/ (spec.md, spec sha256 18768f18...) on refs/imports/f06 = ef9ddf11 after the spec review (f06fspec-a no, then yes in round 2; f06fspec-b yes). The pin of a run is the orchestrator's act and carries the Co-Authored-By trailer. Ledger O265."
+  },
+  {
+   "id": "f06f",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "99b43a2e3a516c60e8edd73a7bad1622b1ad7fd9",
+    "3199ac32265af53ef2ef2e82ac3225ef3b20708f"
+   ],
+   "run_state": "dogfood/f06f/20261010T2102Z/run-evidence/state.json",
+   "candidate_id": "20261010t2102z-f06f-i1-a1",
+   "why_not_the_product": "The product built the test-only repair of f06 (hold_lease pinned per call: renewal retry over OSError, LockBusy, RuntimeError, ValueError) in run 20261010t2102z-f06f from dogfood/f06f/spec.md (accepted in iteration 1; import refs/imports/f06f = 99b43a2e). The orchestrator wrote the spec, pinned it, imported the candidate, had two review agents review it (f06-a and f06-b (round 2 by fresh reviewers on 91871a5a), release yes/yes) and merged it after both gates found MERGE_ELIGIBLE (the product's `hoh merge-gate check` as the gate of record where it was one, the orchestrator's script as the cross-check; receipt digests in the merge message 3199ac32). The merge 3199ac32 brings in f06 and f06f together and binds the original spec dogfood/f06/spec.md. Evidence in dogfood/f06f/20261010T2102Z/. Ledger O265."
+  },
+  {
+   "id": "projid-pin",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "511b882d9ec46934edfc5863c71172e84459f549"
+   ],
+   "why_not_the_product": "The spec-only pin of the projid run: a single commit that adds dogfood/projid/ (spec.md, spec sha256 3f28ba3f...) on 2b7978d5 after the spec review (projidspec-a and projidspec-b both yes). The pin of a run is the orchestrator's act and carries the Co-Authored-By trailer. Ledger O265."
+  },
+  {
+   "id": "projid",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "68930890dfb99dd3508f9e7bfcc055b85255f3a9",
+    "0c3037c15c3bc547e5d3dc59ac095bcbfc660539"
+   ],
+   "run_state": "dogfood/projid/20261010T1811Z/run-evidence/state.json",
+   "candidate_id": "20261010t1811z-projid-i1-a1",
+   "why_not_the_product": "The product built the project store and the storage registry refusing an id that is not exactly a name (a trailing newline was the only bad id accepted), and `hoh project` answering one with a refusal in run 20261010t1811z-projid from dogfood/projid/spec.md (accepted in iteration 1; import refs/imports/projid = 68930890). The orchestrator wrote the spec, pinned it, imported the candidate, had two review agents review it (projid-a (base b3554d15) and projid-b (base c618a0d2), re-bound on 91871a5a and on 3199ac32, release yes/yes) and merged it after both gates found MERGE_ELIGIBLE (the product's `hoh merge-gate check` as the gate of record where it was one, the orchestrator's script as the cross-check; receipt digests in the merge message 0c3037c1). No plan row; the candidate equals the reference diff (prototype, not independent development). Evidence in dogfood/projid/20261010T1811Z/. Ledger O265."
+  },
+  {
+   "id": "gb-pin",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "cfaa2ee7bcb75d66f176390beca02bba8a6381a6"
+   ],
+   "why_not_the_product": "The spec-only pin of the gb run: a single commit that adds dogfood/gb/ (spec.md, spec sha256 9b8d17a4...) on 0c3037c1 after the spec review (gbspec-a no, then yes in a narrow round; gbspec-b yes). The pin of a run is the orchestrator's act and carries the Co-Authored-By trailer. Ledger O265."
+  },
+  {
+   "id": "gb",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "c00ff341b6be447b066631c7c451bfa5d2f94e66",
+    "74772dc17fafab61359cb2ba363c6e05602a2cd7"
+   ],
+   "run_state": "dogfood/gb/20261010T2155Z/run-evidence/state.json",
+   "candidate_id": "20261010t2155z-gb-i1-a1",
+   "why_not_the_product": "The product built the binding of the three P2 checklist-gate items (items, fsck, review) in tools/build_plan.py, fail closed (tools-only) in run 20261010t2155z-gb from dogfood/gb/spec.md (accepted in iteration 1; import refs/imports/gb = c00ff341). The orchestrator wrote the spec, pinned it, imported the candidate, had two review agents review it (gb-a and gb-b, release yes/yes) and merged it after both gates found MERGE_ELIGIBLE (the product's `hoh merge-gate check` as the gate of record where it was one, the orchestrator's script as the cross-check; receipt digests in the merge message 74772dc1). Lifts no row; the P2 gate stays shut for measured reasons. Evidence in dogfood/gb/20261010T2155Z/. Ledger O265."
+  },
+  {
+   "id": "lb-pin",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "67437a6bb35df3f602b87d275cefade60af7e3af"
+   ],
+   "why_not_the_product": "The spec-only pin of the lb run: a single commit that adds dogfood/lb/ (spec.md, spec sha256 0f390cef...) on 0c3037c1 after the spec review (lbspec-a yes; lbspec-b no, then yes in round 2). The pin of a run is the orchestrator's act and carries the Co-Authored-By trailer. Ledger O265."
+  },
+  {
+   "id": "lb",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "222b6be9b469c797f22edfd09cced29422cde95b",
+    "b4a3fe8f4196e9b738ea777643bcc642b2993eaa"
+   ],
+   "run_state": "dogfood/lb/20261010T2219Z/run-evidence/state.json",
+   "candidate_id": "20261010t2219z-lb-i1-a1",
+   "why_not_the_product": "The product built the context rotation Layer B (the rotation policy and its controller under `hoh project hold --rotate-policy` and `rollover-accept --rotate-policy`, `hoh project create`), fail closed in run 20261010t2219z-lb from dogfood/lb/spec.md (accepted in iteration 1; import refs/imports/lb = 222b6be9). The orchestrator wrote the spec, pinned it, imported the candidate, had two review agents review it (lb-a and lb-b (rb1 on 74772dc1 in the live panes), release yes/yes) and merged it after both gates found MERGE_ELIGIBLE (the product's `hoh merge-gate check` as the gate of record where it was one, the orchestrator's script as the cross-check; receipt digests in the merge message b4a3fe8f). The merge carries the P2-14 `equivalent` hold in the same commit (a records act of the orchestrator, ledger O265). Evidence in dogfood/lb/20261010T2219Z/. Ledger O265."
+  },
+  {
+   "id": "o264-merge",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "3713a5d8824a6290d31a1ebc8dcc3671d3771928"
+   ],
+   "why_not_the_product": "The merge of the O264 records branch (refs/imports/o264 = c0208b62, three revisions) after the review pair o264rev-a and o264rev-b released it yes/yes with 0 BLOCKING (Revision 3 fold verified) and both gates (the orchestrator's script and the product's `hoh merge-gate check`) found MERGE_ELIGIBLE (receipt digests in the merge message). Ledger O264 and O265."
+  },
+  {
+   "id": "o265-evidence",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "ea01283d82a2d84b873268f1f2ba8c763ee4a046"
+   ],
+   "why_not_the_product": "O265 part 1: the run evidence of the product runs merged since O264 with their integration and spec reviews, copied by build_evidence_o265.py (additions only under dogfood/), and the redaction of two private session-id prefixes in five texts and six recorded role prompts (redact_o265.py). Records only, written by a Sonnet 5.5 drafting session. (Revision 2 of O265 replayed this commit onto the merge e0d9bdff of rlname: on branch o265r2 it is ea01283d; on branch o265 it was 2bcbab9c.)"
+  },
+  {
+   "id": "o265-records",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "1ea21896e98e9f813d382c4e29202b72555a5024"
+   ],
+   "why_not_the_product": "The O265 records commit: the register notes of the sixteen merges since O264 (P2-14, P2-35, P2-36, P2-42, P5-36, P5-38, P5-39, P5-40, P5-42, P5-43), amendment A7 pinned with its directive and overlap record, PROGRESS_O265.md, the README and LIMITATIONS corrections, the amendments test extended by A7 and two test constants changed for the export leak scan, CLAIMS, EXPORT_MANIFEST, the derived documents and CLI baselines regenerated offline, 44 attribution entries and the ledger entry O265. Records only, written by a Sonnet 5.5 drafting session; src/ and tools/ are unchanged. Ledger O265. (Revision 2 of O265 replayed this commit onto the merge e0d9bdff of rlname: on branch o265r2 it is 1ea21896; on branch o265 it was d88281da.)"
+  },
+  {
+   "id": "o265-rev1",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "d86f563b9991a6df087a600a5f3a9ae3d01089a8"
+   ],
+   "why_not_the_product": "The O265 Revision 1 commit: paper/NUMBERS_V2.md re-rendered at the records commit d88281da, the dated sentences that carry the figures of the moving present (README, LIMITATIONS, paper section 19, erratum E12), their claims, the attribution entry of the records commit, the regenerated baselines and the ledger Revision 1. Records only, written by a Sonnet 5.5 drafting session; src/ and tools/ are unchanged. Ledger O265. (Revision 2 of O265 replayed this commit onto the merge e0d9bdff of rlname: on branch o265r2 it is d86f563b; on branch o265 it was ee14c3e2.)"
+  },
+  {
+   "id": "rlname-pin",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "6e278483ef650c323d8bfdb9b079a83e2568b9ae"
+   ],
+   "why_not_the_product": "The spec-only pin of the rlname run: a single commit that adds dogfood/rlname/ (spec.md, spec sha256 3781ba83...) on b4a3fe8f after the spec review (rlnamespec-a and rlnamespec-b both yes; MINORs folded by the orchestrator as Revision 1b). The pin of a run is the orchestrator's act and carries the Co-Authored-By trailer. Ledger O265 Revision 2."
+  },
+  {
+   "id": "rlname",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "e8e5a66f8c0fbf263ce2985d59e27e4a974edece",
+    "e0d9bdff8fef5c33070b70e0fa15a06a8943bfec"
+   ],
+   "run_state": "dogfood/rlname/20261011T0026Z/run-evidence/state.json",
+   "candidate_id": "20261011t0026z-rlname-i1-a1",
+   "why_not_the_product": "The product made the successor's Herdr agent name obey Herdr's rule (a fixed letter, the random part, the lower-cased session id with every other character mapped to '-', at most 24 characters; `successor_agent_name` in src/hoh/rollover.py and a strict fake in tests/test_rollover_agent_name.py) in run 20261011t0026z-rlname from dogfood/rlname/spec.md (Revision 1b; accepted in iteration 1; import refs/imports/rlname = e8e5a66f). The defect was found by the first dress rehearsal of the A7 canary (not evidence). The orchestrator wrote the spec, pinned it, imported the candidate, had two review agents review it (rlname-a and rlname-b, release yes/yes) and merged it after both gates found MERGE_ELIGIBLE (receipt digests in the merge message e0d9bdff). Lifts no row. Evidence in dogfood/rlname/20261011T0026Z/. Ledger O265 Revision 2."
+  },
+  {
+   "id": "canary-a7-evidence",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": false,
+   "commits": [
+    "38a21f2e8c894fef4b3b6079b3f62e51fbaf36e3"
+   ],
+   "why_not_the_product": "O265 Revision 2 part 1: the run evidence of rlname and a redacted evidence copy of the A7 canary (dogfood/canary-a7/20261011T0101Z/), copied by build_evidence_o265r2.py and canary_import_o265.py (additions only under dogfood/). The rotation itself was done by the product (hoh project hold --rotate-policy, rollover-accept); this commit only records it. Records only, written by a Sonnet 5.5 drafting session. Ledger O265 Revision 2."
+  },
+  {
+   "id": "o265-r2-records",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "298528438617ead48001f043722849d3beb3d481"
+   ],
+   "why_not_the_product": "The O265 Revision 2 records commit: the strand rlname recorded (its run evidence is in the commit before), the A7 canary recorded (the redacted evidence copy is in the commit before), the P2-14 and P2-20 holds lifted on its evidence with previous_equivalent provenance, notes for P2-35 and P2-42 (hold kept), the README, LIMITATIONS and paper section 20 corrections by addition, CLAIMS, EXPORT_MANIFEST, the regenerated derived documents and baselines, the re-pointed attribution entries and the ledger Revision 2. Records only, written by a Sonnet 5.5 drafting session; src/ and tools/ are unchanged. Ledger O265 Revision 2."
+  },
+  {
+   "id": "o265-r21",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "aa802931f9e4621664fa32e347d676beb79da1f4"
+   ],
+   "why_not_the_product": "The O265 Revision 2.1 commit: paper/NUMBERS_V2.md re-rendered at the Revision 2 records commit, the dated sentences that carry the figures (README, LIMITATIONS, paper section 20, erratum E13), their claims, the attribution entry of the Revision 2 records commit, the regenerated baselines and the ledger Revision 2.1 (which reports the export leak-scan finding introduced by the merge of rlname). Records only, written by a Sonnet 5.5 drafting session; src/ and tools/ are unchanged. Ledger O265 Revision 2."
+  },
+  {
+   "id": "o265-r3-records",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "84384e1d560d337adfc9fa455678791fbedadf39"
+   ],
+   "why_not_the_product": "The O265 Revision 3 records commit: the review MINORs of o265r2rev-a and o265r2rev-b folded by addition (a limit and a dated sentence in the P2-14 and P2-20 notes, the README, LIMITATIONS and paper additions, the canary MANIFEST path map and corrections, one fragment redacted, the NOT_COPIED recount, the regenerated derived documents and baselines and the ledger Revision 3). Records only, written by a Sonnet 5.5 drafting session; src/ and tools/ are unchanged. Ledger O265 Revision 3."
+  },
+  {
+   "id": "o265-r31",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "3329b8329ed968892b2efa61f60cf8858c61972e"
+   ],
+   "why_not_the_product": "The O265 Revision 3.1 commit: paper/NUMBERS_V2.md re-rendered at the Revision 3 records commit, the dated sentences that carry the figures (README, LIMITATIONS, paper section 20), their claims, the attribution entry of the records commit, the regenerated baselines and the ledger Revision 3.1. Records only, written by a Sonnet 5.5 drafting session; src/ and tools/ are unchanged. Ledger O265 Revision 3."
+  },
+  {
+   "id": "o265-r32-records",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "d70a1add6d53cdc40b8f7492bf50c5d2c6d05cf0"
+   ],
+   "why_not_the_product": "The O265 Revision 3.2 records commit: the narrow fold of the second-round reviews of Revision 3 (the sentences that said the second rotation is recorded in the closure records, none of which exists yet, corrected by addition in the P2-14 and P2-20 notes, the README, LIMITATIONS, paper section 20 and the ledger; the attic recount explained in NOT_COPIED.txt and the ledger), with the regenerated baselines. Records only, written by a Sonnet 5.5 drafting session; src/ and tools/ are unchanged. Ledger O265 Revision 3.2."
+  },
+  {
+   "id": "o265-r321",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "d2e91fbe2a367d473f7d3b152c459f602c01a848"
+   ],
+   "why_not_the_product": "The O265 Revision 3.2.1 commit: paper/NUMBERS_V2.md re-rendered at the Revision 3.2 records commit, the dated sentences that carry the figures (README, LIMITATIONS, paper section 20), their claims, the attribution entry of the records commit, the regenerated baselines and the ledger Revision 3.2.1. Records only, written by a Sonnet 5.5 drafting session; src/ and tools/ are unchanged. Ledger O265 Revision 3.2."
+  },
+  {
+   "id": "leakids2-pin",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "622774a553c9125333dace2eb602a4ce0fd93f67"
+   ],
+   "why_not_the_product": "The spec-only pin of the leakids2 run: a single commit that adds dogfood/leakids2/ (spec.md, spec sha256 39313b15..., the reference diff, the mutant list and the decision file) on e0d9bdff after the spec reviews (round 1 yes and no, narrow round 2 yes and yes). The pin of a run is the orchestrator's act and carries the Co-Authored-By trailer. Entered by the v0.3.0a3 release package, which is the first act after the merge f956b119 to touch the ledger."
+  },
+  {
+   "id": "leakids2",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "6891d41357ad48fae217f98b850b4b4cdc675a23",
+    "f956b1193a6be07f9e4866365dcbee549eafe1ac"
+   ],
+   "why_not_the_product": "The product's candidate for the leak-scan repair (the private-id list complete for six more session prefixes, digests only, and an ordered character-set literal no longer taken for a secret: tools/export_manifest.py and tests/test_export_manifest.py; src/hoh untouched) from dogfood/leakids2/spec.md, in a run of a registered project (accepted in iteration 1; import refs/imports/leakids2 = 6891d413), and its merge f956b119 by the orchestrator after the integration pair released it yes/yes and both gates found MERGE_ELIGIBLE (receipt digests in the merge message). Filed as MAIN_ORCHESTRATOR_DIRECT, not as VERIHARNESS_RUN_ORCHESTRATOR_MERGED, because that category needs the run state and the candidate's recorded tree digest as files of this tree and the run evidence of this strand has not been copied into it yet (it is a records act); the product's own part is stated here and not claimed by the category. A records act that copies the evidence may re-point this entry by addition."
+  },
+  {
+   "id": "o265-merge",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "96caae573ff452bde27aaa7c6553ba0ae4ab79f6"
+   ],
+   "why_not_the_product": "The merge of the O265 records branch (refs/imports/o265r32 = 29976e1a, Revision 3.2) after the review pair released it yes/yes with 0 BLOCKING in the third round and both gates (the orchestrator's script and the product's `hoh merge-gate check`) found MERGE_ELIGIBLE (receipt digests in the merge message). Ledger O265."
+  },
+  {
+   "id": "rel-a3-docs",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "d933485c9a70dd540bcc617679c155a3e269cdb2"
+   ],
+   "why_not_the_product": "The release documentation of the v0.3.0a3 pre-release: version 0.3.0a3 (pyproject.toml, CITATION.cff), the RELEASE_NOTES section, the generated CHANGELOG section, the public figures taken again (paper/NUMBERS_V2.md and the documents that carry them), the claims bound to the new lines, EXPORT_MANIFEST.json re-derived (the seven dogfood/leakids2 entries) and the regenerated claims document. Text and generated documents only; src/ is byte-identical to f956b119. Written by a Sonnet 5.5 drafting session, not reviewed (the review is the next act)."
+  },
+  {
+   "id": "rel-a3-fold1",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "47261dd99e152b88cee660f91897aab9f90cfb6c"
+   ],
+   "why_not_the_product": "Fold 1 of the v0.3.0a3 release documentation on the orchestrator's decision: README line 16 names v0.3.0a3 as the current pre-release (the earlier value in parentheses), the a3 row of the status table and the dated update say the tag is cut from the merge of the package after its review, instead of 'prepared, not yet cut'; the claims of the edited lines re-anchored (seven entries, none added or removed) and CLAIMS.md rendered. Text only; src/ is byte-identical to f956b119. Written by a Sonnet 5.5 drafting session, not reviewed."
   }
  ]
 }

@@ -29,6 +29,7 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import json
+import stat
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -399,8 +400,310 @@ def _register_requirements() -> list[dict]:
     return json.loads(path.read_text(encoding="utf-8")).get("requirements") or []
 
 
+#: P2's three "Checklist gate:" exit conditions (AUTHORITATIVE_PROGRAM_SCOPE lines
+#: 107-109) and the programme instrument that answers each. No requirement claims
+#: them, and a claim must not be added to meet them: it would read the condition met
+#: when a requirement is PROVEN, with no supervisor review taken or current. They are
+#: measured instead, from the register, the committed matrix and the preserved
+#: reviews, by the tools that exist for the purpose; a claim, if one were made,
+#: would still be required to be PROVEN besides, never stand in. An id missing here
+#: is an unclaimed item, which stays unmeasured and unmet.
+CHECKLIST_GATE_ITEMS = {
+    "P2.checklist-gate.all-phase-blocking-checklist-items-verified-or-validly-waive":
+        "items",
+    "P2.checklist-gate.current-independent-checklist-supervisor-review-complete":
+        "review",
+    "P2.checklist-gate.checklistfsck-pass": "fsck",
+}
+_GATE_LABELS = {"items": "checklist items", "review": "supervisor review",
+                "fsck": "ChecklistFsck"}
+#: The phase those items belong to, and where its supervisor review is kept (the
+#: board's row reads the same files).
+CHECKLIST_GATE_PHASE = "P2"
+REVIEW_RECORD = "dogfood/p2-gate/REVIEW.json"
+REVIEW_ROOT = "dogfood/p2-gate"
+#: Ceilings on what the gate reads and prints. A register, a matrix or a review
+#: record beyond the first is not read; a reason beyond the second is cut.
+_GATE_INPUT_MAX_BYTES = 32 * 1024 * 1024
+_GATE_REASON_MAX = 240
+
+
+def _bound(text, limit: int = _GATE_REASON_MAX) -> str:
+    """One printable line of at most `limit` characters, for the DAG and the console."""
+    one = "".join(c if c.isprintable() else "?" for c in " ".join(str(text).split()))
+    return one if len(one) <= limit else one[:limit - 3] + "..."
+
+
+def _gate_input(path: Path, what: str, *, kinds: tuple = (dict,),
+                shape: str = "a JSON object") -> tuple[object | None, str]:
+    """JSON of one of `kinds` from a regular file inside this repository, or why not.
+
+    Never raises. A dangling link, a directory, a FIFO (never opened: reading one
+    blocks), a file that resolves outside the repository, one over the ceiling,
+    bytes that are not UTF-8, text that is not JSON (nesting deep enough to
+    exhaust the parser is a `RuntimeError`) and JSON of another shape are each a
+    reason, never an answer."""
+    try:
+        resolved = path.resolve(strict=True)
+        if not resolved.is_relative_to(HOH.resolve()):
+            return None, f"{what} resolves outside the repository"
+        info = resolved.stat()
+        if not stat.S_ISREG(info.st_mode):
+            return None, f"{what} is not a regular file"
+        if info.st_size > _GATE_INPUT_MAX_BYTES:
+            return None, f"{what} is larger than {_GATE_INPUT_MAX_BYTES} bytes"
+        body = json.loads(resolved.read_bytes().decode("utf-8"))
+    except FileNotFoundError:
+        return None, f"{what} is missing"
+    except (OSError, ValueError, RuntimeError) as exc:
+        return None, f"{what} cannot be read ({type(exc).__name__})"
+    if not isinstance(body, kinds):
+        return None, f"{what} is not {shape}"
+    return body, ""
+
+
+def _programme_supervisor():
+    """`tools/programme_supervisor.py`, which carries the checklist binding
+    (`.programme_checklist`) with it. Loaded per call, so a tree is never judged
+    by a stale copy."""
+    spec = importlib.util.spec_from_file_location(
+        "programme_supervisor", HERE / "programme_supervisor.py")
+    ps = importlib.util.module_from_spec(spec)
+    sys.modules["programme_supervisor"] = ps
+    spec.loader.exec_module(ps)
+    return ps
+
+
+def _readiness():
+    """`tools/readiness.py`, loaded for one row: the board's supervisor-review
+    check is the one instrument that holds every honesty rule about a review
+    (what the supervisor returned, the brief it was given, the preserved history,
+    a vouched-for register). The gate asks it rather than copy it."""
+    spec = importlib.util.spec_from_file_location(
+        "readiness_for_build_plan", HERE / "readiness.py")
+    rd = importlib.util.module_from_spec(spec)
+    sys.modules["readiness_for_build_plan"] = rd
+    spec.loader.exec_module(rd)
+    return rd
+
+
+def _other_tree(*tools) -> str:
+    """Why the loaded `tools` do not all judge this repository, or `""`.
+
+    The checklist binding and the board's row each derive their own `HOH`, and read the
+    preserved reviews and the review record below it. The gate's register, matrix and
+    record come from build_plan's `HOH`; a tool that judges another tree would give the
+    three conditions two different trees' answers, so none is accepted. A tool with no
+    usable `HOH` counts as another tree."""
+    here = HOH.resolve()
+    for tool in tools:
+        try:
+            same = Path(tool.HOH).resolve() == here
+        except (AttributeError, TypeError, OSError, ValueError, RuntimeError):
+            same = False
+        if not same:
+            name = getattr(tool, "__name__", "a loaded tool")
+            return f"{name} judges another tree than this repository"
+    return ""
+
+
+def _preserved_review_problems(pc) -> list[str]:
+    """Preserved reviews whose findings the checklist binding would skip unread.
+
+    `programme_checklist` passes over a review directory whose `findings.json` does not
+    parse, and over entries of it that are not objects -- so an open finding could
+    be hidden by spoiling the file that raised it. The gate refuses to close over a
+    review it cannot read. Same directories as the binding reads (stamped, in this
+    tree, not links); a missing `findings.json` is not a review and is not a problem."""
+    root = HOH / REVIEW_ROOT
+    if root.is_symlink() or root.exists():
+        try:
+            inside = root.resolve(strict=True).is_relative_to(HOH.resolve())
+        except (OSError, ValueError, RuntimeError):
+            inside = False
+        if not inside:
+            return [f"{REVIEW_ROOT} resolves outside the repository"]
+    if not root.is_dir():
+        return []
+    problems = []
+    for directory in sorted(root.iterdir(), key=lambda d: d.name):
+        if (directory.is_symlink() or not directory.is_dir()
+                or not pc._STAMP.match(directory.name)):
+            continue
+        file = directory / "findings.json"
+        if not (file.exists() or file.is_symlink()):
+            continue
+        shown = f"{directory.name}/findings.json"
+        raw, why = _gate_input(file, shown, kinds=(dict, list),
+                               shape="a JSON object or list")
+        if raw is None:
+            problems.append(why)
+            continue
+        if isinstance(raw, dict) and not isinstance(raw.get("findings"), list):
+            problems.append(f"{shown} is an object without a findings list")
+            continue
+        returned = raw["findings"] if isinstance(raw, dict) else raw
+        if any(not isinstance(f, dict) for f in returned):
+            problems.append(f"{shown} does not hold a list of finding objects")
+        elif any(not isinstance(f.get("finding_id"), str) or not f["finding_id"].strip()
+                 for f in returned):
+            # the resolution state skips an entry without an id, so it would be unread
+            problems.append(f"{shown} holds a finding without a finding_id")
+    return problems
+
+
+def _checklist_verdicts(ps, register: dict, matrix: dict, unread: str) -> dict:
+    """The first and third conditions, from the checklist this programme runs on."""
+    phase = CHECKLIST_GATE_PHASE
+    pc = ps.programme_checklist
+    try:
+        snapshot, evidence, _items = ps.reconciled(register, matrix)
+    except ValueError as exc:
+        why = _bound(f"the checklist is not sound, so no verdict is reported: {exc}")
+        return {"items": (False, why), "fsck": (False, why)}
+    gate = pc.phase_gate(snapshot, phase, evidence=evidence)
+    if gate.closed:
+        items = (True, f"every blocking {phase} item is VERIFIED or WAIVED")
+    else:
+        ids = [b.item_id for b in gate.blockers]
+        more = f" and {len(ids) - 5} more" if len(ids) > 5 else ""
+        items = (False, _bound(f"{len(ids)} {phase} blocker(s) neither VERIFIED nor "
+                               f"WAIVED: {', '.join(ids[:5])}{more}"))
+    if unread:
+        return {"items": items, "fsck": (False, unread)}
+    try:
+        found = pc._preserved_release_blocking_findings()
+    except pc.ReviewRootOutside as exc:
+        return {"items": items, "fsck": (False, _bound(exc))}
+    problems = pc.fsck(snapshot.items, snapshot=snapshot,
+                       requirements=ps.declared_requirement_refs(register),
+                       release_blocking_findings=found,
+                       known_digests={ps.plan_revision(register)})
+    if problems:
+        return {"items": items, "fsck": (False, _bound(
+            f"{len(problems)} problem(s), e.g. {problems[0]}"))}
+    return {"items": items, "fsck": (True, "fsck finds no problem and no unresolved "
+                                           "release-blocking finding")}
+
+
+def _review_causes(record: dict, register: dict, matrix: dict) -> list[str]:
+    """Why `record` is not a current, complete review of P2, in its own terms.
+
+    A diagnostic and never a verdict -- the board's row decides, and its cell is cut
+    at 400 characters, which can leave the cause unprinted."""
+    try:
+        ps = _programme_supervisor()
+        snapshot, _evidence, _items = ps.reconciled(register, matrix)
+        loaded = ps.load_record(record, snapshot=snapshot)
+        causes = ([f"the record reviews {loaded.phase}, not {CHECKLIST_GATE_PHASE}"]
+                  if loaded.phase != CHECKLIST_GATE_PHASE else [])
+        if loaded.blocking_findings:
+            causes.append(f"{len(loaded.blocking_findings)} blocking finding(s)")
+        return causes + ps.stale_against(
+            loaded, snapshot=snapshot, matrix_digest=ps.matrix_digest(matrix))
+    except Exception as exc:  # noqa: BLE001 - a diagnostic that fails says so
+        return [f"the record is refused ({type(exc).__name__})"]
+
+
+def _review_verdict(register: dict, matrix: dict, unread: str) -> tuple[bool, str]:
+    """The second condition: a record the gate may read, and the board's
+    `programme_supervisor` row reads PASS over it."""
+    if unread:
+        return False, unread
+    record, why = _gate_input(HOH / REVIEW_RECORD, "the review record")
+    if record is None:
+        return False, _bound(why)
+    rd = _readiness()
+    other = _other_tree(rd)
+    if other:
+        return False, _bound(f"the board's programme_supervisor row cannot be read: {other}")
+    row = rd.row_programme_supervisor()
+    detail = getattr(row, "value_", "")
+    if row.state == rd.PASS:
+        return True, (f"{_bound(detail, 160)}; independence is a property of the "
+                      "dispatch and is not measured here")
+    causes = _review_causes(record, register, matrix)
+    return False, _bound(f"the board's programme_supervisor row is {row.state}: "
+                         + ("; ".join(causes) if causes else detail))
+
+
+def checklist_gate_measures() -> dict[str, tuple[bool, str]]:
+    """P2's three checklist-gate questions put to the programme's own instruments.
+
+    `{"items" | "review" | "fsck": (met, reason)}`, from the committed register
+    and capability matrix and the preserved review under `dogfood/p2-gate`:
+
+    * `items` -- `hoh.checklist.phase_gate` over the reconciled checklist
+      (`programme_supervisor.reconciled`): every blocking P2 item VERIFIED or
+      validly WAIVED, re-derived from evidence (a waiver is not handed in, so it
+      does not meet the condition: the stricter reading);
+    * `fsck` -- `hoh.checklist.fsck` over that checklist, with the release-blocking
+      findings the preserved reviews leave open (the check no phase may close over),
+      and none of those reviews unreadable;
+    * `review` -- the board's `programme_supervisor` row: a record that loads, is
+      about P2, is complete with no blocking finding, is not stale against the
+      matrix digest or the snapshot seal, is bound to the findings and the brief, and
+      rests on a vouched-for register. Whether the reviewer was independent is a
+      property of the dispatch; no file shows it.
+
+    Never raises: a register, matrix or record that is missing, unreadable,
+    malformed, oversize or outside the repository, and any instrument that fails,
+    is `(False, reason)`. Reasons are one line and bounded.
+    """
+    register, why_r = _gate_input(HOH / "program/v3_3/REQUIREMENTS.json",
+                                  "the requirement register")
+    matrix, why_m = _gate_input(
+        HOH / "program/v3_3/VERIHARNESS_CAPABILITY_MATRIX.json",
+        "the capability matrix")
+    if register is None or matrix is None:
+        why = _bound("; ".join(w for w in (why_r, why_m) if w))
+        return {kind: (False, why) for kind in _GATE_LABELS}
+    out: dict[str, tuple[bool, str]] = {}
+    try:
+        ps = _programme_supervisor()
+        other = _other_tree(ps.programme_checklist)
+        if other:
+            raise RuntimeError(other)
+        problems = _preserved_review_problems(ps.programme_checklist)
+        unread = (_bound("a preserved review cannot be read: " + "; ".join(problems))
+                  if problems else "")
+        out.update(_checklist_verdicts(ps, register, matrix, unread))
+    except Exception as exc:  # noqa: BLE001 - an instrument that fails is an unmet condition
+        why = _bound(f"the checklist could not be derived ({type(exc).__name__}): {exc}")
+        out.update(items=(False, why), fsck=(False, why))
+        unread = why
+    try:
+        out["review"] = _review_verdict(register, matrix, unread)
+    except Exception as exc:  # noqa: BLE001 - likewise
+        out["review"] = (False, _bound(
+            f"the review could not be evaluated ({type(exc).__name__}): {exc}"))
+    return out
+
+
+def _gate_measurements(provider) -> dict[str, tuple[bool, str]]:
+    """The provider's answers, each a real `(bool, str)`; anything else is unmet.
+    `met` must be the bool `True`: a truthy string or number does not open a gate."""
+    try:
+        got = (provider or checklist_gate_measures)()
+    except Exception as exc:  # noqa: BLE001 - an instrument that fails is an unmet condition
+        got = {}
+        failure = f"the instrument failed ({type(exc).__name__}): {exc}"
+    else:
+        failure = "the instrument returned no usable answer"
+    out = {}
+    for kind in _GATE_LABELS:
+        value = got.get(kind) if isinstance(got, dict) else None
+        if (isinstance(value, tuple) and len(value) == 2
+                and isinstance(value[0], bool) and isinstance(value[1], str)):
+            out[kind] = (value[0], _bound(value[1]))
+        else:
+            out[kind] = (False, _bound(failure))
+    return out
+
+
 def phase_gates(capabilities: list[dict] | None = None,
-                requirements: list[dict] | None = None,
+                requirements: list[dict] | None = None, *,
+                checklist_measures=None,
                 ) -> tuple[list[str], dict[str, tuple[bool, str]]]:
     """The plan's phase order and, per phase, whether its non-requirement
     conditions are met. Three sources, each for one question:
@@ -417,11 +720,19 @@ def phase_gates(capabilities: list[dict] | None = None,
     every requirement bound to it is measured exactly PROVEN: a waiver does
     not meet an exit condition, and a bound requirement with no row is not
     measured and unmet. An unbound item is an exit condition nothing here
-    measures yet, and stays unmet -- P2's checklist gates, P3's invariants,
-    P7's whole product proof. That holds later phases shut, which is what "the
-    authoritative implementation sequence" means, rather than letting a v2.0
-    backend show up as ready beside a v0.2 gap. A phase with no gate-kind item
-    is absent from the result.
+    measures yet, and stays unmet -- P3's invariants, P7's whole product proof.
+    That holds later phases shut, which is what "the authoritative
+    implementation sequence" means, rather than letting a v2.0 backend show up
+    as ready beside a v0.2 gap.
+
+    The exception is the item named in `CHECKLIST_GATE_ITEMS`: P2's three
+    checklist gates are measured by the programme's own instruments
+    (`checklist_gate_measures`, or `checklist_measures` when given: a callable
+    returning `{"items" | "review" | "fsck": (met, reason)}`). Such an
+    item is met only when its instrument says `True` -- and, if a requirement
+    also claims it, when that requirement is PROVEN as well: a claim never
+    stands in for the instrument. An unmet one is reported with its reason, not
+    as unmeasured. A phase with no gate-kind item is absent from the result.
     """
     scope = _scope()
     if scope is None:
@@ -445,7 +756,14 @@ def phase_gates(capabilities: list[dict] | None = None,
         conditions = [i for i in items if i["kind"] in _GATE_KINDS]
         if not conditions:
             continue
-        unmeasured = [i for i in conditions if not bindings[i["id"]]]
+        instrument = {i["id"]: CHECKLIST_GATE_ITEMS[i["id"]] for i in conditions
+                      if i["id"] in CHECKLIST_GATE_ITEMS}
+        measured = _gate_measurements(checklist_measures) if instrument else {}
+        unmeasured = [i for i in conditions
+                      if not bindings[i["id"]] and i["id"] not in instrument]
+        instrument_unmet = [(instrument[i["id"]], measured[instrument[i["id"]]][1])
+                            for i in conditions if i["id"] in instrument
+                            and not measured[instrument[i["id"]]][0]]
         unmet_bound = 0
         not_proven: list[str] = []
         for i in conditions:
@@ -453,9 +771,13 @@ def phase_gates(capabilities: list[dict] | None = None,
             if short:
                 unmet_bound += 1
                 not_proven += [rid for rid in short if rid not in not_proven]
-        if not unmeasured and not unmet_bound:
+        if not unmeasured and not unmet_bound and not instrument_unmet:
             gates[ph] = (True, f"{len(conditions)} exit condition(s), each bound "
-                               "to a PROVEN requirement")
+                               "to a PROVEN requirement" if not instrument else
+                               f"{len(conditions)} exit condition(s) met: "
+                               f"{len(conditions) - len(instrument)} bound to a "
+                               f"PROVEN requirement, {len(instrument)} measured by "
+                               "the checklist instruments")
             continue
         why = []
         if unmet_bound:
@@ -465,6 +787,11 @@ def phase_gates(capabilities: list[dict] | None = None,
                 named += f" and {len(not_proven) - 5} more"
             why.append(f"{unmet_bound} exit condition(s) bound to requirement(s) "
                        f"not PROVEN: {named}")
+        if instrument_unmet:
+            named = "; ".join(f"{_GATE_LABELS[kind]}: {reason}"
+                              for kind, reason in instrument_unmet)
+            why.append(f"{len(instrument_unmet)} checklist-gate exit condition(s) "
+                       f"measured by the checklist instruments and unmet -- {named}")
         if unmeasured:
             why.append(f"{len(unmeasured)} exit condition(s) nothing "
                        "here measures yet, e.g. "

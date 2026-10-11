@@ -11,8 +11,8 @@ longer session. Two ways exist; know which one is proven.
   facts the successor must re-derive, the operator's decisions kept verbatim, and advisory context
   with no authority; a successor takes the master epoch only if everything re-derives, and a stale
   predecessor is fenced. It has been tested with fakes. **No live succession has been run, so
-  nothing here is proven by it.** It also needs a governed project record, and `hoh` has no command
-  that creates one yet; do not improvise one.
+  nothing here is proven by it.** It also needs a governed project record, which
+  `hoh project create PROJECT --repo DIR` makes (once; it never replaces one).
 - The manual protocol below needs nothing but files and a second Herdr tab. It is a fallback with
   weaker guarantees (the successor checks a digest, not re-derived facts) and no live evidence in this
   repository either.
@@ -23,6 +23,29 @@ longer session. Two ways exist; know which one is proven.
 - When each request has grown to a few hundred thousand tokens, or when you notice yourself
   re-reading your own notes to remember what you decided.
 - Never mid-iteration, and never because a run is slow.
+
+## Automatic rotation: a policy decides, not a person
+
+`hoh project hold --watch-pid PID --rotate-policy FILE` (PID is your own session's process; the
+hold refuses a policy without it) applies a rotation policy at every renewal of the lease, and only
+inside Herdr. The policy is a small JSON document written once: the threshold in context
+tokens, where the master's own transcript is, the successor's model, and a capsule input (what to
+derive, the operator's decisions) that names exactly one file kept for the successor, the entry
+`handoff`; that file is yours alone, never one the product or the harness writes (not inside the
+project's directory, not your transcript), or the policy is refused. When the context is at the
+threshold the process prints one line, `rotation_requested`, and asks for that file; keep a monitor
+on the process's output. Writing the handoff is your consent to be rotated out, and it answers
+that request only if its **first line names the request id** the line carries (for example `# Handoff
+rq-...`). Write it, then start no run, merge or commit until a `rotation_finished`,
+`rotation_request_expired`, `rotation_withdrawn` or `rotation_error` line follows. A
+`rotation_finished` line with the outcome COMPLETE means the successor holds the lease and you are
+fenced: do nothing more and leave your tab to the operator. If you are not at a point where you can
+stop, do not write the handoff: the request expires, nothing rotates, and a new request comes only
+after a cool-down. With the handoff, the product runs the protocol above, binds
+a copy of the handoff into the capsule, starts the successor with the same policy (the pointer
+carries the policy's digest: a policy file that changed meanwhile is refused), and records
+every decision in `rotation/policy.log.jsonl` beside the project's state. Your lease is kept alive
+while the successor starts. Every failure leaves you the master.
 
 ## The manual protocol
 

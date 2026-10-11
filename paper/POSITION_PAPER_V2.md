@@ -877,3 +877,111 @@ register has been read again. The figures marked **R** were taken again at the b
   storage account, a scoped reclaim, a detached run, an event wait) as planned work. None is built. The finding that
   prompted it is a limit of the harness as used: finished runs read as active while idle shells of their launcher tabs
   stayed open, and storage had to be scanned because nothing accounted it per run.
+
+## 18. Update after v0.3.0a2, third part (added 2026-10-09, ledger O264)
+
+The preceding sections stay as written. Since section 17 ten more product runs have been merged: the temporary roots wired into
+`hoh run` for a registered project, a baseline that keeps a stale limit banner from re-parking a good turn, the merge gate, a
+read-only wait on a run, the owned-surface reaper, test and tool hygiene, and the refusal of a plan that drops, re-types, wraps or
+deselects a declared criterion. The figures marked **R** were taken again at the base named in `paper/NUMBERS_V2.md`; the value of
+the preceding section stands in parentheses.
+
+* **Provider usage limits (§12, §13 and §17).** The statement of section 17 that the fix for the stale-banner re-park is specified
+  and not merged no longer holds: it is merged, and the register still reads P2-43 PROVEN `[V40]` **R**. It is bounded, not closed
+  everywhere: a status-area line left in a healed pane's scrollback is still read, a repeated rate-limit body after a long turn is
+  missed, and no developer pane has been recorded on a real limit. A live run that meets a real provider limit is NOT_RUN.
+* **Temporary roots (§6 and §17).** `hoh run` registers, admits and releases the scratch of a run of a registered project; the
+  register reads P2-42 PARTIAL `[V10d]`, because the role scratch is not a registered root. The row is not lifted.
+* **The orchestration layer (§17).** Three of the eight capabilities registered by the sixth amendment now exist in part: the merge
+  gate as a command, the owned-surface reaper, and the read-only wait on a run. The first two read PARTIAL in the register through an
+  `equivalent` that names what is not built; the wait is slice 1 of nine clauses and reads MISSING. None has been used to decide a
+  merge or run against a live Herdr session.
+* **The register and the gate.** The register holds 235 requirements, 61 of them PROVEN and 12 PARTIAL `[V10]` **R** (61 and 10 in
+  section 17; the two rows that moved are the merge gate and the owned surfaces, MISSING to PARTIAL); 34 of P2's requirements read
+  PROVEN `[V10c]` **R** (34); the P2 gate has 9 requirements blocking and open `[V12]` **R** (9), with 174 open requirements, 157 of
+  them behind a phase gate; of the requirements registered for P3 to P12, 156 of 176 read MISSING `[V11b]` **R** (158 of 176). No
+  requirement was lifted to PROVEN by these merges.
+* **The honest ratio.** The attribution check counts 233 nodes after its anchor `[V06]` **R** (204), of which one `[V06a]` ran through
+  the shipped control plane end to end, 104 `[V06b]` **R** were developed by the product and merged by the orchestrating session after
+  review (94), and 128 `[V06c]` **R** are the orchestrating session's direct work (109). The ratio is unchanged in kind: the merge
+  decision stays with the orchestrating session, and every merge of this section was decided by its script, not by the product's command.
+
+## 19. Update after v0.3.0a2, fourth part (added 2026-10-11, ledger O265)
+
+The preceding sections stay as written. Since section 18 sixteen more merges have been made on the development line: a detached run,
+a per-run storage account, pin and import by plumbing, waits on a review report and on a process id, the registration of a target
+clone and the role scratch of a registered project's run, the refusal of run ids and project ids that are not plain names, an
+export leak scan for private identifiers, a guarded read of the review reports, the binding of the P2 checklist gate, and the
+automatic rotation of the orchestrating session under a policy. The figures marked **R** were taken again at the base named in
+`paper/NUMBERS_V2.md`; the value of the preceding section stands in parentheses.
+
+* **The register and the gate.** No requirement was lifted by these merges: the register still holds 235 requirements, 61 of them
+  PROVEN and 12 PARTIAL `[V10]` **R** (61 and 12 in section 18); 34 of P2's requirements read PROVEN `[V10c]` **R** (34); the P2
+  gate has 9 requirements blocking and open and no exit condition that nothing measures, with 174 open requirements, 157 of them
+  behind a phase gate `[V12]` **R** (3 exit conditions nothing measured in section 18: the checklist-gate items are now measured,
+  and read unmet for the reasons the build plan prints). P2-42 reads PARTIAL `[V10d]` **R**: the role scratch of a registered
+  project's run is below its registered workspace, and what holds the row is that no run of a registered project has been observed.
+  P2-14 stays PARTIAL on a recorded hold: without it the import of the rotation module would read PROVEN, which is import
+  evidence and not a rotation run by the product.
+* **Waiting and the orchestration layer (§17, §18).** `hoh wait` now also waits on a review report and on a process id; the row
+  still reads MISSING (a durable list and a trigger of the reaper are not built). `hoh pin` and `hoh import` and `hoh run --detach`
+  exist as first slices; none lifts its row, and none has run against a live Herdr session.
+* **The honest ratio.** The attribution check counts 281 nodes after its anchor `[V06]` **R** (233), of which one `[V06a]` ran
+  through the shipped control plane end to end, 125 `[V06b]` **R** were developed by the product and merged by the orchestrating
+  session after review (104), and 155 `[V06c]` **R** are the orchestrating session's direct work (128). The ratio is unchanged in
+  kind: the merge decision stays with the orchestrating session; from the merge `1e633e46` on the gate of record was the product's
+  command, which decides eligibility and does not merge.
+
+## 20. Update after v0.3.0a2, fifth part (added 2026-10-11, ledger O265, second revision)
+
+The preceding sections stay as written. The statements of the earlier sections that the product's rotation of the orchestrating
+session had not run live, and that P2-14 reads PARTIAL on a recorded hold, no longer hold. On 2026-10-11 the product rotated
+the orchestrating session of the build by itself, as the canary of amendment A7: the policy asked for the rotation at its
+threshold, the master wrote its handoff, a successor verified the frozen capsule and took the lease as the second epoch, and the
+old session was fenced; the decision log ends COMPLETE. On that evidence the register reads P2-14 and P2-20 PROVEN. The claim is
+narrow: one rotation, one host, the orchestrating role of one project, one successor model; the paths of expiry and error and a
+second rotation were not run live; the capsule input of the canary was static and missed the newest run root, which is tracked.
+A first rehearsal found a real defect that no test had seen (the successor's agent name was refused by Herdr) and the strand
+`rlname` fixed it before the canary. The figures marked **R** were taken again at the base named in `paper/NUMBERS_V2.md`; the
+value of the preceding section stands in parentheses.
+* **The register and the gate (second revision of the entry).** The register holds 235 requirements, 63 PROVEN and 10 PARTIAL `[V10]` **R** (61 PROVEN and 12 PARTIAL in section 19); of P2's requirements 36 PROVEN `[V10c]` **R** (34 PROVEN); the P2 gate reads 7 blocking open; 5 exit conditions bound to requirements not PROVEN; 0 exit conditions nothing measures yet; 172 open requirements, 157 behind a phase gate `[V12]` **R** (9 blocking open in section 19). The two rows that moved are P2-14 and
+  P2-20, PARTIAL to PROVEN, on the evidence of the canary; P2-42 still reads PARTIAL `[V10d]` **R**. Of the requirements registered for P3 to P12 156 of 176 MISSING (9 PARTIAL, 11 PROVEN) `[V11b]` **R** (unchanged).
+* **The honest ratio (second revision).** The attribution check counts 285 nodes after its anchor `[V06]` **R** (281), of which one `[V06a]` ran through the shipped control
+  plane end to end, 126 `[V06b]` **R** were developed by the product and merged by the orchestrating session after review (125), and 158 `[V06c]` **R** are the
+  orchestrating session's direct work (155). The rotation that the canary records was run by the product and decided by it; every merge was still decided by the
+  orchestrating session with the product's gate of record.
+* **Two qualifications (added 2026-10-11, third revision of the records entry O265).** The canary exercised the rotation of the session, not the
+  item-level rotation that the probe of P2-14 names (`rotate` has no caller outside the tests); and the statement of this section that a
+  second rotation was not run live was true when it was written: a second rotation by the product completed later on 2026-10-11
+  (successor epoch three, outcome COMPLETE) and is recorded in the closure records.
+* **The honest ratio (third revision of the entry).** The attribution check counts 287 nodes after its anchor `[V06]` **R** (285), of which one `[V06a]` ran through the shipped
+  control plane end to end, 126 `[V06b]` **R** were developed by the product and merged by the orchestrating session after review (126), and 160 `[V06c]` **R** are the
+  orchestrating session's direct work (158).
+* **Correction of the preceding qualification (2026-10-11, third revision of the records entry O265, second part).** It says that the second rotation "is recorded
+  in the closure records". That was wrong when it was set: no closure record exists yet. It is replaced by: the second rotation is to be recorded in the closure records,
+  none of which exists yet; it is observed in the canary root and in the orchestrator's ledger and is not counted here.
+* **The honest ratio (second part of the third revision of the entry).** The attribution check counts 289 nodes after its anchor `[V06]` **R** (287), of which one `[V06a]` ran through the
+  shipped control plane end to end, 126 `[V06b]` **R** were developed by the product and merged by the orchestrating session after review (126), and 162 `[V06c]` **R** are the
+  orchestrating session's direct work (160).
+
+## 21. Update for the pre-release v0.3.0a3 (added 2026-10-11)
+
+The preceding sections stay as written. This section is the update for the preparation of the third alpha: the figures marked
+**R** were taken again at the base named in `paper/NUMBERS_V2.md` (the commit `3517ce6f`), and the value of section 20 stands in
+parentheses. `RELEASE_NOTES.md` has the account and every limit.
+
+* **What the line holds beyond the second alpha.** The product-run merges after the second alpha added commands (the merge gate
+  as a command, `hoh wait`, `hoh surface`, `hoh run --detach`, `hoh pin`, `hoh import`, the per-run storage account and target
+  registration), the closure of the disk-full-safe writes and of the provider-limit classification (P2-41 and P2-43 PROVEN, each
+  with its limits), the ephemeral temporary roots wired for registered projects (P2-42 still PARTIAL), and the rotation of the
+  orchestrating session by the product (P2-14 and P2-20 PROVEN on one live rotation, with the limits of section 20 and its
+  qualifications). The preparation of the release lifts no requirement.
+* **The register and the gate.** The register holds 235 requirements, 63 PROVEN and 10 PARTIAL `[V10]` **R** (the same); of P2's
+  requirements 36 PROVEN `[V10c]` **R** (36); the P2 gate reads 7 blocking open; 5 exit conditions bound to requirements not
+  PROVEN; 0 exit conditions nothing measures yet; 172 open requirements, 157 behind a phase gate `[V12]` **R** (the same).
+* **The product-run merges.** The line holds 97 product-run merges since 2026-09-25 `[V01]` **R** (69 at the second alpha), 78 of
+  which change `src/hoh/` `[V02]` **R** (55): the count reads the titles, and the merges since the second alpha carry titles of
+  their own, which the tool now lists one by one; a convention for the title would end the list.
+* **The honest ratio.** The attribution check counts 294 nodes after its anchor `[V06]` **R** (289), of which one `[V06a]` ran
+  through the shipped control plane end to end, 126 `[V06b]` **R** were developed by the product and merged by the orchestrating
+  session after review (126), and 167 `[V06c]` **R** are the orchestrating session's direct work (162).

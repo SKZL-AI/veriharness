@@ -1882,3 +1882,226 @@ def test_f2_a_transient_fault_in_the_linger_still_ends_with_a_result(w):
     result = rotation.go(reclaim_linger_s=30)
     assert faults == [1]                                  # it happened, in the linger
     assert result.outcome is Outcome.RECLAIMED and result.predecessor_is_master
+
+
+# --------------------------------------------------------------------------- #
+# f06 -- residue of crl-followup: X10, a poll or interval the clock cannot sleep
+# --------------------------------------------------------------------------- #
+
+
+def test_f06_x10_a_reclaimed_lease_that_lapsed_while_lingering_is_not_reported_as_master(w):
+    rotation = Rotation(w, takes=False, takeover_s=60)
+    real = w.pred.acquire
+
+    def acquire_then_never_renew_again(**kw):
+        epoch = real(**kw)
+
+        def busy(*a, **k):
+            raise LockBusy("busy (test)")
+
+        w.pred.renew = busy                       # every renewal in the linger fails
+        return epoch
+
+    w.pred.acquire = acquire_then_never_renew_again
+    result = rotation.go(reclaim_linger_s=4000)   # longer than the ttl (1800 s)
+    assert result.outcome is Outcome.RECLAIMED
+    assert w.pred.problems()                      # the lease is expired: this is no master
+    assert result.predecessor_is_master is False
+    assert result.as_dict()["predecessor_is_master"] is False
+
+
+SENTENCE = "must be positive and finite, between 0.01 and 86400 seconds"
+
+
+@pytest.mark.parametrize("poll", ["-1", "0", "-0.5", "nan", "inf", "1e308", "1e-300", "0.001"])
+def test_f06_a_poll_the_clock_cannot_sleep_is_refused_before_anything_is_frozen_or_launched(
+        tmp_path, monkeypatch, capsys, poll):
+    started = []
+
+    class CountingLauncher(NullLauncher):
+        def start(self, **kw):
+            started.append(kw)
+            return super().start(**kw)
+
+    project = make_project(tmp_path)
+    monkeypatch.setattr(ro, "HerdrLauncher", CountingLauncher)
+    rc = hoh(project, "rollover", "p", "--model", "m", *master_args(project),
+             f"--poll={poll}", "--ack-timeout", "1")
+    assert rc == 2 and f"--poll {SENTENCE}" in capsys.readouterr().err
+    assert not started and project.master.problems() == []                      # still master
+    assert not (project.store.dir / "rollover").exists()                        # nothing frozen
+    rc = hoh(project, "rollover-accept", "p", "--capsule", str(tmp_path / "none.json"),
+             "--digest", "d", "--session", "s", f"--poll={poll}")
+    assert rc == 2 and f"--poll {SENTENCE}" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("interval", ["1e308", "86400.5", "1e-300", "0.001"])
+def test_f06_rollover_accept_refuses_an_interval_outside_the_period_range_before_the_capsule_is_read(
+        tmp_path, capsys, interval):
+    project = make_project(tmp_path)
+    rc = hoh(project, "rollover-accept", "p", "--capsule", str(tmp_path / "none.json"),
+             "--digest", "d", "--session", "s", f"--interval={interval}")
+    assert rc == 2 and f"--interval {SENTENCE}" in capsys.readouterr().err      # not 5: no capsule load
+
+
+@pytest.mark.parametrize("interval", ["1e308", "1e-300", "0.001"])
+def test_f06_the_interval_of_a_hold_is_refused_before_the_lease_is_taken_when_no_clock_takes_it(
+        tmp_path, capsys, interval):
+    project = make_project(tmp_path)
+    project.master.release(reason="free it for hold")
+    rc = hoh(project, "hold", "p", "--session", "h1", f"--interval={interval}", "--hold-for", "1")
+    assert rc == 2 and f"--interval {SENTENCE}" in capsys.readouterr().err
+    lease = MasterAuthority(project.store.dir, "probe").read_lease()
+    assert lease.leader_session_id == "pred" and lease.released_at              # h1 never acquired
+
+
+def test_f06_the_poll_is_refused_before_the_masters_claim_is_judged(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(ro, "HerdrLauncher", NullLauncher)
+    project = make_project(tmp_path)
+    stale = ["--session", "pred", "--epoch", "99", "--token-file", str(project.token)]
+    rc = hoh(project, "rollover", "p", "--model", "m", *stale, "--poll=-1", "--ack-timeout", "1")
+    err = capsys.readouterr().err
+    assert rc == 2 and f"--poll {SENTENCE}" in err                              # not 5: no claim yet
+    rc = hoh(project, "rollover", "p", "--model", "m", *stale, "--poll=0.05", "--ack-timeout", "1")
+    assert rc == 5 and "refused" in capsys.readouterr().err                     # the claim is judged
+
+
+@pytest.mark.parametrize("value, ok", [
+    (None, True), (0.01, True), (0.05, True), (1.0, True), (86400.0, True), (86400.5, False),
+    (0.0, False), (0.0099, False), (1e-300, False), (-1.0, False), (float("nan"), False),
+    (float("inf"), False), (-float("inf"), False), (1e308, False)])
+def test_f06_a_period_is_finite_and_between_the_floor_and_a_day(value, ok):
+    problem = ro.period_problem("--poll", value)
+    assert (problem is None) is ok
+    assert ok or problem.startswith(f"--poll {SENTENCE}")
+
+
+@pytest.mark.parametrize("failure", [OverflowError("timestamp out of range for platform time_t"),
+                                     KeyboardInterrupt()])
+def test_f06_a_hold_that_ends_in_an_exception_gives_the_lease_back(w, failure):
+    def cannot_sleep(seconds):
+        raise failure
+
+    with pytest.raises(type(failure)):
+        hold_lease(w.pred, interval=1.0, sleep=cannot_sleep)
+    lease = w.authority("probe").read_lease()
+    assert lease.released_at and lease.leader_session_id == "pred"
+    assert "abnormally" in lease.released_reason
+
+
+def test_f06_a_failing_give_back_does_not_replace_the_exception_that_ended_the_hold(w):
+    def cannot_sleep(seconds):
+        raise KeyboardInterrupt()
+
+    def busy(**kw):
+        raise LockBusy("busy (test)")
+
+    w.pred.release = busy
+    with pytest.raises(KeyboardInterrupt):
+        hold_lease(w.pred, interval=1.0, sleep=cannot_sleep)
+
+
+# --------------------------------------------------------------------------- #
+# F06F -- every call of the hold loop is inside the cleanup, not only `sleep`
+# --------------------------------------------------------------------------- #
+
+
+def _dies(failure):
+    """A stand-in for any callable of the hold loop that raises `failure`."""
+    def boom(*args, **kwargs):
+        raise failure
+    return boom
+
+
+def _given_back_abnormally(w):
+    lease = w.authority("probe").read_lease()
+    assert lease.released_at and lease.leader_session_id == "pred"
+    assert "abnormally" in lease.released_reason
+
+
+@pytest.mark.parametrize("failure", [PermissionError, KeyboardInterrupt, SystemExit])
+def test_f06f_a_hold_whose_watch_check_dies_gives_the_lease_back(w, failure):
+    slept = []
+    with pytest.raises(failure):
+        hold_lease(w.pred, interval=1.0, watch_pid=1, alive=_dies(failure("watch check (test)")),
+                   sleep=slept.append)
+    assert slept == []                      # it died at the check, not at a later sleep
+    _given_back_abnormally(w)
+
+
+@pytest.mark.parametrize("failure", [OSError, KeyboardInterrupt, SystemExit])
+def test_f06f_a_hold_whose_time_check_dies_gives_the_lease_back(w, failure):
+    readings = []
+
+    def monotonic():
+        readings.append(1)
+        if len(readings) > 1:               # the first reading starts the hold, the second is the loop's
+            raise failure("clock (test)")
+        return 0.0
+
+    slept = []
+    with pytest.raises(failure):
+        hold_lease(w.pred, interval=1.0, hold_for=60, monotonic=monotonic, sleep=slept.append)
+    assert len(readings) == 2 and slept == []
+    _given_back_abnormally(w)
+
+
+@pytest.mark.parametrize("failure", [KeyboardInterrupt, SystemExit])
+def test_f06f_an_interrupt_inside_a_renewal_gives_the_lease_back(w, failure):
+    w.pred.renew = _dies(failure("renewal (test)"))
+    slept = []
+    with pytest.raises(failure):
+        hold_lease(w.pred, interval=1.0, sleep=slept.append)
+    assert slept == []
+    _given_back_abnormally(w)
+
+
+@pytest.mark.parametrize("failure", [OSError, LockBusy, RuntimeError, ValueError])
+def test_f06f_a_renewal_that_fails_with_an_ordinary_error_is_retried_not_the_end_of_the_hold(
+        w, failure):
+    real_renew = w.pred.renew
+    attempts = []
+
+    def flaky():
+        attempts.append(1)
+        if len(attempts) == 1:
+            raise failure("disk full or lock busy (test)")
+        return real_renew()
+
+    w.pred.renew = flaky
+    ticks = {"t": 0.0}
+
+    def sleep(seconds):
+        ticks["t"] += seconds
+        w.clock.advance(seconds)
+
+    result = hold_lease(w.pred, interval=1.0, hold_for=2.0, sleep=sleep,
+                        monotonic=lambda: ticks["t"])
+    assert result.reason == "elapsed" and result.released and result.renewals == 1
+    assert len(attempts) == 2                                       # the failed one and the retry
+    assert "abnormally" not in w.authority("probe").read_lease().released_reason
+
+
+@pytest.mark.parametrize("ttl, period", [(1800, 600.0), (30, 10.0), (10, 10 / 3), (4, 4 / 3), (3, 1.0),
+                                            (1, 1.0)])
+def test_f06f_a_hold_without_an_interval_renews_three_times_per_ttl_and_never_faster_than_a_second(
+        tmp_path, ttl, period):
+    world = World(tmp_path, ttl=ttl)
+    asked = []
+    ticks = {"t": 0.0}
+
+    def sleep(seconds):
+        asked.append(seconds)
+        ticks["t"] += seconds                                       # the lease's own clock stands still
+
+    result = hold_lease(world.pred, hold_for=1.0, sleep=sleep, monotonic=lambda: ticks["t"])
+    assert result.reason == "elapsed" and asked == [period]         # one period, the default one
+
+
+def test_f06f_the_poll_is_judged_before_the_prompt_delay(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(ro, "HerdrLauncher", NullLauncher)
+    project = make_project(tmp_path)
+    rc = hoh(project, "rollover", "p", "--model", "m", *master_args(project),
+             "--poll=-1", "--prompt-delay=nan", "--ack-timeout", "1")
+    err = capsys.readouterr().err
+    assert rc == 2 and f"--poll {SENTENCE}" in err and "--prompt-delay" not in err

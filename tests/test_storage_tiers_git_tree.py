@@ -128,10 +128,19 @@ def test_git_tree_writes_no_objects(world):
 
 
 def test_age_irrelevant_git_tree(world, monkeypatch):
-    """Catches: a decision that reads a time stamp. Mutant: an mtime read."""
+    """Catches: a decision that reads a time stamp. Mutant: an mtime read.
+
+    Run alone, this node failed (LGS-F1): the first classification of a process
+    imports `hoh.archive_target` and `hoh.rehydration` lazily
+    (`extract_root_proof`), and importlib reads `st_mtime` of the package
+    directories to do it. That is the import system, not the decision, and in
+    the whole file an earlier test had already paid it. The warm-up call below
+    pays it first, so the spy sees only the second, import-free decision."""
     world.register()
     for path in (world.root / "tree").rglob("*"):
         os.utime(path, (0, 0), follow_symlinks=False)
+    warm = classify(world, world.root / "tree")
+    assert warm.tier == st.REPRODUCIBLE_SCRATCH
     seen: list[str] = []
     real = os.stat_result.__getattribute__
 
@@ -287,6 +296,67 @@ def test_own_bound_notes_do_not_make_own_root_hot(world):
     (world.reviews / "r9" / "notes.md").write_text(f"tree copy in {world.root}/tree\n",
                                                    encoding="utf-8")
     assert classify(world, world.root / "tree").tier == st.HOT
+
+
+def test_a_bound_note_does_not_exempt_the_naming_of_another_root(world):
+    """LGS-F2 E5. Catches: the own-root exemption of a bound, unchanged note
+    extended to every root, so a note kept in `r1` that names `r2` (in a spelling
+    `text_refs` cannot see, `~/`) no longer holds `r2` while `r2` is still named
+    there. Mutant E5: `if (root != own or not exempt)` becomes `if not exempt`
+    in `_legacy_findings`. Control: the same note names `r1` too and does not
+    hold `r1` (the exemption is real)."""
+    r2 = world.reviews / "r2"
+    rel1 = world.root.relative_to(world.tmp).as_posix()
+    rel2 = r2.relative_to(world.tmp).as_posix()
+    (world.root / "notes.md").write_text(f"Scratch: ~/{rel1}/ and later ~/{rel2}/\n",
+                                         encoding="utf-8")
+    world.register()
+    archive_into(world.repo, world.old, r2 / "tree")
+    anchor = world.anchor(designations=[world.brief(root=r2, name="dogfood/x/r2.md")],
+                          reports=[world.report()], path=r2,
+                          file="dogfood/storage-anchors/legacy-r2.json")
+    world.reg.register_legacy_root("a", r2, "legacy_review", anchor)
+    own = classify(world, world.root / "tree")
+    assert own.tier == st.REPRODUCIBLE_SCRATCH, own.reasons
+    other = classify(world, r2 / "tree")
+    assert other.tier == st.HOT, other.reasons
+    assert any(r.startswith("open_finding") for r in other.reasons)
+
+
+@pytest.mark.parametrize("prefix", ["$HOME/", "${HOME}/"])
+def test_dollar_home_spellings_of_the_root_are_hot(world, prefix):
+    """LGS-F2 E2. Catches: a brief that spells the root `$HOME/...` or
+    `${HOME}/...` missed (`text_refs` cannot see either). Mutant E2: those two
+    forms dropped from `_root_spellings`. Control: before the brief exists the
+    tree is REPRODUCIBLE_SCRATCH, and a sibling name (`<root>2`) is not the
+    root."""
+    world.register()
+    assert classify(world, world.root / "tree").tier == st.REPRODUCIBLE_SCRATCH
+    rel = world.root.relative_to(world.tmp).as_posix()
+    (world.reviews / "r1-sibling.md").write_text(f"Scratch: {prefix}{rel}2/\n", encoding="utf-8")
+    assert classify(world, world.root / "tree").tier == st.REPRODUCIBLE_SCRATCH
+    (world.reviews / "r1-reuse.md").write_text(f"Scratch: {prefix}{rel}/\n", encoding="utf-8")
+    decision = classify(world, world.root / "tree")
+    assert decision.tier == st.HOT, decision.reasons
+    assert any(r.startswith("open_finding") for r in decision.reasons)
+
+
+def test_a_bound_sibling_replaced_by_the_same_bytes_is_drift(world):
+    """LGS-F2 E1. Catches: drift that compares content only. A bound note that
+    is deleted and written again with the same bytes and mode is another inode;
+    the anchor bound the first one. Mutant E1: `recorded != [st.st_dev,
+    st.st_ino]` ignores the inode in `_legacy_root_drift`. Control: the tree is
+    REPRODUCIBLE_SCRATCH until the note is replaced."""
+    (world.root / "notes.md").write_text("first round\n", encoding="utf-8")
+    world.register()
+    assert classify(world, world.root / "tree").tier == st.REPRODUCIBLE_SCRATCH
+    new = world.root / "notes.md.new"
+    new.write_text("first round\n", encoding="utf-8")
+    os.chmod(new, os.stat(world.root / "notes.md").st_mode & 0o7777)
+    os.replace(new, world.root / "notes.md")
+    decision = classify(world, world.root / "tree")
+    assert decision.tier == st.HOT, decision.reasons
+    assert any(r.startswith("legacy_drift") and "notes.md" in r for r in decision.reasons)
 
 
 def test_legacy_findings_read_txt_and_json(world):

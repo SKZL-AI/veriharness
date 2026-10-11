@@ -1097,3 +1097,12 @@ source and the command that regenerates it, in `paper/NUMBERS_V2.md`.
   times (`docs/LIMITATIONS.md`, limit 1, last subsection; `README.md`, "Duration, autonomy and scale of the build").
   "Multi-day" is therefore, for the line as a whole, multi-week; "without intervention" is still not shown. E9
   above: the ledger now runs to O262, with 234 numbered entries `[V49]`.
+* **E11 -- the numbered entries of E9 and E10, taken again (added later on 2026-10-09, ledger O264).** The ledger now runs to O264,
+  with 236 numbered entries `[V49]`; E9 and E10 stay as written.
+* **E12 -- the figures of E9 to E11, taken again (added 2026-10-11, ledger O265).** The ledger now runs to O265, with 237 numbered
+  entries `[V49]`; the first and the latest commit of the mainline are 34 days 3 hours apart `[V46]` and 25 of the 35 calendar days
+  carry a commit `[V47]`; E9 to E11 stay as written.
+* **E13 -- the figures of E9 to E12, taken again (added 2026-10-11, ledger O265, second revision).** The ledger now runs to O265, with 237 numbered
+  entries `[V49]`; the first and the latest commit of the mainline are 34 days 4 hours apart `[V46]` and 25 of the 35 calendar days
+  carry a commit `[V47]`; E9 to E12 stay as written.
+* **E14 -- the figures of E5 and E9 to E13, taken again (added 2026-10-11, release documentation of v0.3.0a3).** The line holds 97 product-run merges since 2026-09-25 `[V01]`, 78 of which change `src/hoh/` `[V02]` (E5 states 55 of 69); the ledger runs to O265, with 237 numbered entries `[V49]`; the first and the latest commit of the mainline are 34 days 7 hours apart `[V46]` and 25 of the 35 calendar days carry a commit `[V47]`; E5 and E9 to E13 stay as written.

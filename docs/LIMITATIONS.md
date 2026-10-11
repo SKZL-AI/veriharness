@@ -1914,3 +1914,179 @@ capability matrix reads P2-43 PROVEN (ledger entry O262). What that rests on, an
   claim, by design.
 * *NOT_RUN.* A live developer turn that meets a real provider limit, a live rate-limit body, a live resume against a pane
   that continued by itself, a live race of two resuming processes, and a live run that meets a real limit with receipts.
+
+## Update, later on 2026-10-09 (ledger O264): what the merges after the first update change, and what they leave
+
+Nothing above is edited. Where a sentence above says that something is not merged and it is merged now, this section is the
+correction; where it says that something does not exist and it exists now, this section says how far.
+
+* *The stale-banner re-park of P2-43 (supersedes the bullet "The stale-banner re-park (open)" of the section above).* A
+  limit banner that the developer's pane already showed when the prompt was sent is not read as this turn's. A pane that is
+  still limited when the prompt is sent stays a failed dispatch. What stays: a banner with the same words after a turn longer
+  than the window is missed unless its status-area line is read; that backstop exists for usage limits and not for a rate-limit
+  body, so a repeated byte-identical body is missed; a status-area line that a healed pane left in its scrollback is read, and
+  the run is parked again until the resume limit and then handed to a person (reproduced in review); an unreadable baseline is
+  none, and so is the baseline of a turn awaited after a stalled send; no developer pane that survived a limit wait has been
+  recorded, so how often any of this happens is SUSPECTED. The register still reads P2-43 PROVEN, with these limits.
+* *Ephemeral temporary roots (P2-42, still PARTIAL).* `hoh run` for a run of a registered project registers, admits and
+  releases the scratch of its acceptance checks and of each iteration, and no longer makes the runner's sibling scratch. The
+  role scratch is not a registered root, a run of an unregistered project keeps the old scratch, a workspace whose creator
+  died is not reclaimed, and arenas and output sinks are run-store artefacts outside the row. `hoh resume-storage` unparks a
+  run only when the role and the iteration's workspace would be admitted together. A live run of the product, a really full
+  disk and a race of two processes for one session are NOT_RUN.
+* *The merge gate as a command (P5-36, PARTIAL).* `hoh merge-gate check` aggregates the required review reports of one
+  candidate and `verify` re-decides a receipt. A report counts only with a complete six-line footer that the reviewer
+  declares complete, bound to the candidate, base and spec digest, and not modified in the last minute; a partial or cut-off
+  report is no verdict. It is not wired into any merge step, the receipt is not signed, the merge message is not generated
+  from it, and the build's own merges still use the orchestrator's script. The command has not decided a merge.
+* *Waiting on a run (P5-43, MISSING).* `hoh wait RUN` is read-only and answers one JSON line and an exit code. It does not wait
+  for a report or a process id, keeps no list of what it reported, and does not close anything. `idle` is a verdict about the
+  moment of the look, and `parked` says that a resume loop will lift the block, not that one is running. Nothing ran against a
+  live Herdr session.
+* *Owned surfaces and their reaper (P5-39, PARTIAL).* `hoh surface open` records a tab as a run's own; `hoh surface reap`
+  closes it when the run is over (failed, cancelled or ready for delivery, with no live process) and the shell in it is proven
+  idle by a scan of every user's processes. A checkpoint is not the end of a run, a foreign tab is never closed, and anything
+  that cannot be proven is kept. Reviewer and drafter tabs are not covered, closing a tab is expected to hang up its shell, and
+  what a real Herdr does is NOT_RUN.
+* *Criterion fidelity (supersedes the row "The planner re-types the specification's criteria" above, for specifications that
+  declare a block).* A specification that states its criteria in one fenced block is held to them: a plan that drops, re-types,
+  wraps or deselects one is refused. A specification without the block is accepted as before, with "criterion fidelity
+  NOT_RUN" in the reason; the older specifications are not back-filled. The preflight of every criterion in the run's own
+  isolation, before quota is spent, is outlined and not built.
+
+* *The figures of the development line, taken again.* At the commit of the records entry O264 (`dff02f08`, committed on
+  2026-10-09 at 22:14 +0300; the figures quoted above for the O262 records commit stay as written) the history is 1,130 commits
+  `[V48]` and 236 numbered ledger entries, O23 to O264 `[V49]`. Of the development nodes after the attribution anchor, 104 were
+  developed by a product run and merged by the orchestrating session after review `[V06b]` and 128 were written by the
+  orchestrating session directly `[V06c]`. The seven product-run merges described in this section were decided by the orchestrator's own script,
+  not by the product's `hoh merge-gate`.
+
+## Update, 2026-10-11 (ledger O265): what the merges after the second update change, and what they leave
+
+Nothing above is edited. Where a sentence above says that something does not exist or is not merged and it is merged now, this
+section is the correction; where it says that something is true and it has changed, this section says how far. No requirement is
+lifted by this entry.
+
+* *Waiting (supersedes the bullet "Waiting on a run (P5-43, MISSING)" of the section above; the row still reads MISSING).*
+  `hoh wait` waits on a run, on a review report (`--report PATH`) and on a process id (`--pid N`). A report counts as final only
+  after the stable age of the merge gate, a late footer starts the age again, and a FIFO, a directory or an oversize file end the
+  wait at once as unreadable. A process is identified by its id and its start time, never by a name; a reused id or a zombie ends
+  the wait, and no signal is sent. A candidate-less final stage and a storage park that no timer will lift read `held`, an accepted
+  run whose process died says so, and a closed standard output exits with a refusal. Still not built: the durable list of what
+  was reported (clause C7) and the trigger of the reaper (clause C9). Nothing ran against a live Herdr session.
+* *Temporary roots (P2-42, still PARTIAL; supersedes the bullet "The role scratch is not a registered root" of the section
+  above, for a run of a registered project).* The role scratch of such a run lives below the iteration's registered workspace, a
+  pane whose temporary directory is not the bound scratch and an adopted pane are refused, and a refusal keeps the pane open.
+  The operator ruled that the row reads "for a run of a registered project". What still holds the row: no run of a registered
+  project has been observed, a live run with real panes and the other harnesses' temporary files are NOT_RUN, and the
+  approval-resume of a registered run cannot adopt the kept pane. A run of an unregistered project keeps the old scratch.
+* *Handing the orchestrating session over (P2-14, P2-20, still PARTIAL).* The rotation policy, its controller and the creation of
+  the governed project record are merged and tested with fakes, and fail closed. No rotation has been run by the product; the
+  register holds P2-14 at PARTIAL on purpose, because without the hold the import of the module alone would read PROVEN. The
+  dress rehearsal on a synthetic transcript is not evidence. A handoff within the file-system timestamp granularity of its request
+  waits until the request expires, and a policy that names a transcript path is inherited by the successor.
+* *The detached run (P5-42, MISSING).* `hoh run --detach` opens an owned run-host tab, types one command of safe words and
+  returns when a new process marker appears. A refusal that only the tab can make reads "started"; the named profile, the
+  timeout from the specification, the dedicated pinned clone and the derived contract are not built; whether Herdr behaves as
+  documented is NOT_RUN. A run id is refused unless it is a plain direct child of the runs root.
+* *Pin and import (P5-38, MISSING).* `hoh pin` builds a specification-only pin commit by plumbing on a base the product resolved,
+  create-only, with a digest trailer; `hoh import` verifies an accepted candidate and writes a receipt. Both write git objects to
+  the repository they are given. The topology check, the scope-of-diff check and registered receipts are not built, and a live
+  import of a real run is NOT_RUN.
+* *The per-run storage account (P5-40, MISSING).* `hoh storage account` reads bytes and entries over registry-owned paths, counts
+  a hard link once and never answers zero for what it could not measure. It does not enter `hoh status`, produces no receipt and
+  admits nothing on entries; its command pre-checks are unbounded and a file can change under the walk.
+* *The merge gate (P5-36, still PARTIAL; supersedes the sentence "the build's own merges still use the orchestrator's script"
+  of the section above).* The report read is guarded: a FIFO, a socket, a device, a directory, a symlink or an oversize file is
+  unreadable, never a hang. The orchestrator's script and the product command disagreed on more than half of a probe set; since
+  `1e633e46` the product command has been the gate of record, every merge since has carried both receipts, and a replay of the older
+  receipts found that many merges had been made on a reviewed base that was no longer the first parent (the product refuses that).
+  No merge step of the product calls the command.
+* *Owned surfaces (P5-39, still PARTIAL).* The reaper refuses a recorded directory that is a mount point or too broad, and an
+  unreadable mount table refuses every listed surface. Reviewer and drafter tabs are not covered; a cleanup script
+  closed sixty reviewer and run tabs on a rule that read an idle agent as finished, which is the case the product feature of the
+  surface book is for (drafted, not merged).
+* *The export leak scan.* It reads the bytes of every exported file, a UTF-16 reading of them and the name, refuses a private
+  session or scratch identifier by digest and any session-shaped UUID that is not on a short list of synthetic ones, and treats an
+  unreadable file as a finding. A name carrier prints its path (limit L8) and a UTF-16 text at an odd offset is not read (limit
+  L9). The list of digests names only the identifiers known when it was last extended.
+* *A phase is closed at a commit (amendment A7).* The rule that later changes to the source create regression obligations and do
+  not re-open a closed phase is recorded as an amendment of the production line. No phase is closed by it: the gate of P2 reads
+  open.
+* *The figures of the development line, taken again.* At the commit of the records entry O265 (`d88281da`, committed on 2026-10-11 at 03:44 +0300; the figures quoted above for the O264
+  records commit stay as written) the history is 1,197 commits `[V48]` and 237 numbered ledger entries, O23 to O265 `[V49]`. The first
+  and the latest commit of the mainline are 34 days 3 hours apart `[V46]`, and 25 of the 35 calendar days carry a commit `[V47]`. Of
+  the development nodes after the attribution anchor, 125 were developed by a product run and merged by the orchestrating session
+  after review `[V06b]` and 155 were written by the orchestrating session directly `[V06c]`. The product's `hoh merge-gate`
+  decided the merges recorded in this section from `1e633e46` on, as the gate of record, with the orchestrator's script beside it.
+
+## Update, 2026-10-11, later (ledger O265, second revision): the first rotation by the product has run
+
+Nothing above is edited. This section supersedes, for P2-14 and P2-20, the table row "Context rollover (Layer A) is merged and has not
+run live", the sentence of the first limit that the product's rollover protocol "has not run live", and the bullet "Handing the
+orchestrating session over (P2-14, P2-20, still PARTIAL)" of the section above. The record is under `dogfood/canary-a7/`.
+
+* *Handing the orchestrating session over (P2-14 and P2-20 now read PROVEN).* On 2026-10-11 the product rotated the
+  orchestrating session of the build by itself: `hoh project hold --rotate-policy` requested the rotation because the measured context
+  was above the threshold (not lowered for the canary), the master wrote its handoff as consent, the controller froze a capsule of
+  derived facts, operator decisions and advisory context, started a successor, and `rollover-accept` re-measured every derived fact,
+  acknowledged, took the lease as the second epoch with the reason SUCCESSION, and the decision log ends COMPLETE with the
+  predecessor no longer the master. A write with the old token was refused. The orchestrator checked ten acceptance items and found them
+  met. The two rehearsals before it are not evidence; the first found a real defect (the successor's agent name), which the strand
+  `rlname` fixed.
+* *What that does not show.* One rotation, on one host, of the orchestrating role of one project, to one successor model in one
+  permission mode. The expiry, the withdrawal and the error paths of the controller were not run live, no second rotation (the
+  cool-down) has run, and the capsule input of the canary was written before the newest run existed and did not bind its run root
+  (nothing was lost; tracked: derive the input again before each rotation). A policy that names a transcript path is inherited by the
+  successor; the canary used the session id from the environment. The digests of the record chain can be re-checked on the committed
+  copy only where no private session id enters them; the manifest says which.
+* *The context capsule (P2-20).* The module is used live by the verification of the succession capsule: the capsule's derived facts
+  are bound as sources and judged by the freshness rule before an acknowledgement is written, and the acknowledgement of the canary
+  is verified with no mismatch. Only that path ran live (the assembly with a zero budget, the source binding, the freshness rule);
+  hierarchical loading, the role-aware views and the budget squeeze are exercised by tests only.
+* *Controller and session replacement (P2-35, status unchanged).* The canary is one replacement of one role observed live; it is
+  not the durability record, which is taken again at the freeze, and it binds no gate.
+* *Not changed.* P2-42 still reads PARTIAL; P2-11 and P2-33 to P2-37 are unchanged; the gate of P2 is shut.
+* *The figures of the development line, taken again.* At the commit of the second revision of the records entry O265 (`29852843`, committed on 2026-10-11 at 04:21 +0300; the
+  figures quoted above for the first revision stay as written) the history is 1,204 commits `[V48]` and 237 numbered ledger entries, O23 to
+  O265 `[V49]`, with 126 development nodes developed by a product run and merged by the orchestrating session after review `[V06b]` and 158
+  written by the orchestrating session directly `[V06c]`. The first and the latest commit of the mainline are 34 days 4 hours apart `[V46]`, and
+  25 of the 35 calendar days carry a commit `[V47]`. The register holds 235 requirements, 63 PROVEN + 10 PARTIAL + 6 IMPLEMENTED_NOT_PROVEN + 156 MISSING `[V10]`.
+
+## Update, 2026-10-11, third revision of the records entry O265 (review findings folded by addition)
+
+Nothing above is edited.
+
+* *A limit of the PROVEN reading of P2-14 (added).* The canary exercised the rotation of the session of the orchestrator (the policy, the
+  controller and the rollover). The item-level context rotation that the probe of the row names, `rotate` in `src/hoh/rotation.py`
+  and `reachable`, has no caller outside the tests; the register note's sentence that nothing rotates items yet stays true. The status
+  is PROVEN as set; it is a statement about the rotation of the session.
+* *"No second rotation has run" (dated).* The bullet above that says that a second rotation was not run live was true when it was
+  written. A second rotation by the product completed later on 2026-10-11 (successor epoch three, outcome COMPLETE); it is recorded in
+  the closure records and is not counted here.
+* *The figures of the development line, taken again.* At the commit of the third revision of the records entry O265 (`84384e1d`, committed on 2026-10-11 at 05:06 +0300) the history is
+  1,207 commits `[V48]`, with 126 development nodes developed by a product run and merged by the orchestrating session after review `[V06b]` and 160 written
+  by the orchestrating session directly `[V06c]`.
+* *Correction of the bullet "No second rotation has run" above (2026-10-11, third revision of the records entry O265, second part).* The bullet says that the second
+  rotation "is recorded in the closure records". That was wrong when it was set: no closure record exists yet. It is replaced by: the second rotation is to
+  be recorded in the closure records, none of which exists yet; it is observed in the canary root and in the orchestrator's ledger and is not counted here.
+* *The figures of the development line, taken again.* At the commit of the second part of the third revision of the records entry O265 (`d70a1add`, committed on 2026-10-11 at 05:26 +0300) the
+  history is 1,210 commits `[V48]`, with 126 development nodes developed by a product run and merged by the orchestrating session after review `[V06b]` and 162
+  written by the orchestrating session directly `[V06c]`.
+
+## Update, 2026-10-11, for v0.3.0a3 (release documentation)
+
+Nothing above is edited. The limits of the third alpha are those of the sections above and of the section of `v0.3.0a3` in
+`RELEASE_NOTES.md`; the preparation of the release changes no source file and lifts no requirement.
+
+* *What the release notes add.* They collect under one heading the limits that the sections above state for P2-41, P2-43, P2-42,
+  P2-14 and P2-20 and for the commands merged since the second alpha, and they say that none of `hoh wait`, `hoh surface` and
+  `hoh run --detach` has run against a live Herdr session. The durability evidence is not taken at this commit, and the reboot
+  proof (P2-11) stays NOT_RUN until the operator's restart.
+* *The product-run merges are counted by title (tracked, LOW).* The count, 97 product-run merges since 2026-09-25 `[V01]`, 78 of
+  which change `src/hoh/` `[V02]`, lists the titles of the merges since the second alpha one by one in `tools/docs_numbers.py`; a
+  figure that depends on a list of titles is brittle, and a convention for the title of a product-run merge would end the list.
+* *The figures of the development line, taken again.* At the commit `3517ce6f` (committed on 2026-10-11 at 07:24 +0300; the figures quoted above
+  for the earlier records commits stay as written) the history is 1,217 commits `[V48]`. Of the development nodes after the
+  attribution anchor, 126 were developed by a product run and merged by the orchestrating session after review `[V06b]` and 167
+  were written by the orchestrating session directly `[V06c]`.

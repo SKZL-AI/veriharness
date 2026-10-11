@@ -1625,3 +1625,386 @@ def test_moving_a_published_file_into_the_archive_is_visible(tmp_path):
     assert "docs/GUIDE.md" not in after, "the move did not register"
     assert after[".archiv/"] == "EXCLUDE"
     assert before != after
+
+
+# --------------------------------------------------------------------------- #
+# leakid -- private session / scratch ids and UUID-shaped session ids
+#
+# Every id used here is made up, and the UUID-shaped one is assembled at run
+# time: this file is itself an INCLUDE file and the scan under test would
+# refuse a UUID-shaped literal that is not on the allowlist.
+# --------------------------------------------------------------------------- #
+
+_MADE_UP_ID = "c0ffee11"
+_MADE_UP_UUID = "-".join(["1badc0de", "1234", "4abc", "8def", "0123456789ab"])
+
+
+def _digests_of(*ids: str) -> frozenset:
+    return frozenset(hashlib.sha256(i.encode()).hexdigest() for i in ids)
+
+
+def _leak_scan(tmp_path, rel: str, text: str, rule: str = "public-docs") -> list[dict]:
+    target = tmp_path / rel
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(text, encoding="utf-8")
+    return em.scan_include_for_leaks(
+        [{"path": rel, "decision": "INCLUDE", "rule": rule}], tmp_path)
+
+
+@pytest.mark.parametrize("rule", ["public-docs", "governance", "package", "tests",
+                                  "tooling", "operational-integration", "example"])
+def test_a_listed_private_id_in_an_exported_file_is_refused(tmp_path, monkeypatch, rule):
+    """A listed id is refused in an exported file whatever its rule, in prose, in
+    a path-like string, as the first group of a UUID and in upper case; the
+    finding names the file and never the id. Controls: another id, a longer
+    token and an id glued to a letter are not it."""
+    monkeypatch.setattr(em, "PRIVATE_ID_DIGESTS", _digests_of(_MADE_UP_ID))
+    carriers = {
+        "prose.txt": f"the session {_MADE_UP_ID} ran it\n",
+        "path.txt": f"scratch/{_MADE_UP_ID}/notes\n",
+        "upper.txt": f"id {_MADE_UP_ID.upper()}\n",
+        "code.py": f"SESSION = '{_MADE_UP_ID}'  # from the orchestrator\n",
+        "uuid.txt": f"{_MADE_UP_ID}-3e42-4b92-9dd3-e4977b6e535c\n",
+    }
+    for name, text in carriers.items():
+        findings = _leak_scan(tmp_path, name, text, rule)
+        assert any(f == {"type": "private-id", "path": name} for f in findings), (name, findings)
+        assert _MADE_UP_ID not in repr(findings), "a finding must not carry the id"
+    for name, text in {"c1.txt": "id c0ffee12\n", "c2.txt": f"id {_MADE_UP_ID}2\n",
+                       "c3.txt": f"id x{_MADE_UP_ID}\n", "c4.txt": "id c0ffee1\n"}.items():
+        assert _leak_scan(tmp_path, name, text, rule) == [], name
+    twice = _leak_scan(tmp_path, f"{_MADE_UP_ID}/t.txt",
+                       f"{_MADE_UP_ID} {_MADE_UP_ID} {_MADE_UP_UUID} {_MADE_UP_UUID}\n", rule)
+    assert sorted(f["type"] for f in twice) == ["private-id", "session-uuid"], twice   # one finding per type per file
+    named = _leak_scan(tmp_path, f"notes/{_MADE_UP_ID}/x.txt", "clean\n", rule)
+    assert named == [{"type": "private-id", "path": f"notes/{_MADE_UP_ID}/x.txt"}]
+
+
+def test_a_uuid_shaped_session_id_is_refused_unless_it_is_on_the_allowlist(tmp_path, monkeypatch):
+    """Any UUID-shaped token that is not a listed synthetic one is refused (a real
+    session id is a UUID), in any case and in a file name; the synthetic ones
+    pass in either case; a near miss is not a UUID."""
+    assert "00000000-0000-0000-0000-000000000000" in em.SYNTHETIC_SESSION_UUIDS
+    for name, text in {"a.txt": f"session {_MADE_UP_UUID}\n",
+                       "b.txt": f"SESSION {_MADE_UP_UUID.upper()}\n",
+                       "c.json": '{"session": "' + _MADE_UP_UUID + '"}\n',
+                       "d.txt": f"{sorted(em.SYNTHETIC_SESSION_UUIDS)[0]} and {_MADE_UP_UUID}\n"}.items():
+        findings = _leak_scan(tmp_path, name, text, "package")
+        assert {"type": "session-uuid", "path": name} in findings, (name, findings)
+        assert _MADE_UP_UUID not in repr(findings)
+    assert _leak_scan(tmp_path, f"x/{_MADE_UP_UUID}/y.txt", "clean\n") == [
+        {"type": "session-uuid", "path": f"x/{_MADE_UP_UUID}/y.txt"}]
+    for i, synthetic in enumerate(sorted(em.SYNTHETIC_SESSION_UUIDS)):
+        assert _leak_scan(tmp_path, f"s{i}.txt", f"id {synthetic}\n") == [], synthetic
+        assert _leak_scan(tmp_path, f"u{i}.txt", f"id {synthetic.upper()}\n") == [], synthetic
+    assert _leak_scan(tmp_path, "n1.txt", _MADE_UP_UUID[:-1] + "\n") == [], "one character short is not a UUID"
+    for name, text in {"g1.txt": f"agent{_MADE_UP_UUID}\n", "g2.txt": f"{_MADE_UP_UUID}0\n",
+                       "g3.txt": f"x_{_MADE_UP_UUID}_y\n"}.items():
+        findings = _leak_scan(tmp_path, name, text)
+        assert {"type": "session-uuid", "path": name} in findings, ("a UUID needs no boundary", name, findings)
+    monkeypatch.setattr(em, "SYNTHETIC_SESSION_UUIDS",
+                        em.SYNTHETIC_SESSION_UUIDS | {_MADE_UP_UUID})
+    assert _leak_scan(tmp_path, "ok.txt", f"session {_MADE_UP_UUID}\n") == []
+
+
+def test_the_private_id_list_holds_digests_and_the_real_include_set_is_clean():
+    """The list is digests (64 lower-case hex characters), is not empty, and the
+    source that holds it writes no listed id in clear. Reads the committed
+    manifest, like the other real-tree checks of this file: no exported file,
+    and no exported file name, holds a listed id or an unlisted UUID."""
+    assert em.PRIVATE_ID_DIGESTS, "no ids to refuse -- the scan would pass vacuously"
+    assert all(re.fullmatch(r"[0-9a-f]{64}", d) for d in em.PRIVATE_ID_DIGESTS)
+    known = {   # the session / scratch ids found in tracked files on 2026-10-09 (digests only)
+        "df393794f5b4977cf0a084d4252aeda87b7341663fc5d125169e0655fcae5199",
+        "8225c626925f86ff0beb5b49cda1bac5f3b6fd3ad2c426fc3e034f1339b02bd1",
+        "7336d8c280075a4bbd348a4bf469503944220c353b838b673e4500dc8419b171",
+        "a616a488ae0f2029c705a5551f76075e8d2b613c45f0b006fe6b792112007be6",
+        "932cf771871161199d741896d6f0b18f1d4c45a5924190858ab9a92e5e33984f",
+        "0ee9c6b31aaaf86b7fcd167e67cd339a7e0fce1a2450fbef556b8df5109fa1f3",
+        "74365e1c25e655310b11c3a6217a8099b790cced8e8a3cfde633ed7c2743ab1c",
+        "939022fec3f278a5d22c43d1f2faa9789308c1df4b8ea434847be205bab33e53",
+        "258ad7d9cb244ccfc9db90125fae7b1b871148ca200b26ef8809b4565f561ccc",
+        "7dca78702a86173cc5cdb3da16fde72ac8afa4344345e38d8c12e63a5881f307",
+        # the five orchestrator sessions of 2026-10-10/11 and the 2026-10-10 20:39Z cleanup session (digests only)
+        "e562ac7aab4d34d4c028d8329c19e3baea680acf08cb8b1699c94acd1446fbba",
+        "8b788a59a61e5b2175083c82afb9e57611c9cd035fa51df43481e04ce4b7e3e2",
+        "4ab768b2628b021d773d8f5b5c81ed1aa9d97e74183791734945180ae01602dc",
+        "e19144e81b5c1a7c8e2b27fadb1f65dd98e2515018ef72cf490f66a8bb8711eb",
+        "22f91aecc75a19f63f21fe169419ca5c5528a62721b446f2ef1c8647d30d42c6",
+        "96f3c1c474c7cc23cefb65703d44a82e0c7c25234f213af5f0017f912b7886e4",
+    }
+    assert known <= em.PRIVATE_ID_DIGESTS, "a known private id fell off the list"
+    assert em.PRIVATE_ID_DIGESTS <= known, "a digest joined the list that no reviewer has read"
+    source = (REPO_ROOT / "tools" / "export_manifest.py").read_text(encoding="utf-8")
+    assert not em.has_private_id(source), "the module writes a listed id in clear"
+    manifest = json.loads((REPO_ROOT / "EXPORT_MANIFEST.json").read_text(encoding="utf-8"))
+    assert em.scan_for_private_ids(manifest["entries"], REPO_ROOT) == []
+
+
+def _leak_scan_bytes(tmp_path, rel: str, data: bytes) -> list[dict]:
+    target = tmp_path / rel
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(data)
+    return em.scan_include_for_leaks(
+        [{"path": rel, "decision": "INCLUDE", "rule": "package"}], tmp_path)
+
+
+def test_a_file_that_cannot_be_decoded_or_read_is_never_waved_through(tmp_path, monkeypatch):
+    """Fail closed. The scan reads bytes: an id (or an unlisted UUID) is found
+    in Latin-1 text, in a binary file, in UTF-16 (with and without a byte-order
+    mark) and after a byte that is not UTF-8; clean files of the same kinds
+    pass. A file that cannot be read at all -- missing, a dangling link, no
+    permission -- is an `unreadable` finding. No finding carries the id."""
+    monkeypatch.setattr(em, "PRIVATE_ID_DIGESTS", _digests_of(_MADE_UP_ID))
+    uid = _MADE_UP_ID
+    carriers = {
+        "latin1.txt": ("caf\xe9 session " + uid + "\n").encode("latin-1"),
+        "binary.bin": b"\x00\x01\x89PNG\xff" + uid.encode() + b"\xfe\x00",
+        "utf16_bom.txt": ("session " + uid + "\n").encode("utf-16"),
+        "utf16_le.txt": ("session " + uid + "\n").encode("utf-16-le"),
+        "utf16_be.txt": ("session " + uid + "\n").encode("utf-16-be"),
+    }
+    for name, data in carriers.items():
+        findings = _leak_scan_bytes(tmp_path, name, data)
+        assert {"type": "private-id", "path": name} in findings, (name, findings)
+        assert uid not in repr(findings)
+    uuid_carriers = {
+        "uuid_ff.bin": b"\xff\xfe junk \xff " + _MADE_UP_UUID.encode() + b" \x80",
+        "uuid_utf16.txt": ("id " + _MADE_UP_UUID).encode("utf-16"),
+        "uuid_latin1.txt": ("\xe9 " + _MADE_UP_UUID).encode("latin-1"),
+    }
+    for name, data in uuid_carriers.items():
+        findings = _leak_scan_bytes(tmp_path, name, data)
+        assert {"type": "session-uuid", "path": name} in findings, (name, findings)
+        assert _MADE_UP_UUID not in repr(findings)
+    clean = {
+        "clean_latin1.txt": "caf\xe9 au lait\n".encode("latin-1"),
+        "clean_bin.bin": b"\x00\x01\x89PNG\xff\xfe\x00\x80",
+        "clean_utf16.txt": "plain text\n".encode("utf-16"),
+    }
+    for name, data in clean.items():
+        assert _leak_scan_bytes(tmp_path, name, data) == [], name
+
+    missing = em.scan_include_for_leaks(
+        [{"path": "no/such/file.txt", "decision": "INCLUDE", "rule": "package"}], tmp_path)
+    assert {"type": "unreadable", "path": "no/such/file.txt"} in missing
+    try:
+        os.symlink(tmp_path / "gone-target", tmp_path / "dangling.txt")
+    except (OSError, NotImplementedError):
+        pass
+    else:
+        found = em.scan_include_for_leaks(
+            [{"path": "dangling.txt", "decision": "INCLUDE", "rule": "package"}], tmp_path)
+        assert {"type": "unreadable", "path": "dangling.txt"} in found
+    locked = tmp_path / "locked.txt"
+    locked.write_text("clean\n", encoding="utf-8")
+    locked.chmod(0)
+    try:
+        if not os.access(locked, os.R_OK):          # not running as root
+            found = em.scan_include_for_leaks(
+                [{"path": "locked.txt", "decision": "INCLUDE", "rule": "package"}], tmp_path)
+            assert {"type": "unreadable", "path": "locked.txt"} in found
+    finally:
+        locked.chmod(0o600)
+
+
+def test_utf16_text_next_to_non_ascii_characters_is_scanned_like_utf8(tmp_path, monkeypatch):
+    """leakidf. An id (or a UUID) in UTF-16 text is found when the character
+    next to it is not ASCII -- a corner bracket, kana, Cyrillic, CJK, an
+    ideographic space -- before, after and on both sides, in both byte orders,
+    with and without a byte-order mark, exactly as
+    in UTF-8. The same text with the id glued to an ASCII letter is not it, in
+    any of those forms."""
+    monkeypatch.setattr(em, "PRIVATE_ID_DIGESTS", _digests_of(_MADE_UP_ID))
+    uid = _MADE_UP_ID
+    neighbours = ["「", "あ", "а", "中", "　", "。"]
+    n = 0
+
+    def forms(text: str) -> dict:
+        return {
+            "utf8": text.encode("utf-8"),
+            "le": text.encode("utf-16-le"), "be": text.encode("utf-16-be"),
+            "le_bom": b"\xff\xfe" + text.encode("utf-16-le"),
+            "be_bom": b"\xfe\xff" + text.encode("utf-16-be"),
+        }
+
+    for ch in neighbours:
+        for shape in (ch + uid, uid + ch, ch + uid + ch):
+            for label, data in forms(shape + "\n").items():
+                n += 1
+                name = f"f{n}.txt"
+                findings = _leak_scan_bytes(tmp_path, name, data)
+                assert {"type": "private-id", "path": name} in findings, (label, ascii(shape))
+        for label, data in forms(ch + "plain text" + ch + "\n").items():
+            n += 1
+            assert _leak_scan_bytes(tmp_path, f"c{n}.txt", data) == [], label
+    for glued in ("あx" + uid, uid + "x", "x" + uid + "x"):     # an ASCII letter glued before, after, both
+        for label, data in forms(glued + "\n").items():
+            n += 1
+            assert _leak_scan_bytes(tmp_path, f"g{n}.txt", data) == [], (label, ascii(glued))
+    # A lone surrogate (invalid UTF-16) becomes U+FFFD and does not glue the id to the next letter.
+    for codec in ("utf-16-le", "utf-16-be"):
+        for shape in (uid + "\ud841x", "x\udc00" + uid, "\ud841" + uid + "\udc00x"):
+            n += 1
+            name = f"s{n}.txt"
+            data = (shape + "\n").encode(codec, "surrogatepass")
+            assert {"type": "private-id", "path": name} in _leak_scan_bytes(tmp_path, name, data), (codec, ascii(shape))
+    for label, data in forms("「" + _MADE_UP_UUID + "」\n").items():
+        n += 1
+        name = f"u{n}.txt"
+        assert {"type": "session-uuid", "path": name} in _leak_scan_bytes(tmp_path, name, data), label
+
+
+def test_utf16_at_an_odd_offset_next_to_a_non_ascii_character_is_a_stated_limit(tmp_path, monkeypatch):
+    """leakidf, limit L9: a known miss, pinned so a change is noticed. UTF-16
+    that starts at an odd byte (a one-byte prefix, or text a CRLF tool turned
+    `0A 00` into `0D 0A 00`) is read only through the bytes-with-NULs-removed
+    view: found when its neighbours are ASCII, missed when a non-ASCII
+    character touches the id. If a later change reads the odd alignment, this
+    test is the place to update, together with the stated limit."""
+    monkeypatch.setattr(em, "PRIVATE_ID_DIGESTS", _digests_of(_MADE_UP_ID))
+    uid = _MADE_UP_ID
+    for codec in ("utf-16-le", "utf-16-be"):
+        ascii_neighbours = b"#" + (" session " + uid + "\n").encode(codec)
+        assert {"type": "private-id", "path": "odd_ascii.txt"} in _leak_scan_bytes(
+            tmp_path, "odd_ascii.txt", ascii_neighbours), codec
+    missed = b"#" + ("「" + uid + "」\n").encode("utf-16-le")
+    assert _leak_scan_bytes(tmp_path, "odd_cjk.txt", missed) == [], "L9 is now read: update the limit"
+    crlf = ("a\n「" + uid + "」\n").encode("utf-16-le").replace(b"\n\x00", b"\r\n\x00")
+    assert _leak_scan_bytes(tmp_path, "crlf_cjk.txt", crlf) == [], "L9 is now read: update the limit"
+
+
+# --------------------------------------------------------------------------- #
+# token-shaped: an ordered character-set literal is not a secret (leakids2, Fold 2)
+# --------------------------------------------------------------------------- #
+
+_LOWER, _UPPER, _DIGITS = ("abcdefghijklmnopqrstuvwxyz", "ABCDEFGHIJKLMNOPQRSTUVWXYZ", "0123456789")
+
+
+def _random_tokens(seed: int, count: int, extra: str = "") -> list[str]:
+    """Seeded random alphanumeric tokens of length 24-64 that the needle's own
+    conditions would take for a token (a letter, a digit, not pure hex)."""
+    import random
+    rng = random.Random(seed)
+    alphabet = _LOWER + _UPPER + _DIGITS + extra
+    out: list[str] = []
+    while len(out) < count:
+        s = "".join(rng.choice(alphabet) for _ in range(rng.randint(24, 64)))
+        if (any(c.isdigit() for c in s) and any(c.isalpha() for c in s)
+                and not re.fullmatch(r"[0-9a-fA-F]+", s)):
+            out.append(s)
+    return out
+
+
+def test_an_ordered_character_set_literal_is_not_a_token():
+    """The pin's `src/hoh/rollover.py` carries `frozenset("abcdefghijklmnopqrstuvwxyz0123456789-_")`;
+    the 24-character needle took the ordered alphabet for a secret and blocked every export.
+    A run made entirely of ascending consecutive-code-point segments of at least 10 characters,
+    with no character twice, is an alphabet: found in no spelling -- lower case, upper case, digits
+    first, both cases, every order of the three classes, with the base64 `+` anywhere, with `=`
+    padding, inside code. The bound is pinned from both sides (a ten-character piece is exempt, a
+    nine-character piece is not), and dropping one character from the literal is exempt exactly when
+    every remaining piece is still 10 long (or empty)."""
+    import itertools
+    line = 'HERDR_AGENT_NAME_CHARS = frozenset("abcdefghijklmnopqrstuvwxyz0123456789-_")\n'
+    assert em.find_token_shaped(line) is None
+    assert em.is_ordered_alphabet(_LOWER + _DIGITS)
+    spellings = {
+        "lower + digits": _LOWER + _DIGITS,
+        "digits first": _DIGITS + _LOWER,
+        "upper + digits": _UPPER + _DIGITS,
+        "digits first, upper": _DIGITS + _UPPER,
+        "both cases + digits": _LOWER + _UPPER + _DIGITS,
+        "base64 order with '+'": _UPPER + _LOWER + _DIGITS + "+",
+        "'+' first": "+" + _LOWER + _DIGITS,
+        "'+' between classes": _LOWER + "+" + _DIGITS,
+        "one '=' padding": _LOWER + _DIGITS + "=",
+        "two '=' padding": _UPPER + _DIGITS + "==",
+        "'+' and '=' padding": _LOWER + _DIGITS + "+==",
+        "ten-character pieces": "abcdefghij" + "0123456789" + "klmnopqrst",
+        "two '+': a-z + 0-9 + A-Z": _LOWER + "+" + _DIGITS + "+" + _UPPER,
+        "'++' inside": _LOWER + "++" + _DIGITS,
+        "'+++' inside": _UPPER + "+++" + _DIGITS,
+        "four '+', first and last": "+" + _LOWER + "+" + _DIGITS + "+" + _UPPER + "+",
+        "'++' padding both ends": "++" + _LOWER + _DIGITS + "++",
+        "a partial class of 10": "klmnopqrstuvwxyz" + "01234567890"[:10] + "ABCDEFGHIJ",
+    }
+    for order in itertools.permutations((_LOWER, _UPPER, _DIGITS)):
+        spellings["order " + "".join(p[0] for p in order)] = "".join(order)
+    for label, literal in spellings.items():
+        assert em.find_token_shaped(literal) is None, label
+        assert em.find_token_shaped(f'CHARS = "{literal}"  # ok\n') is None, label
+        assert em.find_token_shaped(f"x-{literal}_y\n") is None, label
+    nine = "abcdefghi" + "0123456789" + "klmnopqrst"
+    assert em.find_token_shaped(nine) == nine, "a 9-character piece is not an alphabet"
+    exempt = {0, 10, 11, 12, 13, 14, 15, 25}      # index dropped from lower + digits
+    full = _LOWER + _DIGITS
+    for i in range(len(full)):
+        near = full[:i] + full[i + 1:]
+        found = em.find_token_shaped(near)
+        assert (found is None) == (i in exempt), (i, full[i])
+
+
+def test_random_and_near_alphabet_tokens_are_still_found():
+    """What the rule must NOT hide. Seeded random alphanumeric tokens (1,000 of 24-64 characters, and
+    500 with `+` and `=` padding), tokens that CONTAIN a short ordered run (`abc`, `0123`, `xyz789`)
+    or a whole class, an alphabet with a random head or tail, a repeated alphabet, an ascending
+    sequence with gaps, a reversed alphabet, and every adjacent swap of the alphabet: all found, and
+    the finding is the whole token. A later random token in the same text is found after an exempt
+    alphabet."""
+    import random
+    for tok in _random_tokens(20261011, 1000):
+        assert em.find_token_shaped(tok) == tok
+    for tok in _random_tokens(7, 500, extra="+"):
+        padded = tok + "=="
+        assert em.find_token_shaped(padded) is not None
+    rng = random.Random(42)
+    for n, run in enumerate(("abc", "0123", "xyz789", "ABCDEFGHI", "klmnopqrs", _DIGITS, _LOWER, _UPPER)):
+        for tok in _random_tokens(100 + n, 20):
+            at = rng.randint(0, len(tok))
+            glued = tok[:at] + run + tok[at:]
+            assert em.find_token_shaped(glued) == glued, (run, at)
+    literal = _LOWER + _DIGITS
+    tail = _random_tokens(5, 5)
+    for t in tail:
+        assert em.find_token_shaped(literal + t) == literal + t
+        assert em.find_token_shaped(t + literal) == t + literal
+    assert em.find_token_shaped(literal + literal) == literal + literal            # repeated: no symbol twice
+    assert em.find_token_shaped(_LOWER + _DIGITS + "7") is not None               # one repeated digit
+    gaps = "acegikmoqsuwy02468"                                                    # ascending, not consecutive
+    assert em.find_token_shaped(gaps + gaps.upper()[:10] + "13579BDFH") is not None
+    assert em.find_token_shaped(literal[::-1]) == literal[::-1]                    # reversed
+    assert em.find_token_shaped(_DIGITS[::-1] + _LOWER[::-1]) is not None
+    for i in range(len(literal) - 1):
+        swapped = literal[:i] + literal[i + 1] + literal[i] + literal[i + 2:]
+        assert em.find_token_shaped(swapped) == swapped, i
+    assert em.find_token_shaped("gH" * 12 + "1") is not None                        # mixed case, repeats (not hex)
+    # the exempt alphabet does not stop the scan: a random token after it is the finding
+    secret = _random_tokens(9, 1)[0]
+    text = f'CHARS = "{literal}"\nkey = "{secret}"\n'
+    assert em.find_token_shaped(text) == secret
+    # `=` splits nothing: a padded alphabet followed by a random token is two tokens
+    assert em.find_token_shaped(literal + "==" + secret) == secret
+
+
+def test_the_real_rollover_module_and_the_include_set_carry_no_token_finding():
+    """On the pin `export_manifest check` stops on one finding, `token-shaped` in the INCLUDE file
+    `src/hoh/rollover.py` (its agent-name alphabet), which blocks every export. `src/hoh` is frozen,
+    so the detector is what is right or wrong: the file is read as the real file, through the needle,
+    the whole INCLUDE set of the committed manifest goes through the leak scan `check` runs, and a
+    fresh derivation of the tree is asked for its `token-shaped` findings (none)."""
+    manifest = json.loads((REPO_ROOT / "EXPORT_MANIFEST.json").read_text(encoding="utf-8"))
+    rollover = [e for e in manifest["entries"] if e["path"] == "src/hoh/rollover.py"]
+    assert len(rollover) == 1 and rollover[0]["decision"] == "INCLUDE"
+    text = (REPO_ROOT / "src" / "hoh" / "rollover.py").read_text(encoding="utf-8")
+    assert "abcdefghijklmnopqrstuvwxyz0123456789" in text, "the alphabet literal is the thing under test"
+    assert em.find_token_shaped(text) is None
+    assert em.scan_include_for_leaks(manifest["entries"], REPO_ROOT) == []
+    # The committed manifest can be stale (it is, on the pin: `check` stops at the drift before it scans), so the
+    # same question is asked of a fresh derivation. Only `token-shaped` is asserted: a fresh derivation also carries
+    # two findings of other kinds in two test files that another strand edits.
+    fresh = em.derive(REPO_ROOT)
+    assert any(e["path"] == "src/hoh/rollover.py" and e["decision"] == "INCLUDE" for e in fresh["entries"]), (
+        "the fresh derivation does not list rollover.py as INCLUDE: the question below would be asked of nothing")
+    tokens = [f for f in em.scan_include_for_leaks(fresh["entries"], REPO_ROOT) if f["type"] == "token-shaped"]
+    assert tokens == [], tokens

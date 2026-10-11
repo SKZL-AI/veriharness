@@ -237,6 +237,12 @@ class HerdrAgentControl:
     def close_tab(self, tab_id, *, purpose="") -> None:
         self._run(["herdr", "tab", "close", tab_id], purpose or f"close tab {tab_id}")
 
+    def run_in_pane(self, pane_id, command, *, purpose="") -> None:
+        """Type `command` and Enter into the shell of `pane_id` (`herdr pane run`). One verb
+        beyond the protocol: a run host is a plain shell that runs one command, not an agent."""
+        self._run(["herdr", "pane", "run", pane_id, command],
+                  purpose or f"run a command in {pane_id}", text=True)
+
 
 # --------------------------------------------------------------------------- #
 # Ownership: which agents a run started, and in what role
@@ -572,3 +578,13 @@ class OwnedAgentControl:
 
     def snapshot(self) -> dict:
         return self._base.snapshot()
+
+    def run_in_pane(self, pane_id, command, *, purpose="") -> None:
+        """`HerdrAgentControl.run_in_pane` for a pane this run owns (an acting verb, like
+        `press`); a runtime without the verb is refused, nothing is sent."""
+        self._require(self.registry.owns_pane(pane_id), f"pane {pane_id}", "run_in_pane")
+        runner = getattr(self._base, "run_in_pane", None)
+        if runner is None:
+            raise DispatchError("run_in_pane: this runtime cannot run a command in a pane; "
+                                "nothing was sent")
+        runner(pane_id, command, purpose=purpose)

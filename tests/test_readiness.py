@@ -1022,3 +1022,17 @@ def test_the_docs_consistency_row_never_passes_without_both_checks(monkeypatch):
                                                       "differs")]))
     assert rd.row_docs_consistency().state == rd.FAIL
 
+
+def test_a_private_id_finding_reads_as_a_leak(monkeypatch):
+    """leakidf. The export row names a leak separately from "other problems".
+    A private session id, an unlisted UUID and an unreadable INCLUDE file are
+    leaks too (a home path already was); an unrelated FAIL line is not."""
+    for kind in ("private-id", "session-uuid", "unreadable"):
+        out = f"FAIL: {kind} found in INCLUDE-classified docs/x.md\n1 problem(s).\n"
+        monkeypatch.setattr(rd, "_py", lambda *a, _out=out, **k: (1, _out))
+        row = rd.row_export()
+        assert "1 leak(s)" in row.value_, (kind, row.value_)
+        assert not row.advisory, kind
+    monkeypatch.setattr(rd, "_py", lambda *a, **k: (1, "FAIL: something else entirely\n1 problem(s).\n"))
+    row = rd.row_export()
+    assert "leak(s)" not in row.value_ and "no leaks" in row.value_

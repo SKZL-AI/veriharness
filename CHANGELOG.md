@@ -2,6 +2,365 @@
 
 All notable changes to this project are documented here. Formatting loosely follows Keep a Changelog conventions; versioning follows SemVer once a public release process exists.
 
+<!-- BEGIN GENERATED: tools/changelog_from_release_notes.py 0.3.0a3 -->
+## [0.3.0a3] - 2026-10-11 (pre-release)
+
+**This is a pre-release.** `v0.3.0a3` is the third alpha of the v0.3 line, a
+research preview. It follows `v0.3.0a2` (tagged 2026-10-09) by the ledger
+entries O261 to O265. It is prepared at a documentation checkpoint and **not**
+after phase P2 closed: P2, *v0.3 Durable Program Runtime + Autonomy Contract
+Base*, is in progress, its gate is not met, and every open gate below is listed
+as NOT_YET_PROVEN. The latest stable release is still `v0.1.0`. The sections of
+the two earlier alphas further down in this file are the text of their tags with
+their dated corrections, and their figures are the figures of their own cuts;
+the `[Vnn]` figures of this section are the ones that `paper/NUMBERS_V2.md` now
+carries.
+
+`pyproject.toml` carries `0.3.0a3`. Like the earlier alphas it is installed from
+the tagged source and is not published to PyPI: the distribution workflow of
+this repository accepts only the audited `v0.1.0`. `docs/READINESS.md` is
+**unchanged** by this release, and readiness is not claimed. The board still
+reads `TECHNICALLY_STABLE_READY = no` `[V13]`; that is the measurement taken at
+commit `75214e31`, and it is not regenerated for this alpha either, because
+regeneration needs the network (the `clean_install` row and the union gate's
+wheel build call the package index). The `tests` row of the board is stale and
+conservative: it predates every merge below.
+
+**What this alpha adds, in one paragraph.** Everything in it was built by
+product runs under the same discipline as the earlier alphas: each merge is of a
+candidate the product had accepted, released by two independent integration
+reviewers and bound by the merge gate; since `1e633e46` the gate of record is
+the product's own `hoh merge-gate check`. The development line now holds 97
+product-run merges, 78 of which change `src/hoh/` `[V01]` `[V02]` (69 and 55 at
+the second alpha; the merges since then carry titles of their own, which the
+count now lists, see *Changed*). The user-visible changes are commands:
+`hoh merge-gate`, `hoh wait`, `hoh surface`, `hoh run --detach`, `hoh pin`,
+`hoh import`, `hoh storage account`, `hoh storage new-target`,
+`hoh storage register-project` and `hoh project create`, with a rotation policy
+under which the product hands the orchestrating session over by itself. On the
+register, disk-full-safe writes (P2-41), the classification and the park
+binding of provider usage limits (P2-43), and the two rows that the first live
+rotation of the orchestrating session bears on (P2-14, P2-20) now read PROVEN,
+each under limits that its entry below states: 36 of P2's 43 registered
+requirements read PROVEN `[V10c]` `[V10b]` (32 at the second alpha); P2 is
+**not** closed. Apart from the one live rotation of the orchestrating session
+described below, nothing in this paragraph was run in a live Herdr session, on a
+real NixOS or macOS host, or against a real provider limit; those are NOT_RUN
+and stay listed as such under *Known limitations*.
+
+**Where the first integration pair said no.** Several candidates the product
+had accepted were refused at the first round of integration review and merged
+only together with a repair that a second pair released: the wiring of the
+ephemeral temporary roots (a stale or duplicate run could write `PAUSED` into a
+live master's run, and an unpark and re-park loop), the surface reaper (it
+raised, and wrote to standard output, when standard error was broken), the
+export leak scan (a UTF-16 text next to a non-ASCII character failed open), the
+per-run storage account (an unproven aggregate read 0 while it was UNMEASURED),
+the registration of a target clone (a symlinked `.git/objects` or refs
+registered while the adoption path refuses it), the pins of the hygiene
+allowlist (exactness and breadth unpinned) and the residue of the rollover
+(a rule of `hold_lease` pinned for `sleep()` only). The repair of each is in its
+merge. The first live dress rehearsal of the automatic rotation was refused by
+Herdr itself, which is the last entry under *Fixed*.
+
+The central invariant of this development line is unchanged:
+
+    candidate creation != product acceptance != integration acceptance != merge authority != phase closure
+
+### Added
+
+* **Disk-full-safe durable writes, the closure slice (P2-41; merge `0985ecb9`,
+  records O261).** The dispatcher's leaf write, its audit append and the
+  recorded answer go through the durable-write primitives, with a directory
+  file-descriptor form, and the restore filters lock files; the host helper and
+  the bundle helper, which keep their own temp-fsync-publish code, have the
+  full-disk tests of this closure. **P2-41 reads PROVEN, on text-level evidence and with
+  limits:** the writer scan is lexical (an aliased call, `getattr`,
+  `codecs.open` or `io.FileIO` is not seen); the host helper has no zero-byte
+  test and the bundle helper no fsync-error test; the registry writer has a test
+  of a failed replace and none of a full disk; the leaf write, the audit append
+  and the recorded answer are now refused under the one-mebibyte free-space
+  reserve, which the recorded answer did not obey before. Not claimed: a long
+  unattended run that survives a full disk end to end (P2-40).
+* **Provider usage limits: the park binding is enforced, and a developer's
+  limit screen is a failed dispatch (P2-43; merges `b86b09e9`, `39348042` and
+  `8d7f8c04`, records O262 and O264).** The binding that the second recovery
+  slice wrote is now checked before a parked run is unblocked: a stale, foreign
+  or restored park, two masters and a declaration over a park are refused, the
+  park gate fails closed, and a resume that cannot be taken escalates. A
+  developer turn that ends normally on a recorded provider usage or rate-limit
+  screen is a failed dispatch and never a candidate for QA; a limit banner that
+  was already on the developer's pane before the prompt was sent is not read as
+  this turn's, and a pane that is still limited at the prompt stays a failed
+  dispatch. **P2-43 reads PROVEN, with limits that matter:** the detection reads
+  only the recorded shapes of the provider's banner, whole (a hyphenated hour
+  limit, a weekly limit, a bare phrase or another language is not read); a line
+  of a role's own words that is exactly a recorded banner among the last twelve
+  lines is read as the banner; a repeated byte-identical rate-limit body after a
+  long turn is missed; a status-area line that a healed pane left in its
+  scrollback is read and the run is parked again until the resume limit and then
+  handed to a person; no developer pane has been recorded on a real limit.
+  `hoh unblock` and `hoh resume --force` lift a park without the verification,
+  by design.
+* **The product rotates the orchestrating session by itself (P2-14, P2-20;
+  merges `3199ac32`, `b4a3fe8f` and `e0d9bdff`, records O265).** A rotation
+  policy and its controller run under `hoh project hold --rotate-policy` and
+  `hoh project rollover-accept --rotate-policy`, `hoh project create` makes the
+  governed project record that they need, and every step fails closed. The
+  residue of the rollover and of `hoh migrate` that the review found (an
+  interval and a poll validated before anything acts, a dying hold giving its
+  lease back, a migration refusing an unparseable record) is closed, with the
+  lease-renewal rules of the hold pinned by tests. The first live rotation was run on 2026-10-11 by the
+  product itself: the policy asked for it at its threshold, the master wrote its
+  handoff, a capsule of derived facts was frozen, the successor re-derived every
+  fact against the world, took the lease as the second epoch and the old session
+  was fenced. **P2-14 and P2-20 read PROVEN, with the limits of that evidence:**
+  one rotation, on one host, of the orchestrating role of one project, to one
+  successor model in one permission mode; the paths of expiry, withdrawal and
+  error were not run live; the capsule input of the canary was written before
+  the newest run existed (tracked: derive it again before each rotation); a
+  policy that names a transcript path is inherited by the successor; for P2-20
+  only the verification path of the capsule ran live. The item-level context
+  rotation that the probe of P2-14 names (`rotate` in `src/hoh/rotation.py` and
+  `reachable`) has no caller outside the tests, so the status is a statement
+  about the rotation of the session. A second rotation by the product completed
+  later the same day; it is to be recorded in the closure records, none of which
+  exists yet, and it is not counted here.
+* **The merge gate as a product command (P5-36; merges `1be5ac70` and
+  `1e633e46`).** `hoh merge-gate check` judges the review reports a candidate
+  requires and writes the decision as a new receipt; `hoh merge-gate verify`
+  decides a receipt's inputs again. A report counts only with a complete
+  six-line footer that its reviewer declares complete, bound to the candidate,
+  the base and the specification's digest, and not modified in the last minute;
+  a partial or cut-off report is no verdict. The reading of a report is guarded:
+  a FIFO, a socket, a device, a directory, a symlink or an oversize file is
+  unreadable and never a hang. **P5-36 reads PARTIAL:** no merge step of the
+  product calls the command, the receipt is not signed and the merge message is
+  not generated from it.
+* **`hoh wait` (P5-43; merges `577185d1`, `997a7dd3` and `7240719f`).** A
+  read-only wait on a run's state, on a review report (`--report`, with the
+  footer check and the stable-age rule of the merge gate) and on a process id
+  (`--pid`, identified by its id and its start time, never signalled). It
+  answers one JSON line and an exit code per outcome, never writes, never polls
+  faster than once a second and never waits unbounded. A candidate-less final
+  stage and a storage park that no timer will lift read `held`. **P5-43 reads
+  MISSING, still:** the durable list of what was reported and the trigger of the
+  reaper are not built.
+* **A run's own terminal tabs are closed when the run is over (P5-39; merges
+  `fb473c13` and `9fd95ff1`).** `hoh surface open|list|reap` records a tab as a
+  run's own in an owned registry and closes it when the run is over (failed,
+  cancelled, or ready for delivery with no live process; a checkpoint is not the
+  end) and the shell in it is proven idle by a scan of every user's processes.
+  A foreign tab, a running run and an unproven shell are never closed, the
+  reaper never closes its own tab, a recorded directory that is a mount point is
+  refused, and one `closed` line is written per surface under a run-directory
+  lock. **P5-39 reads PARTIAL:** reviewer and drafter tabs of a strand without a
+  run are not covered, and what a real Herdr does on the close is NOT_RUN.
+* **A detached run (P5-42; merges `cf7c26c2` and `2b7978d5`).**
+  `hoh run --detach` (with `--detach-timeout` and `--require-contract`) refuses
+  in a read-only preflight before any tab or role exists, then opens an owned
+  run-host tab, types one command of safe words, keeps a log and a create-only
+  launch record, and returns once a new process marker appears. **P5-42 reads
+  MISSING, still:** a refusal that only the tab can make reads "started", the
+  named profile, the timeout from the specification, the dedicated pinned clone
+  and the derived contract are not built, and whether Herdr behaves as documented
+  is NOT_RUN.
+* **Pin and import (P5-38; merge `91871a5a`).** `hoh pin` builds a
+  specification-only pin commit by plumbing on a base the product resolved,
+  create-only, with a digest trailer; `hoh import` fetches an accepted candidate
+  into `refs/imports/<id>`, proves that its tree is the accepted one, previews
+  the merge and writes a receipt. **P5-38 reads MISSING, still:** the topology
+  check, the scope-of-diff check and registered receipts are not built, and an
+  import of a real run through the command is NOT_RUN.
+* **The per-run storage account (P5-40; merge `79ea2a90`).** `hoh storage
+  account` reads bytes and entries over registry-owned paths, counts a hard link
+  once, never answers 0 for what it could not measure (UNMEASURED, with a lower
+  bound) and bounds every walk; it names a root that is not intact. **P5-40
+  reads MISSING, still:** it does not enter `hoh status`, produces no receipt and
+  admits nothing on entries.
+* **Ephemeral temporary roots in the controller, and the role scratch of a
+  registered project (P2-42; merges `485b6251`, `b3554d15` and `01fc9a09`).**
+  For a run of a registered project, `hoh run` registers, admits and releases
+  the scratch of its acceptance checks and of each iteration, the resume gate
+  asks for the role and the iteration's workspace together, and a session held
+  by another live process is refused with nothing written. The role scratch of
+  such a run lives below the iteration's registered workspace; a pane whose
+  `TMPDIR` is not the bound scratch and an adopted pane are refused and kept
+  open. `hoh storage new-target` creates an owned, registered directory for a
+  target clone (its owner record first) and `hoh storage register-project`
+  registers a fresh clone, create-only, applying the git-store rule of the
+  adoption path. The role prompt gets one bullet: helper files go to the
+  role's scratch, not beside it. **P2-42 reads PARTIAL, still** `[V10d]`: no run
+  of a registered project has been observed, a live run with real Herdr panes
+  and the other harnesses' temporary files are NOT_RUN, and the approval-resume
+  of a registered run cannot adopt the kept pane.
+* **Criterion fidelity (merge `f44f90df`).** A specification that declares its
+  criteria in one criteria block is held to them: the controller refuses a plan
+  that drops, re-types, wraps or deselects one (`CRITERION_FIDELITY`). A
+  specification without the block is accepted as before, with "criterion
+  fidelity NOT_RUN" in the reason; older specifications are not back-filled.
+  The merge also repairs a test-isolation defect that it exposed (a test
+  reloaded the real `hoh.roles` and left a stale exception base; the product
+  never reloads).
+* **The export leak scan refuses private identifiers (merges `1869a46a` and
+  `f956b119`).** The scan reads the bytes of every exported file, a UTF-16
+  reading of them and the file name, refuses a private session or scratch
+  identifier by digest and any session-shaped UUID that is not on a short list
+  of synthetic ones, and treats an unreadable file as a finding; the export
+  scans the exact bytes it is about to write, before the first write. The list
+  of digests is complete for the six session prefixes named when it was
+  extended, and an ordered character-set literal is no longer taken for a secret
+  (a content-based rule, with no path or literal allowlist). Its limits are in
+  `docs/LIMITATIONS.md` (a name carrier prints its path, a UTF-16 text at an odd
+  offset is not read, the list names only the identifiers known when it was
+  last extended).
+* **The P2 checklist-gate binding (merge `74772dc1`).** `tools/build_plan.py`
+  measures the three P2 checklist-gate items (the items, the fsck and the
+  review) from the reconciled checklist and the supervisor board, fail closed;
+  the exit conditions that nothing measures read 0 now `[V12]`, where the
+  second alpha had 3. It is tools-only and lifts no row; the gate stays shut for
+  measured reasons.
+* **Identifiers and hygiene (merges `0c3037c1`, `addb7e0f` and `c618a0d2`).**
+  The project store and the storage registry refuse a project id that is not
+  exactly a name (a trailing newline was the only bad id accepted) and
+  `hoh project` answers one with a refusal; the test hygiene rules for legacy
+  scratch are pinned, falsy evidence no longer binds and a duplicate id fails,
+  and the hygiene allowlist is pinned to the file and the literal in both
+  directions and a stale entry is refused (test-only).
+* **New CLI surface** (development, not a stable interface): `hoh merge-gate`,
+  `hoh wait`, `hoh surface`, `hoh pin`, `hoh import`; `hoh run --detach`;
+  `hoh storage account`, `hoh storage new-target`,
+  `hoh storage register-project`; `hoh project create` and the option
+  `--rotate-policy` of `hoh project hold` and `hoh project rollover-accept`.
+
+### Changed
+
+* **The register.** Of all 235 requirements, 63 read PROVEN, 10 PARTIAL, 6
+  IMPLEMENTED_NOT_PROVEN and 156 MISSING `[V10]` (227 requirements and 59
+  PROVEN at the second alpha; amendment A6 pulled eight rows forward, P5-36 to
+  P5-43); P2 is 36 PROVEN, 1 PARTIAL (P2-42), 6 IMPLEMENTED_NOT_PROVEN (P2-11
+  and P2-33 to P2-37) and none MISSING `[V10c]`. The matrix measures an import
+  statement, never execution: the weight of each PROVEN above rests on the merge
+  run's criteria, its integration pair and the limits written into its note. The
+  later phases hold 156 of 176 requirements MISSING, 9 PARTIAL and 11 PROVEN
+  `[V11b]`.
+* **The P2 gate.** It has 7 requirements blocking and open `[V12]`, where the
+  second alpha had 11: P2-11, P2-33 to P2-37 and P2-42. The three exit
+  conditions that no instrument measured at the second alpha are measured now
+  (above), and the gate is still shut.
+* **P2-14 is held, and then lifted on a live record.** The merge of the
+  rotation policy carried an `equivalent` that held P2-14 at PARTIAL in the same
+  commit, because without it the matrix would have read PROVEN from an import
+  and fakes alone. The hold was lifted by the records entry of the live
+  rotation, on that evidence and with the limits above, not by the merge.
+* **Amendments A6 and A7.** A6 (the agent-session orchestration surface) pulled
+  eight rows into the plan (P5-36 to P5-43: the merge gate as a command, review
+  start, pin and import, the reaper, the storage account, scoped reclaim, the
+  detached run, the wait) and dispositioned the mined to-do items. A7 records
+  that a phase is closed at a commit by a closure record, and that later changes
+  to the source create regression obligations and do not re-open a closed phase.
+  No phase is closed by it.
+* **The public description states the measured reality.** The README and the
+  documents it points to say what the build is (orchestrated development with product
+  runs since 2026-09-25, not an unattended or continuous run) with its figures
+  derived by `tools/docs_numbers.py` (merge `b352c667`, ledger O263).
+* **How product-run merges are counted.** `tools/docs_numbers.py` counts a
+  product-run merge by its title. The merges since the second alpha carry
+  titles of their own, and the count lists them one by one (a test pins them and
+  a lookalike that must not count); a convention for the title of a product-run
+  merge would end the list and has not been made. The table heading names this
+  pre-release.
+* **The v0.3.0a2 pre-release was exported and tagged** on 2026-10-09 (export
+  commit `e95e09a0`); a later export (`a84e4030`) carried the refreshed public
+  description only and is not a release.
+
+### Fixed
+
+* A zero-byte write made the archive bundle writer spin. A criterion of the
+  P2-41 closure found it; a three-line guard fixes it.
+* A run id of `..` escaped the runs root through `hoh run` and `--detach`
+  (HIGH). A run id is refused unless it is a plain direct child of the runs
+  root, a name with a `_` or `.` prefix and the names `backups` and `projects`
+  are refused, and `hoh` answers with a refusal and exit 2. Detach types its
+  options as `--flag=value` and refuses empty values and leading dashes before
+  anything starts.
+* A developer turn that ended on a recorded limit screen reached QA, and a
+  good re-run after a limit wait was parked again by a banner already on the
+  reused pane (both P2-43, above).
+* The export leak scan failed open on a UTF-16 text next to a non-ASCII
+  character; the account of a storage root read 0 for what it could not
+  measure; the reaper raised on a broken standard error; and the registration of
+  a target clone accepted a symlinked `.git/objects` or refs. All four were
+  found at integration review and repaired before their merge.
+* The successor of a rotation was started under an agent name that Herdr
+  refuses (a digit-leading token with upper-case letters). The first dress
+  rehearsal of the automatic rotation ended `LAUNCH_FAILED` on it with the
+  predecessor still master and its lease intact; every earlier test used a fake
+  Herdr that accepted any name. The name now obeys Herdr's rule (a fixed letter,
+  the random part, the session id lower-cased with every other character mapped
+  to `-`, at most 24 characters) and a strict fake refuses names exactly as
+  Herdr does.
+
+### Known limitations at this pre-release, and what is not claimed
+
+Each open gate below is NOT_YET_PROVEN, and a gate that reads red stays red.
+
+* **P2 is not closed.** Its gate has 7 requirements blocking and open `[V12]`.
+  P2-11 needs a real reboot that has never been run, and the reboot proof stays
+  NOT_RUN until the operator's restart. P2-33 to P2-37 read
+  IMPLEMENTED_NOT_PROVEN because their durability evidence is stale and the
+  evidence tooling has not been run at the freeze commit (the durability freeze
+  is armed at `e0d9bdff`). P2-42 reads PARTIAL `[V10d]`
+  (above) and its hold stays until the closure records exist. P2-14 and P2-20
+  read PROVEN on one live rotation with the limits stated above, and no closure
+  record exists yet.
+* **Durability evidence is not taken at this commit.** `src/hoh/` is identical
+  in this release to the tip it is cut from; the durability run, the reboot
+  evidence and the full suite are not part of this package (the suite was run
+  by the orchestrator at each merge, with the same environment failures as the
+  base each time; this package does not repeat it).
+* **A provider usage limit is read from recorded shapes only.** See P2-43
+  above: other wordings are not read, and no developer pane has been recorded on
+  a real limit. Whether first-prompt readiness cures the stall of an agent's
+  first prompt stays SUSPECTED until a live check; nothing in this alpha
+  changes it.
+* **Rotation has one live record.** The expiry, withdrawal and error paths of
+  the controller have not run live as evidence, the second rotation of the same
+  day is not yet recorded, and the item-level rotation has no caller outside the
+  tests.
+* **The new commands have not run against a live Herdr session.** `hoh wait`,
+  `hoh surface` and `hoh run --detach` were tested with fakes and temporary
+  directories and reviewed; what a real Herdr does on a pane close or a tab
+  create with an environment is NOT_RUN.
+* **Owned agent control, portability and agent-setup are as at the second
+  alpha.** The limits of P2-17, of the NixOS-first portability patch (never run
+  on a host) and of `hoh agent-setup` (not tried by a live agent session) are
+  not changed by anything in this alpha.
+* **No merge step of the product calls the merge gate.** The orchestrator's
+  script ran beside the command at every merge; the two disagreed on more than
+  half of a probe set, and a replay of the older receipts found that many merges
+  had been made on a reviewed base that was no longer the first parent (the
+  product command refuses that).
+* **The earlier limitations stand where they are not named above.** The
+  integrity gate is met for the replayed paths and not for every path; the role
+  pane lifecycle ends a role's own processes with the limits the first alpha
+  states; the QA-gap gate is not merged; the storage steward has not reclaimed
+  anything of VeriHarness's own data.
+* **Smaller tracked items.** Lint and the identifier check are red at this
+  commit, as they were at the second alpha, and with more findings than then:
+  the findings are in the test files and the modules merged since, and this
+  release does not fix them (it changes no source or test file apart from the
+  tests of `tools/docs_numbers.py`). Two merge messages of the second alpha's
+  period under-report their reviews, and the board's `tests` row is stale.
+* **Not claimed:** that any figure measured for `v0.1.0` describes this line;
+  that the exact-head external CI has run on these bytes (it has not); that a
+  rotation of the orchestrating session is reliable beyond the one live record
+  (it is not shown); that the portability patch works on a real NixOS or macOS
+  host; that a coding agent given the output of `hoh agent-setup` uses `hoh`; or
+  that long-duration unattended operation is demonstrated (it is not).
+
+<!-- END GENERATED: tools/changelog_from_release_notes.py -->
+
 <!-- BEGIN GENERATED: tools/changelog_from_release_notes.py 0.3.0a2 -->
 ## [0.3.0a2] - 2026-10-09 (pre-release)
 

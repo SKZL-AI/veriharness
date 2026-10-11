@@ -65,7 +65,18 @@ class ImmutableViolation(StoreError):
     """Attempt to overwrite an immutable result file."""
 
 
-_SAFE = re.compile(r"^[A-Za-z0-9._-]+$")
+class UnsafeRunId(StoreError):
+    """The run id's directory would not be a direct child of the runs root, or the id is a
+    name the runs root keeps for itself. Nothing was read, created or locked."""
+
+
+# `$` also matches before a final newline; `\Z` does not.
+_SAFE = re.compile(r"^[A-Za-z0-9._-]+\Z")
+
+#: Names the runs root keeps for itself (`_arenas`, `_restore`, `.timers.lock`, `backups`,
+#: `projects`): never a run id.
+RESERVED_PREFIXES = ("_", ".")
+RESERVED_RUN_IDS = ("backups", "projects")
 
 
 def _stamp() -> str:
@@ -97,9 +108,21 @@ class RunStore:
     """Every write access of a run passes through here."""
 
     def __init__(self, root: Path | str, run_id: str) -> None:
-        self.run_id = _check_name(run_id)
+        try:
+            self.run_id = _check_name(run_id)
+        except StoreError as exc:
+            raise UnsafeRunId(str(exc)) from exc
         self.root = Path(root).expanduser().resolve()
         self.dir = self.root / self.run_id
+        # `.` and `..` pass the character set; their "run directory" is the root or its parent.
+        # Checked before anything is read, created or locked.
+        if os.path.normpath(self.dir) != os.path.join(str(self.root), self.run_id):
+            raise UnsafeRunId(f"unsafe file name: {run_id!r} is not a direct child of the "
+                              f"runs root {str(self.root)!r}")
+        if self.run_id.startswith(RESERVED_PREFIXES) or self.run_id in RESERVED_RUN_IDS:
+            raise UnsafeRunId(f"unsafe file name: {run_id!r} is reserved (the runs root keeps "
+                              "names that begin with '_' or '.', and 'backups' and 'projects', "
+                              "for itself)")
         self.results_dir = self.dir / "results"
         self.receipts_dir = self.dir / "receipts"
         self.logs_dir = self.dir / "logs"

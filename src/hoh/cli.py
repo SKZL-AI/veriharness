@@ -21,7 +21,7 @@ from . import pane_ledger, stages
 from .contracts import Budgets, Condition, Role, Stage
 from .controller import Controller, new_run_id
 from .durable_io import DurableWriteNotSynced, durable_write
-from .store import LockBusy, RunStore, StoreError, list_runs
+from .store import LockBusy, RunStore, StoreError, UnsafeRunId, list_runs
 
 DEFAULT_ROOT = Path(os.environ.get("HOH_RUNS", Path.home() / "hoh" / "runs"))
 
@@ -409,6 +409,60 @@ def cmd_storage_adopt_project(args) -> int:
     return 0
 
 
+def cmd_storage_new_target(args) -> int:
+    """`hoh storage new-target --parent-project Q --path ABS --storage-root PATH`:
+    the registry creates an EMPTY directory for a target clone
+    (`StorageRegistry.create_external_root`, kind `target_clone`, the only call
+    made): its index entry is written `PENDING` before the directory exists and
+    `CREATED` after, and its parent must be one the operator listed in the state
+    root's `CONFIG.json`. The caller then clones into it and registers it
+    (`hoh storage register-project`). Exit 0 with `{"storage_root", "root"}`
+    printed; exit 2 with `storage new-target refused: <message>` on stderr.
+    `--storage-root` is required and has no fallback; the state root is never
+    initialised here."""
+    from .storage_registry import StorageOwnershipError, StorageRegistry
+
+    if not os.path.isabs(args.path):
+        print(f"storage new-target refused: --path {args.path!r} is not an absolute path",
+              file=sys.stderr)
+        return 2
+    root = Path(args.storage_root).expanduser()
+    try:
+        entry = StorageRegistry(root).create_external_root(
+            args.parent_project, args.path, "target_clone")
+    except (StorageOwnershipError, OSError) as exc:
+        print(f"storage new-target refused: {exc}", file=sys.stderr)
+        return 2
+    _print({"storage_root": str(root), "root": entry})
+    return 0
+
+
+def cmd_storage_register_project(args) -> int:
+    """`hoh storage register-project --project P --repo ABS --storage-root PATH`:
+    register a FRESH project whose repository is a target clone the registry
+    created (`hoh storage new-target`) -- `StorageRegistry.register_project(P,
+    ABS, fresh_target=True)`, the only call made. Create-only: a project id or a
+    root that is registered already is refused, never returned. Exit 0 with
+    `{"storage_root", "project"}` printed; exit 2 with `storage register-project
+    refused: <message>` on stderr. `--storage-root` is required and has no
+    fallback; the state root is never initialised here."""
+    from .storage_registry import StorageOwnershipError, StorageRegistry
+
+    if not os.path.isabs(args.repo):
+        print(f"storage register-project refused: --repo {args.repo!r} is not an absolute path",
+              file=sys.stderr)
+        return 2
+    root = Path(args.storage_root).expanduser()
+    try:
+        record = StorageRegistry(root).register_project(args.project, args.repo,
+                                                        fresh_target=True)
+    except (StorageOwnershipError, OSError) as exc:
+        print(f"storage register-project refused: {exc}", file=sys.stderr)
+        return 2
+    _print({"storage_root": str(root), "project": record})
+    return 0
+
+
 def cmd_storage_survey_legacy(args) -> int:
     """`hoh storage survey-legacy --project P --reviews DIR --out FILE
     --storage-root PATH`: draft a legacy-roots anchor for the reviewer dirs
@@ -622,6 +676,49 @@ def _archive_targets(root: Path, registry, session_id: str) -> tuple[list, list[
         seen.add(target.target_id)
         targets.append(target)
     return targets, problems
+
+
+def cmd_storage_account(args) -> int:
+    """`hoh storage account --project P [--storage-root PATH] [--budget SECONDS] [--no-tiers]`:
+    the storage account of the project (I10b, `hoh.storage_account`): bytes and entries of its
+    registered namespace per root, run, session, tier and reclaimable now, printed as JSON. Read
+    only: no session, no lease, no admission, nothing written (the state root is never created).
+    A partial account is printed with `complete: false` and exit 0 -- a partial report is never
+    a verdict. Exit 2 with `storage account refused: <why>` on stderr and nothing on stdout for a
+    budget outside (0, 3600], a state root that is not initialised and a project that is not
+    registered."""
+    import math
+
+    from . import storage_account
+    from .storage_registry import StorageRegistry
+
+    root = resolve_storage_root(getattr(args, "storage_root", None))
+    budget = args.budget
+    if not (isinstance(budget, float) and math.isfinite(budget)
+            and 0 < budget <= storage_account.MAX_BUDGET_S):
+        print(f"storage account refused: --budget must be a number of seconds in "
+              f"(0, {storage_account.MAX_BUDGET_S:g}], not {budget!r}", file=sys.stderr)
+        return 2
+    registry = StorageRegistry(root)
+    if not registry._owner_valid():
+        print("storage account refused: " + STORAGE_NOT_INITIALISED.format(root=root),
+              file=sys.stderr)
+        return 2
+    if registry._project_record(args.project) is None:
+        print(f"storage account refused: project {args.project!r} is not registered",
+              file=sys.stderr)
+        return 2
+    try:
+        account = storage_account.take_account(
+            registry, args.project, budget_s=budget, tiers=not getattr(args, "no_tiers", False))
+    except ValueError as exc:
+        print(f"storage account refused: {exc}", file=sys.stderr)
+        return 2
+    # A name that is not UTF-8 reaches the account as a surrogate escape: ASCII JSON escapes
+    # it (`\udcXX`); the shared `_print` (ensure_ascii=False) would crash on it.
+    print(json.dumps({"storage_root": str(root), "account": account}, indent=2,
+                     ensure_ascii=True))
+    return 0
 
 
 def cmd_storage_steward(args) -> int:
@@ -1494,21 +1591,129 @@ def _close_ephemeral(session) -> None:
               file=sys.stderr)
 
 
+def _surface_run_dirs(args) -> list[Path]:
+    """The run directories a `hoh surface` command looks at: the named run, or
+    every run under the root (a listing of the root, nothing else is read)."""
+    if args.run_id:
+        return [RunStore(args.root, args.run_id).dir]
+    return [RunStore(args.root, name).dir for name in list_runs(args.root)]
+
+
+def cmd_surface_open(args) -> int:
+    """`hoh surface open RUN`: open a Herdr tab for the run and record it as the
+    run's own (`surfaces.open_surface`). Refuses, creating nothing, for a run that
+    does not exist or is already over (a checkpointed run is not)."""
+    from . import herdr as herdr_mod
+    from . import surfaces
+    from .controller import DispatchError
+
+    try:
+        store = _store(args)
+    except StoreError as exc:
+        print(f"surface open refused: {exc}", file=sys.stderr)
+        return 2
+    if not store.state_exists():
+        print(f"surface open refused: there is no run {args.run_id} under {args.root}",
+              file=sys.stderr)
+        return 2
+    over, why = surfaces.run_over(store.dir)
+    if over:
+        print(f"surface open refused: the run is already over ({why}); a surface "
+              "opened now would have nothing to wait for", file=sys.stderr)
+        return 2
+    try:
+        program = store.read_state().project_name
+        surface = surfaces.open_surface(store.dir, role=args.role, label=args.label,
+                                        cwd=args.cwd, program=program)
+    except ValueError as exc:
+        print(f"surface open refused: {exc}", file=sys.stderr)
+        return 2
+    except (herdr_mod.HerdrError, DispatchError, StoreError, OSError) as exc:
+        print(f"surface open failed: {exc}", file=sys.stderr)
+        return 2
+    _print({"run_id": args.run_id, "role": f"program:{args.role}",
+            "pane_id": surface.pane_id, "tab_id": surface.tab_id,
+            "registry": str(store.dir / surfaces.SURFACES_FILE)})
+    return 0
+
+
+def cmd_surface_list(args) -> int:
+    """`hoh surface list [RUN]`: the surfaces the registries own or owned. Asks
+    Herdr nothing."""
+    from . import surfaces
+
+    try:
+        dirs = _surface_run_dirs(args)
+    except StoreError as exc:
+        print(f"surface list refused: {exc}", file=sys.stderr)
+        return 2
+    rows: list[dict] = []
+    for run_dir in dirs:
+        if os.path.lexists(run_dir / surfaces.SURFACES_FILE):
+            rows.extend(surfaces.listing(run_dir))
+    _print({"surfaces": rows})
+    return 0
+
+
+def cmd_surface_reap(args) -> int:
+    """`hoh surface reap [RUN] [--close]`: for every run that is over and has owned
+    surfaces, close them (`--close`) or say what would be closed. Exit 1 when a
+    surface is refused (unprovable), 2 when Herdr cannot be reached."""
+    from . import herdr as herdr_mod
+    from . import surfaces
+    from .controller import DispatchError
+
+    try:
+        dirs = _surface_run_dirs(args)
+    except StoreError as exc:
+        print(f"surface reap refused: {exc}", file=sys.stderr)
+        return 2
+    results: list[dict] = []
+    failed = False
+    pane, tab, inside = surfaces.own_location()
+    for run_dir in dirs:
+        if not os.path.lexists(run_dir / surfaces.SURFACES_FILE):
+            continue
+        try:
+            results.extend(surfaces.reap(
+                run_dir, close=bool(args.close),
+                self_pane=pane, self_tab=tab, self_inside=inside))
+        except (herdr_mod.HerdrError, DispatchError, OSError) as exc:
+            print(f"surface reap failed for {run_dir.name}: {exc}", file=sys.stderr)
+            failed = True
+            break
+    _print({"close": bool(args.close), "surfaces": results})
+    if failed:
+        return 2
+    return 1 if any(r["outcome"] == "refused" for r in results) else 0
+
+
 def cmd_run(args) -> int:
     """`hoh run`, with a process marker around the whole of it (review B3, C):
     a replacement master can tell a run still being executed between two
     iterations -- when its lock is free -- from one whose process is gone."""
+    if (getattr(args, "detach", False) or getattr(args, "detach_timeout", None) is not None
+            or getattr(args, "require_contract", False)):
+        # P5-42 slice 1: the run starts in a tab of its own (`hoh.detach`); nothing below runs here.
+        from . import detach
+        return detach.cmd_detach(args)
     store = RunStore(args.root, args.run_id)
     if not store.state_exists():
         return _cmd_run(args)
     try:
         with store.process_marker():
-            return _cmd_run(args)
+            rc = _cmd_run(args)
     except LockBusy as exc:
         if "already being executed" not in str(exc):
             raise
         print(str(exc), file=sys.stderr)
         return 2
+    # The marker is released, so `run_over` can now say the run is over: the
+    # first moment the surfaces opened for it (`hoh surface open`) can be closed.
+    # Never raises, never changes `rc`; a run with no surfaces record does nothing.
+    from . import surfaces
+    surfaces.reap_after_run(store.dir)
+    return rc
 
 
 def _cmd_run(args) -> int:
@@ -1577,8 +1782,9 @@ def _run_in(args, scope: ExitStack) -> int:
                                   "ledger": str(storage_admission.ledger)}})
     if ephemeral is not None:
         state.note(f"temporary roots: project {ephemeral.project_id!r} (by {matched}), "
-                   f"session {ephemeral.session_id!r}: every acceptance check and every "
-                   "iteration of this process works in a workspace of its tmp root")
+                   f"session {ephemeral.session_id!r}: every acceptance check, every "
+                   "iteration and every role's scratch (TMPDIR) of this process works in "
+                   "a workspace of its tmp root")
         _print({"ephemeral_roots": {"project": ephemeral.project_id,
                                     "session": ephemeral.session_id,
                                     "root": str(ephemeral.root), "matched_by": matched}})
@@ -1694,6 +1900,10 @@ def _run_in(args, scope: ExitStack) -> int:
             models=models,
             efforts=efforts,
             approval_policy=policy,
+            # P2-42: a run of a registered project keeps its roles' scratch in the iteration's
+            # registered workspace (`Controller._run_temp` binds it); any other run keeps the
+            # `.hoh-scratch-role-<role>` directories of the arena root.
+            defer_role_scratch=ephemeral is not None,
         )
     except Exception as exc:   # DispatchError and HerdrUnavailable
         print(str(exc), file=sys.stderr)
@@ -2113,6 +2323,67 @@ def cmd_report(args) -> int:
     return 0
 
 
+def cmd_wait(args) -> int:
+    """`hoh wait [RUN | --report PATH | --pid N] [--until ...] [--timeout S] [--poll S]`:
+    block until the run is at rest, the review report is final, or the process has ended.
+
+    Read-only: it reads the run's state and its process lock (a run), a report through the
+    merge gate's reader (`--report`) or `/proc/N/stat` (`--pid`), and writes nothing but one
+    JSON line on stdout (`hoh.runwait`). Exactly one target is named; `--until` is for a run
+    only. Run: exit 0 accepted or the asked-for stage or condition reached, 1 failed or
+    cancelled, 3 blocked, 4 parked, 5 paused, 6 idle, 7 died, 8 held. Report: 0 final and
+    RELEASE_YES (not a merge approval), 1 final and no, 8 partial or invalid. Process: 0
+    ended, 9 not there at the first look. 124 timeout; 2 refused or the command itself
+    failed (no JSON line, also when the answer cannot be written). Exit 0 and 1 always come
+    with a JSON line: a stdout that is closed at the start is exit 2 before any look.
+    """
+    from . import runwait
+
+    if sys.stdout is None:                            # `>&-`: print would do nothing and exit 0 say "answered"
+        print("wait refused: stdout is closed, the answer could not be written", file=sys.stderr)
+        return runwait.REFUSED
+    report, pid, run_id = args.report, args.pid, args.run_id
+    named = [name for name, value in (("RUN", run_id), ("--report", report), ("--pid", pid))
+             if value is not None]
+    try:
+        if len(named) != 1:
+            raise runwait.WaitRefused(
+                "name exactly one target: RUN, --report PATH or --pid N"
+                + (f" (got {' and '.join(named)})" if named else ""))
+        if report is not None:
+            if args.until is not None:
+                raise runwait.WaitRefused("--until applies to a run only, not to --report")
+            result = runwait.wait_report(report, timeout=args.timeout, poll=args.poll)
+            line = runwait.render_report(result)
+        elif pid is not None:
+            if args.until is not None:
+                raise runwait.WaitRefused("--until applies to a run only, not to --pid")
+            result = runwait.wait_pid(pid, timeout=args.timeout, poll=args.poll)
+            line = runwait.render_pid(result)
+        else:
+            until = runwait.parse_until(args.until)
+            result = runwait.wait(_store(args), until, timeout=args.timeout, poll=args.poll)
+            line = runwait.render(result)
+    except (runwait.WaitRefused, StoreError) as exc:
+        print(f"wait refused: {exc}", file=sys.stderr)
+        return runwait.REFUSED
+    except Exception as exc:                          # noqa: BLE001 - exit 1 is an outcome, never a crash
+        print(f"wait failed: {type(exc).__name__}: {exc}", file=sys.stderr)
+        return runwait.REFUSED
+    try:
+        print(line, flush=True)
+    except (OSError, ValueError) as exc:               # stdout closed or full: the answer was not given
+        print(f"wait failed: the answer could not be written: {type(exc).__name__}: {exc}",
+              file=sys.stderr)
+        try:                       # so that the flush at exit does not fail again: stdout goes to a pipe nobody reads
+            _unread, sink = os.pipe()
+            os.dup2(sink, sys.stdout.fileno())
+        except (OSError, ValueError, AttributeError):
+            pass
+        return runwait.REFUSED
+    return result.exit_code
+
+
 def cmd_timers(args) -> int:
     """What this root is waiting for, and what is late.
 
@@ -2282,6 +2553,31 @@ def cmd_decision(args) -> int:
     return 1 if result.errors else 0
 
 
+def cmd_merge_gate(args) -> int:
+    """`hoh merge-gate check|verify` (A6, requirement row P5-36): may this candidate be merged?
+
+    `check` decides over the required review reports and writes the decision as a receipt that is
+    created and never replaced; `verify` decides the receipt's inputs again, now. Neither merges
+    anything. Exit 0: eligible / verified. Exit 1: a decision was made and it is no (the receipt
+    exists). Exit 2: no decision (bad input, unreadable repository, a receipt that cannot be
+    created, a failure of the gate itself): nothing on stdout, no receipt. The logic and its
+    contract are in `hoh.mergegate`.
+    """
+    from . import mergegate
+
+    if args.merge_gate_cmd == "verify":
+        outcome = mergegate.run_verify(args.receipt, repo=args.repo, candidate=args.candidate,
+                                       base=args.base)
+    else:
+        outcome = mergegate.run_check(
+            repo=args.repo, candidate=args.candidate, base=args.base, spec=args.spec,
+            reviews=args.review, receipt=args.receipt, min_reviews=args.min_reviews,
+            min_age=args.min_age)
+    sys.stdout.write(outcome.out)
+    sys.stderr.write(outcome.err)
+    return outcome.code
+
+
 def cmd_list(args) -> int:
     runs = list_runs(args.root)
     if not runs:
@@ -2294,6 +2590,38 @@ def cmd_list(args) -> int:
         except StoreError as exc:
             print(f"{rid}  UNREADABLE: {exc}")
     return 0
+
+
+def cmd_pin(args) -> int:
+    """`hoh pin` (A6 I6, requirement row P5-38): a spec-only pin commit by plumbing on a base the product resolved.
+
+    Exit 0: the pin and its receipt exist. Exit 2: refused (nothing was published). Exit 3: the pin exists but
+    its receipt could not be written. The logic and its contract are in `hoh.pin`.
+    """
+    from . import pin
+
+    outcome = pin.run_pin(
+        repo=args.repo, base=args.base, files_root=args.files_root, spec=args.spec, name=args.ref,
+        message_file=args.message_file, co_author=args.co_author, receipt=args.receipt, allow=args.allow)
+    sys.stdout.write(outcome.out)
+    sys.stderr.write(outcome.err)
+    return outcome.code
+
+
+def cmd_import(args) -> int:
+    """`hoh import` (A6 I6, requirement row P5-38): fetch an accepted candidate, prove its tree, preview the merge.
+
+    Exit 0: imported, every preview clean. Exit 1: imported, a preview is a conflict or an error. Exit 2: refused
+    (no ref). Exit 3: the import ref exists but its receipt could not be written. The logic is in `hoh.importref`.
+    """
+    from . import importref
+
+    outcome = importref.run_import(
+        repo=args.repo, run_state=args.run_state, commit=args.commit, name=args.id, receipt=args.receipt,
+        base=args.base, against=args.against, against_unmerged=args.against_unmerged)
+    sys.stdout.write(outcome.out)
+    sys.stderr.write(outcome.err)
+    return outcome.code
 
 
 def cmd_migrate(args) -> int:
@@ -2434,7 +2762,8 @@ def cmd_migrate(args) -> int:
                     report = run_one(kind, store, dry_run=False)
                 records += [line(kind, ident, e) for e in report.files]
                 done.append(f"{kind} {ident}")
-        except (LockBusy, migrations.MigrationError, OSError, StoreError) as exc:
+        except (LockBusy, migrations.MigrationError, OSError, StoreError,
+                *migrations.UNPARSEABLE) as exc:
             return stop(f"{exc}; already migrated: {done or 'none'} (rerun resumes)")
         applied = True
 
@@ -2468,7 +2797,8 @@ def cmd_project(args) -> int:
     and epoch (AC7).
     """
     from .projectstore import (
-        ProjectStore, list_projects, record_external_action, resume_decision, unblock,
+        ProjectStore, UnsafeProjectId, list_projects, record_external_action, resume_decision,
+        unblock,
     )
 
     if args.project_cmd == "list":
@@ -2487,7 +2817,11 @@ def cmd_project(args) -> int:
                 print(f"{pid}  UNREADABLE: {exc}")
         return 0
 
-    store = ProjectStore(args.root, args.project_id)
+    try:
+        store = ProjectStore(args.root, args.project_id)
+    except UnsafeProjectId as exc:
+        print(f"refused: {exc}", file=sys.stderr)
+        return 2
     if not store.exists():
         print(f"project {args.project_id} has no state under {args.root}", file=sys.stderr)
         return 2
@@ -2868,6 +3202,56 @@ def _program_lock_free(store) -> bool:
         return False
 
 
+def cmd_project_create(args) -> int:
+    """Create the governed record of a project: the state file that `hold`, `rollover`
+    and `rollover-accept` need, and nothing else. Idempotent -- the project that exists
+    is reported, never replaced -- and it refuses a repository that is not the one the
+    record was made for. Exit 0 created or already there, 2 refused, 3 unreadable."""
+    from .project import ProjectState
+    from .projectstore import _NAME_RE, ProjectStore
+
+    # a whole name: `fullmatch`, because `$` also matches before a final newline and
+    # `projects/x\n` would be a directory of its own
+    if not isinstance(args.project_id, str) or not _NAME_RE.fullmatch(args.project_id):
+        print(f"refused: Invalid project id {args.project_id!r}: expected "
+              "[A-Za-z0-9][A-Za-z0-9._-]{0,63}", file=sys.stderr)
+        return 2
+    try:
+        repo = Path(args.repo).expanduser().resolve()
+        store = ProjectStore(args.root, args.project_id)
+    except (OSError, RuntimeError, ValueError, StoreError) as exc:
+        print(f"refused: {exc}", file=sys.stderr)
+        return 2
+    if not repo.is_dir() or not (repo / ".git").exists():
+        print(f"refused: {repo} is not a git checkout; a governed record names the "
+              "repository whose HEAD a capsule binds", file=sys.stderr)
+        return 2
+    try:
+        existed = store.exists()
+        if existed:
+            st = store.read_state()
+        else:
+            with store.lock():
+                created_state = store.create(ProjectState(project_id=args.project_id,
+                                                          repo_path=str(repo)))
+            st = created_state
+    except LockBusy as exc:
+        print(f"refused: {exc}", file=sys.stderr)
+        return 2
+    except StoreError as exc:
+        print(f"UNREADABLE: {exc}", file=sys.stderr)
+        return 3
+    if st.repo_path != str(repo):
+        print(f"refused: project {st.project_id} already exists for the repository "
+              f"{st.repo_path}, not {repo}; nothing was changed", file=sys.stderr)
+        return 2
+    _print({"created": not existed, "project_id": st.project_id, "state": str(store.state_path),
+            "repo_path": st.repo_path, "nodes": len(st.nodes),
+            "program_generation": st.program_generation, "write_seq": st.write_seq,
+            "master_epoch": st.master_epoch})
+    return 0
+
+
 def _project_hold(args, store, st) -> int:
     """Become the governed master and *stay* one: renew the lease until it is
     fenced, released, or the session's own process is gone.
@@ -2879,16 +3263,19 @@ def _project_hold(args, store, st) -> int:
     program. A live holder elsewhere refuses it.
     """
     from .orchestrator import write_lock
-    from .rollover import RolloverError, hand_token_over, hold_lease
+    from .rollover import RolloverError, hand_token_over, hold_lease, period_problem
     from .succession import LeaseError, LeaseHeld, MasterAuthority
-    import math
 
-    if args.interval is not None and not (0 < args.interval and math.isfinite(args.interval)):
+    if problem := period_problem("--interval", args.interval):
         # before the lease is taken: a renewal period that is not positive and finite
         # would busy-renew or fail after the acquire (`sleep(nan)`, `sleep(inf)`,
-        # `sleep(-1)`) and leave a LOST lease behind
-        print(f"refused: --interval must be positive and finite, got {args.interval}",
-              file=sys.stderr)
+        # `sleep(-1)`, `sleep(1e308)`) and leave a LOST lease behind
+        print(f"refused: {problem}", file=sys.stderr)
+        return 2
+    rotation, refusal = _rotation_policy(args, store)
+    if refusal:
+        # also before the lease is taken: a policy that cannot be applied is no policy
+        print(f"refused: {refusal}", file=sys.stderr)
         return 2
     try:
         authority = MasterAuthority(store.dir, args.session, ttl_seconds=args.ttl,
@@ -2904,10 +3291,101 @@ def _project_hold(args, store, st) -> int:
             "token_out": args.token_out})
     sys.stdout.flush()
     result = hold_lease(authority, interval=args.interval, watch_pid=args.watch_pid,
-                        hold_for=args.hold_for)
+                        hold_for=args.hold_for,
+                        on_tick=_rotation_tick(store, authority, rotation, args.token_out))
     _print({"project_id": st.project_id, "ended": result.reason,
             "renewals": result.renewals, "released": result.released})
     return 0
+
+
+def _rotation_policy(args, store):
+    """(loaded policy, None), (None, None) when no policy was asked for, or (None, why).
+
+    The policy is read, and the capsule input it names checked (against this project's
+    directory too: the handoff must be a file only the master writes), before any lease is
+    taken or any capsule acknowledged; and it is armed only where its successor can be
+    started, which is inside Herdr. `--rotate-policy-sha256` (the successor's pointer
+    carries it) names the digest of the policy file that started the rotation: a file that
+    changed since is refused, so that the policy that authorised a rotation is the policy
+    its successor runs under."""
+    import re
+
+    from . import herdr as herdr_mod
+    from .rotation import PolicyError, load_policy
+
+    want = getattr(args, "rotate_policy_sha256", None)
+    if not getattr(args, "rotate_policy", None):
+        if want is not None:
+            return None, ("--rotate-policy-sha256 names the digest of the policy file and "
+                          "needs --rotate-policy")
+        return None, None
+    if want is not None and not re.fullmatch(r"[0-9a-f]{64}", want):
+        return None, f"--rotate-policy-sha256 must be 64 lower-case hex digits, got {want!r}"
+    if getattr(args, "watch_pid", None) is None:
+        return None, ("a rotation policy needs --watch-pid: the hold must know when the "
+                      "session it rotates is gone, or a dead master's lease would be kept alive")
+    try:
+        loaded = load_policy(args.rotate_policy, directory=store.dir)
+    except PolicyError as exc:
+        return None, str(exc)
+    if want is not None and loaded.sha256 != want:
+        return None, (f"the rotation policy {loaded.path} is not the file that started this "
+                      f"rotation (sha256 {loaded.sha256}, the pointer names {want}): it "
+                      "changed since; nothing is applied")
+    if not herdr_mod.available():
+        return None, ("a rotation policy starts the successor in Herdr, and Herdr is not "
+                      "available here (HERDR_ENV != 1, or no herdr on PATH)")
+    return loaded, None
+
+
+def _rotation_event(row: dict) -> None:
+    """One event, one line, flushed: a monitor on this process reads them as they come."""
+    try:
+        print(json.dumps(row, sort_keys=True), flush=True)
+    except (OSError, ValueError):
+        pass                    # a closed stdout never ends a hold; the row is in the log
+
+
+def _rotation_tick(store, authority, loaded, token_out, *, fresh=False, keepalive_s=None):
+    """The hold loop's `on_tick`: the rotation policy applied at every renewal, or None.
+
+    The controller decides (`hoh.rotation`); the move is `run_rollover`, the same call
+    `hoh project rollover` makes, with the successor's pointer carrying the policy so
+    that it rotates the same way in its turn. `fresh` is the successor's: it starts in a
+    cool-down (`RotationController.arm`). The rotation runs under the lease's keepalive
+    (renewed every `keepalive_s`, default a third of the ttl): starting the successor can
+    take longer than the lease is valid, and the hold loop cannot renew while it waits."""
+    if loaded is None:
+        return None
+    from .rollover import hand_token_over
+    from .rotation import RotationController, make_trigger
+
+    policy = loaded.policy
+
+    def perform(inp, trigger):
+        from .rollover import HerdrLauncher, run_rollover
+        from .succession_capsule import LocalObserver
+
+        st = store.read_state()
+        with authority.keepalive(interval=keepalive_s):
+            return run_rollover(
+                authority, store.dir, inp=inp, observer=LocalObserver(),
+                launcher=HerdrLauncher(agent_args=policy.successor_args(),
+                                       prompt_delay_s=policy.prompt_delay_s),
+                root=str(store.root), repo=st.repo_path, project_id=st.project_id,
+                successor_session=new_run_id("succ"), trigger=trigger,
+                safe=lambda: _program_lock_free(store), generation=st.program_generation,
+                ack_timeout_s=policy.ack_timeout_s, takeover_s=policy.takeover_s,
+                poll_s=policy.poll_s,
+                accept_args=("--rotate-policy", str(loaded.path),
+                             "--rotate-policy-sha256", loaded.sha256))
+
+    controller = RotationController(
+        loaded, directory=store.dir, project_id=store.project_id,
+        session=authority.session_id, trigger=make_trigger(policy), perform=perform,
+        on_reclaimed=lambda: hand_token_over(authority, token_out), emit=_rotation_event)
+    controller.arm(fresh=fresh)
+    return controller.tick
 
 
 def _rollover_default_input(store, st, args, model: str | None) -> dict:
@@ -2941,10 +3419,15 @@ def _project_rollover(args, store, st) -> int:
 
     from .rollover import (
         HerdrLauncher, Outcome, RolloverError, TriggerError, evaluate_trigger,
-        hand_token_over, run_rollover,
+        hand_token_over, period_problem, run_rollover,
     )
     from .succession_capsule import CapsuleInput, LocalObserver
 
+    if problem := period_problem("--poll", args.poll):
+        # before anything is frozen or launched: a poll the clock cannot sleep would
+        # end the command after the successor was started
+        print(f"refused: {problem}", file=sys.stderr)
+        return 2
     if not (math.isfinite(args.prompt_delay) and 0 <= args.prompt_delay <= 300):
         print(f"refused: --prompt-delay must be between 0 and 300 seconds, got "
               f"{args.prompt_delay}", file=sys.stderr)
@@ -3045,15 +3528,20 @@ def _project_rollover_accept(args, store, st) -> int:
     everything again, take the lease, then hold it. Exit 5 on any refusal --
     nothing is taken."""
     from .orchestrator import write_lock
-    from .rollover import RolloverError, Successor, hold_lease
+    from .rollover import RolloverError, Successor, hold_lease, period_problem
     from .succession import LeaseError, MasterAuthority
     from .succession_capsule import CapsuleError, LocalObserver, load_capsule
-    import math
 
-    if args.interval is not None and not (0 < args.interval and math.isfinite(args.interval)):
-        print(f"refused: --interval must be positive and finite, got {args.interval}",
-              file=sys.stderr)
-        return 2
+    for flag, value in (("--interval", args.interval), ("--poll", args.poll)):
+        if problem := period_problem(flag, value):
+            print(f"refused: {problem}", file=sys.stderr)
+            return 2
+    rotation, refusal = _rotation_policy(args, store)
+    if refusal:
+        # before the capsule is read or acknowledged: the predecessor then sees no
+        # acknowledgement and stays master
+        print(f"refused: {refusal}", file=sys.stderr)
+        return 5
     try:
         cap = load_capsule(args.capsule)
         if cap.project_id != st.project_id:
@@ -3075,7 +3563,9 @@ def _project_rollover_accept(args, store, st) -> int:
     if args.no_hold:
         return 0
     result = hold_lease(took.authority, interval=args.interval, watch_pid=args.watch_pid,
-                        hold_for=args.hold_for)
+                        hold_for=args.hold_for,
+                        on_tick=_rotation_tick(store, took.authority, rotation, args.token_out,
+                                               fresh=True))
     print(f"hold ended: {result.reason} after {result.renewals} renewals")
     return 0
 
@@ -3256,6 +3746,17 @@ def build_parser() -> argparse.ArgumentParser:
                         "refuses every role dispatch. Default: $HOH_STATE_ROOT, else "
                         "${XDG_STATE_HOME:-~/.local/state}/veriharness. Must be "
                         "initialised (`hoh storage init --root PATH`); never created here.")
+    r.add_argument("--detach", action="store_true",
+                   help="start the run in a Herdr tab of its own (an owned run host) and return "
+                        "once its process has written a new marker; the output goes to the tab "
+                        "and to logs/detached-<UTC>.log. Exit 0 started, 2 refused (nothing "
+                        "created), 3 the tab exists but the run was not seen starting")
+    r.add_argument("--detach-timeout", type=float, default=None, metavar="SEC",
+                   help="with --detach: how long to wait for the run's process (1 to 600, "
+                        "default 60)")
+    r.add_argument("--require-contract", action="store_true",
+                   help="with --detach: refuse unless the run has an autonomy contract, pinned "
+                        "or offered with --autonomy, that `hoh run` would accept")
     r.set_defaults(func=cmd_run)
 
     for name, fn, help_ in (
@@ -3371,6 +3872,18 @@ def build_parser() -> argparse.ArgumentParser:
     sgw.add_argument("--storage-root", metavar="PATH", default=None,
                      help="the storage state root (same resolution as `hoh run`)")
     sgw.set_defaults(func=cmd_storage_steward)
+    sgc = sgs.add_parser("account", help="Bytes and entries (inodes) of a project's registered "
+                                         "storage namespace per root, run, session, tier and "
+                                         "reclaimable now (read-only; I10b)")
+    sgc.add_argument("--project", required=True, metavar="P")
+    sgc.add_argument("--storage-root", metavar="PATH", default=None,
+                     help="the storage state root (same resolution as `hoh run`); never created")
+    sgc.add_argument("--budget", type=float, default=120.0, metavar="SECONDS",
+                     help="time budget of the whole account, in (0, 3600] (default 120); what "
+                          "is not read in time reads UNMEASURED")
+    sgc.add_argument("--no-tiers", action="store_true",
+                     help="skip the tier classification (it hashes every file of an item)")
+    sgc.set_defaults(func=cmd_storage_account)
     sga = sgs.add_parser("adopt-project",
                          help="Adopt an existing project directory through an adoption anchor "
                               "committed in the trust root (a one-time operator act)")
@@ -3382,6 +3895,26 @@ def build_parser() -> argparse.ArgumentParser:
     sga.add_argument("--storage-root", required=True, metavar="PATH",
                      help="the storage state root, named explicitly (no fallback)")
     sga.set_defaults(func=cmd_storage_adopt_project)
+    sgn = sgs.add_parser("new-target",
+                         help="Create an empty, registered directory for a target clone "
+                              "(its owner record is written before the directory exists)")
+    sgn.add_argument("--parent-project", required=True, metavar="Q",
+                     help="the registered project that owns the new root")
+    sgn.add_argument("--path", required=True, metavar="ABS",
+                     help="the new directory: absolute, not existing, its parent listed in "
+                          "the state root's CONFIG.json")
+    sgn.add_argument("--storage-root", required=True, metavar="PATH",
+                     help="the storage state root, named explicitly (no fallback)")
+    sgn.set_defaults(func=cmd_storage_new_target)
+    sgp = sgs.add_parser("register-project",
+                         help="Register a fresh project whose repository is a target clone "
+                              "made by `new-target` (create-only)")
+    sgp.add_argument("--project", required=True, metavar="P")
+    sgp.add_argument("--repo", required=True, metavar="ABS",
+                     help="the clone: exactly the directory `new-target` created")
+    sgp.add_argument("--storage-root", required=True, metavar="PATH",
+                     help="the storage state root, named explicitly (no fallback)")
+    sgp.set_defaults(func=cmd_storage_register_project)
     sgl = sgs.add_parser("survey-legacy",
                          help="Draft a legacy-roots anchor for legacy reviewer dirs (read-only)")
     sgl.add_argument("--project", required=True, metavar="P")
@@ -3438,6 +3971,77 @@ def build_parser() -> argparse.ArgumentParser:
     c = sub.add_parser("list", help="All runs")
     c.set_defaults(func=cmd_list, run_id=None)
 
+    from . import runwait
+
+    wt = sub.add_parser(
+        "wait",
+        help="Block until a run is at rest or has reached a stage or condition, a review "
+             "report is final, or a process has ended (read-only; one JSON line; the exit "
+             "code names the outcome)")
+    wt.add_argument("run_id", nargs="?", default=None,
+                    help="the run to wait for (exactly one of RUN, --report, --pid)")
+    wt.add_argument("--report", default=None, metavar="PATH",
+                    help="wait until this review report is final: a regular file, not modified "
+                         "for the merge gate's stable age, ending with a well-formed footer")
+    wt.add_argument("--pid", type=runwait.pid_arg, default=None, metavar="N",
+                    help="wait until this process id is gone, taken by another process, or a "
+                         "zombie (read from /proc/N/stat; nothing is signalled)")
+    wt.add_argument(
+        "--until", default=None, metavar="WHAT",
+        help="settled (default): the run is at rest -- accepted, failed, cancelled, blocked, "
+             "parked, held, paused, idle or died; terminal: accepted, failed or cancelled only; "
+             "stage=NAME or condition=NAME: that stage or condition holds (a run only)")
+    wt.add_argument("--timeout", type=runwait.timeout_arg, default=runwait.DEFAULT_TIMEOUT, metavar="SEC",
+                    help="give up after this many seconds (default 3600; 0 = look once)")
+    wt.add_argument("--poll", type=runwait.poll_arg, default=runwait.DEFAULT_POLL, metavar="SEC",
+                    help="seconds between two looks (default 10, at least 1)")
+    wt.set_defaults(func=cmd_wait)
+
+    pnp = sub.add_parser(
+        "pin",
+        help="Build a spec-only pin commit by plumbing on a base commit the product resolved (moves no branch, "
+             "index or working tree); exit 0 pinned, 2 refused, 3 pinned but no receipt",
+    )
+    pnp.add_argument("--base", required=True, metavar="FULL_ID",
+                     help="the commit to build on: a full 40/64-digit lower-case id, never a ref or a short id")
+    pnp.add_argument("--files-root", required=True, metavar="DIR",
+                     help="a directory laid out like the repository; every file in it is added to the pin")
+    pnp.add_argument("--spec", required=True, metavar="PATH",
+                     help="the specification, a path relative to --files-root (its digest is recorded)")
+    pnp.add_argument("--ref", required=True, metavar="NAME",
+                     help="the pin's name; the ref refs/pins/NAME is created, never moved")
+    pnp.add_argument("--message-file", required=True, metavar="FILE", help="the commit message")
+    pnp.add_argument("--co-author", required=True, metavar="'NAME <ADDRESS>'",
+                     help="the attribution trailer (Co-Authored-By) the product appends")
+    pnp.add_argument("--receipt", required=True, metavar="FILE",
+                     help="the receipt to create; an existing file is never replaced")
+    pnp.add_argument("--allow", action="append", default=[], metavar="KIND",
+                     help="accept findings of this kind in the spec (home-path, scratch-path, invisible); repeatable, "
+                          "recorded in the receipt")
+    pnp.add_argument("--repo", default=".", metavar="DIR", help="the repository (default: .)")
+    pnp.set_defaults(func=cmd_pin, run_id=None)
+
+    imp = sub.add_parser(
+        "import",
+        help="Fetch an accepted candidate into refs/imports/ID, prove its tree is the accepted one and preview "
+             "the merge; exit 0 clean, 1 a preview conflicts, 2 refused, 3 imported but no receipt",
+    )
+    imp.add_argument("--run-state", required=True, metavar="FILE",
+                     help="the run's state.json (its last accepted candidate names the tree and the worktree)")
+    imp.add_argument("--commit", required=True, metavar="FULL_ID",
+                     help="the candidate's commit in the run's worktree: a full lower-case id")
+    imp.add_argument("--id", required=True, metavar="ID", help="the import's name; refs/imports/ID is created, never moved")
+    imp.add_argument("--receipt", required=True, metavar="FILE",
+                     help="the receipt to create; an existing file is never replaced")
+    imp.add_argument("--base", default=None, metavar="FULL_ID",
+                     help="the integration tip to preview against (a full id; default: HEAD, resolved by the product)")
+    imp.add_argument("--against", action="append", default=[], metavar="ID",
+                     help="also preview against refs/imports/ID (repeatable)")
+    imp.add_argument("--against-unmerged", action="store_true",
+                     help="also preview against every other import that is not yet in the base")
+    imp.add_argument("--repo", default=".", metavar="DIR", help="the repository (default: .)")
+    imp.set_defaults(func=cmd_import, run_id=None)
+
     mg = sub.add_parser(
         "migrate",
         help="Bring run and project state to the current schema version "
@@ -3460,6 +4064,31 @@ def build_parser() -> argparse.ArgumentParser:
 
     st = sub.add_parser("stuck", help="Non-terminal objects with no way out")
     st.set_defaults(func=cmd_stuck, run_id=None)
+
+    sf = sub.add_parser(
+        "surface",
+        help="The Herdr tabs opened for a run: open one (recorded as the run's), "
+             "list them, close them once the run is over")
+    sfs = sf.add_subparsers(dest="surface_cmd", required=True)
+    so = sfs.add_parser("open", help="Open a tab for RUN and record it as the run's own")
+    so.add_argument("run_id")
+    so.add_argument("--role", default="run-host",
+                    help="the program role the tab is owned under: a lowercase slug "
+                         "(default run-host)")
+    so.add_argument("--label", required=True, help="the tab's label")
+    so.add_argument("--cwd", required=True, help="absolute directory the tab starts in")
+    so.set_defaults(func=cmd_surface_open)
+    sl = sfs.add_parser("list", help="The surfaces recorded for RUN (every run without one)")
+    sl.add_argument("run_id", nargs="?", default=None)
+    sl.set_defaults(func=cmd_surface_list)
+    sr = sfs.add_parser(
+        "reap",
+        help="Close the surfaces of runs that are over that the registry owns "
+             "(a dry run unless --close)")
+    sr.add_argument("run_id", nargs="?", default=None)
+    sr.add_argument("--close", action="store_true",
+                    help="actually close; without it only say what would be closed")
+    sr.set_defaults(func=cmd_surface_reap)
 
     dc = sub.add_parser(
         "decision",
@@ -3485,12 +4114,60 @@ def build_parser() -> argparse.ArgumentParser:
                     help="also write the result to this new file (never replaced)")
     dc.set_defaults(func=cmd_decision, run_id=None)
 
+    mgp = sub.add_parser(
+        "merge-gate",
+        help="Decide whether a candidate may be merged from its review reports (merges nothing)",
+    )
+    mgs = mgp.add_subparsers(dest="merge_gate_cmd", required=True)
+    mgc = mgs.add_parser(
+        "check",
+        help="Judge the required review reports and write the decision as a new receipt; "
+             "exit 0 MERGE_ELIGIBLE, 1 not eligible, 2 no decision",
+    )
+    mgc.add_argument("--candidate", required=True, metavar="REF",
+                     help="the candidate commit (a ref is resolved now, the receipt keeps the sha)")
+    mgc.add_argument("--base", required=True, metavar="REF",
+                     help="the integration base; pass a ref such as HEAD so that a base that moved "
+                          "since the review is seen")
+    mgc.add_argument("--spec", required=True, metavar="PATH",
+                     help="the specification file, a path inside the candidate commit")
+    mgc.add_argument("--review", action="append", required=True, metavar="ID=FILE",
+                     help="a required review and its report (repeatable)")
+    mgc.add_argument("--receipt", required=True, metavar="FILE",
+                     help="the receipt to create; an existing file is never replaced")
+    mgc.add_argument("--repo", default=".", metavar="DIR", help="the repository (default: .)")
+    mgc.add_argument("--min-reviews", type=int, default=2, metavar="N",
+                     help="how many distinct required reviews must be named (default 2)")
+    mgc.add_argument("--min-age", type=float, default=60.0, metavar="SECONDS",
+                     help="a report modified more recently than this is not stable (default 60)")
+    mgv = mgs.add_parser(
+        "verify",
+        help="Decide a receipt's inputs again, now; exit 0 verified, 1 not verified, 2 not a receipt",
+    )
+    mgv.add_argument("receipt", metavar="RECEIPT")
+    mgv.add_argument("--repo", default=None, metavar="DIR",
+                     help="the repository (default: the one the receipt names)")
+    mgv.add_argument("--candidate", default=None, metavar="REF",
+                     help="the commit about to be merged: it must be the receipt's candidate")
+    mgv.add_argument("--base", default=None, metavar="REF",
+                     help="the tip about to receive it (pass HEAD): it must be the receipt's base")
+    mgp.set_defaults(func=cmd_merge_gate, run_id=None)
+
     pr = sub.add_parser(
         "project",
         help="The orchestration layer above a run: which runs happen at all",
     )
     ps = pr.add_subparsers(dest="project_cmd", required=True)
     ps.add_parser("list", help="All projects with their resume verdict")
+    pcr = ps.add_parser(
+        "create",
+        help="Create a project's governed record (idempotent): what hold and rollover need",
+    )
+    pcr.add_argument("project_id")
+    pcr.add_argument("--repo", required=True, metavar="DIR",
+                     help="the git checkout whose HEAD the project's capsules bind")
+    # Overrides the group's func, like `contract`: cmd_project refuses a project without state.
+    pcr.set_defaults(func=cmd_project_create)
     for name, helptext in (
         ("status", "Full state: nodes, gates, closure, decisions"),
         ("resume", "What a fresh session should do, as JSON"),
@@ -3577,6 +4254,10 @@ def build_parser() -> argparse.ArgumentParser:
                     help="release the lease after this many seconds")
     hd.add_argument("--interval", type=float, default=None,
                     help="seconds between renewals (default: a third of the ttl)")
+    hd.add_argument("--rotate-policy", default=None, metavar="FILE",
+                    help="apply this rotation policy at every renewal: when the master's "
+                         "context is over its threshold, ask for a handoff and rotate the "
+                         "session (inside Herdr only)")
     ro = ps.add_parser(
         "rollover",
         help="Roll the orchestrator session over: freeze a capsule, start a successor "
@@ -3659,6 +4340,12 @@ def build_parser() -> argparse.ArgumentParser:
                      help="seconds between polls for the handover")
     ra2.add_argument("--wait", type=float, default=900.0,
                      help="seconds to wait for the handover before giving up")
+    ra2.add_argument("--rotate-policy", default=None, metavar="FILE",
+                     help="keep applying this rotation policy while holding the lease "
+                          "(the predecessor's pointer carries it)")
+    ra2.add_argument("--rotate-policy-sha256", default=None, metavar="HEX",
+                     help="the sha256 of the policy file that started this rotation; a "
+                          "policy file that changed since is refused (the pointer carries it)")
     pc = ps.add_parser(
         "contract",
         help="The PM boundary, read-only: check an imported contract, describe an "
@@ -3694,6 +4381,9 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
         return args.func(args)
+    except UnsafeRunId as exc:
+        print(f"refused: {exc}", file=sys.stderr)
+        return 2
     except KeyboardInterrupt:
         print("aborted", file=sys.stderr)
         return 130

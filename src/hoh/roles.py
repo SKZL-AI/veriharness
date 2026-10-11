@@ -41,6 +41,11 @@ DEVELOPER_FREEZE = (
 """The developer only: the freeze follows its turn directly."""
 
 
+CRITERION_FIDELITY = "CRITERION_FIDELITY"
+"""The name of the verdict on a plan that does not carry the specification's
+acceptance criteria as written (`spec_criteria`); the repair prompt keys on it."""
+
+
 class RoleOutputError(ValueError):
     """The role output does not satisfy the contract. Exactly one repair attempt."""
 
@@ -125,6 +130,16 @@ context bringing them along:
   make theirs below `$TMPDIR`, fail here with `AF_UNIX path too long`. That is
   the layout, not the code under test, and the acceptance checks run under a
   `TMPDIR` just as long: report it, and do not unset `TMPDIR` to get around it.
+- **A helper file goes inside `$TMPDIR`, and nothing beside or above it.** A one-off
+  script, a generated list, a copy, a note to yourself -- anything that is not your answer
+  file and, for the developer, not part of the candidate itself: give it a path below
+  `$TMPDIR` (a tool that honours `TMPDIR` already does). Do not write to `$TMPDIR/..`, to
+  the directory your working directory sits in, or anywhere else this assignment does not
+  name, and do not make an empty file to see whether a location is writable: those
+  directories belong to the run and nobody reads what is left in them. After your turn
+  HoH checks the run's evidence and the other iterations' arenas and, for the planner and
+  the developer, the listing of the arena root: one new entry there, an empty file
+  included, ends the run as a capability violation.
 
 An acceptance criterion that violates these rules is not executed by the runner
 in the first place and can therefore never turn green.
@@ -222,6 +237,20 @@ The increment is bounded but locally complete: it contains the accompanying
 changes that make it work and make it testable.
 
 {_HOUSE_RULES_POINTER}
+
+/the-specifications-criteria
+If the specification declares its acceptance criteria in a fenced block that opens
+with ```criteria, they are not yours to rewrite. Put every one into
+"acceptance_checks" under its own id, with its command copied character for
+character from its line (the id, spaces, then the command to the end of the line)
+and "expect_exit": 0. A criterion that is shortened, re-quoted, wrapped (in a
+`python3 -c` call, for instance), extended with `--deselect` or any other option,
+or left out is refused, and the plan comes back to you once. You may add checks of
+your own under other ids. Do not wrap a criterion to give pytest a base temporary
+directory: the runner gives every acceptance check a HOME and TMPDIR inside the
+run's own directories, so pytest's default base temporary directory is never the
+machine's shared one. If you believe a criterion cannot pass in this run, keep it
+as written and say so in "objective"; never change it.
 
 /output-contract
 Emit **exclusively** a JSON object, with no surrounding text and no code fence.
@@ -544,13 +573,18 @@ def parse_plan(text: str) -> DevelopmentPlan:
 def repair_prompt(role: Role, error: str, previous: str) -> str:
     """The one permitted repair round (handoff §8: one schema repair per role
     output)."""
+    only_form = (
+        "Nothing about the content should change, only the form."
+        if not error.startswith(CRITERION_FIDELITY) else
+        "The one thing that changes is the commands of the criteria named above: "
+        "copy each one exactly as the specification has it."
+    )
     return f"""Your previous output as {role.value} violated the output contract:
 
 {error}
 
 Now emit **exclusively** the required JSON object -- no surrounding text, no
-code fence, no explanation. Nothing about the content should change, only the
-form.
+code fence, no explanation. {only_form}
 
 Your previous output was:
 {previous[:2000]}

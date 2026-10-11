@@ -247,3 +247,66 @@ def test_missing_item_control_both_present_and_equal_binds(tree):
     assert status == tree.cm.PROVEN, note
     row = tree.board()
     assert _passes(row, tree.rd), row
+
+
+# --------------------------------------------------------------------------- #
+# K3: what "missing" means for a non-string item, and one id on two entries
+# --------------------------------------------------------------------------- #
+
+@pytest.mark.parametrize("record_item,register_item", [
+    (0, 0), (False, False), ([], []), ({}, {}),
+    (0, _P2_33), ({}, _P2_33), (_P2_33, 0), (_P2_33, []),
+], ids=["zero-zero", "false-false", "list-list", "dict-dict",
+        "record-zero", "record-dict", "register-zero", "register-list"])
+def test_a_falsy_non_string_item_is_missing_and_never_a_match(tree, record_item, register_item):
+    """Catches `theirs in (None, "")` (kbr, `_key_not_bound`): a falsy
+    item that is not a string -- `0`, `False`, `[]`, `{}` -- counted as present,
+    so two equal ones bound a key to a requirement (PROVEN) where the pin's
+    `not theirs` refused it. Missing means falsy, on either side: the refusal
+    names exactly the side whose item is falsy (both when both are), and the
+    board blocks. Kills the mutant that narrows the test back to `None`/`""`."""
+    tree.record({"P2-33": _rec_entry(record_item)})
+    (entry,) = tree.register(_entry("P2-33", _probe("P2-33"), register_item))
+    status, note = tree.matrix(entry)
+    assert status == tree.cm.NOT_DETERMINABLE, note
+    assert ("record entry" in note) == (not record_item), note
+    assert ("register entry" in note) == (not register_item), note
+    assert _blocks(tree.board(), tree.rd)
+
+
+@pytest.mark.parametrize("item", [5, True, ["x"]], ids=["int", "true", "list"])
+def test_a_truthy_non_string_item_binds_as_revision_3a_says(tree, item):
+    """Pins the positive clause of keybind Revision 3a: only a falsy item is
+    missing; `5`, `True` or `["x"]` on both sides is compared as it is and
+    binds (PROVEN, the board passes), and a different one on the other side
+    is a mismatch that names both. Kills a missing-test widened to every
+    non-string."""
+    tree.record({"P2-33": _rec_entry(item)})
+    (entry,) = tree.register(_entry("P2-33", _probe("P2-33"), item))
+    status, note = tree.matrix(entry)
+    assert status == tree.cm.PROVEN, note
+    assert _passes(tree.board(), tree.rd)
+    (other,) = tree.register(_entry("P2-33", _probe("P2-33"), [item]))
+    status, note = tree.matrix(other)
+    assert status == tree.cm.NOT_DETERMINABLE, note
+    assert "record entry" not in note and "register entry" not in note, note
+    assert "names authoritative_item" in note, note
+    assert _blocks(tree.board(), tree.rd)
+
+
+@pytest.mark.parametrize("order", ["wrong-first", "wrong-last"])
+def test_two_register_entries_with_one_id_are_not_collapsed(tree, order):
+    """Catches `{r["id"]: ... for r in entries}` in `row_acceptance` (kbr):
+    two evidence-probed entries with one id left one result, and the entry that
+    was not kept was never judged -- with the mis-keyed one first, the board
+    passed. The board now blocks and names the id, in either order. Control: the
+    same entries under two ids pass."""
+    tree.record({"P2-33": _rec_entry(_P2_33), "P2-35": _rec_entry(_P2_35)})
+    right = _entry("P2-33", _probe("P2-33"), _P2_33)
+    wrong = _entry("P2-33", _probe("P2-35"), _P2_33)
+    tree.register(*((wrong, right) if order == "wrong-first" else (right, wrong)))
+    row = tree.board()
+    assert _blocks(row, tree.rd), row
+    assert "duplicate" in row.value_ and "P2-33" in row.value_, row
+    tree.register(right, _entry("P2-35", _probe("P2-35"), _P2_35))
+    assert _passes(tree.board(), tree.rd)

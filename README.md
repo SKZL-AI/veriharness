@@ -13,8 +13,8 @@ done. `docs/EVIDENCE_MODEL.md` makes the full case for why that distinction
 matters; this file is the map of the rest.
 
 **State on 2026-10-09 (added; the opening paragraph above is unchanged).** The latest stable release is `v0.1.0`. The
-current pre-release is `v0.3.0a2`, an alpha and a research preview, installed from the tagged source and not published
-to PyPI. The development line (phase P2) is in progress: 34 of its 43 registered requirements read PROVEN `[V10c]` `[V10b]`,
+current pre-release is `v0.3.0a3` (it was `v0.3.0a2` on 2026-10-09), an alpha and a research preview, installed from the tagged
+source and not published to PyPI. The development line (phase P2) is in progress: 34 of its 43 registered requirements read PROVEN `[V10c]` `[V10b]`,
 and 9 blocking items of its gate are open `[V12]`. The line has been developed under its own orchestration since
 2026-09-07, with 69 product-run merges since 2026-09-25 `[V01]`, by an agent-orchestrated loop that an operator directs
 and that stopped several times, over 32 days 15 hours `[V46]`; the account, the figures and the interruptions are under
@@ -31,6 +31,7 @@ apart on purpose.
 | **Latest stable release** | `v0.1.0`, tagged 2026-09-14, on PyPI since 2026-09-15 | The only stable release. The campaign figures, the benchmark and the findings further down this file describe the work that produced it, and they stay as they were measured. |
 | **Pre-release** | `v0.3.0a1` -- **PRE-RELEASE**, an alpha and a research preview, **prepared, not yet cut** | Prepared at a documentation checkpoint, not at the end of a phase. Its integrity gate is met for the paths its reviewers replayed (the qaw-followup merge `ab41589f` closed the three findings that had held it; one residual is stated in `docs/LIMITATIONS.md`), and the cut waits for the operator's decision on the exact commit. Once cut, it is installed from the tagged source and is not published to PyPI: the distribution workflow of this repository accepts only the audited `v0.1.0`. `pyproject.toml` carries `0.3.0a1`. `RELEASE_NOTES.md` opens with its account; its open gates are listed as NOT_YET_PROVEN there and in `docs/LIMITATIONS.md`. (Correction, 2026-10-09: `v0.3.0a1` was cut on 2026-10-08; "prepared, not yet cut" and "the cut waits for the operator's decision" are the text of the checkpoint before the cut and are kept here. `pyproject.toml` now carries the next pre-release, in the next row.) |
 | **Newer pre-release** | `v0.3.0a2` -- **PRE-RELEASE**, an alpha and a research preview, tagged `v0.3.0a2` | Prepared at a documentation checkpoint after the ledger entries O256 to O260, not at the end of a phase. It adds a NixOS-first portability patch, `hoh agent-setup`, owned control of the agents HoH starts, more disk-full-safe writers, a classification of failed provider dispatches with its provenance and park binding, `hoh migrate` and `hoh decision check`, and the five P0 measurements; none of it was run on a real NixOS or macOS host or in a live coding-agent session. It is installed from the tagged source and is not published to PyPI. `pyproject.toml` carries `0.3.0a2`. `RELEASE_NOTES.md` opens with its account; its open gates are listed as NOT_YET_PROVEN there and in `docs/LIMITATIONS.md`. |
+| **Newest pre-release** | `v0.3.0a3` -- **PRE-RELEASE**, an alpha and a research preview, tagged `v0.3.0a3` | Prepared at a documentation checkpoint after the ledger entries O261 to O265, not at the end of a phase. It adds the merge gate as a command, `hoh wait`, `hoh surface`, `hoh run --detach`, `hoh pin` and `hoh import`, the per-run storage account, target registration, and a rotation policy under which the product hands the orchestrating session over by itself; P2-41, P2-43, P2-14 and P2-20 read PROVEN, each with limits that `RELEASE_NOTES.md` states. It is installed from the tagged source and is not published to PyPI. `pyproject.toml` carries `0.3.0a3`. P2 is not closed; its open gates are listed as NOT_YET_PROVEN in `RELEASE_NOTES.md` and in `docs/LIMITATIONS.md`. |
 | **Current development** | Phase P2, *v0.3 Durable Program Runtime + Autonomy Contract Base* -- **IN PROGRESS** | Not closed. The pre-release is a snapshot of this line, and a clone of the default branch may be ahead of the tag. |
 | **Long-term roadmap** | Phases P0 to P12, v0.2 through v2.0 | A registered plan, not a promise. P1 was completed as an internal development milestone. No public v0.2 release was cut; the latest stable public release remains v0.1.0 while the development line continues through P2. Of the requirements registered for P3 to P12, 150 of 168 read MISSING `[V11b]`; ten of the 11 that read PROVEN are storage-lifecycle items that amendment A1 placed there and that were built early. (Updated 2026-10-09 at the O262 base: 158 of 176 read MISSING `[V11b]`, because amendment A6 registered eight more requirements for phase P5; see *The parts, and what each has and has not shown*.) |
 
@@ -257,6 +258,114 @@ banner are read, whole, and no developer pane has ever been recorded on a real l
 parked again and again until the resume limit and is then handed to a person, and the fix is specified and not merged;
 no real rate-limit body was ever recorded; a live run that meets a real provider limit is NOT_RUN. The limits are in the
 register note of P2-43 and in the ledger entry O262.
+
+**Update, later on 2026-10-09 (ledger entry O264).** The previous update says that the fix for the stale-banner re-park of P2-43 is
+specified and not merged. It is merged: a limit banner that was already on the developer's pane when the prompt was sent is not
+read as this turn's. That bounds the problem and does not remove it everywhere: a status-area line that a healed pane left in
+its scrollback is still read, a repeated rate-limit body after a long turn is missed, and no developer pane has been recorded on
+a real limit. Five further pieces are merged on the development line and are not in `v0.3.0a2`. Ephemeral temporary roots are used
+by `hoh run` for a run of a registered project (P2-42 stays PARTIAL, because the role scratch is not a registered root).
+`hoh merge-gate` checks a set of review reports and verifies a receipt; no merge step of the product calls it. `hoh wait` waits
+on a run and on nothing else. `hoh surface` records the tabs of a run and closes the ones of a run that is over once the shell
+in them is proven idle. Criterion fidelity refuses a plan that drops, re-types, wraps or deselects a declared criterion, and
+holds only for a specification that declares its criteria in one block. The capability matrix reads P5-36 and P5-39 PARTIAL and
+P5-43 MISSING, and lifts no requirement to PROVEN. None of this has run against a live Herdr session. The limits are in the
+register notes and in `docs/LIMITATIONS.md`.
+
+The figures of the moving present that `paper/NUMBERS_V2.md` derives were taken again at the commit of the records entry O264
+(`dff02f08`, committed on 2026-10-09 at 22:14 +0300); the table in the section above, which names the O262 records commit as its
+base, keeps its figures as written. At the new base the history is 1,130 commits, 153 of them merges `[V48]`, and 236 numbered
+ledger entries, O23 to O264 `[V49]`. Of 233 development nodes after the attribution anchor `[V06]`, 1 went through the shipped
+control plane end to end `[V06a]`, 104 were developed by a product run and merged by the orchestrating session after review
+`[V06b]`, and 128 were written by the orchestrating session directly `[V06c]`. Of the requirements registered for P3 to P12, 156 of
+176 read MISSING, 9 read PARTIAL and 11 read PROVEN `[V11b]`.
+
+**Update, 2026-10-11 (ledger entry O265).** Sixteen further merges are on the development line after the update above and are not in
+`v0.3.0a2`. Two sentences of that update are out of date and are corrected here by addition. `hoh wait` no longer waits on a run and
+on nothing else: it also waits on a review report (`--report`, with the footer check and the stable-age rule of the merge gate) and on
+a process id (`--pid`); a durable list of what it reported and a trigger of the reaper are not built, and the register still reads
+P5-43 MISSING. The scratch of the roles of a run of a registered project now lives below the iteration's registered workspace, and
+`hoh storage new-target` and `hoh storage register-project` register a target clone; P2-42 still reads PARTIAL, because no run of a
+registered project has been observed and nothing has run against a live Herdr session. The product now rotates the orchestrating
+session by itself under a policy and creates the governed project record (`hoh project create`); that was tested with fakes, P2-14
+still reads PARTIAL and is held until a live rotation has run. Also merged: `hoh run --detach`, `hoh pin` and `hoh import`, the
+per-run storage account `hoh storage account`, a guarded read of the review reports for the merge gate (the product command has been
+the gate of record since `1e633e46`), the export leak scan for private identifiers, the refusal of run ids and project ids that are
+not plain names, and the amendment A7, which records that a phase is closed at a commit and that later changes to the source create
+regression obligations. No requirement was lifted to PROVEN. The limits are in the register notes and in `docs/LIMITATIONS.md`.
+
+The figures of the moving present that `paper/NUMBERS_V2.md` derives were taken again at the commit of the records entry O265
+(`d88281da`, committed on 2026-10-11 at 03:44 +0300); the paragraph above that names the O264 records commit as its base keeps its figures as written. At the new base the
+history is 1,197 commits, 170 of them merges `[V48]`, and 237 numbered ledger entries, O23 to O265 `[V49]`; the first and the
+latest commit of the mainline are 34 days 3 hours apart `[V46]` and 25 of the 35 calendar days carry a commit `[V47]`. Of 281 development
+nodes after the attribution anchor `[V06]`, 1 went through the shipped control plane end to end `[V06a]`, 125 were developed by a
+product run and merged by the orchestrating session after review `[V06b]`, and 155 were written by the orchestrating session
+directly `[V06c]`.
+
+**Update, 2026-10-11, later (ledger entry O265, second revision).** The first rotation of the orchestrating session by the product has run, as
+the canary of amendment A7: the policy asked for the rotation at its threshold, the master wrote its handoff, the successor verified the
+frozen capsule against the world and took the lease as the second epoch, and the old session was fenced. On that evidence P2-14 and
+P2-20 read PROVEN, and three sentences above are out of date and are corrected here by addition: the sentence in "Duration, autonomy
+and scale of the build" that the session was handed over by files and not by the product's rollover protocol, "which has not run
+live"; the row "Handing the orchestrating session over" of the table, which says "tested with fakes; no live succession has run";
+and the paragraph of this entry that holds P2-14 at PARTIAL until a live rotation has run. What the evidence is not: one rotation, on
+one host, of one role, with one successor model; the paths of expiry and error and a second rotation were not run live, the
+capsule input of the canary was static and missed the newest run root (tracked), P2-11 and P2-33 to P2-37 are unchanged, and the gate
+of P2 is still shut. P2-42 still reads PARTIAL. The strand `rlname`, merged before the canary, fixed the defect that the first
+rehearsal found (the name of the successor's agent was refused by Herdr); it lifts no requirement.
+
+The figures of the moving present that `paper/NUMBERS_V2.md` derives were taken again at the commit of the second revision of the records entry
+O265 (`29852843`, committed on 2026-10-11 at 04:21 +0300). At that base the register holds 235 requirements, 63 PROVEN and
+10 PARTIAL `[V10]`; of the requirements of P2, 36 PROVEN `[V10c]`; of those registered for P3 to P12, 156 of 176 MISSING (9 PARTIAL, 11 PROVEN) `[V11b]`. The history is
+1,204 commits, 171 of them merges `[V48]`, and 237 numbered ledger entries, O23 to O265 `[V49]`. Of 285 development nodes after
+the attribution anchor `[V06]`, 1 went through the shipped control plane end to end `[V06a]`, 126 were developed by a product run and merged by the
+orchestrating session after review `[V06b]`, and 158 were written by the orchestrating session directly `[V06c]`.
+
+**Update, 2026-10-11, third revision of the records entry O265 (review findings folded by addition).** Three limits and three dated facts
+qualify the paragraph above. First, the canary exercised the rotation of the session (the policy, the controller, the rollover); the item-level
+context rotation that the probe of P2-14 names (`rotate` in `src/hoh/rotation.py` and `reachable`) has no caller outside the tests, so
+the status PROVEN of P2-14 is a statement about the rotation of the session and the sentence of the register note that nothing rotates items
+yet stays true. Second, where this README says that a second rotation was not run live, that was true when it was written; a second
+rotation by the product completed later the same day (successor epoch three, outcome COMPLETE); it is recorded in the closure records and
+is not counted here. Third, three further sentences of this README say that no succession has run and are out of date in the same way as
+the three named above, all three in the section "What changed after v0.1.0": the paragraph on the rollover ("It has been tested with
+fakes; no live succession has been run, so no P2 row is proven by it"), the sentence on what is built and not exercised ("Context
+rollover is built and not exercised: no live succession has run") and the list item on its follow-up fixes ("It has still not run
+live"). They are kept as written; the canary paragraph above and the limits of this paragraph supersede them.
+
+The figures of the moving present that `paper/NUMBERS_V2.md` derives were taken again at the commit of the third revision of the records entry O265
+(`84384e1d`, committed on 2026-10-11 at 05:06 +0300). At that base the history is 1,207 commits, 171 of them merges `[V48]`; of 287 development nodes after the
+attribution anchor `[V06]`, 1 went through the shipped control plane end to end `[V06a]`, 126 were developed by a product run and merged by the orchestrating
+session after review `[V06b]`, and 160 were written by the orchestrating session directly `[V06c]`.
+
+**Correction, 2026-10-11 (third revision of the records entry O265, second part).** The paragraph on the third revision above says of the second
+rotation that it "is recorded in the closure records". That was wrong when it was set: no closure record exists yet (amendment A7 states
+it, and the gate of P2 is shut). It is replaced by: the second rotation is to be recorded in the closure records, none of which exists
+yet; it is observed in the canary root and in the orchestrator's ledger, and it is not counted here.
+
+The figures of the moving present that `paper/NUMBERS_V2.md` derives were taken again at the commit of the second part of the third revision of the records
+entry O265 (`d70a1add`, committed on 2026-10-11 at 05:26 +0300). At that base the history is 1,210 commits, 171 of them merges `[V48]`; of 289 development nodes
+after the attribution anchor `[V06]`, 1 went through the shipped control plane end to end `[V06a]`, 126 were developed by a product run and merged by the
+orchestrating session after review `[V06b]`, and 162 were written by the orchestrating session directly `[V06c]`.
+
+**Update, 2026-10-11, for `v0.3.0a3` (release documentation).** The documentation of the third alpha is prepared for the
+tag `v0.3.0a3`, which is cut from the merge of this package after its review: `pyproject.toml` and `CITATION.cff` carry `0.3.0a3`,
+`RELEASE_NOTES.md` opens with its account, and `CHANGELOG.md` carries the section generated from it. The statement at the top of
+this file that the current pre-release is `v0.3.0a3`, and the row of the table above, hold once that tag exists. The preparation
+lifts no requirement and changes no source file; the lifts since the second alpha are those of the records entries O261, O262 and O265 (P2-41, P2-43,
+P2-14 and P2-20 read PROVEN, each with the limits stated in `docs/LIMITATIONS.md`). P2 is not closed: P2-11 needs a real reboot
+that has not been run, the durability evidence is not taken at this commit, and the hold on P2-42 stays. The statement of an
+earlier update that no closure record exists yet is still true.
+
+The figures of the moving present that `paper/NUMBERS_V2.md` derives were taken again at the commit `3517ce6f` (2026-10-11 at 07:24 +0300; the
+figures quoted in the updates above stay as written). At that base the register holds 235 requirements, 63 PROVEN and 10 PARTIAL
+`[V10]`; of the requirements of P2, 36 PROVEN `[V10c]`, and 7 blocking items of its gate are open `[V12]`; of those registered
+for P3 to P12, 156 of 176 MISSING (9 PARTIAL, 11 PROVEN) `[V11b]`. The history is 1,217 commits, 173 of them merges `[V48]`;
+the first and the latest commit of the mainline are 34 days 7 hours apart `[V46]` and 25 of the 35 calendar days carry a commit
+`[V47]`. The development line has 97 product-run merges since 2026-09-25 `[V01]`, 78 of which change `src/hoh/` `[V02]` (69 and 55
+before): the count lists the titles of the merges since the second alpha one by one. Of 294 development nodes after the
+attribution anchor `[V06]`, 1 went through the shipped control plane end to end `[V06a]`, 126 were developed by a product run and
+merged by the orchestrating session after review `[V06b]`, and 167 were written by the orchestrating session directly `[V06c]`.
 
 ## What this actually is
 

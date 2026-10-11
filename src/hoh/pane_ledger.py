@@ -20,7 +20,11 @@ Events:
 """
 from __future__ import annotations
 
+import fcntl
 import json
+import os
+import time
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -37,6 +41,12 @@ _OPEN_LISTS = {"kept": "kept_open", "refused": "refused", "closing": "unconfirme
 
 #: The fields a summary entry carries, when the line has them.
 _ENTRY_FIELDS = ("role", "pane", "tab", "why", "at")
+
+GATE_WAIT_S = 5.0
+"""How long `gate` polls for the lock before it answers `False`."""
+
+GATE_PAUSE_S = 0.01
+"""The pause between two polls of the lock."""
 
 
 def append(run_dir: Path | str, event: str, **fields) -> bool:
@@ -58,6 +68,48 @@ def append(run_dir: Path | str, event: str, **fields) -> bool:
     except Exception:  # noqa: BLE001 - a record must never raise out of a close
         return False
     return True
+
+
+@contextmanager
+def gate(run_dir: Path | str):
+    """Hold the run's ledger gate: yields `True` while this process holds an exclusive
+    `flock` on the run directory itself (a lock needs no file of its own), `False`
+    when it could not be had within `GATE_WAIT_S` or the directory cannot be opened
+    (missing, a symbolic link, a file). Never raises for either; the descriptor is
+    closed on exit and the kernel drops the lock with it.
+
+    It makes a check of the ledger and the append that follows one step for the
+    reapers of a run (`surfaces.reap`); `append` itself does not take it. Where
+    `flock` fails (a file system without it) or the run directory is a link, the
+    gate is always `False`: the caller keeps what it would have changed.
+    """
+    flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
+    try:
+        fd = os.open(os.fspath(run_dir), flags)
+    except OSError:
+        fd = None
+    held = False
+    try:
+        if fd is not None:
+            deadline = time.monotonic() + GATE_WAIT_S
+            while True:
+                try:
+                    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    held = True
+                    break
+                except BlockingIOError:
+                    if time.monotonic() >= deadline:
+                        break
+                    time.sleep(GATE_PAUSE_S)
+                except OSError:               # no flock here: waiting would not help
+                    break
+        yield held
+    finally:
+        if fd is not None:
+            try:
+                os.close(fd)
+            except OSError:
+                pass
 
 
 def summary(run_dir: Path | str) -> dict:

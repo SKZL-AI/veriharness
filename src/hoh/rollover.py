@@ -62,7 +62,7 @@ from .succession_capsule import (
 __all__ = [
     "DEFAULT_THRESHOLD", "HerdrLauncher", "HoldResult", "LaunchHandle", "LauncherError",
     "Outcome", "RolloverError", "RolloverLog", "RolloverResult", "State", "Successor",
-    "SuccessorLauncher", "TokenOutError", "TookOver", "TriggerError", "TriggerResult",
+    "SuccessorLauncher", "Tick", "TokenOutError", "TookOver", "TriggerError", "TriggerResult",
     "evaluate_trigger", "hand_token_over", "hold_lease", "pointer_prompt",
     "product_invocation", "run_rollover",
 ]
@@ -370,17 +370,22 @@ def product_invocation(*, python: str | None = None,
 
 def pointer_prompt(*, root: str, project_id: str, capsule_file: str,
                    capsule_digest: str, session: str, token_out: str,
-                   invocation: Sequence[str] = ("hoh",)) -> str:
+                   invocation: Sequence[str] = ("hoh",),
+                   extra_args: Sequence[str] = ()) -> str:
     """What the successor is told: a pointer and nothing else. It carries no
     history -- not a decision, not a note -- only where the capsule is and the
     one command to run. ASCII, under 2,500 characters, every value of the
     command shell-quoted. `invocation` is how the command starts the product
     (`product_invocation()` in a real rotation; the bare `hoh` only where it is
     known to be on PATH). The command ends with the lease bound to the
-    successor's own conversation process (`SESSION_PID_EXPR`)."""
+    successor's own conversation process (`SESSION_PID_EXPR`). `extra_args` are
+    more words of that one command, each shell-quoted like every other value
+    (the rotation policy's `--rotate-policy FILE`, so that the successor keeps
+    rotating by the same rules); they follow `--token-out` and precede
+    `--watch-pid`."""
     argv = [*invocation, "--root", root, "project", "rollover-accept", project_id,
             "--capsule", capsule_file, "--digest", capsule_digest,
-            "--session", session, "--token-out", token_out]
+            "--session", session, "--token-out", token_out, *map(str, extra_args)]
     command = " ".join(shlex.quote(a) for a in argv) + f" --watch-pid {SESSION_PID_EXPR}"
     text = (
         f"You are the successor orchestrator session {shlex.quote(session)} for project "
@@ -408,6 +413,23 @@ def pointer_prompt(*, root: str, project_id: str, capsule_file: str,
 # --------------------------------------------------------------------------- #
 # the launcher seam
 # --------------------------------------------------------------------------- #
+
+
+#: Herdr's rule for an agent name (`herdr agent start`): a lower-case letter, then up to 31 of
+#: lower-case letters, digits, '-' and '_'; anything else is refused with `invalid_agent_name`.
+HERDR_AGENT_NAME_CHARS = frozenset("abcdefghijklmnopqrstuvwxyz0123456789-_")
+
+
+def successor_agent_name(session_id: str, token: str) -> str:
+    """The Herdr agent name of a successor: a fixed letter, the random part, the session id.
+
+    Random part first, because Herdr cuts agent names at about 24 characters. It follows a
+    fixed letter because a hex token starts with a digit five times in eight, and the session id
+    is lower-cased with every other character mapped to '-' because run ids carry an upper-case
+    'T' and 'Z': either one made Herdr refuse the live launch with `invalid_agent_name` (A7 dress
+    rehearsal 2026-10-11, strand rlname) -- the fakes never checked the name."""
+    raw = f"s{token}-{session_id}".lower()
+    return "".join(c if c in HERDR_AGENT_NAME_CHARS else "-" for c in raw)[:24]
 
 
 class LauncherError(RuntimeError):
@@ -502,8 +524,7 @@ class HerdrLauncher:
                 raise LauncherError(f"Herdr returned no pane for the tab: {data}")
             pane = str(pane)
             self._sleep(self.settle_s)     # the new tab's shell needs a moment
-            # Random part first: Herdr cuts agent names at about 24 characters.
-            name = f"{secrets.token_hex(3)}-{session_id}"[:24]
+            name = successor_agent_name(session_id, secrets.token_hex(3))
             started = None
             for attempt in range(5):
                 try:
@@ -580,18 +601,47 @@ def hand_token_over(authority: MasterAuthority, token_out: str | None) -> None:
 # --------------------------------------------------------------------------- #
 
 
+#: The shortest and the longest period, in seconds, that `--interval` or `--poll` may name. The
+#: floor keeps a loop from spinning (`--poll 0`, `--poll 1e-300`); the ceiling (a day) keeps the
+#: value inside what the platform's clock takes (`sleep(1e308)` raises OverflowError, after the
+#: lease was taken).
+MIN_PERIOD_S = 0.01
+MAX_PERIOD_S = 86400.0
+
+
+def period_problem(flag: str, value: float | None) -> str | None:
+    """Why `value` cannot be a period (`--interval`, `--poll`), or None: it must be finite and
+    between `MIN_PERIOD_S` and `MAX_PERIOD_S`. NaN and infinity fail the test."""
+    if value is None or MIN_PERIOD_S <= value <= MAX_PERIOD_S:
+        return None
+    return (f"{flag} must be positive and finite, between {MIN_PERIOD_S:g} and "
+            f"{MAX_PERIOD_S:g} seconds, got {value}")
+
+
 @dataclass(frozen=True)
 class HoldResult:
-    reason: str          # "fenced" | "watched session ended" | "elapsed"
+    reason: str          # "fenced" | "watched session ended" | "elapsed" | "rotated"
     renewals: int
     released: bool
+
+
+@dataclass(frozen=True)
+class Tick:
+    """What a hold loop's `on_tick` answers: how soon it wants the next tick
+    (`next_in` seconds, never longer than the renewal period) and whether the
+    loop is done (`stop`: the lease was handed over, there is nothing left to
+    renew)."""
+
+    next_in: float | None = None
+    stop: bool = False
 
 
 def hold_lease(authority: MasterAuthority, *, interval: float | None = None,
                watch_pid: int | None = None, hold_for: float | None = None,
                sleep: Callable[[float], None] = time.sleep,
                monotonic: Callable[[], float] = time.monotonic,
-               alive: Callable[[int], bool] = pid_alive) -> HoldResult:
+               alive: Callable[[int], bool] = pid_alive,
+               on_tick: Callable[[], Tick | None] | None = None) -> HoldResult:
     """Renew the lease until it is lost, or the session is gone, or time is up.
 
     A lease is judged by its holder's pid; a conversation is not a long-lived
@@ -599,6 +649,14 @@ def hold_lease(authority: MasterAuthority, *, interval: float | None = None,
     Ends when fenced (a handoff, or another master: `StaleMaster`), or when
     `watch_pid` -- the session's own process -- no longer exists (the lease is
     then given back at once), or after `hold_for` seconds (also given back).
+
+    `on_tick` (the rotation policy, `hoh.rotation`) is called after every
+    renewal that succeeded -- the renewal is the safe point of this loop: this
+    process holds a live lease and nothing else of the session's is in flight
+    here. It may ask for an earlier next tick, or end the loop (`Tick.stop`:
+    the lease was handed to a successor, so it is neither renewed nor given
+    back). A fault in `on_tick` never ends a hold: it is retried at the next
+    tick, like a transient fault of the renewal itself.
     """
     period = interval if interval is not None else max(1.0, authority.ttl / 3)
     started = monotonic()
@@ -611,19 +669,42 @@ def hold_lease(authority: MasterAuthority, *, interval: float | None = None,
             return HoldResult("fenced", renewals, False)
         return HoldResult(why, renewals, True)
 
-    while True:
-        if watch_pid is not None and not alive(watch_pid):
-            return give_back("watched session ended")
-        if hold_for is not None and monotonic() - started >= hold_for:
-            return give_back("elapsed")
+    try:
+        while True:
+            if watch_pid is not None and not alive(watch_pid):
+                return give_back("watched session ended")
+            if hold_for is not None and monotonic() - started >= hold_for:
+                return give_back("elapsed")
+            wait = period
+            try:
+                authority.renew()
+                renewals += 1
+                renewed = True
+            except StaleMaster:
+                return HoldResult("fenced", renewals, False)
+            except Exception:                               # noqa: BLE001 - retried
+                renewed = False     # a transient fault (a full disk, a lock hiccup): next period
+            if renewed and on_tick is not None:
+                try:
+                    tick = on_tick()
+                except Exception:                           # noqa: BLE001 - retried
+                    tick = None     # a fault of the policy never ends a hold
+                if isinstance(tick, Tick):
+                    if tick.stop:
+                        return HoldResult("rotated", renewals, False)
+                    hint = tick.next_in
+                    if (isinstance(hint, (int, float)) and not isinstance(hint, bool)
+                            and math.isfinite(hint) and hint > 0):
+                        wait = min(period, max(MIN_PERIOD_S, float(hint)))
+            sleep(wait)
+    except BaseException:
+        # The loop is ending in a way nobody planned (a sleep that cannot take the period,
+        # an interrupt): a lease left behind reads LOST once this process is gone.
         try:
-            authority.renew()
-            renewals += 1
-        except StaleMaster:
-            return HoldResult("fenced", renewals, False)
-        except Exception:                                   # noqa: BLE001 - retried
-            pass            # a transient fault (a full disk, a lock hiccup): next period
-        sleep(period)
+            give_back("hold ended abnormally")
+        except Exception:                                   # noqa: BLE001 - best effort
+            pass            # the original exception is the one that must propagate
+        raise
 
 
 # --------------------------------------------------------------------------- #
@@ -907,7 +988,8 @@ def run_rollover(authority: MasterAuthority, directory: Path | str, *,
                  sleep: Callable[[float], None] = time.sleep,
                  capsule_id: str | None = None,
                  reclaim_linger_s: float = 5.0,
-                 invocation: Sequence[str] | None = None) -> RolloverResult:
+                 invocation: Sequence[str] | None = None,
+                 accept_args: Sequence[str] = ()) -> RolloverResult:
     """The predecessor's whole rotation. See the module docstring; the steps:
 
     1. check; the trigger (optional) must fire; a cycle in flight refuses; no
@@ -924,6 +1006,7 @@ def run_rollover(authority: MasterAuthority, directory: Path | str, *,
     `invocation` is how the pointer's command starts the product; None (the
     default) is `product_invocation()`, resolved first, so a product that cannot
     name itself refuses (RolloverError) before anything is frozen or launched.
+    `accept_args` are further words for the pointer's command (`pointer_prompt`).
     """
     invocation = tuple(invocation) if invocation is not None else product_invocation()
     directory = Path(directory)
@@ -1028,7 +1111,7 @@ def run_rollover(authority: MasterAuthority, directory: Path | str, *,
                                 capsule_file=str(frozen.path),
                                 capsule_digest=cap.capsule_digest, session=successor,
                                 token_out=str(cwd / "master.token"),
-                                invocation=invocation)
+                                invocation=invocation, extra_args=accept_args)
         handle = launcher.start(session_id=successor, model=cap.successor_model,
                                 cwd=cwd, prompt=prompt, label=f"successor-{capsule_id}")
     except Exception as exc:                                # noqa: BLE001 - fail closed

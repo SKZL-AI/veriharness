@@ -17,6 +17,7 @@ from hoh.store import (
     RunStore,
     StaleWrite,
     StoreError,
+    UnsafeRunId,
     list_runs,
 )
 
@@ -164,6 +165,57 @@ def test_unsafe_file_names_are_rejected(store: RunStore):
 def test_the_run_id_is_validated(tmp_path: Path):
     with pytest.raises(StoreError, match="unsafe file name"):
         RunStore(tmp_path, "../../etc")
+
+
+def test_a_run_id_must_name_a_direct_child_of_the_runs_root(tmp_path: Path):
+    """Catches: a run id of `.` or `..` whose "run directory" is the runs root or its parent (every
+    command then reads and creates files outside the root), a trailing newline that `$` lets
+    through, a path-like id, the names the runs root keeps for itself (`_arenas`, `.timers.lock`,
+    `backups`, `projects`) taken for a run, a refusal that comes after something was created, and
+    an over-eager refusal of the ids real runs have (dots, underscores, a long id)."""
+    root = tmp_path / "runs"
+    refused = {
+        ".": "not a direct child", "..": "not a direct child",
+        "r1\n": "unsafe file name", "\n": "unsafe file name", "": "unsafe file name",
+        "a/b": "unsafe file name", "../x": "unsafe file name", "/abs": "unsafe file name",
+        "a\0b": "unsafe file name", " r1": "unsafe file name",
+    }
+    for run_id, needle in refused.items():
+        with pytest.raises(UnsafeRunId, match="unsafe file name") as caught:
+            RunStore(root, run_id)
+        assert isinstance(caught.value, StoreError) and needle in str(caught.value), run_id
+    for run_id in ("_arenas", "_restore", "_x", ".hidden", ".timers.lock", "...", "backups",
+                   "projects"):
+        with pytest.raises(UnsafeRunId, match="reserved") as caught:
+            RunStore(root, run_id)
+        assert "unsafe file name" in str(caught.value), run_id
+    assert not root.exists(), "a refusal must come before anything is created"
+    assert not tmp_path.joinpath("results").exists()
+
+    generated = "hoh-20261010T160700Z-ab12cd"
+    for run_id in ("r1", "a.b", "a_b", "x-1_2", "backups2", "projects-x", generated, "r" * 200):
+        store = RunStore(root, run_id)
+        assert store.dir == root.resolve() / run_id and store.run_id == run_id
+        assert store.dir.parent == root.resolve()
+    assert not root.exists(), "building a store creates nothing"
+
+    # a result, receipt or log name ends in the same pattern: a newline is not part of a name
+    store = RunStore(root, "r1")
+    with pytest.raises(StoreError, match="unsafe file name"):
+        store.write_result("res\n", Candidate(candidate_id="c1", repo_path="/tmp/repo",
+                                              commit="a" * 40, tree_clean=True,
+                                              tree_digest="d"))
+    assert not root.exists()
+
+    # the parent of the root is never read as a run
+    (tmp_path / "state.json").write_text("{}", encoding="utf-8")
+    root.mkdir()
+    with pytest.raises(UnsafeRunId):
+        RunStore(root, "..").state_exists()
+    with pytest.raises(UnsafeRunId):
+        RunStore(root, ".").ensure()
+    assert sorted(p.name for p in root.iterdir()) == []
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["runs", "state.json"]
 
 
 # --- The lock: exactly one controller (A07) -------------------------------- #

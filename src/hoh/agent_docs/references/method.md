@@ -48,11 +48,16 @@ machine-specific in a shared copy.
 ## 4. The merge gate, bound to a footer
 
 - Every required report ends with five lines: `VERDICT`, `CANDIDATE`, `BASE`, `SPEC_SHA256`,
-  `BLOCKING_OPEN`. A merge is allowed only if every required review is present, unique, complete,
-  `RELEASE_YES` with zero open BLOCKING, and its candidate, base and specification digest equal the
-  values recomputed now. Missing, stale, ambiguous or colliding means not eligible.
-- Run the gate as its own step, read its output, write its receipt to a fresh name. The receipt
-  digest goes into the merge message.
+  `BLOCKING_OPEN`, and a sixth line, `COMPLETENESS`. A merge is allowed only if every required
+  review is present, unique, complete (`COMPLETENESS: COMPLETE`), stable (not modified in the last
+  minute), `RELEASE_YES` with zero open BLOCKING, and its candidate, base and specification digest
+  equal the values recomputed now. Missing, stale, ambiguous, partial, unstable or colliding means
+  not eligible; a partial or unstable report is no verdict, never a release yes or a release no.
+- Run the gate as its own step (`hoh merge-gate check`), read its output, write its receipt to a
+  fresh name (an existing receipt is never replaced). The receipt digest goes into the merge
+  message. Run `hoh merge-gate verify` on the receipt right before the merge, with `--candidate`
+  and `--base HEAD` naming the pair about to be merged: it refuses a report that changed, a base
+  that moved, or a receipt for another pair.
 - Acceptance is not merge: candidate creation, product acceptance, integration acceptance, merge
   authority and phase closure are five different things, held by different parties.
 

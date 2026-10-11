@@ -643,6 +643,16 @@ class _Base:
         #: until `register_role_scratch` runs: `build_dispatcher` does it, and a
         #: dispatcher built any other way (a test, `__new__`) makes no directory.
         self.role_scratch: dict[Role, Path] = {}
+        #: P2-42, role scratch in a registered root. A dispatcher built with
+        #: `defer_role_scratch` (a run of a registered project: `hoh run` passes it) makes no
+        #: role directory at build time. The controller binds the roles' directories into the
+        #: iteration's registered temporary workspace (`bind_role_scratch`) and takes them
+        #: out again when the iteration ends (`unbind_role_scratch`); outside that window a
+        #: deferred dispatcher has no scratch and `ensure_role_scratch` refuses -- it never
+        #: falls back to the arena root or to `/tmp`. `_role_scratch_base` is the directory
+        #: the role directories are children of (the arena root, or the bound workspace).
+        self.role_scratch_deferred: bool = False
+        self._role_scratch_base: "Path | None" = None
 
     def register_role_scratch(self) -> None:
         """Make each role's scratch directory under the run's arena root, **before
@@ -650,6 +660,27 @@ class _Base:
         raise `DispatchError` -- never fall back to `/tmp`. Idempotent: a resumed run
         finds its directories again."""
         self.role_scratch = _role_scratch_dirs(self.arenas_dir)
+        self._role_scratch_base = self.arenas_dir
+
+    def bind_role_scratch(self, workspace: "Path | str") -> None:
+        """Make each role's scratch directory a child of `workspace` -- the iteration's
+        registered temporary workspace (`EphemeralRoots.create`), which already exists and
+        is the creator's own -- or raise `DispatchError`. The directories are made and
+        checked (`_role_scratch_dirs`) here, before any dispatch of the iteration, and the
+        workspace itself is never made: a missing one is a refusal, not a new unregistered
+        directory. The roles' `TMPDIR` is then below a registered root, and so is
+        the directory above it (`$TMPDIR/..`)."""
+        base = Path(workspace)
+        self.role_scratch = _role_scratch_dirs(base, parents=False)
+        self._role_scratch_base = base
+
+    def unbind_role_scratch(self) -> None:
+        """The iteration's workspace is being released: no role has a scratch directory
+        until the next iteration binds one. A dispatcher that was not deferred keeps the
+        arena-root directories it registered at build time."""
+        if self.role_scratch_deferred:
+            self.role_scratch = {}
+            self._role_scratch_base = None
 
     def ensure_role_scratch(self, role: Role) -> None:
         """Make `role`'s scratch directory again if it is gone (`exist_ok`), or raise
@@ -658,15 +689,34 @@ class _Base:
         new child of the arena root. A pane whose `TMPDIR` names a missing directory
         makes Python fall back to `/tmp` -- the incident this change exists to prevent --
         so nothing may leave the directory missing at dispatch time. A no-op for a
-        dispatcher nobody registered (`role_scratch == {}`)."""
+        dispatcher nobody registered (`role_scratch == {}`) -- but not for a deferred one
+        (`role_scratch_deferred`): without a bound workspace it raises, and a bound one is
+        checked again in place (never re-made: `parents=False`)."""
+        if self.__dict__.get("role_scratch_deferred") and role not in self.__dict__.get("role_scratch", {}):
+            raise self._no_scratch(role)
         if role in self.__dict__.get("role_scratch", {}):
-            self.role_scratch.update(_role_scratch_dirs(self.arenas_dir, (role,)))
+            bound = self.__dict__.get("_role_scratch_base")
+            if bound is not None and bound != self.arenas_dir:
+                self.role_scratch.update(_role_scratch_dirs(bound, (role,), parents=False))
+            else:
+                self.role_scratch.update(_role_scratch_dirs(self.arenas_dir, (role,)))
 
     def _scratch_env(self, role: Role) -> dict[str, str]:
         """What `role_scratch_env` gives this role; empty for a dispatcher built
         without `__init__` (several tests do) that has registered no scratch."""
         scratch = self.__dict__.get("role_scratch", {}).get(role)
-        return role_scratch_env(scratch) if scratch else {}
+        if scratch:
+            return role_scratch_env(scratch)
+        if self.__dict__.get("role_scratch_deferred"):
+            raise self._no_scratch(role)
+        return {}
+
+    def _no_scratch(self, role: Role) -> DispatchError:
+        """The refusal of a deferred dispatcher that has no scratch directory bound for `role`."""
+        return DispatchError(
+            f"the {role.value} role has no scratch directory: this run keeps its roles' "
+            f"scratch in the iteration's registered temporary workspace and none is bound "
+            f"(nothing falls back to the arena root or to /tmp)")
 
     def _answer_path(self, role: Role, state: RunState) -> Path:
         return self.answers_dir / f"i{state.iteration}-a{state.attempt}-{role.value}.json"
@@ -939,7 +989,8 @@ def role_scratch_env(scratch: "Path | str") -> dict[str, str]:
     return {"TMPDIR": str(scratch)}
 
 
-def _role_scratch_dirs(arenas_dir: Path, roles: "tuple[Role, ...] | None" = None) -> "dict[Role, Path]":
+def _role_scratch_dirs(arenas_dir: Path, roles: "tuple[Role, ...] | None" = None, *,
+                       parents: bool = True) -> "dict[Role, Path]":
     """One scratch directory per role under the run's arena root, **made before any
     dispatch**: the witness compares the arena root's listing around a dispatch, so
     a directory created during the first one would be reported. Refuses (never
@@ -949,7 +1000,7 @@ def _role_scratch_dirs(arenas_dir: Path, roles: "tuple[Role, ...] | None" = None
     for role in (roles if roles is not None else tuple(Role)):
         directory = arenas_dir / f"{ROLE_SCRATCH_PREFIX}{role.value}"
         try:
-            directory.mkdir(mode=0o700, parents=True, exist_ok=True)
+            directory.mkdir(mode=0o700, parents=parents, exist_ok=True)
             info = os.lstat(directory)
         except OSError as exc:
             raise DispatchError(f"the scratch directory of the {role.value} role cannot be "
@@ -1125,8 +1176,52 @@ class HerdrDispatcher(_Base):
         name = f"h{digest}-{role.value}-{readable}"
         return "".join(c if (c.isalnum() or c == "-") else "-" for c in name)[:32]
 
+    def _require_current_scratch(self, role: Role, *, adopted: str | None = None) -> None:
+        """A pane keeps the environment it was opened with, and the roles' scratch of a
+        deferred dispatcher is a workspace that dies with its iteration. A pane that
+        outlives its iteration (`release_role` refused, or a pane kept for an approval and
+        adopted by name by the next process) would run with a `TMPDIR` that is gone, and Python
+        falls back to the shared `/tmp`. So for a deferred dispatcher a pane is used only if
+        it was opened by this process with exactly the directory bound for `role` now; an
+        adopted pane (`adopted` is its agent name) has an unknown environment and a released
+        workspace. Anything else is refused by `_refuse_pane`, which keeps the pane."""
+        if not self.__dict__.get("role_scratch_deferred"):
+            return
+        bound = self.__dict__.get("role_scratch", {}).get(role)
+        if adopted is not None:
+            pane = (self._adopted().get(adopted) or ("", ""))[1] or None
+            recorded = None
+        else:
+            pane = self._role_panes().get(role)
+            recorded = self._pane_tmpdirs().get(str(pane)) if pane else None
+        if bound is not None and recorded is not None and recorded == str(bound):
+            return
+        if bound is None:
+            self._refuse_pane(role, pane, str(self._no_scratch(role)))
+        what = ("an agent that an earlier process left in its pane (its environment is unknown)"
+                if adopted is not None else f"pane {pane}, opened with TMPDIR {recorded!r}")
+        self._refuse_pane(
+            role, pane,
+            f"the {role.value} role would run in {what}, not with the scratch of this "
+            f"iteration ({bound}): this run keeps the roles' scratch in the iteration's "
+            f"registered temporary workspace, which is released with the iteration, so that "
+            f"pane's TMPDIR is gone and its tools would fall back to /tmp. The pane is "
+            f"neither reused nor closed (it may hold an approval or work): inspect it and "
+            f"close it yourself, then run again.")
+
+    def _refuse_pane(self, role: Role, pane: str | None, message: str) -> None:
+        """Refuse a pane the way the dispatcher refuses any pane it cannot prove free: keep
+        it (`_kept`: refused by **every** close, `close_own` included, which would otherwise
+        re-take an earlier process's pane from the registry and close it with its turn) and
+        raise `PaneNotClean`, which `cli` treats by type as "the tabs stay open"."""
+        if pane:
+            self._kept()[pane] = message
+            self._record("kept", role=role.value, pane=pane, why=message)
+        raise PaneNotClean(message)
+
     def _ensure_agent(self, role: Role, state: RunState) -> str:
         if role in self.agents:
+            self._require_current_scratch(role)
             return self.agents[role]
 
         kind = self.profiles.get(role)
@@ -1172,6 +1267,10 @@ class HerdrDispatcher(_Base):
             # `/tmp/pytest-of-<user>`, and nothing here or in the controller notices. Only
             # the role prompt does: it tells the role to stop unless `$TMPDIR` names a
             # `.hoh-scratch-role-` directory it can write.
+            #
+            # A deferred dispatcher (a run of a registered project) refuses such a pane: its
+            # roles' scratch is the iteration's workspace and the pane's is a released one.
+            self._require_current_scratch(role, adopted=name)
             self.agents[role] = name
             self.endpoints[role] = restored
             self._unsettled()[name] = (RESTORED, 0.0, None)
@@ -1399,6 +1498,12 @@ class HerdrDispatcher(_Base):
         """pane -> the agent names HoH recorded for it (the role's, recorded
         **before** `agent start`, and a dead agent's)."""
         return self._lazy("_pane_agent_names", dict)
+
+    def _pane_tmpdirs(self) -> dict:
+        """pane -> the `TMPDIR` the pane was opened with (the env handed to Herdr, read
+        back at `_new_tab_pane`); a pane that is not in it (restored, adopted) has an
+        unknown one."""
+        return self._lazy("_pane_tmpdir_ids", dict)
 
     def _pane_dirs(self) -> dict:
         """pane -> the directory HoH made it in (or found it in, if adopted)."""
@@ -1704,6 +1809,7 @@ class HerdrDispatcher(_Base):
             self._stalls().pop(name, None)
         self._kept().pop(pane, None)
         self._pane_marks().pop(pane, None)
+        self._pane_tmpdirs().pop(pane, None)
         self._pane_dirs().pop(pane, None)
 
     # -- The role's processes ------------------------------------------------- #
@@ -1999,6 +2105,7 @@ class HerdrDispatcher(_Base):
             purpose="create tab")
         pane = surface.pane_id
         tab = surface.tab_id
+        self._pane_tmpdirs()[str(pane)] = env.get("TMPDIR")
         if tab:
             self.own_tabs.append(str(tab))
         time.sleep(2.0)   # the shell of the new tab needs a moment
@@ -3215,8 +3322,13 @@ def build_dispatcher(
     models: dict[Role, str] | None = None,
     efforts: dict[Role, str] | None = None,
     approval_policy=None,
+    defer_role_scratch: bool = False,
 ) -> _Base:
-    """Picks the adapter -- and says honestly when it is not the evidencing one."""
+    """Picks the adapter -- and says honestly when it is not the evidencing one.
+
+    `defer_role_scratch` (P2-42): make no role scratch directory in the arena root; the
+    controller binds them into the iteration's registered temporary workspace
+    (`bind_role_scratch`) and the dispatcher refuses to dispatch a role without one."""
     if prefer_herdr:
         if not herdr.available():
             raise DispatchError(
@@ -3231,12 +3343,22 @@ def build_dispatcher(
                             timeout_ms=timeout_ms, models=models, efforts=efforts,
                             registry=registry)
         d.approval_policy = approval_policy
-        d.register_role_scratch()
+        _scratch_of(d, defer_role_scratch)
         return d
     # The subprocess adapter counts in seconds, not in milliseconds.
     d = HarnessDispatcher(answers_dir=answers_dir, profiles=profiles, cwd=cwd,
                           timeout=max(1, timeout_ms // 1000),
                           models=models, efforts=efforts)
     d.approval_policy = approval_policy
-    d.register_role_scratch()
+    _scratch_of(d, defer_role_scratch)
     return d
+
+
+def _scratch_of(d: "_Base", deferred: bool) -> None:
+    """The role scratch of a freshly built dispatcher: made in the arena root (the runner's
+    sibling-scratch family, a run of no registered project) or deferred to the iteration's
+    registered workspace."""
+    if deferred:
+        d.role_scratch_deferred = True
+    else:
+        d.register_role_scratch()

@@ -170,6 +170,30 @@ def test_only_the_prerelease_section_of_the_notes_is_read_for_tags(tmp_path):
     assert dn.check_tags(tmp_path, rows_for_tags(), {"status": "x"}) == []
 
 
+def test_a_phrase_is_read_in_the_newest_section_only(tmp_path):
+    """The earlier pre-releases keep the figures of their own cut: their
+    "all MISSING" is history once the figure moved; the newest section's is
+    checked (the figure and tag checks still read every section)."""
+    older = ("# Release notes -- v1.0.0a1 (pre-release)\n\n42 `[V01]` 30 "
+             "`[V02]`; all MISSING `[V03]`\n")
+    newer = ("# Release notes -- v1.0.0a2 (pre-release)\n\n42 `[V01]` 30 "
+             "`[V02]`; {x} `[V03]`\n\n---\n\n")
+    tail = "\n# Release notes -- v0.1.0\n\nold text\n"
+    (tmp_path / "RELEASE_NOTES.md").write_text(
+        newer.format(x="reads") + older + tail, encoding="utf-8")
+    assert dn.check_tags(tmp_path, rows_for_tags(), {"status": "PROVEN"}) == []
+    (tmp_path / "RELEASE_NOTES.md").write_text(
+        newer.format(x="all MISSING") + older + tail, encoding="utf-8")
+    bad = dn.check_tags(tmp_path, rows_for_tags(), {"status": "PROVEN"})
+    assert len(bad) == 1 and "all MISSING" in bad[0]
+    (tmp_path / "RELEASE_NOTES.md").unlink()
+    (tmp_path / "CHANGELOG.md").write_text(
+        "<!-- BEGIN GENERATED: x -->\n## [2]\n\n42 `[V01]` 30 `[V02]` `[V03]`\n"
+        "<!-- END GENERATED: x -->\n\n<!-- BEGIN GENERATED: x -->\n## [1]\n\n"
+        "all MISSING `[V03]`\n<!-- END GENERATED: x -->\n", encoding="utf-8")
+    assert dn.check_tags(tmp_path, rows_for_tags(), {"status": "PROVEN"}) == []
+
+
 # --------------------------------------------------------------------------
 # the generated audit block
 # --------------------------------------------------------------------------
@@ -278,6 +302,40 @@ def test_the_product_run_merges_with_another_title_are_counted(repo):
     base = git(repo, "rev-parse", "HEAD")
     facts = dn.derive_git(repo, base)
     assert facts["merges"] == 4 and facts["merges_src"] == 4
+
+
+def test_the_product_run_merges_after_the_second_alpha_are_counted_by_title(repo):
+    """The product-run merges of the third alpha's period carry their own titles
+    (`Merge i3: ...`, `Merge i10a + i10af: ...`, `Merge leakids2: ...`); each is
+    counted, a records merge (`Merge O265 ...`, `Merge docs refresh ...`) and a
+    lookalike (`Merge i30: ...`) are not."""
+    titles = ("Merge p241s2: P2-41 closure slice 2",
+              "Merge p242w + p242wf: ephemeral temp roots wired",
+              "Merge i3: the merge gate as a product command",
+              "Merge i3b: guarded reads",
+              "Merge i10a + i10af: the operator's feature",
+              "Merge regproj+regprojf: new-target",
+              "Merge f06+f06f: rollover residue",
+              "Merge leakids2: the export's leak scan",
+              "Merge O265 (records, Revision 3.2): the sixteen merges",
+              "Merge docs refresh (O263): the public description",
+              "Merge i30: lookalike")
+    for i, title in enumerate(titles):
+        git(repo, "checkout", "-q", "-b", f"f{i}")
+        commit(repo, f"feature {i}", f"2026-10-{i + 1:02d}T10:00:00+0300",
+               {f"src/hoh/m{i}.py": "x = 1\n"})
+        git(repo, "checkout", "-q", "main")
+        git(repo, "merge", "--no-ff", "-q", f"f{i}", "-m", title)
+    base = git(repo, "rev-parse", "HEAD")
+    facts = dn.derive_git(repo, base)
+    assert facts["merges"] == 8 and facts["merges_src"] == 8
+
+
+def test_every_extra_merge_title_is_named_in_the_regeneration_command():
+    """The V01 row's command is built from the same tuple the derivation uses."""
+    rows = {r["tag"]: r for r in dn.build_rows(None)}
+    for title in dn.EXTRA_MERGE_TITLES:
+        assert f"--grep='{title}'" in rows["V01"]["regenerate"]
 
 
 def test_the_candidate_phrase_is_counted_only_inside_its_window(repo):
