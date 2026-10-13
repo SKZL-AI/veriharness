@@ -3616,6 +3616,308 @@
     "47261dd99e152b88cee660f91897aab9f90cfb6c"
    ],
    "why_not_the_product": "Fold 1 of the v0.3.0a3 release documentation on the orchestrator's decision: README line 16 names v0.3.0a3 as the current pre-release (the earlier value in parentheses), the a3 row of the status table and the dated update say the tag is cut from the merge of the package after its review, instead of 'prepared, not yet cut'; the claims of the edited lines re-anchored (seven entries, none added or removed) and CLAIMS.md rendered. Text only; src/ is byte-identical to f956b119. Written by a Sonnet 5.5 drafting session, not reviewed."
+  },
+  {
+   "id": "rel-a3-merge",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "41e4cd14381937e3edf6d984950002ab16b66344"
+   ],
+   "why_not_the_product": "The merge of the v0.3.0a3 release documentation branch (refs/imports/rel-a3 = cdd9cf72, a fast-forward of f956b119) after the release pair rela3rev-a (PUBLIC TRUTH) and rela3rev-b (MECHANICS) released it yes/yes with 0 BLOCKING and both gates (the orchestrator's script and the product's `hoh merge-gate check`) found MERGE_ELIGIBLE (receipt digests in the merge message); src/ byte-identical to the base. The MINORs of the two reports are folded by addition in ledger O266. Evidence in dogfood/release-review-v030a3/20261011T0510Z/."
+  },
+  {
+   "id": "export-sync-a3",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "1bc10bed7d0ebf098201fd294b9a930a075c0f42"
+   ],
+   "why_not_the_product": "The export-sync base recorded after the public export of v0.3.0a3 (tools/export_sync.py record --export-commit d98092cc under the operator's standing publish authority of 2026-10-09, confirmed for this export on 2026-10-11): the records file dogfood/export-sync/EXPORT_SYNC_STATE.json only; src/ untouched. Tool output, recorded in ledger O266."
+  },
+  {
+   "id": "o266-evidence",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "d2010d0b4693060b0ae1e98397d6f6dcb5bb1b25"
+   ],
+   "why_not_the_product": "O266 part 1: the evidence of the entry copied into the repository by build_evidence_o266.py (additions only under dogfood/): the durability freeze evidence taken on a git archive of e0d9bdff with its reboot across the operator's restart, the run directory of the live registered run leakids2 with its registry state and reviews, the v0.3.0a3 release reviews, and a redacted copy of the product's rotation logs of epochs 2 to 8. Records only, written by a Sonnet 5.5 drafting session; src/ and tools/ unchanged."
+  },
+  {
+   "id": "o266-records",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "7d439f6f6c6f9dfa0b109d289faf07ccaf15a0ec"
+   ],
+   "why_not_the_product": "The O266 records commit: the six durability probes re-pointed at the freeze evidence of e0d9bdff with the record re-derived (P2-11 and P2-33 to P2-37 PROVEN), P2-42's hold lifted on the first run of a registered project, notes by addition for P2-14, P2-20 and P2-35 on the six further product rotations and the recovery after the restart, the corrections of the third alpha's texts by addition (README, LIMITATIONS, RELEASE_NOTES and the generated CHANGELOG section, paper section 22), CLAIMS, EXPORT_MANIFEST, the derived documents and baselines regenerated offline, the evidence addendum of the seventh rotation, the ledger entry O266. Records only, written by a Sonnet 5.5 drafting session; src/ and tools/ unchanged. Ledger O266."
+  },
+  {
+   "id": "o266-addendum-1",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "cc79b2ae0415a7f466e0f9eefe38d43622450d1d"
+   ],
+   "why_not_the_product": "The O266 addendum 1 commit on the orchestrator's brief addendum (pre-mortem items PM10 and PM14): the P2-42 ruling and the three limits of the lifted hold, and the durability record's own statements (agent_execution, what, the undiscriminated checks and problem classes per scenario, the staleness rule, the drift NOT_RUN reason), quoted verbatim in the register notes by addition, with the derived documents regenerated offline and the attribution entry of the records commit. Records only, written by a Sonnet 5.5 drafting session; src/ and tools/ unchanged. Ledger O266, Revision 1."
+  },
+  {
+   "id": "o266-figures",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "e6f0ce1e5e1711ba522ec502d14b1483ca926a4c"
+   ],
+   "why_not_the_product": "The O266 Revision 1 commit: the figures of the moving present taken again at the addendum commit (paper/NUMBERS_V2.md and the audit block re-rendered), the dated sentences that carry them in README, LIMITATIONS and paper section 22 and erratum E15, the claims bound to the new lines and CLAIMS.md rendered, the attribution entry of the addendum commit, and ledger Revision 1 (addendum 1, controls, checks, closure preparation). Records only, written by a Sonnet 5.5 drafting session; src/ and tools/ unchanged. Ledger O266, Revision 1."
+  },
+  {
+   "id": "o266-attribution-of-figures",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "47efab8d3f166f021466518de34428113c50b8cb"
+   ],
+   "why_not_the_product": "The attribution entry of the O266 Revision 1 commit (dogfood/ATTRIBUTION.json only), written in the same records entry by a Sonnet 5.5 drafting session. Ledger O266."
+  },
+  {
+   "id": "rel030pre",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "0aa796be50a26d31c47bc29fa8bc1beae213e30a"
+   ],
+   "why_not_the_product": "The non-record change that precedes the P2 sealing commit (precondition 1 of the records procedure): pyproject.toml version 0.3.0, the edition heading of the numbers table in tools/docs_numbers.py, paper/NUMBERS_V2.md re-rendered at the base it records (heading line only), the one not-claim that binds that line re-anchored in CLAIMS.json and CLAIMS.md rendered, and the spec of the slice. Version metadata and a heading string; src/hoh is byte-identical to 9c487146. Written by a Sonnet 5.5 drafting session under the orchestrator's brief, not yet reviewed."
+  },
+  {
+   "id": "o266-correction",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "0b9b24e429324c2b12fcbc8d22613ab416332033"
+   ],
+   "why_not_the_product": "The last commit of the O266 records branch: the correction by addition of two figures (the export manifest's growth is +3,637 entries, not +3,626) and of a question number in the ledger entry O266, and the attribution entry of 47efab8d (dogfood/ATTRIBUTION.json). Records only (DOGFOOD_LEDGER.md and dogfood/ATTRIBUTION.json), written by a Sonnet 5.5 drafting session; src/ and tools/ unchanged. It was the commit the review pair o266rev-a and o266rev-b read and the branch tip merged by f99ec9fe, and it came after the entry that names the O266 commits through 47efab8d, so no entry named it. Ledger O266."
+  },
+  {
+   "id": "o266-merge",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "f99ec9fe444185eef0b49859e07c6d8dcb5dc7cc"
+   ],
+   "why_not_the_product": "The merge of the O266 records branch (refs/imports/o266 = 0b9b24e4, a fast-forward of 1bc10bed, six commits; src/, tests/ and tools/ byte-identical to the base) after the review pair o266rev-a (TRUTH) and o266rev-b (MECHANICS) released it yes/yes with 0 BLOCKING, COMPLETE, and both gates (the orchestrator's script and the product's `hoh merge-gate check`) found MERGE_ELIGIBLE (receipt digests in the merge message). Capability matrix PROVEN 63 -> 70, P2 blocking requirements 7 -> 0; P2 is not closed by this merge. Ledger O266."
+  },
+  {
+   "id": "p2inst-pin",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "2f224c8615235013c7ebd5a930538e7851f2a228"
+   ],
+   "why_not_the_product": "The spec-only pin of the p2inst run: a single commit that adds dogfood/p2inst/ (spec.md, spec sha256 31adf74e..., fix.diff, mutants.json, NOTES.md, QUESTIONS.md and DECISIONS.md) on f99ec9fe after the spec reviews (reviews and decisions: dogfood/p2inst/DECISIONS.md). The pin of a run is the orchestrator's act and carries the Co-Authored-By trailer."
+  },
+  {
+   "id": "p2board-pin",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "28cabfe3e29925c5735dcd3762e87a43b26e08d5"
+   ],
+   "why_not_the_product": "The spec-only pin of the p2board run: a single commit that adds dogfood/p2board/ (spec.md, spec sha256 17de4adf..., fix.diff, ROWS.md, NOTES.md, QUESTIONS.md and DECISIONS.md) on f99ec9fe after the spec reviews (reviews and decisions: dogfood/p2board/DECISIONS.md). The pin of a run is the orchestrator's act and carries the Co-Authored-By trailer."
+  },
+  {
+   "id": "p2inst",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "5c0144c1bc44c31a8b5222b566bedaf5911a2831",
+    "a00e32701465cd3fab607d2c15ee5fddbd5c08c7"
+   ],
+   "run_state": "dogfood/p2inst/20261012T0802Z/run-evidence/state.json",
+   "candidate_id": "20261012t0802z-p2inst-i1-a1",
+   "why_not_the_product": "The product made the two P2 instruments fail honestly (a probe's test half reads `collected` only when pytest collected it, a broken collection is NOT_DETERMINABLE; a later review resolves a finding only by naming the review that raised it; tools/capability_matrix.py, tools/programme_checklist.py, tools/programme_supervisor.py, tools/readiness.py and four test files; 8 files +1043/-39; src/hoh untouched) in run 20261012t0802z-p2inst from dogfood/p2inst/spec.md (accepted in iteration 1 after independent QA; import refs/imports/p2inst = 5c0144c1). The orchestrator wrote the spec, pinned it (2f224c86), imported the candidate, had two review agents review it (p2inst-a, ADVERSARIAL, and p2inst-b, MECHANICS; both RELEASE_YES, 0 BLOCKING, COMPLETE on 5c0144c1 / base f99ec9fe) and merged it (a00e3270) after both gates (the orchestrator's script and the product's `hoh merge-gate check`) found MERGE_ELIGIBLE (receipt digests in the merge message). Evidence in dogfood/p2inst/20261012T0802Z/ (the run directory minus attic/, locks, seals and the pre-run inventory, each listed in NOT_COPIED.txt). The review reports are not copied into this tree; the merge message carries the receipt digests. No DOGFOOD_LEDGER.md entry names this strand yet; the facts are the merge message and the pin's DECISIONS.md."
+  },
+  {
+   "id": "p2board",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "14dc99844c9f95d586573099e24e08648d47e25f",
+    "cdc4159ffcae43293d1b769212f1d3d049f931e2"
+   ],
+   "run_state": "dogfood/p2board/20261012T0828Z/run-evidence/state.json",
+   "candidate_id": "20261012t0828z-p2board-i1-a1",
+   "why_not_the_product": "The product made the lint, identifiers and tests rows of the readiness board green on the repository side and made docs_numbers tell the truth (the V10d row from the register, a met P2 gate from build_plan; 26 files +1451/-44; six private session-id digests join the shipped list) in run 20261012t0828z-p2board from dogfood/p2board/spec.md (accepted in iteration 1 after independent QA; import refs/imports/p2board = 14dc9984). The orchestrator pinned the spec (28cabfe3), imported the candidate and had two review agents review it: review B was RELEASE_NO with one BLOCKING finding (B1: the V10d rewrite orphaned the N-1205 anchor and tests/test_claims_anchors.py turned red). The orchestrator repaired that by a records-only commit (8aaaa156, entry p2board-repair) and the reviewers confirmed narrowly on 8aaaa156 / base a00e3270 (p2boardr-a and p2boardr-b, both RELEASE_YES, 0 BLOCKING, COMPLETE). The orchestrator merged the candidate and the repair (cdc4159f) after both gates (the orchestrator's script and the product's `hoh merge-gate check`) found MERGE_ELIGIBLE (receipt digests in the merge message). The candidate's recorded tree digest is that of 14dc9984; the merge carries the repair on top. Evidence in dogfood/p2board/20261012T0828Z/ (as for p2inst). The review reports are not copied into this tree; the merge message carries the receipt digests. No DOGFOOD_LEDGER.md entry names this strand yet; the facts are the merge message and the pin's DECISIONS.md."
+  },
+  {
+   "id": "p2succ2-pin",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "aadab0fc75dda714cb76f6576f9aec2d5be93795"
+   ],
+   "why_not_the_product": "The spec-only pin of the p2succ2 run: a single commit that adds dogfood/p2succ2/ (spec.md, spec sha256 92fd91d5..., Revision 4 with K1 deselecting the nine real-tree nodes that refuse in the git-less arena, fix.diff, RECORDS-PROCEDURE.md, NOTES.md, QUESTIONS.md and DECISIONS.md) on f99ec9fe after the spec reviews (reviews and decisions: dogfood/p2succ2/DECISIONS.md). The pin of a run is the orchestrator's act and carries the Co-Authored-By trailer."
+  },
+  {
+   "id": "p2succ2",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "b970d461fdc0a97c6e317720f8584e44c3eb9511"
+   ],
+   "run_state": "dogfood/p2succ2/20261012T0914Z/run-evidence/state.json",
+   "candidate_id": "20261012t0914z-p2succ2-i1-a1",
+   "why_not_the_product": "The product bound the succession capsule to the P2 exit (tools/succession.py, tools/build_plan.py and tests; 6 files +1545/-93; nothing under src/) in run 20261012t0914z-p2succ2 from dogfood/p2succ2/spec.md (accepted in iteration 1 after independent QA; import refs/imports/p2succ2 = b970d461). This candidate was not merged on its own: the integration pair read RELEASE_NO/RELEASE_NO with the same BLOCKING finding proven independently (a symbolic internal_commit such as HEAD never drifts, so a committed capsule defeated the gate). The repair is the run p2succ2f (entry p2succ2f), stacked on this candidate, and the merge a2fc3eb7 brought both in; it is claimed by the entry p2succ2f, and this entry claims the candidate commit only. Evidence in dogfood/p2succ2/20261012T0914Z/ (as for p2inst). The review reports are not copied into this tree; the merge message carries the receipt digests. No DOGFOOD_LEDGER.md entry names this strand yet; the facts are the merge message and the pin's DECISIONS.md."
+  },
+  {
+   "id": "p2board-repair",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "8aaaa156a20f3afe7a1770f5c13e87c3b8f3b548"
+   ],
+   "why_not_the_product": "The records-only repair on top of the accepted p2board candidate 14dc9984: CLAIMS.json not_claim N-1205 re-anchored at the rewritten paper/NUMBERS_V2.md line 33 (the old text and digest stay verbatim in a dated correction note, correction by addition) and the CLAIMS.md row re-rendered; no other file. Written by the orchestrator's session after integration review B found the defect (B1, RELEASE_NO); merged by cdc4159f with the candidate (entry p2board)."
+  },
+  {
+   "id": "p2succ2f-pin",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "0b1655b1d5fe47953b528c30cb046baffcf39c5c"
+   ],
+   "why_not_the_product": "The spec-only pin of the p2succ2f run, the repair of the p2succ2 integration finding found by both reviewers: a single commit that adds dogfood/p2succ2f/ (spec.md, spec sha256 80791fe8..., fix.diff, NOTES.md, QUESTIONS.md and DECISIONS.md) on the accepted p2succ2 candidate b970d461 after the narrow spec check by the reviewers who found the defect (p2succ2f-spec-a and -b, RELEASE_YES, 0 BLOCKING). The pin of a run is the orchestrator's act and carries the Co-Authored-By trailer."
+  },
+  {
+   "id": "p2succ2f",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "c119307f67c75c28bd99437706accb33a3f71beb",
+    "a2fc3eb7637f8bad86b902201fa9faaf4a5542bd"
+   ],
+   "run_state": "dogfood/p2succ2f/20261012T1144Z/run-evidence/state.json",
+   "candidate_id": "20261012t1144z-p2succ2f-i1-a1",
+   "why_not_the_product": "The product made internal_commit of the succession capsule one full commit id that resolves to itself (tags peeled; tree, blob, short, padded and upper-case refused), made the gate read the plan root from the environment only and fail closed on a non-str recorded plan root, and made the write refuse a HEAD that is not a full commit id, in run 20261012t1144z-p2succ2f from dogfood/p2succ2f/spec.md (accepted in iteration 1 after independent QA; import refs/imports/p2succ2f = c119307f; the candidate delta is patch-id identical to the reviewed fix.diff). The orchestrator merged it with the p2succ2 candidate it stacks on (a2fc3eb7: 17 files +5080/-100 over cdc4159f; nothing under src/ or ops/) after the narrow integration confirmations on the merged tree 9ec8839a (p2succ2f-a and p2succ2f-b, both RELEASE_YES, 0 BLOCKING, COMPLETE) and both gates (the orchestrator's script and the product's `hoh merge-gate check`) found MERGE_ELIGIBLE (receipt digests in the merge message). Evidence in dogfood/p2succ2f/20261012T1144Z/ (as for p2inst). The review reports are not copied into this tree; the merge message carries the receipt digests. No DOGFOOD_LEDGER.md entry names this strand yet; the facts are the merge message and the pin's DECISIONS.md."
+  },
+  {
+   "id": "frontier3-pin",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "538075d34043d1d454b7a67416566d148a79885e"
+   ],
+   "why_not_the_product": "The spec-only pin of the frontier3 run: a single commit that adds dogfood/frontier3/ (spec.md, spec sha256 a505ec7f..., fix.diff, NOTES.md, QUESTIONS.md and DECISIONS.md) on a2fc3eb7 after the spec pair frontier3spec-a and -b (RELEASE_YES, 0 BLOCKING; MINORs folded without a round). The pin of a run is the orchestrator's act and carries the Co-Authored-By trailer."
+  },
+  {
+   "id": "frontier3",
+   "category": "VERIHARNESS_RUN_ORCHESTRATOR_MERGED",
+   "is_development_node": true,
+   "commits": [
+    "395b4800a40836e6998012e3d9602d8997c7f8c9",
+    "9c4871466b0442624f377b6ed572ca899e4d6c0c"
+   ],
+   "run_state": "dogfood/frontier3/20261012T1242Z/run-evidence/state.json",
+   "candidate_id": "20261012t1242z-frontier3-i1-a1",
+   "why_not_the_product": "The product re-stated the three P2 state tests for the post-O266 truth (capability coverage closed, the P2 gate still shut and held only by the named exit conditions of tools/build_plan.py; tests/test_programme_supervisor.py, tests/test_programme_checklist.py and tests/test_ephemeral_wiring.py, one node added; tests only, 11 files +3507/-24 including the pin directory and three .archiv/ copies of the pre-change test files) in run 20261012t1242z-frontier3 from dogfood/frontier3/spec.md (accepted in iteration 1 after independent QA; import refs/imports/frontier3 = 395b4800; the tests/ delta is patch-id identical to the reviewed fix.diff). The orchestrator merged it (9c487146) after the integration pair on the merged tree 831c4895 (frontier3-a and frontier3-b, both RELEASE_YES, 0 BLOCKING, COMPLETE) and both gates (the orchestrator's script and the product's `hoh merge-gate check`) found MERGE_ELIGIBLE (receipt digests in the merge message). Evidence in dogfood/frontier3/20261012T1242Z/ (as for p2inst). The review reports are not copied into this tree; the merge message carries the receipt digests. No DOGFOOD_LEDGER.md entry names this strand yet; the facts are the merge message and the pin's DECISIONS.md."
+  },
+  {
+   "id": "rel030pre-merge",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "9dacb6c553fa75de71f51f0a7a4ec1ae9fe77d48"
+   ],
+   "why_not_the_product": "The merge of the rel030pre branch (refs/imports/rel030pre = 379b403c, two commits on 9c487146: 0aa796be, entry rel030pre, and 379b403c, the ledger entry of 0aa796be only, as for rel-a3) after the integration pair rel030pre-rev-a (adversarial against spec and procedure) and rel030pre-rev-b (integration and closure window) released it yes/yes with 0 BLOCKING, COMPLETE, and both gates (the orchestrator's script and the product's `hoh merge-gate check`) found MERGE_ELIGIBLE (receipt digests in the merge message). Correction by addition: the entry rel030pre says its commit was 'not yet reviewed'; this pair is the review, on the merged candidate, and the entry is left as written. src/ untouched. The MINORs of the pair that belong to records (precedent wording of dogfood/rel030pre/spec.md, the 0.3.0a3 names in the release documents until the tag) are folded at the sealing commit S, not here."
+  },
+  {
+   "id": "attr030",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": false,
+   "commits": [
+    "35409521e29250375c467ff04288286163f2c1a1"
+   ],
+   "why_not_the_product": "The attribution and run-evidence records commit that lands before the P2 sealing commit S (dogfood/attr030/spec.md): fourteen entries by addition for the commits 0b9b24e4 to 9dacb6c5 (entries o266-correction to rel030pre-merge) and the run evidence of the five product runs p2inst, p2board, p2succ2, p2succ2f and frontier3 copied as dogfood/rlname/20261011T0026Z/run-evidence/ was (run directory minus attic/, locks, seals.jsonl and approval/integrity-before.json, each listed in NOT_COPIED.txt; their review reports and briefs are not copied). Additions only under dogfood/; src/, tools/ and tests/ unchanged. Written by a Sonnet 5.5 drafting session under the orchestrator's brief, not yet reviewed. This entry is written in the ledger-only commit that follows it, because an entry cannot name its own commit; that commit changes this ledger and nothing else."
+  },
+  {
+   "id": "attr030-merge",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "8ad54273837813ded3f00198fb83175a1ebf1627"
+   ],
+   "why_not_the_product": "The merge of the attr030 branch (refs/imports/attr030 = c2e949e2, two commits on 9dacb6c5: 35409521, entry attr030, and c2e949e2, the ledger entry of 35409521 only, as for rel030pre) after the integration pair attr030-rev-a (adversarial against the attribution and the byte-identity of the run evidence) and attr030-rev-b (records window, data-file rule, leaks, manifest) released it yes/yes with 0 BLOCKING, COMPLETE, and both gates (the product's `hoh merge-gate check` and the orchestrator's script) found MERGE_ELIGIBLE (receipt digests in the merge message). src/ untouched; 447 files, all under dogfood/. tools/attribution.py tolerated this merge only while it was the tip; this entry, written by the sfolds strand before the P2 sealing commit, names it. The MINORs of the pair that belong to records are folded in the sfolds commit (ledger O267)."
+  },
+  {
+   "id": "sfolds",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": false,
+   "commits": [
+    "8084afb7fbe407242e2970671762547ee9995aa9"
+   ],
+   "why_not_the_product": "The records folds that land before the P2 sealing commit S (dogfood/sfolds/spec.md; ledger O267): the review minors of O266, rel030pre and attr030 folded by addition (the README rotation count; three superseded rows of docs/LIMITATIONS.md pointed at the O266 section, the claim C-568 and three not-claims re-anchored; the rel030pre precedent wording; the timers.json line of five NOT_COPIED.txt files), the P2-07 register decision and the P2-28 reading recorded as probe notes and the P2-42 hold wording completed (program/v3_3/REQUIREMENTS.json, prefix-preserving additions, the one non-record path), six dogfood/p2inst documents classified EXCLUDE in EXPORT_MANIFEST.json ahead of the orchestrator's derivation, and the obligations that must stand before S written in the ledger. Hand-written text; src/, tools/ and tests/ unchanged; no generator run. Written by a Fable drafting session under the orchestrator's brief; the strand's integration pair and the merge gate's receipt are named in the merge message of this branch. Corrections by addition to earlier entries, which stay as written: the entry p2board quotes '26 files +1451/-44' from the merge message, which counts the orchestrator's six-file pin 28cabfe3 (+1101) with the candidate; the product's own work is 20 files +350/-44 (git diff --shortstat 28cabfe3 14dc9984). The entries rel030pre and attr030 say 'not yet reviewed'; the pairs rel030pre-rev-a/-b and attr030-rev-a/-b reviewed the merged candidates (yes/yes, 0 BLOCKING) before the merges 9dacb6c5 and 8ad54273. The entry attr030 is kept at is_development_node false, as this one is: both copy evidence or write records and attribution text and develop nothing of the product (the precedents attribution-ledger and canary-a7-evidence are read the same way); the entry o266-correction reads true because it belongs to the O266 records work that lifted seven rows. This entry is written in the ledger-only commit that follows the folds commit, because an entry cannot name its own commit; that commit also names the merge 8ad54273 (entry attr030-merge)."
+  },
+  {
+   "id": "sfolds-merge",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": true,
+   "commits": [
+    "bcd75cb7ecb1aa420e9d98591bafc4a7d7ca1d7d"
+   ],
+   "why_not_the_product": "The merge of the sfolds branch (refs/imports/sfolds = eaad84ee, two commits on 8ad54273: 8084afb7, entry sfolds, and eaad84ee, the attribution entries attr030-merge and sfolds) after the integration pair sfolds-rev-a (folds faithful, by addition, P2-07 contents) and sfolds-rev-b (records window, register readers, manifest, ledger) released it yes/yes with 0 BLOCKING, COMPLETE, and both gates (the product's `hoh merge-gate check` and the orchestrator's script) found MERGE_ELIGIBLE (receipt digests in the merge message). Record paths and the register only; src/, tools/, tests/ untouched. tools/attribution.py tolerated this merge only while it was the tip; this entry, written at the P2 sealing commit S, names it."
+  },
+  {
+   "id": "p2-closure-R",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": false,
+   "commits": [
+    "204905be25febc470539733290cef825481f9caf"
+   ],
+   "why_not_the_product": "Commit R of the v0.3.0 closure (RECORDS-PROCEDURE steps 2-3, PREMORTEM step 3), made by the orchestrator in the real repository: tools/export_manifest.py derive, two claim_surface_exclusions for newly exported test paths (O258-O266 precedent), tools/regenerate.py to a fixpoint (4 passes), the checklist snapshot. Generated records only, written by the programme's own tools; no hand-written product change, so not a development node. The independent supervisor review 20261013T093422Z-S was made on a read-only worktree of this commit."
+  },
+  {
+   "id": "p2-closure-S",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": false,
+   "commits": [
+    "c4dc643d2c23710e631f6624cc522eecf03badbd"
+   ],
+   "why_not_the_product": "The P2 sealing commit S (RECORDS-PROCEDURE steps 4-6): the independent supervisor review 20261013T093422Z-S preserved and recorded (complete), the board regenerated to a fixpoint, the attribution entries sfolds-merge and p2-closure-R, and the ledger O267 section 8. Records written by the programme's tools and the orchestrator's ledger text; no product change."
+  },
+  {
+   "id": "p2-closure-C",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": false,
+   "commits": [
+    "642a4fa95844e8fca73f11270f1a40cfd74bd187"
+   ],
+   "why_not_the_product": "The succession capsule for S, committed alone (RECORDS-PROCEDURE steps 7-9): tools/succession.py write at a clean tree (internal_commit S, internal_tree_clean true, board reference R); tools/succession.py verify VERIFIED at C."
+  },
+  {
+   "id": "p2-closure-X",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": false,
+   "commits": [
+    "d3791470af3ffcd96a9c19300d66243c7d0fdd11"
+   ],
+   "why_not_the_product": "The P2 closure record, commit X of amendment A7 (DOGFOOD_LEDGER.md O268, the README/LIMITATIONS/paper sentences, dogfood/p2closex/): drafted by a Fable session in the release clone under the orchestrator's brief, pair-reviewed (p2closex-rev-a/-b, round 2 on the amended candidate after the orchestrator's full suite found one u2b defect), both merge gates MERGE_ELIGIBLE, fast-forwarded so that X stays a plain records commit. Records only; no product change."
+  },
+  {
+   "id": "p2-closure-X1",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": false,
+   "commits": [
+    "f78d1cb9edab95efeba5f8ae3f10edaecb58ebb0"
+   ],
+   "why_not_the_product": "The figures commit after the closure record X of P2 (RECORDS-PROCEDURE steps 13-15): tools/regenerate.py at X (the board measured at X, the DAG, the matrix and the checklist re-rendered), the ledger addendum under O268 with the two measurements of step 12, and the attribution entry for X; made by the orchestrator in the real repository. Generated records and the orchestrator's ledger text; no product change, so not a development node. Entered by the v0.3.0 release documents, the first commit after it (an entry cannot name its own commit; the tip is tolerated only while it is the tip)."
+  },
+  {
+   "id": "rel030-docs",
+   "category": "MAIN_ORCHESTRATOR_DIRECT",
+   "is_development_node": false,
+   "commits": [
+    "38a7682cf7958d791ce3bb7cd87f41638c971795"
+   ],
+   "why_not_the_product": "The release documents of v0.3.0 (RECORDS-PROCEDURE step 16; dogfood/rel030/spec.md): CITATION.cff 0.3.0 with the date of the tag, the v0.3.0 section of RELEASE_NOTES.md, the CHANGELOG.md section generated from it, .github/releases/v0.3.0.json, the figures taken again at the base (paper/NUMBERS_V2.md, paper/AUDIT_V2.md and the dated additions that carry them in README.md, docs/LIMITATIONS.md, paper/POSITION_PAPER_V2.md and paper/POSITION_PAPER.md), the claims bound and re-anchored with CLAIMS.md rendered, EXPORT_MANIFEST.json re-derived, and the attribution entry of the figures commit before it. Record paths only; src/, tools/, tests/ and pyproject.toml untouched. Written by a Fable drafting session (the operator chose Fable for the last P2 gates) offline in the orchestrator's release clone; reviewed by the integration pair before its merge (the review is the next act)."
   }
  ]
 }

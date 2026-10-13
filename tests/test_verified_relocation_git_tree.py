@@ -19,7 +19,10 @@ from pathlib import Path
 import hoh.verified_relocation as vr
 from hoh import storage_tiers as st
 from test_storage_registry_legacy import binding
-from test_storage_tiers import PROJECT, World, git, isolated_env, w  # noqa: F401  (fixtures)
+from test_storage_tiers import PROJECT, World, git, isolated_env  # noqa: F401  (fixtures)
+from test_storage_tiers import w as w  # a fixture, found by pytest by name; the alias form is an explicit re-export, so
+# a test parameter named `w` is not a redefinition of an unused import (F811)
+
 from test_verified_relocation import by_path, hook, plan_exec, retain_refs
 
 

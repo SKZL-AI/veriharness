@@ -1,6 +1,6 @@
 [project]
 name = "hoh"
-version = "0.3.0a3"
+version = "0.3.0"
 description = "VeriHarness — an evidence-bound Harness-of-Harness for verifiable long-horizon agent development. hoh is the package, module, and CLI that implement the Harness-of-Harness pattern; VeriHarness is the project built on it."
 requires-python = ">=3.11"
 # SPDX expression only. The captain decided MIT for this project (see

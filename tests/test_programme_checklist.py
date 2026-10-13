@@ -121,26 +121,117 @@ def test_this_programmes_own_gates_agree_with_the_independently_built_plan():
     matrix: `tools/build_plan.py` derives the phase gates from the capability
     matrix directly, and this binding derives them through the product's
     reconciler. They must agree about P1 and P2, or one of them is wrong.
+
+    Re-stated 2026-10-12 (strand frontier3). Until the O266 records merge the agreement
+    was "P1 closed, P2 not" in both views ("P2 is the open frontier"); O266 recorded
+    every P2 row PROVEN. The agreement now is: the reconciler closes P2 on its
+    capability items (every blocking item VERIFIED, from a matrix with every P2 row
+    PROVEN), and `build_plan` still reads P2's exit **unmet** -- not through a
+    requirement-bound condition (there is none left) nor through one nothing measures,
+    but only through the exit conditions its instruments measure (`CHECKLIST_GATE_ITEMS`:
+    the supervisor review, ChecklistFsck and, once bound, the succession capsule). A
+    verdict that reads P2 met before the closure sequence is a false green; a reconciler
+    that holds P2 open on a capability item contradicts the matrix.
     """
     if not pc.REGISTER.is_file() or not pc.MATRIX.is_file():
         pytest.skip("the register and matrix are internal")
-    items, evidence = pc.build(
-        json.loads(pc.REGISTER.read_text(encoding="utf-8")),
-        json.loads(pc.MATRIX.read_text(encoding="utf-8")))
+    register_body = json.loads(pc.REGISTER.read_text(encoding="utf-8"))
+    matrix_body = json.loads(pc.MATRIX.read_text(encoding="utf-8"))
+    items, evidence = pc.build(register_body, matrix_body)
     snapshot = reconcile(items, evidence=evidence, generation=1)
     p1 = phase_gate(snapshot, "P1", evidence=evidence)
     p2 = phase_gate(snapshot, "P2", evidence=evidence)
     assert p1.closed, [b.item_id for b in p1.blockers]
-    assert not p2.closed, "P2 is the open frontier; a closed verdict here is a false green"
+    assert p2.closed and p2.blockers == [], [b.item_id for b in p2.blockers]
+    assert p2.derived_from_evidence
 
-    # The other view: every P1 requirement measured PROVEN, and some P2 one not.
-    measured = {c["id"]: c["status"]
-                for c in json.loads(pc.MATRIX.read_text(encoding="utf-8"))["capabilities"]}
-    register = json.loads(pc.REGISTER.read_text(encoding="utf-8"))["requirements"]
+    # The matrix behind both views: every P1 and every P2 requirement measured PROVEN.
+    measured = {c["id"]: c["status"] for c in matrix_body["capabilities"]}
+    register = register_body["requirements"]
     p1_ids = [r["id"] for r in register if r["target_phase"] == "P1"]
     assert all(measured.get(i) == "PROVEN" for i in p1_ids)
     p2_ids = [r["id"] for r in register if r["target_phase"] == "P2"]
-    assert any(measured.get(i) != "PROVEN" for i in p2_ids)
+    assert all(measured.get(i) == "PROVEN" for i in p2_ids), \
+        [i for i in p2_ids if measured.get(i) != "PROVEN"]
+
+    # The other view, from the same matrix and the programme inventory: P2's exit is
+    # not met, and only its instrument-measured conditions hold it.
+    bp = pc._build_plan()
+    _order, gates = bp.phase_gates(matrix_body["capabilities"], register)
+    assert "P2" in gates, sorted(gates)
+    met, why = gates["P2"]
+    assert met is False, why
+    assert "bound to requirement(s) not PROVEN" not in why, why
+    assert "nothing here measures yet" not in why, why
+    assert "measured by the checklist instruments and unmet" in why, why
+
+    # And this binding says the same about itself: its verdict does not evaluate those
+    # conditions, every P2 condition it leaves unbound is one the instruments measure,
+    # and none is held only through a non-blocking requirement.
+    scope, why_not = pc._programme_scope()
+    assert scope is not None, why_not
+    exits = pc.phase_exit(scope, register_body, matrix_body)["P2"]
+    assert exits["unbound"] and set(exits["unbound"]) <= set(bp.CHECKLIST_GATE_ITEMS)
+    assert exits["not_held"] == []
+    assert "measured by the checklist instruments of tools/build_plan.py" in \
+        pc._exit_note({"P2": exits}, "P2", "")
+
+
+def test_the_p2_exit_is_held_by_the_instruments_and_each_unmet_one_is_named():
+    """Re-stated 2026-10-12 (strand frontier3). The post-O266 gate, per instrument: the checklist
+    items are met (every blocking P2 item VERIFIED), the supervisor review and
+    ChecklistFsck are not (the preserved reviews leave release-blocking findings open and
+    the review on record is stale against this snapshot), and every further kind
+    `CHECKLIST_GATE_ITEMS` maps an item to (the succession capsule, once that strand is
+    merged) is unmet as well. The gate line names each unmet instrument by its label and
+    does not name a met one, so a closure that meets one condition cannot pass as meeting
+    all. Reasons are not pinned: the review's and the capsule's reasons depend on the
+    tree (a git-less copy has no committed capsule), the verdicts do not."""
+    if not pc.REGISTER.is_file() or not pc.MATRIX.is_file():
+        pytest.skip("the register and matrix are internal")
+    bp = pc._build_plan()
+    kinds = set(bp.CHECKLIST_GATE_ITEMS.values())
+    assert {"items", "review", "fsck"} <= kinds
+    answers = bp.checklist_gate_measures()
+    assert answers["items"][0] is True, answers["items"]
+    assert answers["review"][0] is False, answers["review"]
+    assert answers["fsck"][0] is False, answers["fsck"]
+    register_body = json.loads(pc.REGISTER.read_text(encoding="utf-8"))
+    matrix_body = json.loads(pc.MATRIX.read_text(encoding="utf-8"))
+    _order, gates = bp.phase_gates(matrix_body["capabilities"], register_body["requirements"])
+    met, why = gates["P2"]
+    assert met is False, why
+    labels = bp._GATE_LABELS
+    for kind in sorted(kinds - {"items"}):
+        assert f"{labels[kind]}: " in why, (kind, why)
+    assert f"{labels['items']}: " not in why, why
+
+    # Each unmet instrument alone holds the gate, and with every instrument answering met
+    # nothing else does -- P2's exit then reads met. Capability coverage is closed; the
+    # instruments are all that stands between this tree and the closure sequence.
+    import inspect
+    takes_succession = ("succession_measures"
+                        in inspect.signature(bp.phase_gates).parameters)
+    assert takes_succession == ("succession" in kinds), sorted(kinds)
+
+    def gate_with(unmet):
+        answers = {k: (k not in unmet, f"answered for the test: {k}")
+                   for k in ("items", "review", "fsck")}
+        extra = {}
+        if takes_succession:
+            extra["succession_measures"] = lambda: ("succession" not in unmet,
+                                                    "answered for the test: succession")
+        _o, g = bp.phase_gates(matrix_body["capabilities"], register_body["requirements"],
+                               checklist_measures=lambda: answers, **extra)
+        return g["P2"]
+
+    assert gate_with(set())[0] is True, gate_with(set())
+    for kind in sorted(kinds):
+        met_k, why_k = gate_with({kind})
+        assert met_k is False, (kind, why_k)
+        assert f"{labels[kind]}: answered for the test: {kind}" in why_k, (kind, why_k)
+        for other in kinds - {kind}:
+            assert f"{labels[other]}: " not in why_k, (kind, other, why_k)
 
 
 def test_the_written_snapshot_carries_its_seal_and_the_gate_mode(tmp_path):
@@ -461,3 +552,53 @@ def test_a_review_root_outside_the_repository_is_not_read(tmp_path, monkeypatch,
     _foreign_review(inside / "dogfood/p2-gate")
     monkeypatch.setattr(pc, "HOH", inside)
     assert pc._preserved_release_blocking_findings() == ["F-FOREIGN"]
+
+
+def test_the_checklist_gate_items_are_named_as_measured_elsewhere_not_as_unbound(
+        tmp_path, monkeypatch, capsys):
+    """PM6. At zero blockers the verdict printed "phase exit not evaluated (3 gate
+    condition(s) bound to no requirement)" for P2's checklist-gate items, which no
+    requirement claims *on purpose* and `tools/build_plan.py` measures
+    (`CHECKLIST_GATE_ITEMS`). They are still not covered by this verdict, and the line
+    says where they are measured. An ordinary unclaimed item beside them is still
+    "bound to no requirement"; the snapshot's `phase_exit` is unchanged. The number of
+    items is read from `CHECKLIST_GATE_ITEMS`, not written here: another strand adds an
+    entry to it."""
+    ids = sorted(pc._build_plan().CHECKLIST_GATE_ITEMS)
+    n = len(ids)
+    assert n >= 3
+    rc, out, snap = _run_over(tmp_path, monkeypatch, capsys, _register(),
+                              _matrix("PROVEN", "PROVEN"),
+                              _gate_scope(*((i, "PX") for i in ids)))
+    assert rc == 0
+    assert ("  PX: capability coverage closed; phase exit not evaluated "
+            f"({n} gate condition(s) measured by the checklist instruments of "
+            "tools/build_plan.py, not by this verdict)") in out, out
+    assert "bound to no requirement" not in out
+    assert snap["phase_exit"]["PX"]["evaluated"] is False
+    assert snap["phase_exit"]["PX"]["unbound"] == ids
+
+    rc, out, snap = _run_over(tmp_path, monkeypatch, capsys, _register(),
+                              _matrix("PROVEN", "PROVEN"),
+                              _gate_scope(("PX.gate", "PX"), *((i, "PX") for i in ids)),
+                              name="mixed")
+    assert (f"(1 gate condition(s) bound to no requirement, {n} gate condition(s) measured "
+            "by the checklist instruments of tools/build_plan.py, not by this verdict)"
+            ) in out, out
+
+
+def test_an_unreadable_build_plan_leaves_the_note_as_it_was(tmp_path, monkeypatch, capsys):
+    """The instruments are looked up through `_build_plan()`; when that module cannot be
+    loaded the lookup reads as the empty set and every unclaimed gate item is "bound to no
+    requirement" again -- the old note, never a traceback and never a claim that something
+    is measured elsewhere."""
+    def unreadable():
+        raise OSError("build_plan.py is not readable")
+
+    exits = {"PX": {"unbound": ["P2.checklist-gate.checklistfsck-pass"], "bound": [],
+                    "not_held": []}}
+    note = pc._exit_note(exits, "PX", "")
+    assert "measured by the checklist instruments" in note       # the control, loaded
+    monkeypatch.setattr(pc, "_build_plan", unreadable)
+    assert pc._exit_note(exits, "PX", "") == (
+        "; phase exit not evaluated (1 gate condition(s) bound to no requirement)")

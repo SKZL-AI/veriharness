@@ -1040,6 +1040,9 @@ BULK: dict[str, str] = {
 #: Where one German word is two English ones. Keyed by repository-relative
 #: path; merged over DEFAULT for that file only.
 OVERRIDES: dict[str, dict[str, str]] = {
+    # `basis` is in the vocabulary (German Basis -> baseline); this field is the English
+    # word ("the basis of the run id") and is pinned to itself, which `remaining` honours.
+    "src/hoh/storage_account.py": {"run_id_basis": "run_id_basis"},
     "tools/attribution.py": {"zeile": "line", "zeilen": "lines"},
     "tools/succession.py": {"zeile": "row", "zeilen": "rows"},
     "src/hoh/sandbox.py": {"zeile": "line", "zeilen": "lines"},
@@ -1429,6 +1432,7 @@ rawdescriptionhelpformatter deque queries query querying queried
 scheduled reschedule rescheduled unscheduled
 squeeze squeezed squeezes ambiguouschain
 discharge discharged discharges discharging dischargeable undischarged
+setupfailed residue glued asserttrue echoed
 """.split())
 
 

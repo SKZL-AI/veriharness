@@ -13,13 +13,47 @@ done. `docs/EVIDENCE_MODEL.md` makes the full case for why that distinction
 matters; this file is the map of the rest.
 
 **State on 2026-10-09 (added; the opening paragraph above is unchanged).** The latest stable release is `v0.1.0`. The
-current pre-release is `v0.3.0a3` (it was `v0.3.0a2` on 2026-10-09), an alpha and a research preview, installed from the tagged
+current pre-release is `v0.3.0a3` (it was `v0.3.0a2` on 2026-10-09; superseded on 2026-10-13 by the release `v0.3.0`, see the row *Release* below and *State on 2026-10-13, release documents*), an alpha and a research preview, installed from the tagged
 source and not published to PyPI. The development line (phase P2) is in progress: 34 of its 43 registered requirements read PROVEN `[V10c]` `[V10b]`,
 and 9 blocking items of its gate are open `[V12]`. The line has been developed under its own orchestration since
 2026-09-07, with 69 product-run merges since 2026-09-25 `[V01]`, by an agent-orchestrated loop that an operator directs
 and that stopped several times, over 32 days 15 hours `[V46]`; the account, the figures and the interruptions are under
 *Duration, autonomy and scale of the build* below, and the parts and their states are under *The parts, and what each
 has and has not shown*.
+
+**State on 2026-10-13 (added; the paragraphs above are unchanged).** Phase P2 is closed at the commit of the records entry O268 of `DOGFOOD_LEDGER.md`,
+the closure record that amendment A7 (the phase-closure amendment of the production line, pinned by digest in the programme's amendments file) names. That record names the sealing commit `c4dc643d`, the
+succession capsule committed alone at `642a4fa9`, the independent supervisor review `20261013T093422Z-S` (a separate session on a read-only worktree; every
+finding it inherited answered NO_ACTION, none blocking, the review complete), the checklist snapshot by its seal, the committed capability matrix by its digest
+with every requirement of P2 PROVEN, and the durability evidence taken on `e0d9bdff` with an empty diff of the relevant source paths since. The closure is a
+statement about that commit and about nothing later: a later change to the source creates regression obligations under A7 (the eight-minute durability run at
+every records and release checkpoint, the reboot evidence at release checkpoints), not a re-opened phase, and an obligation that fails re-opens P2 by a records
+entry. The limits of the evidence stand as `docs/LIMITATIONS.md` states them: one restart of a virtual machine on one host with fixture role runs, the checks of
+the reboot scenario undiscriminated by any negative control, the approval-resume of a registered run not exercised. The readiness board still reads
+`TECHNICALLY_STABLE_READY = no`: a closed phase is not a stable release. The release documents and the figures of this file are re-taken in the commits that
+follow the closure record, before the tag `v0.3.0`; until then the dated sentences below that say P2 is open, in progress or not closed describe the state at
+their dates and are superseded by this paragraph.
+
+**State on 2026-10-13, release documents of `v0.3.0` (added; the paragraphs above are unchanged).** The release `v0.3.0` is cut
+from the merge of its release documents after their review, behind the closure record of P2 (the paragraph above) and the regenerated figures
+that follow it: `pyproject.toml` and `CITATION.cff` carry `0.3.0`, `RELEASE_NOTES.md` opens with its account, `CHANGELOG.md` carries the
+section generated from it, and `.github/releases/v0.3.0.json` names the title and the source of the release text. It is a release, not a
+pre-release, and it is not a readiness claim: the board reads `TECHNICALLY_STABLE_READY = no`, a closed phase is not a stable release, and
+`v0.1.0` stays the only release on PyPI. The release changes no source file: every merge since the third alpha is records, tools, tests, the
+register notes of three P2 rows (P2-07, P2-28 and P2-42, by addition) or the version line of `pyproject.toml`, and the diff of `src/hoh/`, the continuation unit, the durability harness and its fixture from `e0d9bdff` to the release commit prints nothing,
+so the durability evidence of the closure is about the code the release ships; the operator ruled on 2026-10-12 that the tag therefore needs
+no new reboot, and the eight-minute durability run at the tag is the orchestrating session's regression obligation under amendment A7, recorded
+in the ledger entry of the tag. The sentences of this file that name `v0.3.0a3` as the current pre-release describe their dates.
+
+The figures of the moving present that `paper/NUMBERS_V2.md` derives were taken again for the release `v0.3.0` at the commit `f78d1cb9`
+(2026-10-13 at 19:29 +0300; the figures quoted in the updates above stay as written). At that base the register holds 235 requirements, 70 PROVEN
+and 9 PARTIAL `[V10]`; all 43 requirements of P2 read PROVEN `[V10c]` `[V10b]`, and the P2 gate reads 0 blocking open; 0 exit conditions bound to requirements not PROVEN; 0 exit conditions nothing measures yet; 165 open requirements, 125 behind a phase gate `[V12]`; of
+those registered for P3 to P12, 156 of 176 MISSING (9 PARTIAL, 11 PROVEN) `[V11b]`. The history is 1,260 commits, 182 of them merges `[V48]`; the first and the
+latest commit of the mainline are 36 days 19 hours apart `[V46]` and 27 of the 37 calendar days carry a commit `[V47]`; the ledger runs to O268 with 240
+numbered entries `[V49]`. The development line has 97 product-run merges since 2026-09-25 `[V01]`, 78 of which change `src/hoh/` `[V02]`, as
+at the third alpha: the four product runs merged since carry titles that the counting tool does not list, and the release changes no tool. Of
+320 development nodes after the attribution anchor `[V06]`, 1 went through the shipped control plane end to end `[V06a]`, 131 were developed by a
+product run and merged by the orchestrating session after review `[V06b]`, and 188 were written by the orchestrating session directly `[V06c]`.
 
 ## Where the project stands: release, pre-release, development, roadmap
 
@@ -32,7 +66,8 @@ apart on purpose.
 | **Pre-release** | `v0.3.0a1` -- **PRE-RELEASE**, an alpha and a research preview, **prepared, not yet cut** | Prepared at a documentation checkpoint, not at the end of a phase. Its integrity gate is met for the paths its reviewers replayed (the qaw-followup merge `ab41589f` closed the three findings that had held it; one residual is stated in `docs/LIMITATIONS.md`), and the cut waits for the operator's decision on the exact commit. Once cut, it is installed from the tagged source and is not published to PyPI: the distribution workflow of this repository accepts only the audited `v0.1.0`. `pyproject.toml` carries `0.3.0a1`. `RELEASE_NOTES.md` opens with its account; its open gates are listed as NOT_YET_PROVEN there and in `docs/LIMITATIONS.md`. (Correction, 2026-10-09: `v0.3.0a1` was cut on 2026-10-08; "prepared, not yet cut" and "the cut waits for the operator's decision" are the text of the checkpoint before the cut and are kept here. `pyproject.toml` now carries the next pre-release, in the next row.) |
 | **Newer pre-release** | `v0.3.0a2` -- **PRE-RELEASE**, an alpha and a research preview, tagged `v0.3.0a2` | Prepared at a documentation checkpoint after the ledger entries O256 to O260, not at the end of a phase. It adds a NixOS-first portability patch, `hoh agent-setup`, owned control of the agents HoH starts, more disk-full-safe writers, a classification of failed provider dispatches with its provenance and park binding, `hoh migrate` and `hoh decision check`, and the five P0 measurements; none of it was run on a real NixOS or macOS host or in a live coding-agent session. It is installed from the tagged source and is not published to PyPI. `pyproject.toml` carries `0.3.0a2`. `RELEASE_NOTES.md` opens with its account; its open gates are listed as NOT_YET_PROVEN there and in `docs/LIMITATIONS.md`. |
 | **Newest pre-release** | `v0.3.0a3` -- **PRE-RELEASE**, an alpha and a research preview, tagged `v0.3.0a3` | Prepared at a documentation checkpoint after the ledger entries O261 to O265, not at the end of a phase. It adds the merge gate as a command, `hoh wait`, `hoh surface`, `hoh run --detach`, `hoh pin` and `hoh import`, the per-run storage account, target registration, and a rotation policy under which the product hands the orchestrating session over by itself; P2-41, P2-43, P2-14 and P2-20 read PROVEN, each with limits that `RELEASE_NOTES.md` states. It is installed from the tagged source and is not published to PyPI. `pyproject.toml` carries `0.3.0a3`. P2 is not closed; its open gates are listed as NOT_YET_PROVEN in `RELEASE_NOTES.md` and in `docs/LIMITATIONS.md`. |
-| **Current development** | Phase P2, *v0.3 Durable Program Runtime + Autonomy Contract Base* -- **IN PROGRESS** | Not closed. The pre-release is a snapshot of this line, and a clone of the default branch may be ahead of the tag. |
+| **Release** | `v0.3.0` -- the release at which phase P2 is closed, tagged `v0.3.0` | Cut from the merge of its release documents after their review, behind the closure record of P2 (records entry O268, 2026-10-13) and the regenerated figures that follow it. It is not a pre-release. It changes no source file against the third alpha: every merge since `v0.3.0a3` is records, tools, tests, the register notes of three P2 rows or the version line of `pyproject.toml`, and the durability evidence of the closure is about the code it ships. It is installed from the tagged source and is not published to PyPI (the distribution workflow accepts only `v0.1.0`). `pyproject.toml` carries `0.3.0`. Readiness is not claimed: the board reads `TECHNICALLY_STABLE_READY = no`, and `RELEASE_NOTES.md` opens with the account of the closure, its limits and the rows of the board that do not read PASS. |
+| **Current development** | Phase P2, *v0.3 Durable Program Runtime + Autonomy Contract Base* -- **IN PROGRESS** | Not closed. The pre-release is a snapshot of this line, and a clone of the default branch may be ahead of the tag. (Closed at the commit of records entry O268, 2026-10-13; see *State on 2026-10-13* above. The earlier text of this row stays as written.) |
 | **Long-term roadmap** | Phases P0 to P12, v0.2 through v2.0 | A registered plan, not a promise. P1 was completed as an internal development milestone. No public v0.2 release was cut; the latest stable public release remains v0.1.0 while the development line continues through P2. Of the requirements registered for P3 to P12, 150 of 168 read MISSING `[V11b]`; ten of the 11 that read PROVEN are storage-lifecycle items that amendment A1 placed there and that were built early. (Updated 2026-10-09 at the O262 base: 158 of 176 read MISSING `[V11b]`, because amendment A6 registered eight more requirements for phase P5; see *The parts, and what each has and has not shown*.) |
 
 The board that says what holds today is `docs/READINESS.md`; at its last
@@ -366,6 +401,36 @@ the first and the latest commit of the mainline are 34 days 7 hours apart `[V46]
 before): the count lists the titles of the merges since the second alpha one by one. Of 294 development nodes after the
 attribution anchor `[V06]`, 1 went through the shipped control plane end to end `[V06a]`, 126 were developed by a product run and
 merged by the orchestrating session after review `[V06b]`, and 167 were written by the orchestrating session directly `[V06c]`.
+
+**Update, 2026-10-11, after the operator's restart (records entry O266).** The durability freeze and the restart that the paragraphs above say are still to come
+have taken place. The durability end-to-end run was made on a `git archive` of `e0d9bdff` (the last commit that changed `src/hoh/`): all seven scenarios ran, all
+twenty negative controls were caught, and the reboot scenario was armed, the operator ran `wsl --shutdown` and started Herdr again, and the verification after the
+restart found the lease holder on another boot, spent an epoch as RECOVERY and closed the project with the canonical tick. On that evidence P2-11 and P2-33 to P2-37
+read PROVEN. The limits are in `docs/LIMITATIONS.md` and the note of each row: the restart was the shutdown of a virtual machine and not a power cut; one reboot,
+one host, fixture role runs and the harness's own tick loop (no systemd); the record lists every check of the reboot scenario as one that no negative control
+targets; and the evidence is about one commit, so any change under `src/hoh/` makes these rows read stale until the eight-minute run is repeated (amendment A7 makes
+that a regression obligation). P2-42 reads PROVEN as well: the first run of a registered project was made (the strand `leakids2`, merged as `f956b119`, real Herdr
+panes, every temporary workspace of the run found under the registered root by the readback); the approval-resume of a registered run (limit L2) did not occur in
+it and is still not shown, and the other harnesses' temporary files are NOT_RUN. The product has rotated the orchestrating session six more times by its own
+policy since the canary, took the lease again after the restart as a recovery and rotated once more from it. (Correction, 2026-10-12, records entry O267: the six rotations after the canary already include the one made from the recovered lease, so this sentence counts that rotation twice; at the commit of these figures the product's own log in the evidence copy holds seven finished rotations in all, the canary and six more, the last of them from epoch eight.) **P2 is still not closed.** The blocking requirements of its gate are all PROVEN,
+and two exit conditions that the programme's own instruments measure are unmet: a current independent supervisor review (the preserved record is stale against the
+matrix and the checklist snapshot and carries blocking findings) and the checklist consistency check, which refuses to close a phase over the nineteen
+release-blocking findings that the preserved reviews of 2026-09-24 left unresolved. No closure record exists; one needs the review and that check first.
+
+Sentences of this README that this update supersedes, kept as written: that the five exit conditions P2-33 to P2-37 read IMPLEMENTED_NOT_PROVEN and that
+crash and reboot recovery (P2-11) has never been exercised on a real reboot (the paragraph on the build, and the section on what changed after v0.1.0); that P2-11
+"has never been proven"; the row of the table on the exit conditions of P2; every statement that P2-42 reads PARTIAL or has no observed run of a registered
+project; and, in the update for `v0.3.0a3`, "P2 is not closed: P2-11 needs a real reboot that has not been run". The dated paragraph headed "State on 2026-10-09"
+names `v0.3.0a3` beside figures of that date (thirty-four PROVEN, nine blocking): the figures of that paragraph are those of 2026-10-09, and the figures of the day are in
+the paragraphs below. The install note under *Installation* names the tags `v0.3.0a1` and `v0.3.0a2`; the same holds for the tag `v0.3.0a3`.
+
+The figures of the moving present that `paper/NUMBERS_V2.md` derives were taken again at the commit of the records entry O266 (`cc79b2ae`, committed on 2026-10-11 at 16:01 +0300;
+the figures quoted in the updates above stay as written). At that base the register holds 235 requirements, 70 PROVEN and
+9 PARTIAL `[V10]`; of the requirements of P2, 43 PROVEN `[V10c]`, and the P2 gate reads 0 blocking open; 0 exit conditions bound to requirements not PROVEN; 0 exit conditions nothing measures yet; 165 open requirements, 157 behind a phase gate `[V12]` -- that line counts requirements and
+exit conditions bound to them, not the two checklist-gate conditions named above, which are unmet: the gate is shut; of those registered for P3 to P12, 156 of 176 MISSING (9 PARTIAL, 11 PROVEN) `[V11b]`.
+The history is 1,226 commits, 174 of them merges `[V48]`, and 238 numbered ledger entries, O23 to O266 `[V49]`. The attribution check
+counts 300 development nodes `[V06]`: 1 went through the shipped control plane end to end `[V06a]`, 126 were developed by a product run and merged by
+the orchestrating session after review `[V06b]`, and 173 were written by the orchestrating session directly `[V06c]`.
 
 ## What this actually is
 

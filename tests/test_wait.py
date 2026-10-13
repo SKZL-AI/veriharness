@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import argparse
 import ast
-import contextlib
 import errno
 import json
 import math
@@ -664,8 +663,8 @@ def test_the_answer_is_one_ascii_json_line_with_the_documented_fields(tmp_path, 
     block reported as a current one."""
     root = tmp_path / "runs"
     long = "x" * 900
-    park = _make(root, "park", condition=Condition.BLOCKED, kind="usage_limit",
-                 reason=long, retry=PAST, stop=long)
+    _make(root, "park", condition=Condition.BLOCKED, kind="usage_limit",
+          reason=long, retry=PAST, stop=long)
     got = _ask(capsys, root, "park", "--timeout", "0")
     assert got.out.endswith("\n") and got.out.count("\n") == 1 and got.out.isascii()
     doc = got.doc

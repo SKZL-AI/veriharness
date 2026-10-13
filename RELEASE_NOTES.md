@@ -1,3 +1,361 @@
+# Release notes -- v0.3.0
+
+**This is a release, not a pre-release.** `v0.3.0` is the first release of the
+v0.3 line and the release at which phase P2, *v0.3 Durable Program Runtime +
+Autonomy Contract Base*, is closed. It follows `v0.3.0a3` (tagged 2026-10-11) by
+the ledger entries O266 to O268 and is cut at the commit of these documents, which
+sits behind the closure record of P2 (records entry O268) and the regenerated
+figures that follow it; everything between the third alpha and this commit is
+records, tools, tests, the register notes of three P2 rows (P2-07, P2-28 and
+P2-42, by addition) and the version line of `pyproject.toml`, and no file under
+`src/hoh/` has changed since the third alpha. The sections of the three alphas further down in this file are the
+text of their tags with their dated corrections, and their figures are the
+figures of their own cuts; the `[Vnn]` figures of this section are the ones that
+`paper/NUMBERS_V2.md` now carries, taken at the commit f78d1cb9.
+
+`pyproject.toml` carries `0.3.0` (since the merge `9dacb6c5`, which landed before
+the sealing commit of P2 because the version is not a record path). Like the
+alphas it is installed from the tagged source and is **not** published to PyPI:
+the distribution workflow of this repository accepts only the audited `v0.1.0`,
+which stays the only release on PyPI. **Readiness is not claimed.** The board,
+`docs/READINESS.md`, is regenerated in the closure sequence and reads
+`TECHNICALLY_STABLE_READY = no` `[V13]`: a closed phase is not a stable release.
+The rows of the board that do not read PASS at the sealing commit are named under
+*Known limitations*.
+
+**What this release is, in one paragraph.** Phase P2 is closed at the commit of
+the records entry O268 (commit X of amendment A7), on four things that were
+measured at the sealing commit S and carried to X by records-only commits: the
+digests of the durability evidence, the digest of the committed capability
+matrix with every one of P2's 43 registered requirements PROVEN `[V10c]` `[V10b]`,
+the identity of the independent supervisor review `20261013T093422Z-S`, and the
+digest of the checklist snapshot. The gate of P2 as `tools/build_plan.py`
+measures it has 0 requirements blocking and open, 0 exit conditions bound to
+requirements not PROVEN and 0 exit conditions that nothing measures `[V12]`; the
+register holds 235 requirements, 70 PROVEN and 9 PARTIAL `[V10]`.
+Since the third alpha the line gained the records of the durability freeze and
+the operator's restart (P2-11 and P2-33 to P2-37 PROVEN), of the first run of a
+registered project (P2-42 PROVEN), the instruments that decide the gate honestly
+(tools and tests only), the attribution of every commit, and the closure sequence
+R, S, C, A and X described below. Nothing in it was run on a real NixOS or macOS
+host or against a real provider limit, and the role runs of the durability
+evidence are a deterministic fixture; those limits are stated under *Known
+limitations* and stand.
+
+**The closure sequence (all 2026-10-13, UTC; records entry O268 names each by
+its full commit id and digests).** R `204905be` regenerated the artefacts at the
+merge of the records folds (`bcd75cb7`): the export manifest, the capability
+matrix, the build plan, the checklist snapshot. S `c4dc643d` recorded the
+independent supervisor review `20261013T093422Z-S` and regenerated the board. C
+`642a4fa9` committed the succession capsule alone, written on a clean tree with S
+as its internal commit. A `b36eed34` added the attribution entries for S and C. X
+`d3791470` is the closure record itself: the ledger entry O268, the public
+closure texts by addition, and the derived record of the eight-minute durability
+run made on R. The commit after X regenerated the figures at X and added the
+ledger addendum of the closure, and this commit carries the release documents.
+`python3 tools/succession.py verify` reads VERIFIED at this commit: the commits
+behind the capsule touch record paths only, which the capsule's rules do not read
+as drift.
+
+The central invariant of this development line is unchanged:
+
+    candidate creation != product acceptance != integration acceptance != merge authority != phase closure
+
+## Added
+
+* **The closure record of P2 (records entry O268, commit X).** The record names
+  the commits R, S, C and A; the checklist snapshot by its seal and its file
+  digest; the committed capability matrix by its digest and its file digest; the
+  register digest; the plan snapshot commit and the plan digest; the independent
+  supervisor review `20261013T093422Z-S` with the digests of its capsule and its
+  findings; the durability record with its evidence head and the empty diff of
+  the relevant source paths since that head; the limits, verbatim; the test
+  suite at R; the instrument fixes of the P2 line; and the regression
+  obligations that stand after the closure, each with its trigger, its runner
+  and the place its result is recorded. `README.md`, `docs/LIMITATIONS.md` and
+  `paper/POSITION_PAPER_V2.md` say that P2 is closed at that commit, by addition,
+  and the dated sentences in them that read P2 as open describe their dates.
+* **The independent supervisor review `20261013T093422Z-S` (sealing commit S).**
+  A separate session on a read-only worktree of R, given the canonical capsule
+  and the repository and nothing else, re-measured every finding that the
+  preserved reviews of 2026-09-24 had left open and answered each NO_ACTION in
+  the resolution rule's shape (the evidence reference of each answer is the
+  `resolve_with` entry of the finding it answers); none blocking, the review
+  complete against the checklist snapshot seal and the matrix digest it names,
+  no new finding that blocks P2. Its drift check reads NOT_RUN, because the
+  baseline it would compare with carries no source digests; NOT_RUN is never a
+  pass and the review's completeness does not rest on it. The previous review
+  record is kept beside it, versioned, and the earlier versions are untouched.
+* **The succession capsule bound to the P2 exit (merge `a2fc3eb7`, commit C).**
+  `tools/build_plan.py` measures `tools/succession.py verify` for the exit
+  condition "controller session replacement", fail closed, reading the capsule
+  committed at HEAD and the board, sync, release and ledger from HEAD's blobs;
+  records-only commits behind the capsule are not drift, a source change is. The
+  capsule of C was written on a clean tree with S as its internal commit and is
+  the one the gate reads at X and at this commit.
+* **Durability: P2-11 and P2-33 to P2-37 PROVEN on evidence taken on `e0d9bdff`
+  (records entry O266).** The durability end-to-end run was made on a `git
+  archive` of `e0d9bdff`, the last commit that changed `src/hoh/`: every
+  scenario ran, every negative control was caught, the reboot scenario was armed
+  at that commit, the operator shut the WSL virtual machine down and started it
+  again, and the verification after the restart found the lease holder on
+  another boot, spent an epoch as RECOVERY and closed the fixture project with
+  the canonical tick. The record re-derives from its evidence (`derive --check`
+  exit 0) and the capability matrix refuses it when `src/hoh/`, the continuation
+  unit, the harness or the fixture differ from that commit; they do not differ in
+  this release, and the diff of those paths from `e0d9bdff` to this commit prints
+  nothing.
+* **The eight-minute run at R, recorded (records entry O268; amendment A7's
+  first records checkpoint after the evidence).** `tools/durability_e2e.py run`
+  on a `git archive` of R: no harness failure, a clean tree at start and end,
+  every negative control ran; the derived record reads P2-33 to P2-37 satisfied
+  and P2-11 not satisfied because that run armed no reboot (the reboot evidence
+  is the committed record above and is not re-taken at a records checkpoint).
+  The derived record is copied byte-identically into the tree as a data file
+  under the record directory of the closure, named with its digest in the ledger
+  entry O268; its evidence directory is not copied, so `derive --check` against
+  that copy is NOT_RUN from the repository alone.
+* **P2-42 PROVEN on the first run of a registered project (records entry
+  O266).** The strand that completed the export leak scan (merged as
+  `f956b119`, which the third alpha contained) was run live as a registered
+  project with real Herdr panes, and a readback found every temporary workspace
+  of the run under the registered root. The hold on the row named three
+  conditions; the lift rests on the first of them under the operator's ruling,
+  with the approval-resume of a registered run not exercised and the temporary
+  files of the other role harnesses NOT_RUN.
+* **Instruments that decide the gate honestly (merges `a00e3270`, `cdc4159f`,
+  `9c487146`; tools and tests only).** A probe's test half reads `collected`
+  only when pytest collected it, and a broken collection is NOT_DETERMINABLE per
+  file; a later review resolves a finding only by naming the review that raised
+  it; the board's lint, identifiers and tests rows are measured on the
+  repository side; `tools/docs_numbers.py` reads the status of P2-42 from the
+  register and a met P2 gate from `tools/build_plan.py`; the three P2 state tests
+  assert the post-O266 truth (capability coverage closed, the gate held only by
+  its named exit conditions).
+* **The records before the sealing commit (merges `9dacb6c5`, `8ad54273`,
+  `bcd75cb7`).** The version `0.3.0` and the edition heading of the figures
+  table; the attribution of the commits that no entry had claimed, with the
+  run evidence of five product runs copied into the tree; the folds of the
+  review minors of the records entry O266 and of the two slices before, the
+  register decision on P2-07 (the capsule's currency is a P2 exit condition,
+  measured by the build plan, fail closed), and the obligations of the closure
+  written as obligations before the capsule commit (records entry O267), so that
+  nothing committed after the capsule opens an item of the ledger.
+* **Regression obligations under amendment A7 (records entry O268, section 9).**
+  "The durability end-to-end run of about eight minutes is re-run at every
+  records checkpoint and every release checkpoint after X, and the reboot
+  evidence of the durability test is taken again at every release checkpoint;
+  the result of each is recorded with the commit it was taken on." And, from the
+  operator directive of 2026-10-10: "Later src/hoh changes would then not reopen
+  P2 but only create regression obligations: re-run the 8-minute durability run
+  at records and release checkpoints and re-take the reboot evidence at release
+  checkpoints." The tag `v0.3.0` carries no source change against `e0d9bdff`,
+  and the operator ruled on 2026-10-12 that it therefore needs no new reboot;
+  the eight-minute run at the tag is the orchestrating session's and is recorded
+  in the ledger entry of the tag, not in this package. An obligation that fails
+  re-opens P2 by a records entry, in the open, that names the failing run and the
+  commit it was taken on.
+
+## Changed
+
+* **The register.** Of all 235 requirements, 70 read PROVEN, 9 PARTIAL, 0
+  IMPLEMENTED_NOT_PROVEN and 156 MISSING `[V10]` (63 PROVEN, 10 PARTIAL and 6
+  IMPLEMENTED_NOT_PROVEN at the third alpha); all 43 requirements of P2 read
+  PROVEN `[V10c]` `[V10b]` (36 at the third alpha). The matrix measures an import
+  statement, never execution: the weight of each PROVEN rests on the merge run's
+  criteria, its integration pair and the limits written into its note. The later
+  phases hold 156 of 176 MISSING (9 PARTIAL, 11 PROVEN) `[V11b]`.
+* **The P2 gate.** 0 blocking open; 0 exit conditions bound to requirements not PROVEN; 0 exit conditions nothing measures yet; 165 open requirements, 125 behind a phase gate `[V12]`, where the third alpha had 7 blocking requirements and the two checklist-gate
+  conditions of the records entry O266 unmet. The closure is a statement about
+  the commit of the closure record and about nothing later.
+* **The attribution ratio.** Of 320 development nodes after the attribution anchor
+  `[V06]`, 1 went through the shipped control plane end to end `[V06a]`, 131 were
+  developed by a product run and merged by the orchestrating session after
+  review `[V06b]`, and 188 were written by the orchestrating session directly
+  `[V06c]` (294, 1, 126 and 167 at the third alpha). Every commit of the line
+  belongs to an entry of `dogfood/ATTRIBUTION.json` apart from the tip of the
+  moment, which the check tolerates, and 0 of 367 entries are of category
+  CAPTAIN, a human decision or a human-authored change `[V52]`.
+* **The history.** 1,260 commits, 182 of them merges `[V48]`; the first and the latest
+  commit of the mainline are 36 days 19 hours apart `[V46]`; 27 of the 37 calendar days carry a
+  commit `[V47]`; the ledger runs to O268 with 240 numbered entries `[V49]`.
+* **The count of product-run merges stands at the third alpha's values.** The
+  line has 97 product-run merges since 2026-09-25 `[V01]`, 78 of which change
+  `src/hoh/` `[V02]`, as at the third alpha: the four product runs merged since
+  (the two instrument slices, the succession binding with its repair, and the
+  re-stated state tests) carry titles that the counting tool does not list, and
+  this release changes no tool, because after the sealing commit nothing outside
+  the record paths lands until the tag. The count is corrected when the tool is
+  next changed, after the tag; none of the four changes `src/hoh/`.
+* **The v0.3.0a3 pre-release was exported and tagged** on 2026-10-11 (export
+  commit `d98092cc`), as an annotated tag and a GitHub pre-release whose text is
+  the a3 section of this file at the tag; `v0.1.0` stayed the release that
+  GitHub marks as latest. This release is cut the same way, from the merge of
+  the release documents after their review; it is not marked as a pre-release,
+  and it is the release GitHub marks as latest (the orchestrating session's
+  decision at the cut; `v0.1.0` stays the only release on PyPI).
+* **The version and the dates.** `pyproject.toml` has carried `0.3.0` since
+  the merge `9dacb6c5`; `CITATION.cff` carries `0.3.0` with the date of the tag;
+  the edition heading of `paper/NUMBERS_V2.md` names the release.
+
+## Fixed
+
+* The gate of the succession capsule could be passed by a capsule whose
+  `internal_commit` was a symbolic name (`HEAD`, a branch), which never drifts:
+  both integration reviewers of the binding found it independently and refused
+  the candidate; the repair requires one full commit id that resolves to itself,
+  reads the plan root from the environment only and refuses to write a capsule
+  at a HEAD that is not a full commit id (merge `a2fc3eb7`).
+* The two instruments that decided P2's open supervisor findings read a probe's
+  test half as `collected` whether or not pytest had collected it, and a later
+  review could resolve a finding without naming the review that raised it; both
+  fail honestly now (merge `a00e3270`).
+* The figures tool stated the status of P2-42 as a fixed text that contradicted
+  the register after the lift, and the P2 gate as unmet by its own reading; it
+  now derives both. The re-anchoring of one claim that the rewrite had orphaned
+  was found at integration review and repaired as records before the merge
+  (merge `cdc4159f`).
+* Three state tests asserted that P2 was the open frontier and were red after
+  the O266 records; they assert the post-O266 truth now (merge `9c487146`). The
+  test nodes that pin "unmet" for the P2 exit turn red at the closure by design
+  and are re-stated as the first test change after the tag (see the
+  limitations).
+* The closure record's README paragraph cited an internal amendment file by its
+  path from an exported line, which the export's closure rule refuses; the
+  paragraph names the amendment without the path (the first revision of X,
+  found by the full suite on the candidate).
+* Records corrections, each by addition: the rotation count of the orchestrating
+  session in `README.md` counted one rotation twice; three present-tense rows of
+  `docs/LIMITATIONS.md` that the records entry O266 had superseded point to the
+  lift; the register notes of P2-07, P2-28 and P2-42 carry the current reading
+  (merge `bcd75cb7`, records entry O267).
+
+## Known limitations at this release, and what is not claimed
+
+* **What the closure is not.** It is not a release claim: the board reads
+  `TECHNICALLY_STABLE_READY = no` `[V13]`. It is not a statement about any commit
+  after the closure record. It lifts no limit of the evidence it rests on. A
+  change to `src/hoh/`, the continuation unit, the harness or the fixture after
+  the closure makes the six durability rows read stale until the eight-minute
+  run is repeated, and creates the regression obligations above; it does not
+  re-open the phase, and a failed obligation does.
+* **The durability evidence, with its limits (records entries O266 and O268).**
+  The restart was `wsl --shutdown`, the shutdown of a WSL2 virtual machine and a
+  new start with another kernel boot id, not a power cut or a hardware reset,
+  and a write under an unclean power loss was not exercised. One reboot, on one
+  host, of one fixture project; role runs are the deterministic fixture and the
+  tick is the harness's own loop running the arguments of the continuation unit,
+  so systemd, the timer unit and the plugin binary are bypassed and a real role
+  agent's dialogs are not covered. The record lists as undiscriminated every
+  check of the reboot scenario and the problem classes of the three scenarios
+  P2-11 needs: no negative control targets them, so the instrument cannot show
+  that a build without reboot recovery would fail them. The evidence is about
+  `e0d9bdff`. The operator compacted the WSL virtual disk while it was down, an
+  operator act after which the record still re-derives. The paused master was
+  ended by the shutdown, not by a harness signal.
+* **The scope of the other lifted rows.** The no-human reading of P2-34 covers
+  the orchestration layer: a real role agent can still wait on an operator. A
+  resume service on by default (OP-16) is a P5 item and is not read into P2-36.
+  The lift of P2-42 rests on one run of one registered project on one host with
+  the Claude role harness only; the approval-resume of a registered run and the
+  refusal paths were not exercised live. The rotation of the orchestrating
+  session has the limits of the third alpha: one project on one host; the
+  expiry, withdrawal and error paths not exercised live; the item-level rotation
+  without a caller outside the tests; the capsule input derived by the
+  orchestrating session's script before each rotation, not by the product.
+* **The test suite at R, and the nodes the closure turns red by design.** Two
+  measurements of the full suite exist at R and differ: the orchestrating
+  session's run and the board's `tests` row, taken between the passes of the
+  regeneration with the tree dirty in record paths; both are recorded in the
+  closure record with the cause of each named failure, neither is re-run for
+  this release, and which nodes the board's extra failures are is left open
+  there. Six test nodes pin "unmet" for the P2 exit and turn red at the commit
+  at which the exit turns; a test change is not a record path and would break
+  the succession window, so they are re-stated to the closed state as the first
+  test change after the tag. One test of the program scope builds the scope
+  from the plan without the operator amendments and fails at every commit of
+  this period while the scope check with amendments reads COMPLETE; it is
+  brought to the amendments after the tag.
+* **The board.** The rows that do not read PASS at the sealing commit, with the
+  reasons the board gives: the test suite and the union invariants (the full
+  suite at R in the real repository read 7082 passed, 4 failed, 2 skipped, with
+  the cause of each failure named in the closure record; the board's own `tests`
+  row, taken between the passes of the regeneration, read 7078 passed, 8 failed
+  at the sealing commit and 7079 passed, 7 failed at the figures commit after X;
+  records entries O267 and O268); the benchmark freeze, which reads DRIFTED because files moved
+  after the freeze and the later modules are not named in its artefact, and both
+  benchmark rows with it (one advisory); the export manifest, which was out of
+  date at S, X and the commit after X by design and is re-derived in this
+  commit; the export sync, which has no export checkout set; the succession row
+  as it stood before the capsule commit, re-measured after X; the consistency
+  check, which reads the working tree against the base of the figures table and
+  is re-rendered in this commit; and the external CI, whose recorded run tested
+  a different export. Lint, identifiers, attribution, claims, the capability
+  matrix, the program scope, durability, acceptance, the checklist and the
+  supervisor review read PASS.
+* **The product-run count does not include the four runs merged since the third
+  alpha** (above); the figure is right for the titles it lists and is corrected
+  with the tool after the tag.
+* **The earlier limitations stand where they are not named above.** Nothing of
+  `hoh wait`, `hoh surface` and `hoh run --detach` has run against a live Herdr
+  session; a provider usage limit is read from recorded shapes only; the NixOS
+  portability patch has not run on a host and `hoh agent-setup` has not been
+  tried by a live agent session; no merge step of the product calls the merge
+  gate; the integrity gate is met for the replayed paths and not for every path;
+  the storage steward has not reclaimed anything of VeriHarness's own data.
+* **One self-test of the audit tooling reads red at this commit, and the ledger
+  is not what is wrong.** `python3 tools/audit_refs.py selftest` uses the claim id
+  C-999 as its fixture of an id that must not exist; the claims ledger of this
+  release reaches that id, so the self-test reports its fixture as wrongly
+  resolved. The fixture is corrected with the tool after the tag (no tool changes
+  in the records window); the other seven audit checks and
+  `python3 tools/check_claims.py check all` read green at this commit.
+* **Phase P3 is the next phase, and nothing of it is lifted.** Of the
+  requirements registered for P3 to P12, 156 of 176 MISSING (9 PARTIAL, 11 PROVEN) read as stated `[V11b]`; the P3 candidates that exist were produced
+  during the closure window and are reviewed as candidates by their integration
+  pairs after the tag; none is merged by this release.
+* **Not claimed:** that any figure measured for `v0.1.0` describes this line;
+  that the exact-head external CI has run on these bytes (it has not); that the
+  durability evidence covers a power loss, a second host, a real role agent or
+  more than one reboot; that a rotation of the orchestrating session is reliable
+  beyond the recorded rotations; that the portability patch works on a real
+  NixOS or macOS host; that a coding agent given the output of `hoh agent-setup`
+  uses `hoh`; that long-duration unattended operation is demonstrated (it is
+  not); or that this release is ready in the sense of the board (it is not).
+
+## Check this release yourself
+
+Some of these commands need the development repository and not only the exported
+tree. For each, what it does in the exported tree is said; the exported-tree exit
+codes were measured for the third alpha and are not measured again here.
+
+* `python3 tools/changelog_from_release_notes.py check` -- the `CHANGELOG.md`
+  section of this release is generated from this file and not written twice. It
+  works in the exported tree.
+* `python3 -m pytest --collect-only -q` -- the exported tests collect with no
+  collection error; the command works in the exported tree.
+* `python3 tools/docs_numbers.py check` -- every tagged figure of these
+  documents against the command or the ledger entry that produced it. It reads
+  the development repository's git history and working ledger, which the export
+  does not carry; in the exported tree it reports an environment gap, exit 3.
+* `python3 tools/check_claims.py check all` and
+  `python3 tools/export_manifest.py check` -- the claims ledger and the export
+  classification. They check the whole development tree, with its run evidence
+  and the files the export leaves out; in the exported tree each of them exits 1.
+* `python3 tools/capability_matrix.py` and `python3 tools/build_plan.py` --
+  the register and the P2 gate, whose figures this section states. Both read
+  the programme's requirement register, which is derived from an internal
+  planning package and not exported; in the exported tree each of them exits 3.
+* `python3 tools/succession.py verify` -- the succession capsule of the closure
+  against the tree. It needs the development repository with its history, its
+  run evidence and the plan root the capsule names; what it does in the exported
+  tree was not measured for this release.
+* `git diff e0d9bdff..v0.3.0 -- src/hoh ops/hoh-continue.service tools/durability_e2e.py tools/durability_fixture.py`
+  -- prints nothing: the durability evidence of the closure is about the code
+  this release ships.
+
+---
+
 # Release notes -- v0.3.0a3 (pre-release)
 
 **This is a pre-release.** `v0.3.0a3` is the third alpha of the v0.3 line, a
@@ -353,6 +711,14 @@ Each open gate below is NOT_YET_PROVEN, and a gate that reads red stays red.
   (it is not shown); that the portability patch works on a real NixOS or macOS
   host; that a coding agent given the output of `hoh agent-setup` uses `hoh`; or
   that long-duration unattended operation is demonstrated (it is not).
+* **Corrections after the tag (records entry O266, 2026-10-11; the text above is kept as published).** (a) The statements above that no run of a registered
+  project has been observed are out of date: the live run of a registered project (the strand that completed the export leak scan, merge `f956b119`, which this release contains) was made
+  before the tag was cut and was not counted; P2-42 now reads PROVEN on it, with its limits (the approval-resume limit not met, one run, one harness) in the
+  register note and in `docs/LIMITATIONS.md`. (b) The sentence that the durability freeze is armed at `e0d9bdff` is backed by the durability record, which
+  names that commit as its evidence head and which the capability matrix refuses when `src/hoh/`, the continuation unit, the harness or the fixture differ from
+  it (they do not differ in this release). (c) After the tag: the operator's restart and the freeze evidence were taken, P2-11 and P2-33 to P2-37 read PROVEN on
+  evidence taken on `e0d9bdff` (with the limits above and in `docs/LIMITATIONS.md`), the P2 gate has no blocking requirement open, and two checklist-gate
+  conditions (a current independent supervisor review and the consistency check) are unmet: P2 is not closed.
 
 ## Check this pre-release yourself
 

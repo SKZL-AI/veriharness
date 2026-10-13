@@ -241,3 +241,227 @@ def test_the_equivalent_cap_survives_a_not_determinable_status():
         row = cm.classify({"id": "X", "name": "x", "probe": probe}, {}, _collected(),
                           {"lint": ("PASS", "")}, {})
         assert row["status"] == cm.NOT_DETERMINABLE, probe
+
+
+# --- O220/F7, O223/M12: the test half of a probe -----------------------------
+#
+# `_collected()` returned `(stdout, returncode == 0)` and the probe unpacked
+# `text, ok = collection` and never read `ok`; "collected" was a substring test over
+# the whole `--collect-only -q` output. pytest prints `ERROR tests/test_x.py` for a
+# file that failed to import, so the file's name was "in the text" exactly when its
+# tests could not be collected, and `test_a` is a substring of `test_a_extended` and
+# of another file's `test_a`. Each case below is about what an unmeasured test half
+# may never be: "collected".
+
+_WIDGET = "tests/test_widget.py"
+
+
+def _widget_row(collection, test=_WIDGET, **probe) -> dict:
+    """A symbol probe whose module is consumed by an entry point, so that the test
+    half is the only thing that can move the status."""
+    req = _req(probe={"kind": "symbol", "symbol": "widget", "test": test, **probe})
+    return cm.classify(req, {"widget": ["src/hoh/lonely.py:10"]}, collection, {},
+                       {"lonely": {"tools/thing.py"}})
+
+
+def _says_collected(row: dict) -> bool:
+    return any(str(e).endswith(": collected") for e in row["evidence"])
+
+
+def test_a_failed_collection_decides_per_file_and_never_shows_absence():
+    """pytest exits non-zero and still lists the node ids of the files it could import.
+    What it listed is collected (PM13: one broken file elsewhere must not demote every
+    test-probed row); what it did not list is *not determinable* -- a failed collection
+    cannot show that a test was not collected -- and the exit code must be a bool."""
+    listed = f"{_WIDGET}::test_a\n"
+    row = _widget_row((listed, False))
+    assert row["status"] == cm.PROVEN and _says_collected(row)
+    elsewhere = _widget_row((listed + "ERROR tests/test_other.py\n", False))
+    assert elsewhere["status"] == cm.PROVEN
+
+    # not listed, no error line for the file: undecidable on a failed collection, "not
+    # collected" on a sound one (the control, same text)
+    for text in ("", "no tests collected in 0.09s\n",
+                 "tests/test_other.py::test_a\nERROR tests/test_bad.py\n"):
+        row = _widget_row((text, False))
+        assert row["status"] == cm.NOT_DETERMINABLE, text
+        assert not _says_collected(row), text
+        assert not any("NOT collected" in str(e) for e in row["evidence"]), text
+        assert any("NOT DETERMINABLE" in str(e) for e in row["evidence"]), text
+        sound = _widget_row((text, True))
+        assert sound["status"] == cm.IMPLEMENTED_NOT_PROVEN, text
+
+    # the file's own error line outranks a listing of it
+    own = _widget_row((listed + f"ERROR {_WIDGET} - boom\n", False))
+    assert own["status"] == cm.NOT_DETERMINABLE and not _says_collected(own)
+
+    for ok in (1, None, "yes", 0, "", 2):
+        row = _widget_row((listed, ok))
+        assert row["status"] == cm.NOT_DETERMINABLE, ok
+        assert not _says_collected(row), ok
+
+
+def test_an_error_line_for_the_tests_file_is_not_a_collected_test():
+    """The substring form took `ERROR tests/test_widget.py` for the file being
+    collected. Both spellings pytest prints (summary line, section header), and a
+    node-level error, make that file's half NOT_DETERMINABLE even with `ok` true --
+    a caller can pass one. An error in another file does not touch it."""
+    for text in (f"ERROR {_WIDGET}\n",
+                 f"ERROR {_WIDGET} - ModuleNotFoundError: No module named 'x'\n",
+                 f"_ ERROR collecting {_WIDGET} _\n",
+                 f"{_WIDGET}::test_a\nERROR {_WIDGET}::test_b - boom\n"):
+        row = _widget_row((text, True))
+        assert row["status"] == cm.NOT_DETERMINABLE, text
+        assert not _says_collected(row), text
+    elsewhere = _widget_row((f"{_WIDGET}::test_a\nERROR tests/test_other.py\n", True))
+    assert elsewhere["status"] == cm.PROVEN
+    # a longer file name that merely starts with the reference's path is another file
+    longer = _widget_row((f"{_WIDGET}::test_a\nERROR {_WIDGET}x\n", True))
+    assert longer["status"] == cm.PROVEN
+
+
+@pytest.mark.parametrize("ref,text,collected", [
+    # the reference is a file: some node id of that file
+    pytest.param(_WIDGET, f"{_WIDGET}::test_a\n", True, id="file-listed"),
+    pytest.param(_WIDGET, "tests/test_other.py::test_a\n", False, id="file-not-listed"),
+    pytest.param(_WIDGET, f"other/{_WIDGET}::test_a\n", False,
+                 id="file-path-suffix-is-not-the-path"),
+    pytest.param(_WIDGET, f"{_WIDGET}.bak::test_a\n", False, id="file-longer-name"),
+    pytest.param("tests/test_widget", f"{_WIDGET}::test_a\n", False,
+                 id="file-prefix-of-a-name"),
+    pytest.param("tests", f"{_WIDGET}::test_a\n", False, id="file-a-directory"),
+    pytest.param(" " + _WIDGET, f"{_WIDGET}::test_a\n", False, id="file-leading-space"),
+    pytest.param(_WIDGET.upper(), f"{_WIDGET}::test_a\n", False, id="file-upper-case"),
+    # the reference is a node: that line, its parametrized ids, or what is inside it
+    pytest.param(f"{_WIDGET}::test_a", f"{_WIDGET}::test_a\n", True, id="node-listed"),
+    pytest.param(f"{_WIDGET}::test_a", f"{_WIDGET}::test_a_extended\n", False,
+                 id="node-is-a-prefix-of-another-name"),
+    pytest.param(f"{_WIDGET}::test_a", "tests/test_other.py::test_a\n", False,
+                 id="node-same-name-in-another-file"),
+    pytest.param(f"{_WIDGET}::test_a", f"{_WIDGET}::TestK::test_a\n", False,
+                 id="node-same-name-in-a-class"),
+    pytest.param(f"{_WIDGET}::test_a", f"{_WIDGET}::test_a[1]\n{_WIDGET}::test_a[2]\n",
+                 True, id="node-parametrized-ids"),
+    pytest.param(f"{_WIDGET}::test_a[2]", f"{_WIDGET}::test_a[1]\n{_WIDGET}::test_a[2]\n",
+                 True, id="node-one-parameter"),
+    pytest.param(f"{_WIDGET}::test_a[3]", f"{_WIDGET}::test_a[1]\n{_WIDGET}::test_a[2]\n",
+                 False, id="node-parameter-not-listed"),
+    pytest.param(f"{_WIDGET}::TestK", f"{_WIDGET}::TestK::test_m\n", True,
+                 id="node-class-with-a-test"),
+    pytest.param(f"{_WIDGET}::TestK::test_m", f"{_WIDGET}::TestK::test_m\n", True,
+                 id="node-method-listed"),
+    pytest.param(f"{_WIDGET}::TestK::test_m", f"{_WIDGET}::TestK::test_mm\n", False,
+                 id="node-method-prefix"),
+    pytest.param(f"{_WIDGET}::test_a", f"{_WIDGET}::test_a\r\n", True,
+                 id="node-crlf-line"),
+    pytest.param(f"{_WIDGET}::test_a\n", f"{_WIDGET}::test_a\n", False,
+                 id="node-reference-holds-a-newline"),
+])
+def test_collected_means_the_exact_node_id(ref, text, collected):
+    """With `ok` true and nothing listed an error, only the exact node id counts:
+    IMPLEMENTED_NOT_PROVEN is the word for a symbol whose test was *not* collected."""
+    row = _widget_row((text, True), test=ref)
+    assert _says_collected(row) is collected, (ref, text)
+    assert row["status"] == (cm.PROVEN if collected else cm.IMPLEMENTED_NOT_PROVEN)
+    if not collected:
+        assert any("NOT collected" in str(e) for e in row["evidence"])
+
+
+def test_a_test_probe_that_could_not_be_measured_is_not_missing():
+    """`kind: test` answered MISSING for a collection it could not read -- a statement
+    about the software from a probe that never ran. NOT_DETERMINABLE, as for the symbol
+    kinds; and MISSING stays the answer for a collection that is sound and lacks it."""
+    probe = {"kind": "test", "test": f"{_WIDGET}::test_a"}
+    for collection in (None, ("", False), (f"ERROR {_WIDGET}\n", True), "not a tuple"):
+        row = cm.classify({"id": "X", "name": "x", "probe": probe}, {}, collection, {})
+        assert row["status"] == cm.NOT_DETERMINABLE, collection
+    sound = cm.classify({"id": "X", "name": "x", "probe": probe}, {},
+                        ("tests/test_other.py::test_b\n", True), {})
+    assert sound["status"] == cm.MISSING
+    there = cm.classify({"id": "X", "name": "x", "probe": probe}, {},
+                        (f"{_WIDGET}::test_a\n", True), {})
+    assert there["status"] == cm.PROVEN
+
+
+def test_an_unreadable_collection_or_reference_fails_closed_per_row():
+    """Nothing here may raise out of `classify` -- one malformed value took all 184
+    rows down before -- and nothing here may read as collected."""
+    for collection in ("tests/test_widget.py", (None, True), (b"tests/x", True),
+                       ("only one",), ("a", True, "extra"), 5, {"a": 1, "b": 2}):
+        row = _widget_row(collection)
+        assert row["status"] == cm.NOT_DETERMINABLE, collection
+    for ref in (["tests/test_widget.py"], {"x": 1}, 5, "\x00", "::"):
+        row = _widget_row((f"{_WIDGET}::test_a\n", True), test=ref)
+        assert row["status"] in (cm.NOT_DETERMINABLE, cm.IMPLEMENTED_NOT_PROVEN), ref
+        assert not _says_collected(row), ref
+
+
+def _project(path: Path, **files: str) -> Path:
+    """A throwaway pytest project: `files` maps a name under `tests/` to its source."""
+    (path / "tests").mkdir(parents=True)
+    (path / "pytest.ini").write_text("[pytest]\ntestpaths = tests\n", encoding="utf-8")
+    for name, source in files.items():
+        (path / "tests" / name).write_text(source, encoding="utf-8")
+    return path
+
+
+def test_collection_that_pytest_itself_calls_failed_is_not_a_collected_test(
+        tmp_path, monkeypatch):
+    """The whole path with a real pytest: one test file that cannot be imported makes
+    pytest exit non-zero while still listing the other file's tests. The broken file's
+    half is NOT_DETERMINABLE (it is not even mentioned as "collected"), the good file's
+    stays PROVEN -- one broken file does not demote the rest -- and a node the failed
+    collection does not list is undecidable, not "not collected". Control: the same
+    project without the broken file is sound, and then absence is a finding."""
+    broken = _project(tmp_path / "broken", **{
+        "test_good.py": "def test_one():\n    pass\n",
+        "test_bad.py": "import not_a_module_for_this_test\n\ndef test_two():\n    pass\n"})
+    monkeypatch.setattr(cm, "HOH", broken)
+    text, ok = cm._collected()
+    assert ok is False
+    assert "tests/test_good.py::test_one" in text          # listed
+    assert "ERROR tests/test_bad.py" in text
+    for ref in ("tests/test_good.py", "tests/test_good.py::test_one"):
+        row = _widget_row((text, ok), test=ref)
+        assert row["status"] == cm.PROVEN and _says_collected(row), ref
+    for ref in ("tests/test_bad.py", "tests/test_bad.py::test_two",
+                "tests/test_good.py::test_two", "tests/test_missing.py"):
+        row = _widget_row((text, ok), test=ref)
+        assert row["status"] == cm.NOT_DETERMINABLE, ref
+        assert not _says_collected(row), ref
+
+    sound = _project(tmp_path / "sound", **{"test_good.py": "def test_one():\n    pass\n"})
+    monkeypatch.setattr(cm, "HOH", sound)
+    text, ok = cm._collected()
+    assert ok is True
+    row = _widget_row((text, ok), test="tests/test_good.py::test_one")
+    assert row["status"] == cm.PROVEN and _says_collected(row)
+    absent = _widget_row((text, ok), test="tests/test_good.py::test_two")
+    assert absent["status"] == cm.IMPLEMENTED_NOT_PROVEN
+
+
+def test_pytest_collecting_nothing_is_not_a_sound_collection(tmp_path, monkeypatch):
+    """Exit code 5 -- no tests collected -- is not 0: an empty `tests/` is not a suite
+    that holds the named test, and it is not one that lacks it either."""
+    monkeypatch.setattr(cm, "HOH", _project(tmp_path / "empty", **{"test_x.py": "x = 1\n"}))
+    text, ok = cm._collected()
+    assert ok is False
+    assert _widget_row((text, ok), test="tests/test_x.py")["status"] == cm.NOT_DETERMINABLE
+
+
+def test_collection_output_that_is_not_utf8_does_not_take_the_matrix_down(monkeypatch):
+    """`text=True` raised UnicodeDecodeError out of `measure()` and with it every row.
+    The output is decoded with replacement characters, which cannot spell a node id."""
+    real = cm.subprocess.run
+    script = ("import sys; sys.stdout.buffer.write("
+              "b'tests/test_widget.py::test_a\\n\\xff\\xfe\\n')")
+
+    def run(args, **kw):
+        return real([sys.executable, "-c", script], **{
+            k: v for k, v in kw.items() if k in ("capture_output", "text", "errors")})
+
+    monkeypatch.setattr(cm.subprocess, "run", run)
+    text, ok = cm._collected()
+    assert ok is True
+    assert "tests/test_widget.py::test_a" in text
+    assert _widget_row((text, ok), test=f"{_WIDGET}::test_a")["status"] == cm.PROVEN

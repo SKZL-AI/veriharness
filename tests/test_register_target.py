@@ -29,8 +29,8 @@ import pytest
 from hoh import cli
 from hoh import storage_registry as sr
 from hoh import storage_ephemeral as se
-from test_ephemeral_wiring import (Admission, Fake, beside_the_arenas, documents,
-                                   records, through_the_cli)
+from test_ephemeral_wiring import (Fake, beside_the_arenas, documents, records,
+                                   through_the_cli)
 from test_storage_tiers import PROJECT, World, isolated_env  # noqa: F401  (autouse fixture)
 
 NEW = "hoh-t1"          # the project a fresh target is registered as

@@ -22,8 +22,10 @@ from hoh.controller import DispatchError
 
 # The harness of the surfaces tests, imported by name: the autouse `_isolation` stub
 # applies to this module as it does there.
-from test_surfaces import (World, _isolation, _race_world, _summary,  # noqa: F401
-                           world)
+from test_surfaces import World, _isolation, _race_world, _summary  # noqa: F401
+from test_surfaces import world as world  # a fixture, found by pytest by name; the alias form is an explicit re-export, so
+# a test parameter named `world` is not a redefinition of an unused import (F811)
+
 
 
 # --------------------------------------------------------------------------- #

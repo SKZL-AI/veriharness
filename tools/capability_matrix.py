@@ -65,10 +65,71 @@ def _symbols() -> dict[str, list[str]]:
 
 
 def _collected() -> tuple[str, bool]:
-    """pytest's own collection, so a named test is checked and not assumed."""
+    """pytest's own collection, so a named test is checked and not assumed.
+
+    Returns `(stdout, ok)`. `ok` is true only when pytest exited 0: it exits
+    non-zero on a collection error (1, or 2 when it is interrupted), when it
+    collected nothing (5) and on a usage or internal error (3, 4). What it listed
+    on such an exit is still what it collected, and what it did not list is not
+    evidence of absence: `_test_seen` reads the two differently. Output that is
+    not valid UTF-8 is decoded with replacement characters, which can never
+    spell a node id, rather than raised out of `measure()` and losing every row.
+    """
     p = subprocess.run([sys.executable, "-m", "pytest", "--collect-only", "-q"],
-                       cwd=str(HOH), capture_output=True, text=True)
+                       cwd=str(HOH), capture_output=True, text=True,
+                       errors="replace")
     return p.stdout, p.returncode == 0
+
+
+def _test_seen(test_ref: str, collection) -> tuple[bool | None, str]:
+    """Is `test_ref` among the tests pytest collected: `(True | False | None, why)`.
+
+    `None` means this collection cannot say, and the caller must never read it as
+    "collected" nor as "not collected" (O220/F7, O223/M12). It is returned when there
+    is no collection; when the collection is not `(str, bool)`; when the reference is
+    not a non-blank `str`; when the text names the reference's file on an `ERROR` line
+    (`ERROR tests/test_x.py`, `_ ERROR collecting tests/test_x.py _`: a file that could
+    not be imported); and, for a collection pytest did not exit 0 on, when the node is
+    not listed -- a failed collection can show what was collected and cannot show what
+    was not (it lists nothing at all on exit 5 or 4, and a file it never reached has no
+    `ERROR` line either).
+
+    The decision is **per file**, not per run (PM13): pytest lists the node ids of the
+    files it could import even when it exits 2, and one broken file elsewhere says
+    nothing about whether *this* file's tests exist. Demoting every test-probed row on
+    one unrelated collection error would turn an instrument defect into 65 false
+    findings about the software.
+
+    A match is **exact**, on whole node-id lines as `pytest --collect-only -q` prints
+    them. The reference is either a file (`tests/test_x.py`: some node id starts
+    `tests/test_x.py::`) or a node (`tests/test_x.py::test_a`: that line, or its
+    parametrized `[..]` ids, or the tests inside that class `::`). It is never a
+    substring of the whole output: that matched `ERROR tests/test_x.py` on a file that
+    failed to import, matched `test_a` inside `test_a_extended` and inside another
+    file's `test_a`, and matched a bare `tests`.
+    """
+    if collection is None:
+        return None, "no collection was taken"
+    try:
+        text, ok = collection
+    except (TypeError, ValueError):
+        return None, "the collection is not (stdout, ok)"
+    if not isinstance(text, str) or not isinstance(ok, bool):
+        return None, "the collection is not (stdout text, exit-code-was-zero bool)"
+    if not isinstance(test_ref, str) or not test_ref.strip():
+        return None, f"the test reference {test_ref!r} is not a node id"
+    path = test_ref.split("::", 1)[0]
+    if re.search(r"(?m)^(?:_+ )?ERROR(?: collecting)? " + re.escape(path)
+                 + r"(?= |$|::)", text):
+        return None, f"pytest reports a collection error in {path}"
+    lines = [line.strip() for line in text.splitlines()]
+    if any(line == test_ref or line.startswith((test_ref + "::", test_ref + "["))
+           for line in lines):
+        return True, ""
+    if ok:
+        return False, ""
+    return None, ("pytest collection did not exit 0 and does not list it: a failed "
+                  "collection cannot show that a test was not collected")
 
 
 def _board() -> dict[str, tuple[str, str]]:
@@ -447,13 +508,15 @@ def classify(req: dict, symbols, collection, board,
     test_ref = probe.get("test")
     test_seen = None
     if test_ref:
-        if collection is None:
-            test_seen = None
-        else:
-            text, ok = collection
-            test_seen = (test_ref in text) or (test_ref.split("::")[-1] in text)
-            evidence.append(f"test {test_ref}: "
-                            + ("collected" if test_seen else "NOT collected"))
+        test_seen, why = _test_seen(test_ref, collection)
+        # Three-valued on purpose: `None` is "this collection cannot say" and it
+        # must never print as "collected" -- the old text test did, for a file
+        # that failed to import (O220/F7, O223/M12).
+        evidence.append(
+            f"test {test_ref}: "
+            + ("collected" if test_seen
+               else "NOT collected" if test_seen is False
+               else f"NOT DETERMINABLE ({why})"))
 
     row_name = probe.get("row")
     row_state = None
@@ -480,7 +543,7 @@ def classify(req: dict, symbols, collection, board,
         else:
             status = IMPLEMENTED_NOT_PROVEN
     elif kind == "test":
-        if collection is None:
+        if collection is None or (test_ref and test_seen is None):
             status = NOT_DETERMINABLE
         else:
             status = PROVEN if test_seen else MISSING
@@ -530,6 +593,13 @@ def classify(req: dict, symbols, collection, board,
     # sufficient one -- a named test that is *executed and passes* -- is O220/F7,
     # still unimplemented because `_collected()` binds pytest's return code and
     # discards it.
+    #
+    # Added by the p2inst strand (O220/F7, O223/M12; the sentence above stays as
+    # the record of what stood until then): the return code is no longer
+    # discarded. A test half is NOT_DETERMINABLE when pytest reports an error in
+    # the test's file, or exited non-zero without listing it, and "collected"
+    # means the exact node id, not a substring (`_test_seen`). That is still
+    # *collected*, not *passed*: the executed-and-passes form is a P3 item.
     if status == PROVEN and kind in ("symbol", "method") and graph is not None:
         module = ""
         at_an_entry_point = False

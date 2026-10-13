@@ -169,22 +169,43 @@ def test_a_capsule_from_another_history_is_a_gap_not_a_pass(tmp_path):
 
 def test_a_moved_head_is_drift_and_says_how_far(tmp_path):
     """The capsule is not wrong about the past; it is stale about the present,
-    and a successor deserves to know by how much.
+    and a successor deserves to know by how much -- and what moved.
 
     O187. This read `HEAD~1` and expected drift, which stopped being true the
     day O184 made a one-commit distance correct when that commit is the
-    capsule's own -- and the last commit of a phase close is exactly that. Two
-    commits back is drift under the narrow rule for any history, so the case
-    no longer depends on what the tip happens to contain.
+    capsule's own. It then read `HEAD~2` and expected "moved 2 commit(s)",
+    which stopped being true in a history with merges (`HEAD~2` follows first
+    parents; the count does not: 7 on the tree this was corrected in) and
+    stops meaning drift at all under the records-only rule
+    (`tests/test_succession_records_window.py`). So the case is a scratch
+    repository with two commits that each move a source file: drift, two,
+    and the path named.
     """
-    capsule = _capsule(tmp_path)
-    grandparent = su._git("rev-parse", "HEAD~2")
-    if not grandparent:
-        import pytest
-        pytest.skip("fewer than two parent commits in this checkout")
-    capsule["internal_commit"] = grandparent
-    verdict, detail = _verdict(capsule, "internal_commit")
-    assert verdict == su.DRIFT and "moved 2 commit(s)" in detail
+    repo = tmp_path / "repo"
+    repo.mkdir()
+
+    def git(*a):
+        return subprocess.run(["git", "-C", str(repo), *a], capture_output=True,
+                              text=True, check=True).stdout.strip()
+    git("init", "-q")
+    git("config", "user.email", "t@example.invalid")
+    git("config", "user.name", "t")
+    (repo / "README.md").write_text("one\n")
+    git("add", "-A"); git("commit", "-qm", "first")
+    base = git("rev-parse", "HEAD")
+    for n in (1, 2):
+        (repo / "src").mkdir(exist_ok=True)
+        (repo / "src" / f"m{n}.py").write_text(f"n = {n}\n")
+        git("add", "-A"); git("commit", "-qm", f"source {n}")
+
+    old_hoh, old_capsule = su.HOH, su.CAPSULE
+    try:
+        su.HOH, su.CAPSULE = repo, repo / "dogfood/succession/SUCCESSION.json"
+        verdict, detail = _verdict({"internal_commit": base}, "internal_commit")
+    finally:
+        su.HOH, su.CAPSULE = old_hoh, old_capsule
+    assert verdict == su.DRIFT and "moved 2 commit(s)" in detail, detail
+    assert "src/m1.py" in detail and "src/m2.py" in detail and "not record paths" in detail, detail
 
 
 def test_the_commit_that_records_the_capsule_is_not_drift(tmp_path):
@@ -213,16 +234,29 @@ def test_the_commit_that_records_the_capsule_is_not_drift(tmp_path):
     old_hoh, old_capsule = su.HOH, su.CAPSULE
     try:
         su.HOH, su.CAPSULE = repo, repo / capsule_rel
-        assert su._only_the_capsule_moved(base, head) is True
+        ok, detail, window = su._records_only_since(base, head)
+        assert ok is True and window == [head], detail
 
         # The negative control, and it is the whole point: the same shape of
-        # commit carrying one more file is drift.
+        # commit carrying one more file that is not a record is drift.
         (repo / "other.md").write_text("two\n")
         (repo / capsule_rel).write_text("{ }\n")
         git("add", "-A"); git("commit", "-qm", "capsule and more")
-        assert su._only_the_capsule_moved(head, git("rev-parse", "HEAD").stdout.strip()) is False
-        # And two commits of distance is drift even if both are the capsule.
-        assert su._only_the_capsule_moved(base, git("rev-parse", "HEAD").stdout.strip()) is False
+        ok, detail, _ = su._records_only_since(head, git("rev-parse", "HEAD").stdout.strip())
+        assert ok is False and "other.md is not a record path" in detail, detail
+        # Two commits of distance are not drift when both are records -- the
+        # capsule twice, here; the closure record and the attribution entry in
+        # a real closure (`tests/test_succession_records_window.py`).
+        head2 = git("rev-parse", "HEAD").stdout.strip()
+        (repo / capsule_rel).write_text("{  }\n")
+        git("add", "-A"); git("commit", "-qm", "capsule again")
+        head3 = git("rev-parse", "HEAD").stdout.strip()
+        ok, detail, window = su._records_only_since(head2, head3)
+        assert ok is True and window == [head3], detail
+        # The rule is about the tree diff, not the count: from `head`, `other.md`
+        # is still what differs, three commits on.
+        ok, detail, _ = su._records_only_since(head, head3)
+        assert ok is False and "other.md" in detail, detail
     finally:
         su.HOH, su.CAPSULE = old_hoh, old_capsule
 

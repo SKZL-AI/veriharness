@@ -16,7 +16,10 @@ import pytest
 from hoh import cli, legacy_scratch as ls
 from hoh import storage_registry as sr
 from hoh import storage_tiers as st
-from test_storage_registry import fake, git, isolated_env  # noqa: F401  (fixtures)
+from test_storage_registry import git, isolated_env  # noqa: F401  (fixtures)
+from test_storage_registry import fake as fake  # a fixture, found by pytest by name; the alias form is an explicit re-export, so
+# a test parameter named `fake` is not a redefinition of an unused import (F811)
+
 from test_storage_registry_legacy import World, archive_into, commit_file
 from test_verified_relocation import _removal_functions
 

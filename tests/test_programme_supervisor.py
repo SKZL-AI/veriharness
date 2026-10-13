@@ -485,17 +485,53 @@ def test_main_exit_code_follows_complete_a_finding_is_1_none_is_0(tmp_path, monk
 
 
 def test_this_programmes_p2_capsule_is_built_from_the_real_register():
-    """Catches the binding working only on synthetic data."""
+    """Catches the binding working only on synthetic data, and a status that is copied
+    rather than derived.
+
+    Re-stated 2026-10-12 (strand frontier3). Until the O266 records merge this asserted
+    that some P2 item was still EVIDENCE_PENDING ("P2 is the open frontier"); O266
+    recorded every P2 row PROVEN, so that premise is false and the true state is the one
+    below: P2's capability coverage is closed -- every P2 item VERIFIED, derived from the
+    matrix -- and P2 is still not closed, because its exit is held by the checklist-gate
+    instruments of `tools/build_plan.py` (see `tests/test_programme_checklist.py`), of
+    which the supervisor review is the one this binding serves: the preserved reviews
+    still leave release-blocking findings open against this very snapshot, so the capsule
+    is the brief of a review that is due, not the record of one that closed the phase.
+    """
     if not ps.REGISTER.is_file() or not ps.MATRIX.is_file():
         pytest.skip("the register and matrix are internal")
     register = json.loads(ps.REGISTER.read_text(encoding="utf-8"))
     matrix = json.loads(ps.MATRIX.read_text(encoding="utf-8"))
+    measured = {c["id"]: c.get("status") for c in matrix["capabilities"]}
     capsule = ps.capsule_for("P2", register=register, matrix=matrix)
     p2 = [r["id"] for r in register["requirements"] if r["target_phase"] == "P2"]
     assert capsule.selection.considered == len(p2)
     assert {i.phase for i in capsule.snapshot.items} == {"P2"}
-    # P2 is the open frontier: some item in the capsule is still pending.
-    assert any(i.status is Status.EVIDENCE_PENDING for i in capsule.snapshot.items)
+    # Capability coverage of P2 is closed (O266): every row PROVEN, every item VERIFIED,
+    # none pending -- and the one follows from the other, nothing here is copied.
+    assert all(measured.get(i) == "PROVEN" for i in p2), \
+        [i for i in p2 if measured.get(i) != "PROVEN"]
+    assert {i.status for i in capsule.snapshot.items} == {Status.VERIFIED}
+    assert not any(i.status is Status.EVIDENCE_PENDING for i in capsule.snapshot.items)
+    # Derived, not copied, shown on the real data: the first phase of the register whose
+    # rows are not all PROVEN has exactly its PROVEN rows VERIFIED and the rest pending
+    # (an item `P2-07+<extra>` shares the measurement of its requirement).
+    control = next(r["target_phase"] for r in register["requirements"]
+                   if measured.get(r["id"]) != "PROVEN")
+    assert control != "P2"
+    other = ps.capsule_for(control, register=register, matrix=matrix)
+    assert any(i.status is Status.EVIDENCE_PENDING for i in other.snapshot.items)
+    for item in other.snapshot.items:
+        proven = measured.get(item.item_id.split("+", 1)[0]) == "PROVEN"
+        assert (item.status is Status.VERIFIED) == proven, (item.item_id, item.status)
+    # Not closed: the preserved reviews still hold findings open that fit this snapshot
+    # -- among them every release-blocking one the checklist binding lists -- so the
+    # gate's supervisor-review condition is unmet and this capsule is a brief for a
+    # review that is due. (The final closure sequence resolves them and re-states this.)
+    still_open = ps.open_findings_for("P2", snapshot=capsule.snapshot)
+    assert still_open, "no open finding: the review condition would be met"
+    blocking = set(ps.programme_checklist._preserved_release_blocking_findings())
+    assert blocking and blocking <= set(still_open), sorted(blocking - set(still_open))
 
 
 # --------------------------------------------------------------------------- #
@@ -615,3 +651,344 @@ def test_a_no_action_that_calls_itself_critical_is_not_a_finding_of_nothing():
     quiet = _record([_no_action("F-0", severity="low")], {})
     assert quiet.blocking_findings == ()
     assert quiet.complete is True
+
+
+# --------------------------------------------------------------------------- #
+# O231/N2: a later review resolves a finding by naming the review that raised it
+# --------------------------------------------------------------------------- #
+#
+# `resolution_state` keyed on the bare finding id, so a later `NO_ACTION` of an id
+# resolved any earlier finding of that id and nothing checked that the resolver was about
+# *that* finding. The ten ids the review of 20260924T134525Z settled stay settled by the
+# rule of their time; a review stamped after `NAMED_RESOLUTION_AFTER` must name what it
+# resolves, and the canonical brief has to tell its supervisor how.
+
+RAISED = "20260924T0030Z"          # a review that raised F-1 and F-2
+LATER = "20261012T0900Z"           # after the cutoff
+BEFORE_CUTOFF = "20260925T0000Z"
+
+
+def _ref(review: str, fid: str) -> str:
+    """The evidence ref that names a raised finding, spelled out and not derived: the
+    format is the contract, so the tests do not call the function that produces it."""
+    return f"dogfood/p2-gate/{review}/findings.json#{fid}"
+
+
+def _quiet(fid, *refs, severity="low") -> dict:
+    """A supervisor saying there is nothing at `fid`, citing `refs`."""
+    return {**_no_action(fid, severity=severity), "evidence_refs": list(refs)}
+
+
+def _open_after(*reviews) -> list[str]:
+    still_open, _resolved = ps.resolution_state(list(reviews))
+    return sorted(still_open)
+
+
+def test_the_cutoff_is_the_day_of_the_change_and_a_stamp_not_the_clock():
+    """The constant is pinned because moving it re-judges history. It is a stamp, read
+    through `_stamp_key` like every other review comparison, never `datetime.now()`."""
+    assert ps.NAMED_RESOLUTION_AFTER == "20261011T000000Z"
+    assert ps._stamp_key(ps.NAMED_RESOLUTION_AFTER) == ("20261011", "000000")
+    assert ps.review_ref("20260924T0030Z", "F-1") == \
+        "dogfood/p2-gate/20260924T0030Z/findings.json#F-1"
+
+
+@pytest.mark.parametrize("refs", [
+    pytest.param([], id="names-nothing"),
+    pytest.param(["dogfood/p2-gate/20260924T130000Z/findings.json#F-1"], id="another-review"),
+    pytest.param(["dogfood/p2-gate/20260924T0030Z/findings.json#F-2"], id="another-finding"),
+    pytest.param(["dogfood/p2-gate/20260924T0030Z/findings.json"], id="no-anchor"),
+    pytest.param(["20260924T0030Z"], id="the-stamp-alone"),
+    pytest.param([" dogfood/p2-gate/20260924T0030Z/findings.json#F-1"], id="leading-space"),
+    pytest.param(["dogfood/p2-gate/20260924T0030Z/findings.json#F-1 "], id="trailing-space"),
+    pytest.param(["DOGFOOD/P2-GATE/20260924T0030Z/findings.json#F-1"], id="upper-case"),
+    pytest.param(["x/dogfood/p2-gate/20260924T0030Z/findings.json#F-1"], id="path-prefix"),
+    pytest.param([None, 5, ["dogfood/p2-gate/20260924T0030Z/findings.json#F-1"]],
+                 id="not-strings"),
+    pytest.param("dogfood/p2-gate/20260924T0030Z/findings.json#F-1", id="a-string-not-a-list"),
+    pytest.param(None, id="none"),
+])
+def test_a_later_no_action_that_does_not_name_the_raising_review_resolves_nothing(refs):
+    """Wrong or missing name: the finding stays open, whatever the id spells."""
+    raised = (RAISED, [_finding("F-1"), _finding("F-2", items=("X-02",))])
+    quiet = {**_quiet("F-1"), "evidence_refs": refs}
+    still_open, resolved = ps.resolution_state([raised, (LATER, [quiet])])
+    assert sorted(still_open) == ["F-1", "F-2"] and resolved == []
+
+
+def test_a_no_action_that_resolved_nothing_is_listed_with_its_review():
+    """`unnamed_resolutions` is how the board says why a finding the supervisor answered
+    is still open; a finding it did resolve, and one answered before the cutoff, are not
+    listed."""
+    raised = (RAISED, [_finding("F-1"), _finding("F-2", items=("X-02",))])
+    later = (LATER, [_quiet("F-1"), _quiet("F-2", _ref(RAISED, "F-2"))])
+    assert ps.unnamed_resolutions([raised, later]) == [(LATER, "F-1")]
+    assert ps.unnamed_resolutions([raised, (BEFORE_CUTOFF, [_quiet("F-1")])]) == []
+    named_later = (LATER + "1", [_quiet("F-1", _ref(RAISED, "F-1"))])
+    assert ps.unnamed_resolutions([raised, later, named_later]) == []
+
+
+def test_a_later_no_action_that_names_the_raising_review_resolves_it():
+    """The positive control: only the evidence ref differs from the case above."""
+    raised = (RAISED, [_finding("F-1"), _finding("F-2", items=("X-02",))])
+    named = _quiet("F-1", _ref(RAISED, "F-1"))
+    still_open, resolved = ps.resolution_state([raised, (LATER, [named])])
+    assert sorted(still_open) == ["F-2"] and resolved == ["F-1"]
+    # one name among others is enough, and the order of the findings does not matter
+    mixed = _quiet("F-1", "tools/x.py#y", _ref(RAISED, "F-1"), "docs/z.md")
+    assert _open_after(raised, (LATER, [mixed])) == ["F-2"]
+    assert _open_after((LATER, [mixed]), raised) == ["F-2"]
+
+
+def test_a_review_stamped_up_to_the_cutoff_still_resolves_by_the_bare_id():
+    """Grandfathering by the clock of the review, not by the id: the stamp at the cutoff
+    and every earlier one keep the rule they were written under, and one second after it
+    does not. The 20260924T134525Z review is why."""
+    raised = (RAISED, [_finding("F-1")])
+    assert _open_after(raised, (BEFORE_CUTOFF, [_quiet("F-1")])) == []
+    assert _open_after(raised, ("20261011T000000Z", [_quiet("F-1")])) == []
+    assert _open_after(raised, ("20261011T000001Z", [_quiet("F-1")])) == ["F-1"]
+    assert _open_after(raised, ("20261011T0000Z", [_quiet("F-1")])) == []   # same instant
+
+
+def test_the_ten_ids_the_last_review_settled_stay_settled():
+    """F3 F4 F5 F6 F9 F12 F14 M2 M3 M10, by the shape the preserved reviews have: raised
+    in two reviews, answered by bare id with no `evidence_refs` by one stamped before the
+    cutoff. The same open set and the same resolved list as `resolution_state` gave
+    before this change -- nothing was re-judged."""
+    settled = ["F3", "F4", "F5", "F6", "F9", "F12", "F14", "M2", "M3", "M10"]
+    still = ["F1", "M1", "N1"]
+    first = ("20260924T0030Z", [_finding(i) for i in settled[:7] + ["F1"]])
+    second = ("20260924T130000Z", [_finding(i) for i in settled[7:] + ["M1"]])
+    third = ("20260924T134525Z",
+             [_finding("N1")] + [{**_no_action(i), "evidence_refs": []} for i in settled])
+    still_open, resolved = ps.resolution_state([third, second, first])
+    assert sorted(still_open) == sorted(still)
+    assert resolved == sorted(settled)
+
+
+def test_the_preserved_reviews_leave_the_same_open_and_resolved_sets():
+    """The same statement over the real preserved reviews of this tree, so the synthetic
+    shape above cannot drift from what is on disk: the reviews stamped up to the cutoff
+    leave exactly the ids the board has always read -- ten resolved, nineteen open."""
+    from conftest import Withheld, needs_evidence
+    needs_evidence(Withheld(
+        "dogfood/p2-gate/20260924T134525Z/findings.json", "internal-working-document",
+        "the preserved supervisor reviews are internal working documents"))
+    history = [(name, found) for name, found in ps.preserved_reviews(
+        ps.REVIEW_ROOT, repo=ps.HOH)
+        if ps._stamp_key(name) <= ps._stamp_key("20261011T000000Z")]
+    assert [name for name, _ in history][:3] == [
+        "20260924T0030Z", "20260924T130000Z", "20260924T134525Z"]
+    still_open, resolved = ps.resolution_state(history)
+    assert resolved == sorted(["F3", "F4", "F5", "F6", "F9", "F12", "F14", "M2", "M3", "M10"])
+    assert sorted(still_open) == sorted([
+        "F1", "F2", "F7", "F8", "F10", "F11", "F13",
+        "M1", "M4", "M5", "M6", "M7", "M8", "M9", "M12", "N1", "N2", "N3", "N4"])
+
+
+def test_a_review_does_not_resolve_its_own_finding():
+    """A review that raises F-1 and, in the same file, names itself in a `NO_ACTION` of
+    F-1 has contradicted itself, not looked again: only a *strictly earlier* review can
+    have raised what this one resolves."""
+    same = (LATER, [_finding("F-1"), _quiet("F-1", _ref(LATER, "F-1"))])
+    assert _open_after(same) == ["F-1"]
+
+
+def test_a_finding_raised_again_after_a_resolution_must_be_named_afresh():
+    """The resolution belongs to the raise it named. Raised in A, resolved naming A,
+    raised again in C: a later NO_ACTION that cites A resolves nothing; one that cites C
+    does. (A review that raised it twice without a resolution holds it by either.)"""
+    a = ("20261012T0100Z", [_finding("F-1")])
+    b = ("20261012T0200Z", [_quiet("F-1", _ref(a[0], "F-1"))])
+    c = ("20261012T0300Z", [_finding("F-1")])
+    assert _open_after(a, b) == []
+    assert _open_after(a, b, c) == ["F-1"]
+    stale = ("20261012T0400Z", [_quiet("F-1", _ref(a[0], "F-1"))])
+    assert _open_after(a, b, c, stale) == ["F-1"]
+    fresh = ("20261012T0400Z", [_quiet("F-1", _ref(c[0], "F-1"))])
+    assert _open_after(a, b, c, fresh) == []
+    both = ("20261012T0150Z", [_finding("F-1")])
+    twice = ("20261012T0400Z", [_quiet("F-1", _ref(both[0], "F-1"))])
+    assert _open_after(a, both, twice) == []
+
+
+def test_naming_does_not_depend_on_the_order_the_reviews_are_given():
+    raised = (RAISED, [_finding("F-1")])
+    named = (LATER, [_quiet("F-1", _ref(RAISED, "F-1"))])
+    assert ps.resolution_state([raised, named]) == ps.resolution_state([named, raised])
+    bare = (LATER, [_quiet("F-1")])
+    assert ps.resolution_state([raised, bare]) == ps.resolution_state([bare, raised])
+
+
+def test_a_no_action_that_calls_itself_critical_is_a_raise_not_a_resolution():
+    """The severity rule is unchanged: naming a review does not make a critical
+    `NO_ACTION` a finding of nothing."""
+    raised = (RAISED, [_finding("F-1")])
+    loud = (LATER, [_quiet("F-1", _ref(RAISED, "F-1"), severity="critical")])
+    assert _open_after(raised, loud) == ["F-1"]
+
+
+# --- the brief tells the supervisor which review raised each open finding ---------
+
+def _brief_tree(tmp_path: Path, **reviews):
+    """`reviews` maps a stamp to the findings it returned; written where
+    `preserved_reviews` reads them. Returns (register, matrix, review root, repo)."""
+    root = tmp_path / "dogfood" / "p2-gate"
+    for stamp, found in reviews.items():
+        (root / stamp).mkdir(parents=True)
+        (root / stamp / "findings.json").write_text(json.dumps(found), encoding="utf-8")
+    return _register(), _matrix(X_01="PROVEN", X_02="MISSING", X_03="PROVEN"), root, tmp_path
+
+
+def _brief(tmp_path, before=None, **reviews):
+    register, matrix, root, repo = _brief_tree(tmp_path, **reviews)
+    return ps.canonical_brief(register=register, matrix=matrix, phase="PX",
+                              review_root=root, before=before, repo=repo)
+
+
+def test_the_canonical_brief_says_which_review_raised_each_open_finding(tmp_path):
+    """Without this a fresh supervisor cannot resolve anything, whatever it finds: the
+    exact string it must cite is derived here, per finding, from the preserved reviews."""
+    brief = _brief(tmp_path, **{RAISED: [_finding("F-1"), _finding("F-2", items=("X-02",))],
+                                 "20260924T130000Z": [_finding("M-1")]})
+    by_id = {o.finding_id: o for o in brief.open_finding_origins}
+    assert sorted(by_id) == ["F-1", "F-2", "M-1"]
+    assert by_id["F-1"].raised_by == [RAISED]
+    assert by_id["F-1"].resolve_with == [_ref(RAISED, "F-1")]
+    assert by_id["M-1"].resolve_with == [_ref("20260924T130000Z", "M-1")]
+    assert brief.resolution_rule == ps.RESOLUTION_RULE
+    assert "evidence_refs" in brief.resolution_rule and ps.NAMED_RESOLUTION_AFTER \
+        in brief.resolution_rule
+    printed = json.loads(brief.model_dump_json(by_alias=True))      # what --canonical-brief prints
+    assert printed["open_finding_origins"][0]["resolve_with"]
+    assert printed["resolution_rule"]
+
+
+def test_a_brief_with_no_open_finding_serializes_exactly_as_it_did_before(tmp_path):
+    """The two new fields are omitted when empty, so a capsule preserved before they
+    existed, and a brief of a tree with nothing open, dump and digest as they always did;
+    a record bound to such a capsule keeps its digest."""
+    brief = _brief(tmp_path)
+    assert brief.open_findings == [] and brief.open_finding_origins == []
+    printed = json.loads(brief.model_dump_json(by_alias=True))
+    assert "open_finding_origins" not in printed and "resolution_rule" not in printed
+    again = ps.ProgrammeCapsule.model_validate(printed)
+    assert ps.capsule_digest(again) == ps.capsule_digest(brief)
+    assert ps._sha256(printed) == ps.capsule_digest(brief)
+
+
+def test_end_to_end_only_a_review_that_names_the_raiser_changes_the_next_brief(tmp_path):
+    """The brief is built, a later review is written three ways, and the brief built
+    after it carries the finding exactly when the review did not name its raiser."""
+    raised = {RAISED: [_finding("F-1")]}
+    assert [f.finding_id for f in _brief(tmp_path / "a", **raised).open_findings] == ["F-1"]
+
+    cited = _ref(RAISED, "F-1")
+    for label, refs, still_carried in (("names it", [cited], False),
+                                       ("names nothing", [], True),
+                                       ("names another review",
+                                        [_ref("20260924T130000Z", "F-1")], True)):
+        brief = _brief(tmp_path / label.replace(" ", "-"),
+                       **raised, **{LATER: [_quiet("F-1", *refs)]})
+        carried = [f.finding_id for f in brief.open_findings]
+        assert (carried == ["F-1"]) is still_carried, label
+        assert (brief.open_finding_origins != []) is still_carried, label
+
+
+def test_the_brief_a_review_was_given_is_the_brief_the_gate_rebuilds_after_it(tmp_path):
+    """What the gate does: it rebuilds the brief `before` the review under check and
+    compares digests with the preserved capsule. Before this the rebuild already held the
+    review's own raises and resolutions, so a review that settled or raised anything could
+    never match its own brief -- built both ways, here. The review is the same one in all
+    three cases; only what it returns differs."""
+    cited = _ref(RAISED, "F-1")
+    for label, returned in (
+            ("resolves every open finding",
+             [_quiet("F-1", cited), _quiet("F-2", _ref(RAISED, "F-2"))]),
+            ("resolves", [_quiet("F-1", cited)]),
+            ("raises", [_finding("F-9", items=("X-02",))]),
+            ("returns nothing", [])):
+        root = tmp_path / label.replace(" ", "-")
+        given = _brief(root, **{RAISED: [_finding("F-1"), _finding("F-2", items=("X-02",))]})
+        register, matrix, review_root, repo = (_register(), _matrix(
+            X_01="PROVEN", X_02="MISSING", X_03="PROVEN"), root / "dogfood" / "p2-gate", root)
+        (review_root / LATER).mkdir()
+        (review_root / LATER / "findings.json").write_text(json.dumps(returned),
+                                                          encoding="utf-8")
+        rebuilt = ps.canonical_brief(register=register, matrix=matrix, phase="PX",
+                                     review_root=review_root, before=LATER, repo=repo)
+        assert ps.capsule_digest(rebuilt) == ps.capsule_digest(given), label
+        # and the operator's brief after the review (`before=None`) does see it
+        after = ps.canonical_brief(register=register, matrix=matrix, phase="PX",
+                                   review_root=review_root, before=None, repo=repo)
+        assert (ps.capsule_digest(after) != ps.capsule_digest(given)) is bool(returned), label
+
+
+def test_the_resolver_shape_in_the_brief_is_a_finding_the_product_accepts(tmp_path):
+    """PM4. `supervisor.validate` refuses a `NO_ACTION` that names a phase, and one
+    refused finding makes the whole review INCOMPLETE; so the brief says what a resolver
+    looks like, with an example, and the example is checked here against the product's
+    own validator, evidence-shape check and resolution rule -- filled in, it validates,
+    reads as a finding of nothing, and resolves what it names."""
+    from hoh import supervisor
+
+    brief = _brief(tmp_path, **{RAISED: [_finding("F-1")]})
+    assert json.dumps(ps.RESOLVER_EXAMPLE, sort_keys=True) in brief.resolution_rule
+    origin = brief.open_finding_origins[0]
+
+    filled = {**ps.RESOLVER_EXAMPLE, "finding_id": "F-1", "review_id": "R-later",
+              "reason": "looked at the item again and nothing is there",
+              "evidence_refs": [origin.resolve_with[0]],
+              "supervisor_provider": "independent-supervisor"}
+    capsule, snapshot, _ = _state()
+    assert supervisor.validate(filled, snapshot=snapshot) == []
+    assert ps.evidence_reference_problems(filled["evidence_refs"][0]) == []
+    assert ps._quiet(filled)
+    assert _open_after((RAISED, [_finding("F-1")]), (LATER, [filled])) == []
+
+    # why the example names no item: a phase is refused for NO_ACTION by the product
+    names_the_phase = {**filled, "item_ids": ["PX"]}
+    assert supervisor.validate(names_the_phase, snapshot=snapshot)
+    names_an_item = {**filled, "item_ids": ["X-01"]}
+    assert supervisor.validate(names_an_item, snapshot=snapshot) == []
+    # and a proposed action is refused for it
+    assert supervisor.validate({**filled, "proposed_action": "do it"}, snapshot=snapshot)
+
+
+def test_the_capsule_refuses_origins_that_do_not_describe_what_it_carries(tmp_path):
+    """The validator of `ProgrammeCapsule`: origins must name exactly the carried open
+    findings, once each, and come with the rule that reads them. A capsule file edited
+    to disagree with itself is not a brief (the gate reads that as "cannot be read as a
+    capsule")."""
+    brief = _brief(tmp_path, **{RAISED: [_finding("F-1"), _finding("F-2", items=("X-02",))]})
+    body = json.loads(brief.model_dump_json(by_alias=True))
+    assert len(body["open_finding_origins"]) == 2
+    ps.ProgrammeCapsule.model_validate(body)                       # the control
+
+    fewer = {**body, "open_finding_origins": body["open_finding_origins"][:1]}
+    foreign = {**body, "open_finding_origins": [
+        {**body["open_finding_origins"][0], "finding_id": "F-9"},
+        body["open_finding_origins"][1]]}
+    twice = {**body, "open_finding_origins": [body["open_finding_origins"][0]] * 2}
+    no_rule = {**body, "resolution_rule": ""}
+    for label, edited in (("fewer", fewer), ("foreign id", foreign), ("twice", twice),
+                          ("no rule", no_rule)):
+        with pytest.raises(ValidationError):
+            ps.ProgrammeCapsule.model_validate(edited)
+        assert label
+
+
+def test_a_finding_two_reviews_hold_open_names_both_raisers(tmp_path):
+    """`resolve_with` is "one per raiser": raised in two reviews and resolved by neither, it
+    is carried once, with both reviews in `raised_by` and a ref for each -- and either ref
+    resolves it (disclosed: naming one of several raisers resolves the id)."""
+    second = "20260925T0000Z"
+    reviews = [(RAISED, [_finding("F-1")]), (second, [_finding("F-1")])]
+    assert ps.resolution_origins(reviews) == {"F-1": [RAISED, second]}
+    brief = _brief(tmp_path, **{RAISED: [_finding("F-1")], second: [_finding("F-1")]})
+    origin = brief.open_finding_origins[0]
+    assert origin.raised_by == [RAISED, second]
+    assert origin.resolve_with == [_ref(RAISED, "F-1"), _ref(second, "F-1")]
+    for review in (RAISED, second):
+        assert _open_after(*reviews, (LATER, [_quiet("F-1", _ref(review, "F-1"))])) == []

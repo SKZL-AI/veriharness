@@ -30,11 +30,13 @@ from test_failure_classes import (  # noqa: F401  (repo is a fixture)
     history,
     pa_contract,
     pane,
-    repo,
 )
+from test_failure_classes import repo as repo  # a fixture, found by pytest by name; the alias form is an explicit re-export, so
+# a test parameter named `repo` is not a redefinition of an unused import (F811)
+
 
 from hoh import cli, dispatchrecovery, failures, quota, resumeloop, stages
-from hoh.contracts import Condition, Role, Stage
+from hoh.contracts import Condition, Role
 from hoh.controller import Controller, DispatchError
 from hoh.failures import NormalizedFailure as NF
 from hoh.dispatchrecovery import (

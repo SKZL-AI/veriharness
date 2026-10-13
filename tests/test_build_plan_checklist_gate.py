@@ -59,6 +59,9 @@ pc = ps.programme_checklist
 ITEMS = "P2.checklist-gate.all-phase-blocking-checklist-items-verified-or-validly-waive"
 REVIEW = "P2.checklist-gate.current-independent-checklist-supervisor-review-complete"
 FSCK = "P2.checklist-gate.checklistfsck-pass"
+#: The fourth mapped item (F13/M9): measured by the succession capsule, its own
+#: instrument and its own tests (`test_build_plan_succession_gate.py`).
+SUCCESSION = "P2.exit-includes.controller-session-replacement"
 BY_KIND = {"items": ITEMS, "review": REVIEW, "fsck": FSCK}
 LABEL = {"items": "checklist items", "review": "supervisor review", "fsck": "ChecklistFsck"}
 
@@ -118,7 +121,9 @@ THREE = [_item(ITEMS), _item(REVIEW), _item(FSCK)]
 
 
 def test_the_instrument_map_names_exactly_the_three_checklist_gate_items():
-    assert bp.CHECKLIST_GATE_ITEMS == {ITEMS: "items", REVIEW: "review", FSCK: "fsck"}
+    """And, since F13/M9, the one exit-includes item the capsule measures."""
+    assert bp.CHECKLIST_GATE_ITEMS == {ITEMS: "items", REVIEW: "review", FSCK: "fsck",
+                                       SUCCESSION: "succession"}
 
 
 def test_three_met_instruments_open_a_gate_that_no_requirement_claims(monkeypatch):
@@ -382,9 +387,51 @@ class Tree:
     def measures(self) -> dict:
         return bp.checklist_gate_measures()
 
+    def capsule(self, monkeypatch=None) -> None:
+        """Make the tree a repository of its own with every source a capsule field
+        re-derives from, commit it, write the capsule at that commit and commit the
+        capsule alone -- the shape of a closure. The instrument is a fresh copy of
+        the tool pointed here, as `build_plan` loads one per call."""
+        su = _load("succession", "succession_for_checklist_gate")
+        root = self.root
+
+        def put(rel, text):
+            (root / rel).parent.mkdir(parents=True, exist_ok=True)
+            (root / rel).write_text(text, encoding="utf-8")
+        put("docs/READINESS.md", "# Readiness\n\nMeasured at `abc1234` on 2026-10-11.\n\n"
+            "    TECHNICALLY_STABLE_READY = no\n\nOpen, and each one blocking: tests.\n")
+        put("dogfood/export-sync/EXPORT_SYNC_STATE.json",
+            json.dumps({"synced_export_commit": "e" * 40, "path_digests": {"a": "1"}}))
+        put(".github/releases/v0.1.0.json", json.dumps(
+            {"source_tag": "v0.1.0", "tag_object": "f" * 40, "source_commit": "a" * 40,
+             "sha256": {"w.whl": "0" * 64}}))
+        put("runs/r1/state.json", json.dumps({"stage": "DONE", "condition": "ACCEPTED"}))
+        put("DOGFOOD_LEDGER.md", "# ledger\n")
+        put("plan/01_goal.md", "one\n")
+        put(".gitignore", "runs/\n")
+        env = {**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@example.invalid",
+               "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@example.invalid",
+               "GIT_CONFIG_GLOBAL": "/dev/null", "GIT_CONFIG_SYSTEM": "/dev/null"}
+
+        def git(*a):
+            subprocess.run(["git", "-C", str(root), *a], check=True, capture_output=True, env=env)
+        git("init", "-q")
+        git("add", "-A")
+        git("commit", "-qm", "seal")
+        su.HOH, su.CAPSULE = root, root / bp.SUCCESSION_CAPSULE
+        os.environ[su.PLAN_ENV] = str(root / "plan")
+        self._plan_env = su.PLAN_ENV
+        assert su.write_capsule(root / "plan", su.CAPSULE) == 0
+        git("add", "-A")
+        git("commit", "-qm", "capsule")
+        bp._succession = lambda: su
+        self._su = su
+
 
 @pytest.fixture
 def tree(tmp_path, monkeypatch):
+    monkeypatch.setattr(bp, "_succession", bp._succession)  # restored after capsule()
+    monkeypatch.setenv("VERIHARNESS_PLAN_ROOT", os.environ.get("VERIHARNESS_PLAN_ROOT", ""))
     return Tree(tmp_path / "tree", monkeypatch)
 
 
@@ -431,9 +478,11 @@ def real_gate(tree, monkeypatch):
 
 def test_the_real_inventory_has_exactly_the_three_checklist_gate_items():
     needs_evidence(PROGRAM_REGISTER)
-    in_plan = {i["id"] for i in _real_scope()["items"]
-               if i["phase"] == "P2" and i["section"] == "Checklist gate:"}
-    assert in_plan == set(bp.CHECKLIST_GATE_ITEMS)
+    items = _real_scope()["items"]
+    in_plan = {i["id"] for i in items if i["phase"] == "P2" and i["section"] == "Checklist gate:"}
+    assert in_plan == {k for k, v in bp.CHECKLIST_GATE_ITEMS.items() if v != "succession"}
+    exits = {i["id"] for i in items if i["phase"] == "P2" and i["section"] == "Exit includes:"}
+    assert SUCCESSION in exits and bp.CHECKLIST_GATE_ITEMS[SUCCESSION] == "succession"
 
 
 def test_p2_opens_when_all_three_instruments_agree_and_not_before(real_gate):
@@ -444,9 +493,15 @@ def test_p2_opens_when_all_three_instruments_agree_and_not_before(real_gate):
     assert met is False and "supervisor review: the review record is missing" in why, why
     tree.review()
     met, why = gate()
+    # Fail closed before the tree has a capsule and a tool of its own: the tool
+    # `build_plan` loads judges the real repository, not this tree.
+    assert met is False and "succession capsule: " in why and "judges another tree" in why, why
+    tree.capsule()
+    met, why = gate()
     assert met is True, why
-    assert why == ("8 exit condition(s) met: 5 bound to a PROVEN requirement, "
-                   "3 measured by the checklist instruments")
+    assert why == ("8 exit condition(s) met: 4 bound to a PROVEN requirement, "
+                   "3 measured by the checklist instruments, 1 measured by the "
+                   "succession instrument (its claimant PROVEN besides)")
 
 
 def _stale(tree):

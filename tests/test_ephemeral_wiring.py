@@ -1223,12 +1223,20 @@ def test_a_run_id_the_product_makes_runs_an_iteration_through_the_controller(tmp
 
 def test_the_matrix_reads_proven_for_the_row_once_its_equivalent_is_removed():
     """W10. Catches a consumption cap that still holds (M11: no entry point names the module)
-    and a lift that could be had without the equivalent being removed: with the register's
-    own row for P2-42 the matrix says PARTIAL because of the equivalent, and PARTIAL
-    **capped for want of an importer** is the pin's reason, which this wiring removes --
-    `storage_ephemeral` is now named in an import statement by `src/hoh/cli.py`; the same row
-    with the equivalent removed (what a lift would do -- the orchestrator keeps the row PARTIAL at this merge, the `equivalent` stays and names what is missing) reads PROVEN. The
-    chain is import text (O222); what makes it more is W1-W8, which run it."""
+    and a lift that could be had without the equivalent being removed. As written at this
+    wiring's merge, the register's own row for P2-42 carried an `equivalent` and the matrix
+    said PARTIAL because of it, and the row with the equivalent removed (what a lift would
+    do) read PROVEN for the reason this wiring made true: `storage_ephemeral` is named in an
+    import statement by `src/hoh/cli.py`, so the pin's reason -- PARTIAL **capped for want of
+    an importer** -- is gone. The chain is import text (O222); what makes it more is W1-W8,
+    which run it.
+
+    Re-stated 2026-10-12 (strand frontier3): the lift was had. O266 removed the equivalent
+    (the register keeps it as `previous_equivalent`, with the day, the actor and the
+    evidence of the lift) and recorded the row PROVEN. So the row **as it is** reads
+    PROVEN, for that reason and uncapped, and the control is now the other way round: the
+    same row with the lifted equivalent put back reads PARTIAL, capped by it -- a lift is
+    had by removing the equivalent from the register and by nothing else."""
     import importlib.util
     import sys
 
@@ -1242,19 +1250,30 @@ def test_the_matrix_reads_proven_for_the_row_once_its_equivalent_is_removed():
     spec.loader.exec_module(cm)
     row = next(r for r in json.loads((ROOT / "program/v3_3/REQUIREMENTS.json").read_text())
                ["requirements"] if r["id"] == "P2-42")
+    # The lift is in the register, attributed: no equivalent on the probe any more, and
+    # the one there was is kept with the day, the actor and the evidence of its removal.
+    assert "equivalent" not in row["probe"], row["probe"].get("equivalent")
+    lift = row["previous_equivalent"]
+    assert all(str(lift.get(k, "")).strip() for k in ("text", "lifted_on", "by", "evidence")), \
+        sorted(lift)
     graph = cm._import_graph()
     assert "src/hoh/cli.py" in graph["storage_ephemeral"]            # named by the command surface itself
     assert "src/hoh/cli.py" in cm._reachable_from_an_entry_point("storage_ephemeral", graph)
     symbols = cm._symbols()
     collection = ("tests/test_storage_ephemeral.py", True)
-    kept = cm.classify(row, symbols, collection, {}, graph)
-    assert kept["status"] == cm.PARTIAL
-    assert any("CAPPED at PARTIAL by the equivalent" in e for e in kept["evidence"])
-    assert not any("no entry point" in e for e in kept["evidence"])
-    lifted = dict(row, probe={k: v for k, v in row["probe"].items() if k != "equivalent"})
-    got = cm.classify(lifted, symbols, collection, {}, graph)
+    got = cm.classify(row, symbols, collection, {}, graph)
     assert got["status"] == cm.PROVEN, got["evidence"]
     assert any("named in an import statement by src/hoh/cli.py" in e for e in got["evidence"])
+    assert not any("no entry point" in e for e in got["evidence"])
+    assert not any("CAPPED at PARTIAL" in e for e in got["evidence"])
+    assert "equivalent_here" not in got
+    # Control: the cap still bites. The same row with the lifted equivalent put back is
+    # PARTIAL, capped by it -- nothing but its removal lifts a row.
+    capped = dict(row, probe=dict(row["probe"], equivalent=lift["text"]))
+    kept = cm.classify(capped, symbols, collection, {}, graph)
+    assert kept["status"] == cm.PARTIAL, kept["evidence"]
+    assert any("CAPPED at PARTIAL by the equivalent" in e for e in kept["evidence"])
+    assert not any("no entry point" in e for e in kept["evidence"])
 
 
 # --------------------------------------------------------------------------- #

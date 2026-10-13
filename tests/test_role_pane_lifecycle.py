@@ -238,11 +238,11 @@ class FakeProcs:
             return
         for pid in (info["agent"], info["shell"]):
             if pid in self.procs:
-                self._die(pid)
+                self._kill(pid)
         if self.on_close is not None:
             self.on_close(self)
 
-    def _die(self, pid: int) -> None:
+    def _kill(self, pid: int) -> None:
         if pid not in self.procs:
             return
         self.procs.pop(pid)
@@ -266,7 +266,7 @@ class FakeProcs:
         for pid in list(self._dying):
             self._dying[pid] -= 1
             if self._dying[pid] <= 0:
-                self._die(pid)
+                self._kill(pid)
         return list(self.procs.values())
 
     def signal(self, proc: procs.Proc, sig: int) -> bool:
@@ -285,7 +285,7 @@ class FakeProcs:
                 return True
         elif sig != signal.SIGKILL:
             raise AssertionError(f"a signal other than TERM and KILL: {sig}")
-        self._die(proc.pid)
+        self._kill(proc.pid)
         return True
 
     def sleep(self, seconds: float) -> None:
@@ -2294,7 +2294,7 @@ def test_a_process_that_ends_by_itself_before_the_signal_is_not_recorded_as_ende
     gone, HoH did not end it and does not say it did. No signal, no `ended`."""
     pane, _ = _dev(rig)
     cmd = rig.fprocs.background(pane)
-    rig.fprocs.on_close = lambda fp: fp._die(cmd.pid)
+    rig.fprocs.on_close = lambda fp: fp._kill(cmd.pid)
 
     answer = rig.release(Role.DEVELOPER)
 
@@ -2647,7 +2647,7 @@ def test_a_zombie_is_not_a_marked_leftover_of_a_gone_pane(rig):
     pane, mark = _dev(rig)
     rig.fprocs.add(ppid=rig.fprocs.reaper, mark=mark, state="Z", comm="defunct")
     live = rig.fprocs.background(pane)
-    rig.fprocs._die(live.pid)
+    rig.fprocs._kill(live.pid)
     rig.server._close(pane, whole_tab=False)
 
     assert procs.marked_left(rig.fprocs.snapshot(), mark) == []
@@ -3394,7 +3394,7 @@ def test_a_pane_that_is_gone_with_nothing_left_is_quiescent_after_one_look_at_th
     names no `ended` and no `refused` line."""
     pane, _ = _dev(rig)
     cmd = rig.fprocs.background(pane)
-    rig.fprocs._die(cmd.pid)
+    rig.fprocs._kill(cmd.pid)
     rig.server._close(pane, whole_tab=False)
     taken = rig.fprocs.snapshot
     looks: list[int] = []
@@ -3474,7 +3474,7 @@ def test_a_marked_process_seen_outside_the_pane_at_the_scan_stays_named_when_it_
     pane, _ = _dev(rig)
     cmd = rig.fprocs.background(pane)
     daemon = rig.fprocs.daemon(pane)
-    rig.fprocs.on_close = lambda fp: fp._die(daemon.pid)
+    rig.fprocs.on_close = lambda fp: fp._kill(daemon.pid)
 
     answer = rig.release(Role.DEVELOPER)
 

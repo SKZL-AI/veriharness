@@ -26,6 +26,7 @@ import json
 import sys
 import types
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -33,6 +34,9 @@ from hoh import dispatchers, herdr, procs
 from hoh.contracts import Budgets, Role, RunState
 from hoh.controller import DispatchError
 from hoh.dispatchers import HerdrDispatcher
+
+if TYPE_CHECKING:  # the module itself is imported lazily by ac(), see its docstring
+    from hoh.agentcontrol import AgentInfo
 
 WS = "w1"
 BOX_RULE, INPUT_MARK = "\u2500", "\u276f"

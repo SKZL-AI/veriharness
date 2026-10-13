@@ -985,3 +985,51 @@ parentheses. `RELEASE_NOTES.md` has the account and every limit.
 * **The honest ratio.** The attribution check counts 294 nodes after its anchor `[V06]` **R** (289), of which one `[V06a]` ran
   through the shipped control plane end to end, 126 `[V06b]` **R** were developed by the product and merged by the orchestrating
   session after review (126), and 167 `[V06c]` **R** are the orchestrating session's direct work (162).
+
+## 22. Update after the operator's restart (added 2026-10-11, ledger O266)
+
+The preceding sections stay as written. What section 21 says, that P2-11 needs a real reboot that has not been run and that P2-33 to P2-37 read
+IMPLEMENTED_NOT_PROVEN on stale evidence, and what section 20 says, that P2-42 reads PARTIAL, no longer hold. The durability end-to-end
+run was taken again on a `git archive` of `e0d9bdff`, the last commit that changed the source; the reboot scenario was armed, the operator restarted the
+machine's WSL virtual machine, and the verification after the restart found the lease holder on another boot, spent an epoch as RECOVERY and closed the
+project. P2-11 and P2-33 to P2-37 read PROVEN, with these limits: a virtual-machine restart is not a power cut; one reboot on one host with fixture role runs
+and the harness's own tick loop; every check of the reboot scenario is one that no negative control targets, which the record itself lists; and the evidence
+goes stale at the next change of the source. P2-42 reads PROVEN on the first run of a registered project, with the approval-resume limit not met and the
+other harnesses' temporary files NOT_RUN. The rotation of the orchestrating session by the product has run seven times, the last from the lease recovered after the
+restart; the limits of section 20 stand. What did not change is the gate: no blocking requirement of P2 is open, and two conditions of its checklist gate
+(a current independent supervisor review, and a consistency check that does not close a phase over unresolved release-blocking findings) are unmet; no
+closure record exists. The figures marked **R** were taken again at the base named in `paper/NUMBERS_V2.md`; the value of section 21 stands in parentheses.
+* **The register and the gate (records entry O266).** The register holds 235 requirements, 70 PROVEN and 9 PARTIAL `[V10]` **R** (63 PROVEN and 10 PARTIAL in section 21); of P2's requirements 43 PROVEN `[V10c]` **R** (36 PROVEN); the P2 gate reads 0 blocking open; 0 exit conditions bound to requirements not PROVEN; 0 exit conditions nothing measures yet; 165 open requirements, 157 behind a phase gate `[V12]` **R** (7 blocking open in section 21). The seven rows that moved are P2-11 and
+  P2-33 to P2-37, IMPLEMENTED_NOT_PROVEN to PROVEN on the freeze evidence, and P2-42, PARTIAL to PROVEN on the first run of a registered project. The line of the gate counts
+  requirements and the exit conditions bound to them; the gate itself is shut because two checklist-gate conditions are unmet. Of the requirements registered for P3 to P12 156 of 176 MISSING (9 PARTIAL, 11 PROVEN) `[V11b]` **R** (unchanged).
+* **The honest ratio (records entry O266).** The attribution check counts 300 nodes after its anchor `[V06]` **R** (294), of which one `[V06a]` ran through the shipped control
+  plane end to end, 126 `[V06b]` **R** were developed by the product and merged by the orchestrating session after review (126), and 173 `[V06c]` **R** are the
+  orchestrating session's direct work (167). The evidence of this entry is the orchestrator's own measurement and copying; nothing in it was developed by a product run.
+
+## 23. Update at the closure of P2 (added 2026-10-13, ledger O268)
+
+The preceding sections stay as written. What section 22 says, that the gate of P2 is shut and no closure record exists, no longer holds: phase P2 is closed at
+the commit of the records entry O268, the closure record that amendment A7 names. The record names the sealing commit `c4dc643d`, the succession capsule
+committed alone at `642a4fa9`, the independent supervisor review `20261013T093422Z-S`, which answered every inherited finding NO_ACTION with none blocking and
+is complete against the checklist snapshot and the committed matrix it names, the matrix with every requirement of P2 PROVEN, and the durability record taken
+on `e0d9bdff` with no change of the relevant source paths since. The closure is a statement about that commit and about nothing later: a later change to the
+source creates regression obligations under A7, the eight-minute durability run at every records and release checkpoint and the reboot evidence at release
+checkpoints, each recorded with its commit, and an obligation that fails re-opens the phase by a records entry. Every limit of sections 20 and 22 stands, and
+the board still reads `TECHNICALLY_STABLE_READY = no`: a closed phase is not a stable release. The figures marked **R** are not re-taken in this section; they
+are re-taken in the commits that follow the closure record, before the tag `v0.3.0`, and the values of section 22 stand until then.
+## 24. Update for the release v0.3.0 (added 2026-10-13)
+
+The preceding sections stay as written. This section is the update for the release documents of `v0.3.0`, the release at which P2 is closed
+(section 23): the figures marked **R** were taken again at the base named in `paper/NUMBERS_V2.md` (the commit `f78d1cb9`), and the value
+of section 21 stands in parentheses. `RELEASE_NOTES.md` has the account and every limit; the release changes no source file and lifts no
+requirement, and readiness is not claimed (`TECHNICALLY_STABLE_READY = no` `[V13]` **R**).
+
+* **The register and the gate.** The register holds 235 requirements, 70 PROVEN and 9 PARTIAL `[V10]` **R** (63 and 10); every one
+  of P2's 43 requirements reads PROVEN `[V10c]` **R** (36); the P2 gate reads 0 blocking open; 0 exit conditions bound to requirements not PROVEN; 0 exit conditions nothing measures yet; 165 open requirements, 125 behind a phase gate `[V12]` **R** (7 blocking open at the third alpha); of the requirements
+  registered for P3 to P12, 156 of 176 MISSING (9 PARTIAL, 11 PROVEN) `[V11b]` **R** (the same).
+* **The product-run merges.** 97 since 2026-09-25 `[V01]` **R** (97), 78 of which change `src/hoh/` `[V02]` **R** (78): the four product runs merged
+  since the third alpha carry titles the counting tool does not list, and the release changes no tool; the figure is corrected with the tool
+  after the tag.
+* **The honest ratio.** The attribution check counts 320 nodes after its anchor `[V06]` **R** (294), of which 1 `[V06a]` **R** ran through the shipped
+  control plane end to end (1), 131 `[V06b]` **R** were developed by the product and merged by the orchestrating session after review (126), and
+  188 `[V06c]` **R** are the orchestrating session's direct work (167).

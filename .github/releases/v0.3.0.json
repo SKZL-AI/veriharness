@@ -1,0 +1,58 @@
+{
+  "schema": "veriharness-release-document/1",
+  "release": "v0.3.0",
+  "package": "hoh",
+  "version": "0.3.0",
+  "source_tag": "v0.3.0",
+  "prerelease": false,
+  "github_latest": true,
+  "title": "v0.3.0 -- the release at which phase P2 (v0.3 Durable Program Runtime + Autonomy Contract Base) is closed",
+  "body_source": {
+    "file": "RELEASE_NOTES.md",
+    "section_heading": "# Release notes -- v0.3.0",
+    "rule": "The text of the GitHub release is the v0.3.0 section of RELEASE_NOTES.md at the tag, verbatim, from its heading to the separator before the v0.3.0a3 section -- the rule the three alphas used (their GitHub pre-release text was the section of their tag). CHANGELOG.md carries the section generated from the same notes."
+  },
+  "changelog_section": "## [0.3.0] - 2026-10-13",
+  "citation": {
+    "file": "CITATION.cff",
+    "version": "0.3.0",
+    "date-released": "2026-10-13"
+  },
+  "closure": {
+    "phase": "P2",
+    "ledger_entry": "O268",
+    "amendment": "A7",
+    "commit_R": "204905be25febc470539733290cef825481f9caf",
+    "commit_S": "c4dc643d2c23710e631f6624cc522eecf03badbd",
+    "commit_C": "642a4fa95844e8fca73f11270f1a40cfd74bd187",
+    "commit_A": "b36eed34f017e3600b1daf2f619af8acc6aa8ec7",
+    "commit_X": "d3791470af3ffcd96a9c19300d66243c7d0fdd11",
+    "supervisor_review": "20261013T093422Z-S",
+    "durability_evidence_head": "e0d9bdff8fef5c33070b70e0fa15a06a8943bfec",
+    "source_unchanged_since_evidence_head": [
+      "src/hoh",
+      "ops/hoh-continue.service",
+      "tools/durability_e2e.py",
+      "tools/durability_fixture.py"
+    ]
+  },
+  "figures_base": "f78d1cb9edab95efeba5f8ae3f10edaecb58ebb0",
+  "distribution": {
+    "pypi": false,
+    "install": "from the tagged source",
+    "workflow": ".github/workflows/publish-pypi.yml",
+    "note": "The distribution workflow of this repository accepts only the audited v0.1.0; v0.3.0 is not published to PyPI."
+  },
+  "readiness": {
+    "board": "docs/READINESS.md",
+    "TECHNICALLY_STABLE_READY": "no",
+    "note": "A closed phase is not a stable release; readiness is not claimed by this release."
+  },
+  "filled_at_the_tag": {
+    "source_commit": null,
+    "tag_object": null,
+    "export_commit": null,
+    "github_release_url": null,
+    "note": "The tag step (the records procedure of the closure, step 16) fills these after the tag is cut; nothing in this file is a receipt of a publication. The v0.1.0 receipt beside this file has another schema and is untouched."
+  }
+}

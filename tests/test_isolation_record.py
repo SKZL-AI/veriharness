@@ -971,10 +971,13 @@ def test_a_candidate_that_was_never_mounted_is_not_read_only(tmp_path):
                     i += 3            # drop the candidate's bind entirely
                     continue
                 if full_[i] == "--chdir":
-                    # ... and start somewhere that exists, so the command runs
-                    # and can report. Otherwise bwrap dies at chdir and the
-                    # case under test never happens.
-                    was_truncated += ["--chdir", "/tmp"]
+                    # ... and start somewhere that exists *inside the sandbox*, so
+                    # the command runs and can report. Otherwise bwrap dies at
+                    # chdir and the case under test never happens. The scratch is
+                    # the one writable bind the sandbox always makes; `/tmp` is
+                    # not bound at all (sandbox.py `_argv`), so bwrap failed with
+                    # "Can't chdir to /tmp" and the runner read that as a refusal.
+                    was_truncated += ["--chdir", str(spec.scratch)]
                     i += 2
                     continue
                 was_truncated.append(full_[i])

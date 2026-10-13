@@ -26,12 +26,14 @@ from hoh.storage_registry import OWNED, PROTECTED, UNKNOWN, StorageOwnershipErro
 from test_storage_registry import (  # noqa: F401  (isolated_env is an autouse fixture)
     BOOT,
     FakeOS,
-    fake,
     git,
     isolated_env,
     make_repo,
     new_registry,
 )
+from test_storage_registry import fake as fake  # a fixture, found by pytest by name; the alias form is an explicit re-export, so
+# a test parameter named `fake` is not a redefinition of an unused import (F811)
+
 
 SCHEMA = "veriharness.storage-legacy-roots/1"
 

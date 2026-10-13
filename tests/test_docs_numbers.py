@@ -11,6 +11,7 @@ the text that carries it; a refusal list entry must be recorded as a refusal.
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import sys
@@ -518,3 +519,151 @@ def test_the_ledger_sourced_rows_of_the_duration_figures_have_no_bare_number_nee
         assert rows[tag]["needles"], tag
         assert not any(n.isdigit() or n in {"six", "four", "thirteen"}
                        for n in rows[tag]["needles"]), (tag, rows[tag]["needles"])
+
+
+def test_the_p2_42_description_is_true_for_the_status_its_figure_shows():
+    """O266 Q5 and review B1. The V10d sentence used to be a constant that said the
+    register's equivalent "holds the row below PROVEN"; once the equivalent is
+    lifted the figure reads PROVEN beside a sentence that denies it. The
+    description is derived with the figure and with the register's own lift
+    record, and the facts it states come from that record, not from the tool."""
+    lift = {"lifted_on": "2026-10-11", "by": "records O266",
+            "evidence": "dogfood/leakids2/20261011T0319Z/ (run directory minus attic)",
+            "text": "SUPERSEDED 2026-10-11 (records O265 ...; the operator's ruling of "
+                    "2026-10-10 on the reading of the row, quoted in the note of this row)"}
+
+    def v10d(status, lift_):
+        rows = {r["tag"]: r for r in dn.build_rows({"matrix": {"p2_42": status, "p2_42_lift": lift_}})}
+        return rows["V10d"]
+    held = v10d("PARTIAL", None)
+    assert held["figure"] == "P2-42: PARTIAL"
+    assert "holds the row below PROVEN" in held["what"]
+    lifted = v10d("PROVEN", lift)
+    assert lifted["figure"] == "P2-42: PROVEN"
+    assert "holds the row below PROVEN" not in lifted["what"]
+    assert "lifted by records O266 (2026-10-11)" in lifted["what"]
+    assert "on the live run of leakids2" in lifted["what"]
+    assert "ruling of 2026-10-10 on the reading of the row" in lifted["what"]
+    assert "lifted by the operator" not in lifted["what"]
+    # a lift the register attributes differently is rendered as the register says
+    other = v10d("PROVEN", dict(lift, by="records O270", lifted_on="2026-10-20"))["what"]
+    assert "lifted by records O270 (2026-10-20)" in other
+    # PROVEN with no lift record is said, not invented
+    assert "records no equivalent and no lift" in v10d("PROVEN", None)["what"]
+    assert dn.p2_42_what(None).startswith("the register status of P2-42")
+
+
+def test_the_committed_table_carries_the_v10d_sentence_the_tool_derives():
+    """L6: `check` compares `render()` with the committed table, so the V10d row
+    of paper/NUMBERS_V2.md must carry the sentence the tool derives from the
+    committed matrix and register -- a tool change without the re-rendered line
+    (or the reverse) is a red `docs_consistency` row."""
+    root = Path(dn.__file__).resolve().parent.parent
+    matrix = json.loads((root / "program/v3_3/VERIHARNESS_CAPABILITY_MATRIX.json").read_text(encoding="utf-8"))
+    status = {c["id"]: c["status"] for c in matrix["capabilities"]}.get("P2-42", "ABSENT")
+    want = dn.p2_42_what(status, dn.p2_42_lift(root))
+    rows = [ln for ln in (root / dn.NUMBERS).read_text(encoding="utf-8").splitlines()
+            if ln.startswith("| V10d |")]
+    assert len(rows) == 1, rows
+    cells = [c.strip() for c in rows[0].strip("|").split(" | ")]
+    assert cells[1] == f"P2-42: {status}", cells[1]
+    assert cells[2] == want.replace("|", "\\|"), cells[2]
+
+
+def _fake_build_plan(root: Path, body: str) -> None:
+    (root / "tools").mkdir(parents=True, exist_ok=True)
+    (root / "tools" / "build_plan.py").write_text(body, encoding="utf-8")
+
+
+_PLAN_SCRIPT = """import json, sys
+out = sys.argv[sys.argv.index("--dag") + 1] if "--dag" in sys.argv else None
+if %r:
+    print("165 open requirement(s) in 3 wave(s); 157 held behind a phase gate")
+GATE = %s
+if GATE is not None:
+    if GATE.get("external_met") is False or GATE.get("blocking_open"):
+        print("  gate P2: " + str(len(GATE["blocking_open"])) + " blocking open; " + GATE["external"])
+    if out:
+        open(out, "w").write(%s)
+sys.exit(%d)
+"""
+
+
+def _plan(tmp_path, gate, payload="json.dumps({'phase_gates': {'P2': GATE, 'P3': {}}})", rc=0,
+          summary=True):
+    root = tmp_path / f"r{abs(hash((repr(gate), payload, rc, summary))) % 10**8}"
+    _fake_build_plan(root, _PLAN_SCRIPT % (summary, repr(gate), payload, rc))
+    return dn.derive_plan(root)
+
+
+def test_a_met_p2_gate_is_read_from_build_plans_state_not_from_a_missing_line(tmp_path):
+    """p2succ review #4. build_plan prints no `gate P2:` line once the gate is met;
+    the old reader took the missing line for missing output and raised Gap, so the
+    first met gate turned `docs_consistency` NOT_RUN. The gate state is read from
+    build_plan's own DAG (`phase_gates["P2"]`), and met is a positive reading."""
+    met = _plan(tmp_path, {"blocking_open": [], "external_met": True,
+                           "external": "8 exit condition(s) met: 5 bound to a PROVEN requirement, 3 measured"})
+    assert met["met"] is True and met["blocking"] == 0 and met["bound"] == 0
+    assert met["open"] == 165 and met["held"] == 157
+    unmet = _plan(tmp_path, {"blocking_open": ["P2-11", "P2-33"], "external_met": False,
+                             "external": "5 exit condition(s) bound to requirement(s) not PROVEN: P2-33; "
+                                         "2 exit condition(s) nothing here measures yet"})
+    assert unmet["met"] is False and unmet["blocking"] == 2
+    assert unmet["bound"] == 5 and unmet["unmeasured"] == 2
+    # a gate with no external conditions at all is met when nothing blocks
+    assert _plan(tmp_path, {"blocking_open": [], "external_met": None, "external": ""})["met"] is True
+
+
+def test_derive_plan_fails_closed_on_a_broken_or_silent_build_plan(tmp_path):
+    with pytest.raises(dn.Gap):
+        _plan(tmp_path, {"blocking_open": [], "external_met": True, "external": ""}, rc=1)
+    with pytest.raises(dn.Gap):
+        _plan(tmp_path, {"blocking_open": [], "external_met": True, "external": ""},
+              payload="'not json'")
+    with pytest.raises(dn.Gap):
+        _plan(tmp_path, {"blocking_open": [], "external_met": True, "external": ""},
+              payload="json.dumps({'phase_gates': {'P3': {}}})")
+    with pytest.raises(dn.Gap):
+        _plan(tmp_path, None)                      # no DAG written at all
+    # review b F6: the legs Goal 7 names must each be pinned, not implied
+    ok = {"blocking_open": [], "external_met": True, "external": ""}
+    with pytest.raises(dn.Gap):
+        _plan(tmp_path, ok, summary=False)         # a build_plan that prints no summary line
+    with pytest.raises(dn.Gap):
+        _plan(tmp_path, ok, payload="json.dumps({'phase_gates': {'P2': {}}})")   # empty state
+    with pytest.raises(dn.Gap):
+        _plan(tmp_path, ok, payload="json.dumps({'phase_gates': {'P2': {'blocking_open': []}}})")
+    with pytest.raises(dn.Gap):
+        _plan(tmp_path, ok, payload="json.dumps({'phase_gates': {'P2': {'external_met': True}}})")
+    # review a m1: external_met is a bool or None, never a string or a number
+    for odd in ("false", 0, 1, "true", [], {}):
+        with pytest.raises(dn.Gap):
+            _plan(tmp_path, {"blocking_open": [], "external_met": odd, "external": ""})
+    # a gate with no external items is None in build_plan's own output and reads met
+    assert _plan(tmp_path, {"blocking_open": [], "external_met": None, "external": ""})["met"] is True
+    assert _plan(tmp_path, {"blocking_open": ["P2-11"], "external_met": None, "external": ""})["met"] is False
+
+
+def test_p2_42_lift_is_a_completed_lift_or_nothing(tmp_path):
+    """review a m2. The record is read only when the row no longer carries an
+    `equivalent`; a record beside a standing cap, an incomplete record, a missing row
+    and an unreadable register all give None, which `p2_42_what` says rather than
+    inventing an attribution."""
+    def reg(row):
+        root = tmp_path / f"r{abs(hash(repr(row))) % 10**8}"
+        (root / "program/v3_3").mkdir(parents=True)
+        (root / dn.REGISTER).write_text(json.dumps({"requirements": [row] if row else []}), encoding="utf-8")
+        return root
+    full = {"lifted_on": "2026-10-11", "by": "records O266", "evidence": "dogfood/leakids2/x", "text": "t"}
+    lifted = reg({"id": "P2-42", "probe": {"kind": "symbol"}, "previous_equivalent": full})
+    assert dn.p2_42_lift(lifted) == full
+    still_capped = reg({"id": "P2-42", "probe": {"kind": "symbol", "equivalent": "held"},
+                        "previous_equivalent": full})
+    assert dn.p2_42_lift(still_capped) is None
+    assert dn.p2_42_lift(reg({"id": "P2-42", "probe": {}, "previous_equivalent": {"by": "records O266"}})) is None
+    assert dn.p2_42_lift(reg({"id": "P2-42", "probe": {}, "previous_equivalent": "lifted"})) is None
+    assert dn.p2_42_lift(reg({"id": "P2-41", "probe": {}, "previous_equivalent": full})) is None
+    assert dn.p2_42_lift(reg(None)) is None
+    assert dn.p2_42_lift(tmp_path / "nowhere") is None
+    broken = reg({"id": "P2-42"}); (broken / dn.REGISTER).write_text("{not json", encoding="utf-8")
+    assert dn.p2_42_lift(broken) is None

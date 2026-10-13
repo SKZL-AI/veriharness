@@ -901,7 +901,8 @@ def row_programme_supervisor() -> Row:
     # findings relabelled `NO_ACTION/low` published `0 blocking, complete` with their
     # critical reasons still on disk, and a shim holding an empty findings file erased the
     # history from every later brief.
-    still_open, resolved = _ps.resolution_state(_preserved_reviews(_ps))
+    preserved = _preserved_reviews(_ps)
+    still_open, resolved = _ps.resolution_state(preserved)
     if still_open:
         problems.append(
             f"{len(still_open)} finding(s) raised by a preserved review and resolved by "
@@ -922,6 +923,15 @@ def row_programme_supervisor() -> Row:
         causes.append(f"{len(resolved)} previously-raised finding(s) resolved by a later "
                       f"review: {', '.join(resolved[:6])}"
                       + (" ..." if len(resolved) > 6 else ""))
+    # O231/N2: a later review's NO_ACTION resolves a finding only by naming the review that
+    # raised it. One that did not is not silently a no-op: the cell says which ids it was
+    # returned for and by which review, so "resolved by none" is not read as "nobody looked".
+    unnamed = _ps.unnamed_resolutions(preserved)
+    if unnamed:
+        causes.append(f"{len(unnamed)} NO_ACTION finding(s) name no review that raised "
+                      "what they answer, so resolve nothing: "
+                      + ", ".join(f"{i} in {r}" for r, i in unnamed[:4])
+                      + (" ..." if len(unnamed) > 4 else ""))
 
     # The currency half, and the second version of it. The first compared the matrix
     # *file bytes* against `REVIEW.json`'s `matrix_digest`, which

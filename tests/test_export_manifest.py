@@ -1732,6 +1732,13 @@ def test_the_private_id_list_holds_digests_and_the_real_include_set_is_clean():
         "e19144e81b5c1a7c8e2b27fadb1f65dd98e2515018ef72cf490f66a8bb8711eb",
         "22f91aecc75a19f63f21fe169419ca5c5528a62721b446f2ef1c8647d30d42c6",
         "96f3c1c474c7cc23cefb65703d44a82e0c7c25234f213af5f0017f912b7886e4",
+        # the orchestrator sessions of the build's own rotation, epochs 4, 5, 6, 7, 9 and 10 of 2026-10-11 (digests only; O266 Q4)
+        "96d16c0359e07aab03780de40ad7d9a1288ccd313c5a1b5f5b5982cba72ca276",
+        "ea303866f90cd9da85344b68854d51f0c3661f3b0ea80a1dafb002ca1fd90315",
+        "a81fd9b01a2e2ed5dd45961fcbb0065aa441374e0f71eb88c40974576b237c6c",
+        "344d5ad8098437ab2117e98faadc43dd0443820fc7c2018d6f0982b9abc4d154",
+        "e95ced9773ba4aea1aa4270a7fb672f1fa41ea5f8f18572f46b387d73ada5554",
+        "61d1f9c4aebb6672413bf1583278acae7fd63cb5a147be95b472c2adad0ebbff",
     }
     assert known <= em.PRIVATE_ID_DIGESTS, "a known private id fell off the list"
     assert em.PRIVATE_ID_DIGESTS <= known, "a digest joined the list that no reviewer has read"
@@ -1739,6 +1746,29 @@ def test_the_private_id_list_holds_digests_and_the_real_include_set_is_clean():
     assert not em.has_private_id(source), "the module writes a listed id in clear"
     manifest = json.loads((REPO_ROOT / "EXPORT_MANIFEST.json").read_text(encoding="utf-8"))
     assert em.scan_for_private_ids(manifest["entries"], REPO_ROOT) == []
+
+
+ROTATION_SESSION_DIGESTS = frozenset({
+    # the orchestrator sessions of the build's own product rotation, epochs 4, 5, 6, 7, 9 and 10
+    # (2026-10-11): SHA-256 of each 8-hex session prefix, the ids themselves written nowhere
+    "96d16c0359e07aab03780de40ad7d9a1288ccd313c5a1b5f5b5982cba72ca276",
+    "ea303866f90cd9da85344b68854d51f0c3661f3b0ea80a1dafb002ca1fd90315",
+    "a81fd9b01a2e2ed5dd45961fcbb0065aa441374e0f71eb88c40974576b237c6c",
+    "344d5ad8098437ab2117e98faadc43dd0443820fc7c2018d6f0982b9abc4d154",
+    "e95ced9773ba4aea1aa4270a7fb672f1fa41ea5f8f18572f46b387d73ada5554",
+    "61d1f9c4aebb6672413bf1583278acae7fd63cb5a147be95b472c2adad0ebbff",
+})
+
+
+def test_the_rotation_sessions_are_on_the_private_id_list():
+    """Presence, not lockstep: the exact-set test above would pass with the six
+    digests missing from both sides. Each of the six must be a member of the
+    shipped list, and the module must refuse a stand-in id whose digest is one of
+    them (so the list is read where the scan reads it)."""
+    missing = ROTATION_SESSION_DIGESTS - em.PRIVATE_ID_DIGESTS
+    assert not missing, f"rotation session digest(s) not on the list: {sorted(missing)}"
+    assert em.has_private_id(b"token 0123abcd end", digests=frozenset({
+        hashlib.sha256(b"0123abcd").hexdigest()}))
 
 
 def _leak_scan_bytes(tmp_path, rel: str, data: bytes) -> list[dict]:

@@ -7,8 +7,8 @@ message: >-
   that implement the Harness-of-Harness pattern; VeriHarness is the project
   built on that pattern and the name this citation records.
 title: "VeriHarness: an evidence-bound Harness-of-Harness for verifiable long-horizon agent development"
-version: 0.3.0a3
-date-released: "2026-10-11"
+version: 0.3.0
+date-released: "2026-10-13"
 # date-released: the date of the documentation checkpoint at which the pre-release is
 # cut; the operator may move it if the tag is cut on another day.
 # Provenance: this file said `version: 0.1.0` with `date-released: "2026-09-08"`
@@ -19,6 +19,10 @@ date-released: "2026-10-11"
 # It said `version: 0.3.0a2` with `date-released: "2026-10-09"` until 2026-10-11, when
 # `version` became 0.3.0a3 (the a2 tag was cut on 2026-10-09, see RELEASE_NOTES.md);
 # the date is that of the documentation checkpoint and moves with the tag.
+# It said `version: 0.3.0a3` with `date-released: "2026-10-11"` until 2026-10-13, when
+# `version` became 0.3.0 (the a3 tag was cut on 2026-10-11, see RELEASE_NOTES.md); the date
+# is that of the tag `v0.3.0`, the release at which phase P2 is closed (the closure record is
+# the ledger entry O268; this is a release, not a pre-release, and readiness is not claimed).
 authors:
   - given-names: "Furkan"
     family-names: "Sakızlı"

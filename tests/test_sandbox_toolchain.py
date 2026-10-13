@@ -89,7 +89,22 @@ def test_the_home_directory_stays_invisible(tmp_path):
     assert receipt.outcome(0) is Outcome.PASS, log
     visible = eval(log.strip().splitlines()[-1])
     expected = {b.relative_to(home).parts[0] for b in under_home}
+    # The arena itself and the runner's scratch beside it are bound by construction
+    # (sandbox.py `_argv`: `--ro-bind candidate`, `--bind scratch`); when the arena lies
+    # under the home directory -- a basetemp under `~/hoh-state`, as the house rules
+    # require -- its first path component is visible too, and nothing else of it.
+    arena = tmp_path.resolve()
+    chain = arena.relative_to(home).parts if arena.is_relative_to(home) else ()
+    expected |= set(chain[:1])
     assert set(visible) <= expected, f"leaked into the sandbox: {set(visible) - expected}"
+    if len(chain) > 1 and chain[0] not in {b.relative_to(home).parts[0] for b in under_home}:
+        inner = "+".join(repr(x) for x in ("/", *home.parts[1:], chain[0]))
+        receipt, log = _run(
+            "python3 -c \"import os; p=os.path.join(" + inner.replace("+", ",")
+            + "); print(sorted(os.listdir(p)))\"", tmp_path)
+        assert receipt.outcome(0) is Outcome.PASS, log
+        below = set(eval(log.strip().splitlines()[-1]))
+        assert below == {chain[1]}, f"more than the arena's own path is visible: {below - {chain[1]}}"
 
 
 @needs_bwrap

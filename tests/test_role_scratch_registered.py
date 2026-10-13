@@ -30,16 +30,18 @@ from pathlib import Path
 import pytest
 from test_agent_control import FakeAgentControl, _dispatcher, _no_process
 from test_ephemeral_wiring import (Admission, Fake, beside_the_arenas, documents,  # noqa: F401
-                                   make_repo, new_run, no_sleep, records, repo,
-                                   standalone_repo, tmp_root, w, workspace_dirs)
+                                   make_repo, new_run, no_sleep, records,
+                                   standalone_repo, tmp_root, workspace_dirs)
+from test_ephemeral_wiring import repo as repo, w as w  # a fixture, found by pytest by name; the alias form is an explicit re-export, so
+# a test parameter named `repo` or `w` is not a redefinition of an unused import (F811)
 from test_role_basetemp import herdr_stub  # noqa: F401  (autouse: no test may reach Herdr)
 from test_storage_tiers import isolated_env  # noqa: F401  (autouse: the git and HOME identity of the world)
+
 
 from hoh import cli, dispatchers, integrity, roles
 from hoh import storage_registry as sr
 from hoh.contracts import Role
 from hoh.controller import DispatchError, PaneNotClean
-from hoh.store import RunStore
 
 ROLES = [Role.PLANNER, Role.DEVELOPER, Role.QA]
 PREFIX = dispatchers.ROLE_SCRATCH_PREFIX

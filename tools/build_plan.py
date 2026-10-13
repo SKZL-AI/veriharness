@@ -414,9 +414,22 @@ CHECKLIST_GATE_ITEMS = {
     "P2.checklist-gate.current-independent-checklist-supervisor-review-complete":
         "review",
     "P2.checklist-gate.checklistfsck-pass": "fsck",
+    # F13/M9 of the preserved P2 reviews: session succession is an ingredient of
+    # the exit condition "controller/session replacement", and a capsule that has
+    # drifted is precisely the state in which a successor is handed a wrong
+    # description of the tree. The item stays claimed by its requirement (P2-35,
+    # which must be PROVEN besides, as for every item in this map) and is in
+    # addition measured by `tools/succession.py verify` over the committed capsule.
+    "P2.exit-includes.controller-session-replacement": "succession",
 }
 _GATE_LABELS = {"items": "checklist items", "review": "supervisor review",
-                "fsck": "ChecklistFsck"}
+                "fsck": "ChecklistFsck", "succession": "succession capsule"}
+#: The kinds `checklist_gate_measures` answers; `succession` has an instrument of
+#: its own (`succession_measure`), asked only when an item maps to it.
+_CHECKLIST_KINDS = ("items", "review", "fsck")
+#: The succession capsule the gate verifies, as `tools/succession.py` writes and
+#: reads it (the two spellings are pinned equal by the tests).
+SUCCESSION_CAPSULE = "dogfood/succession/SUCCESSION.json"
 #: The phase those items belong to, and where its supervisor review is kept (the
 #: board's row reads the same files).
 CHECKLIST_GATE_PHASE = "P2"
@@ -485,6 +498,17 @@ def _readiness():
     sys.modules["readiness_for_build_plan"] = rd
     spec.loader.exec_module(rd)
     return rd
+
+
+def _succession():
+    """`tools/succession.py`, loaded per call like the board: its `check` is the one
+    place that knows what a capsule field means and how it is re-derived."""
+    spec = importlib.util.spec_from_file_location(
+        "succession_for_build_plan", HERE / "succession.py")
+    su = importlib.util.module_from_spec(spec)
+    sys.modules["succession_for_build_plan"] = su
+    spec.loader.exec_module(su)
+    return su
 
 
 def _other_tree(*tools) -> str:
@@ -657,7 +681,7 @@ def checklist_gate_measures() -> dict[str, tuple[bool, str]]:
         "the capability matrix")
     if register is None or matrix is None:
         why = _bound("; ".join(w for w in (why_r, why_m) if w))
-        return {kind: (False, why) for kind in _GATE_LABELS}
+        return {kind: (False, why) for kind in _CHECKLIST_KINDS}
     out: dict[str, tuple[bool, str]] = {}
     try:
         ps = _programme_supervisor()
@@ -680,9 +704,99 @@ def checklist_gate_measures() -> dict[str, tuple[bool, str]]:
     return out
 
 
+def succession_measure() -> tuple[bool, str]:
+    """P2's succession exit question (F13/M9): does the committed succession capsule
+    still describe this tree?
+
+    The capsule the gate reads is the one **committed at HEAD** (`git show HEAD:<path>`):
+    a gate is a statement about a commit. The working-tree file must be that blob byte
+    for byte (else drift: an edited capsule is not the committed one), and the capsule
+    must record a clean tree (`internal_tree_clean` true): one written on a dirty tree
+    verifies only while the tree stays dirty the same way, which is not a state a
+    phase closes in. `tools/succession.py check` then re-derives every field **from
+    the blobs committed at HEAD** (`at_commit="HEAD"`: the board, the sync state, the
+    release invariants, the ledger), so an uncommitted record file changes nothing
+    here; this reads its rows and is met only when every one is VERIFIED. DRIFTED fields are
+    named; a field that cannot be checked from here (the plan root not set, the run
+    tree absent -- the tool's ENVIRONMENT_GAP, exit 3 at its command line) is unmet
+    with that reason, never a pass; a capsule that is missing, unreadable, outside the
+    repository, not a JSON object or over the ceiling is unmet (`_gate_input`); a tool
+    that judges another tree, a verifier that raises or returns rows of another shape
+    is unmet. Never raises.
+    """
+    try:
+        su = _succession()
+        other = _other_tree(su)
+        if other:
+            return False, _bound(other)
+        working, why = _gate_input(HOH / SUCCESSION_CAPSULE, "the succession capsule")
+        if working is None:
+            return False, _bound(why)
+        rc, text = su._git_rc("show", f"HEAD:{SUCCESSION_CAPSULE}")
+        if rc != 0:
+            return False, _bound(f"the succession capsule is not committed at HEAD "
+                                 f"(git show exit {rc})")
+        blob = text.encode("utf-8", "surrogateescape")
+        if len(blob) > _GATE_INPUT_MAX_BYTES:
+            return False, (f"the committed succession capsule is larger than "
+                           f"{_GATE_INPUT_MAX_BYTES} bytes")
+        try:
+            capsule = json.loads(blob.decode("utf-8"))
+        except (ValueError, RuntimeError) as exc:
+            return False, _bound("the committed succession capsule cannot be read "
+                                 f"({type(exc).__name__})")
+        if not isinstance(capsule, dict):
+            return False, "the committed succession capsule is not a JSON object"
+        if (HOH / SUCCESSION_CAPSULE).resolve(strict=True).read_bytes() != blob:
+            return False, ("the succession capsule in the working tree differs from the "
+                           "one committed at HEAD; the gate reads the committed one")
+        if capsule.get("internal_tree_clean") is not True:
+            return False, _bound("the committed succession capsule records a tree that was "
+                                 f"not clean (internal_tree_clean={capsule.get('internal_tree_clean')!r}); "
+                                 "a phase does not close on it")
+        # Derived from HEAD's blobs: a gate is a statement about a commit, and an
+        # old board restored in the working tree, uncommitted, must not turn a
+        # drifted capsule green.
+        rows = su.check(capsule, su._plan_root(None), at_commit="HEAD")
+        ok, drift, gap = su.OK, su.DRIFT, su.GAP
+    except Exception as exc:  # noqa: BLE001 - a verifier that fails is an unmet condition
+        return False, _bound(
+            f"the succession capsule could not be verified ({type(exc).__name__}): {exc}")
+    shaped = [r for r in rows if isinstance(r, tuple) and len(r) == 3
+              and all(isinstance(x, str) for x in r)] if isinstance(rows, list) else []
+    if not rows or len(shaped) != len(rows) or any(v not in (ok, drift, gap)
+                                                   for _, v, _ in shaped):
+        return False, "the succession verifier returned no usable answer"
+    drifted = [(f, d) for f, v, d in shaped if v == drift]
+    gaps = [(f, d) for f, v, d in shaped if v == gap]
+    if drifted:
+        return False, _bound("DRIFTED: " + "; ".join(f"{f} ({d})" for f, d in drifted)
+                             + ("; not checkable from here: " + ", ".join(f for f, _ in gaps)
+                                if gaps else ""))
+    if gaps:
+        return False, _bound("not checkable from here, which is not a pass: "
+                             + "; ".join(f"{f} ({d})" for f, d in gaps))
+    commit = str(capsule.get("internal_commit") or "")[:12]
+    return True, _bound(f"VERIFIED: every field re-derives from this tree "
+                        f"({', '.join(f for f, _, _ in shaped)}); capsule for {commit}")
+
+
+def _one_measurement(provider, kind: str) -> tuple[bool, str]:
+    """One instrument's answer as a real `(bool, str)`; anything else is unmet."""
+    try:
+        value = provider()
+    except Exception as exc:  # noqa: BLE001 - an instrument that fails is an unmet condition
+        return False, _bound(f"the instrument failed ({type(exc).__name__}): {exc}")
+    if (isinstance(value, tuple) and len(value) == 2
+            and isinstance(value[0], bool) and isinstance(value[1], str)):
+        return value[0], _bound(value[1])
+    return False, "the instrument returned no usable answer"
+
+
 def _gate_measurements(provider) -> dict[str, tuple[bool, str]]:
-    """The provider's answers, each a real `(bool, str)`; anything else is unmet.
-    `met` must be the bool `True`: a truthy string or number does not open a gate."""
+    """The checklist provider's answers, each a real `(bool, str)`; anything else is
+    unmet. `met` must be the bool `True`: a truthy string or number does not open a
+    gate."""
     try:
         got = (provider or checklist_gate_measures)()
     except Exception as exc:  # noqa: BLE001 - an instrument that fails is an unmet condition
@@ -691,7 +805,7 @@ def _gate_measurements(provider) -> dict[str, tuple[bool, str]]:
     else:
         failure = "the instrument returned no usable answer"
     out = {}
-    for kind in _GATE_LABELS:
+    for kind in _CHECKLIST_KINDS:
         value = got.get(kind) if isinstance(got, dict) else None
         if (isinstance(value, tuple) and len(value) == 2
                 and isinstance(value[0], bool) and isinstance(value[1], str)):
@@ -703,7 +817,7 @@ def _gate_measurements(provider) -> dict[str, tuple[bool, str]]:
 
 def phase_gates(capabilities: list[dict] | None = None,
                 requirements: list[dict] | None = None, *,
-                checklist_measures=None,
+                checklist_measures=None, succession_measures=None,
                 ) -> tuple[list[str], dict[str, tuple[bool, str]]]:
     """The plan's phase order and, per phase, whether its non-requirement
     conditions are met. Three sources, each for one question:
@@ -728,7 +842,10 @@ def phase_gates(capabilities: list[dict] | None = None,
     The exception is the item named in `CHECKLIST_GATE_ITEMS`: P2's three
     checklist gates are measured by the programme's own instruments
     (`checklist_gate_measures`, or `checklist_measures` when given: a callable
-    returning `{"items" | "review" | "fsck": (met, reason)}`). Such an
+    returning `{"items" | "review" | "fsck": (met, reason)}`), and P2's
+    "controller/session replacement" exit by the succession capsule
+    (`succession_measure`, or `succession_measures` when given: a callable
+    returning `(met, reason)`), asked only when an item maps to it. Such an
     item is met only when its instrument says `True` -- and, if a requirement
     also claims it, when that requirement is PROVEN as well: a claim never
     stands in for the instrument. An unmet one is reported with its reason, not
@@ -758,12 +875,20 @@ def phase_gates(capabilities: list[dict] | None = None,
             continue
         instrument = {i["id"]: CHECKLIST_GATE_ITEMS[i["id"]] for i in conditions
                       if i["id"] in CHECKLIST_GATE_ITEMS}
-        measured = _gate_measurements(checklist_measures) if instrument else {}
+        checklist_kinds = {k for k in instrument.values() if k in _CHECKLIST_KINDS}
+        measured = _gate_measurements(checklist_measures) if checklist_kinds else {}
+        if "succession" in instrument.values():
+            measured["succession"] = _one_measurement(
+                succession_measures or succession_measure, "succession")
         unmeasured = [i for i in conditions
                       if not bindings[i["id"]] and i["id"] not in instrument]
         instrument_unmet = [(instrument[i["id"]], measured[instrument[i["id"]]][1])
                             for i in conditions if i["id"] in instrument
                             and not measured[instrument[i["id"]]][0]]
+        succession_unmet = [(k, r) for k, r in instrument_unmet if k == "succession"]
+        instrument_unmet = [(k, r) for k, r in instrument_unmet if k != "succession"]
+        succession_items = [i for i in conditions
+                            if instrument.get(i["id"]) == "succession"]
         unmet_bound = 0
         not_proven: list[str] = []
         for i in conditions:
@@ -771,13 +896,20 @@ def phase_gates(capabilities: list[dict] | None = None,
             if short:
                 unmet_bound += 1
                 not_proven += [rid for rid in short if rid not in not_proven]
-        if not unmeasured and not unmet_bound and not instrument_unmet:
+        if (not unmeasured and not unmet_bound and not instrument_unmet
+                and not succession_unmet):
             gates[ph] = (True, f"{len(conditions)} exit condition(s), each bound "
                                "to a PROVEN requirement" if not instrument else
                                f"{len(conditions)} exit condition(s) met: "
                                f"{len(conditions) - len(instrument)} bound to a "
-                               f"PROVEN requirement, {len(instrument)} measured by "
-                               "the checklist instruments")
+                               f"PROVEN requirement, "
+                               f"{len(instrument) - len(succession_items)} measured by "
+                               "the checklist instruments"
+                               + (f", {len(succession_items)} measured by the "
+                                  "succession instrument"
+                                  + (" (its claimant PROVEN besides)"
+                                     if any(bindings[i["id"]] for i in succession_items)
+                                     else "") if succession_items else ""))
             continue
         why = []
         if unmet_bound:
@@ -792,6 +924,11 @@ def phase_gates(capabilities: list[dict] | None = None,
                               for kind, reason in instrument_unmet)
             why.append(f"{len(instrument_unmet)} checklist-gate exit condition(s) "
                        f"measured by the checklist instruments and unmet -- {named}")
+        if succession_unmet:
+            named = "; ".join(f"{_GATE_LABELS[kind]}: {reason}"
+                              for kind, reason in succession_unmet)
+            why.append(f"{len(succession_unmet)} exit-includes condition(s) measured "
+                       f"by the succession instrument and unmet -- {named}")
         if unmeasured:
             why.append(f"{len(unmeasured)} exit condition(s) nothing "
                        "here measures yet, e.g. "

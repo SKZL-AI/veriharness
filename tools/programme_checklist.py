@@ -288,12 +288,26 @@ def _exit_note(exits: dict | None, phase: str, why: str) -> str:
     if exits is None:
         return f"; phase exit not evaluated ({why})"
     entry = exits.get(phase) or {}
+    # PM6. A gate item no requirement claims is not necessarily unevaluated: the
+    # checklist-gate items of `build_plan.CHECKLIST_GATE_ITEMS` are claimed by none *on
+    # purpose* and are measured there, by the checklist instruments. This verdict does
+    # not cover them -- and says where they are measured instead of calling them
+    # "bound to no requirement", which at zero blockers read as a gap nobody had seen.
+    try:
+        instruments = set(getattr(_build_plan(), "CHECKLIST_GATE_ITEMS", None) or ())
+    except Exception:                      # noqa: BLE001 - unreadable: say nothing more
+        instruments = set()
+    unbound = [i for i in entry.get("unbound") or [] if i not in instruments]
+    measured = [i for i in entry.get("unbound") or [] if i in instruments]
     parts = []
-    if entry.get("unbound"):
-        parts.append(f"{len(entry['unbound'])} gate condition(s) bound to no requirement")
+    if unbound:
+        parts.append(f"{len(unbound)} gate condition(s) bound to no requirement")
     if entry.get("not_held"):
         parts.append(f"{len(entry['not_held'])} gate condition(s) bound only through a "
                      "non-blocking requirement not PROVEN")
+    if measured:
+        parts.append(f"{len(measured)} gate condition(s) measured by the checklist "
+                     "instruments of tools/build_plan.py, not by this verdict")
     return f"; phase exit not evaluated ({', '.join(parts)})" if parts else ""
 
 

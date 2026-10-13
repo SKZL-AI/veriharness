@@ -369,29 +369,82 @@ def derive_matrix(root: Path) -> dict:
         "p2": count(lambda x: x["target_phase"] == "P2"),
         "p3_p12": count(lambda x: x["target_phase"] not in later),
         "p2_42": by_id.get("P2-42", "ABSENT"),
+        "p2_42_lift": p2_42_lift(root),
         "a5": {i: by_id.get(i, "ABSENT") for i in A5_IDS},
     }
 
 
+REGISTER = "program/v3_3/REQUIREMENTS.json"
+
+
+def p2_42_lift(root: Path) -> dict | None:
+    """The register's own account of how P2-42's equivalent was lifted (O266 B1):
+    `previous_equivalent` with `lifted_on`, `by` and `evidence`. None while the
+    row's probe still carries an `equivalent` (checked: a record beside a standing
+    cap is not a lift), when the record lacks `by` or `lifted_on`, when the row or
+    the register is absent, or when the register is not readable here."""
+    try:
+        reg = json.loads((root / REGISTER).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    if not isinstance(reg, dict):
+        return None
+    for r in reg.get("requirements") or []:
+        if isinstance(r, dict) and r.get("id") == "P2-42":
+            probe = r.get("probe") if isinstance(r.get("probe"), dict) else {}
+            if probe.get("equivalent"):
+                return None
+            pe = r.get("previous_equivalent")
+            if isinstance(pe, dict) and pe.get("by") and pe.get("lifted_on"):
+                return {k: str(pe.get(k) or "") for k in ("lifted_on", "by", "evidence", "text")}
+            return None
+    return None
+
+
 def derive_plan(root: Path) -> dict:
-    p = _run(root, sys.executable, "-B", "tools/build_plan.py")
-    text = p.stdout
-    m = re.search(r"^(\d+) open requirement\(s\) in \d+ wave\(s\); (\d+) held "
-                  r"behind a phase gate", text, re.M)
-    g = re.search(r"^\s*gate P2: (.*)$", text, re.M)
-    if not m or not g:
-        raise Gap("tools/build_plan.py output has no summary or P2 gate line")
-    gate = g.group(1)
+    """The P2 gate as `tools/build_plan.py` states it in its own structured output
+    (`--dag`: `phase_gates["P2"]`), never from the presence or absence of a printed
+    `gate P2:` line -- build_plan prints that line only while the gate is unmet, so
+    reading the text made a *met* gate indistinguishable from no output (p2succ
+    review, #4). `met` is positive: an empty `blocking_open` and `external_met` True
+    or None -- None is build_plan's own value for a phase with no external gate item
+    (`gate_open`: "external_met is not False"), so it does not hold a gate shut.
+    Fails closed: a non-zero exit, no summary line, an unreadable DAG, no P2 gate
+    state, a state without a list `blocking_open` or without `external_met`, or an
+    `external_met` that is not True, False or None (a string "false", a 0) is a Gap."""
+    with tempfile.TemporaryDirectory() as td:
+        dag = Path(td) / "dag.json"
+        p = _run(root, sys.executable, "-B", "tools/build_plan.py", "--dag", str(dag))
+        if p.returncode != 0:
+            raise Gap(f"tools/build_plan.py exited {p.returncode}: {p.stderr.strip()[:200]}")
+        m = re.search(r"^(\d+) open requirement\(s\) in \d+ wave\(s\); (\d+) held "
+                      r"behind a phase gate", p.stdout, re.M)
+        if not m:
+            raise Gap("tools/build_plan.py output has no summary line")
+        try:
+            data = json.loads(dag.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            raise Gap(f"tools/build_plan.py wrote no readable DAG: {exc}") from exc
+    gates = data.get("phase_gates") if isinstance(data, dict) else None
+    g = gates.get("P2") if isinstance(gates, dict) else None
+    if (not isinstance(g, dict) or not isinstance(g.get("blocking_open"), list)
+            or "external_met" not in g):
+        raise Gap("tools/build_plan.py's DAG carries no P2 phase-gate state")
+    if g["external_met"] is not None and not isinstance(g["external_met"], bool):
+        raise Gap(f"tools/build_plan.py's P2 gate state has an external_met that is "
+                  f"neither a bool nor None: {g['external_met']!r}")
+    external = str(g.get("external") or "")
 
     def grab(pattern):
-        x = re.search(pattern, gate)
+        x = re.search(pattern, external) if g["external_met"] is False else None
         return int(x.group(1)) if x else 0
 
     return {
         "open": int(m.group(1)), "held": int(m.group(2)),
-        "blocking": grab(r"(\d+) blocking open"),
+        "blocking": len(g["blocking_open"]),
         "bound": grab(r"(\d+) exit condition\(s\) bound to"),
         "unmeasured": grab(r"(\d+) exit condition\(s\) nothing here measures"),
+        "met": not g["blocking_open"] and g["external_met"] is not False,
     }
 
 
@@ -437,6 +490,32 @@ def _plural(n: int, word: str) -> str:
 def _statuses(c: dict, order=("PROVEN", "PARTIAL", "IMPLEMENTED_NOT_PROVEN",
                               "MISSING")) -> str:
     return " + ".join(f"{c.get(k, 0)} {k}" for k in order)
+
+
+def p2_42_what(status, lift: dict | None = None) -> str:
+    """V10d's description, true for the status the figure shows and for what the
+    register records about the lift. While the row carries an `equivalent` the
+    sentence says so. Once it reads PROVEN the sentence names who lifted the
+    equivalent and when -- read from the register's `previous_equivalent`
+    (`lifted_on`, `by`; the live run from its `evidence` path; the ruling's date
+    from its text), never typed here: O266 lifted it on the live run of leakids2,
+    and the operator's ruling of 2026-10-10 narrowed the row's reading only."""
+    head = ("the register status of P2-42 (registered ephemeral temporary "
+            "roots); the code is merged and the register names its symbol")
+    if status != "PROVEN":
+        return head + " with an equivalent, which holds the row below PROVEN"
+    if not lift:
+        return head + "; the register records no equivalent and no lift"
+    run = ""
+    parts = str(lift.get("evidence") or "").split("/")
+    if len(parts) > 1 and parts[0] == "dogfood" and parts[1]:
+        run = f" on the live run of {parts[1]}"
+    ruling = re.search(r"operator's ruling of (\d{4}-\d{2}-\d{2})", str(lift.get("text") or ""))
+    under = (f", under the operator's ruling of {ruling.group(1)} on the reading "
+             "of the row" if ruling else "")
+    return (head + f"; the equivalent that held the row at PARTIAL was lifted by "
+            f"{lift['by']} ({lift['lifted_on']}){run}{under}, with the limits "
+            "stated in the row's register note")
 
 
 def build_rows(facts: dict | None) -> list[dict]:
@@ -587,10 +666,11 @@ def build_rows(facts: dict | None) -> list[dict]:
              regenerate="as V10b, by status"),
         dict(tag="V10d", r=True, needles=[],
              figure=d("matrix", lambda: f"P2-42: {mx['p2_42']}"),
-             what="the register status of P2-42 (registered ephemeral "
-                  "temporary roots); the code is merged and the register "
-                  "names its symbol with an equivalent, which holds the row "
-                  "below PROVEN",
+             # Derived with the figure: the second half of this sentence is a
+             # claim about the register, and it stopped being true the moment
+             # O266 lifted the equivalent. A description that is not re-derived
+             # beside its figure says "held below PROVEN" next to "PROVEN".
+             what=p2_42_what(mx.get("p2_42"), mx.get("p2_42_lift")),
              source="as V10",
              regenerate="`python3 tools/capability_matrix.py --json` -> "
                         "`capabilities`, id `P2-42`"),
@@ -1018,8 +1098,13 @@ def render(root: Path, base: str, facts: dict | None = None) -> str:
         ledger_lines = None
     subject = _git(root, "log", "-1", "--format=%s", base).strip()
     cdate = _git(root, "log", "-1", "--format=%ci", base).strip()
+    # By addition, 2026-10-12 (the v0.3.0 release, non-record change before the
+    # sealing commit of P2): the edition heading names the release `v0.3.0`;
+    # it named the pre-release `v0.3.0a3` since 2026-10-11 (`v0.3.0a2` before
+    # that). `paper/NUMBERS_V2.md` is rendered with this heading, so a table
+    # rendered at the sealing commit does not carry the third alpha's name.
     out = [
-        "# VeriHarness -- Numbers, second edition (pre-release v0.3.0a3)",
+        "# VeriHarness -- Numbers, second edition (release v0.3.0)",
         "",
         "<!-- Generated by `python3 tools/docs_numbers.py render`; "
         "`python3 tools/docs_numbers.py check` compares this file with a "

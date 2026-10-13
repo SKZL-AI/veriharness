@@ -33,6 +33,18 @@ So the division of labour is deliberate:
 * **`complete` is computed, never handed in.** An undecided finding keeps the
   review open, and so does a finding the product refused: a gate that closed
   over either would be closing over what the supervisor found.
+  *Corrected by addition (M4, 2026-10-12); nothing above is removed. The sentence
+  "An undecided finding keeps the review open, and so does a finding the product
+  refused: a gate that closed over either would be closing over what the
+  supervisor found." was written on 2026-09-24 and is **superseded**: O229/G
+  abolished its premise (a decision settles nothing), and `ReviewRecord`'s class
+  docstring was corrected first (O228/K4). The doctrine the code implements: every
+  finding that is not a finding of nothing -- `NO_ACTION` at a severity that agrees
+  with it -- keeps the review open, and so does a finding the product refused; a
+  decision (apply, reject) is recorded and settles nothing; a finding stops holding
+  the phase only when a *later* preserved review resolves it, by returning a
+  `NO_ACTION` of the same id that names the review which raised it
+  (`resolution_state`, O231/N2).*
 
 Usage:
     python3 tools/programme_supervisor.py --phase P2              # capsule JSON on stdout
@@ -64,6 +76,7 @@ from pydantic import (
     ConfigDict,
     Field,
     computed_field,
+    model_serializer,
     model_validator,
 )
 
@@ -263,6 +276,11 @@ def canonical_brief(*, register: Mapping, matrix: Mapping,
     digest the gate compares -- a brief showing a supervisor fewer open findings than the
     tree holds is not the canonical brief.
 
+    The open findings are bounded the same way (O231/N2): only reviews stamped strictly
+    before `before` are consulted, so the brief the gate rebuilds for a review is the brief
+    that review was given, and not one that already holds the review's own findings and
+    resolutions -- which no review that settled or raised anything could ever match.
+
     Source drift is measured against the most recent preserved review of the phase
     **strictly before** `before` (`drift_baseline_for`); `None` means before now. The gate
     passes the stamp of the review it is checking, because it rebuilds the brief after
@@ -285,8 +303,9 @@ def canonical_brief(*, register: Mapping, matrix: Mapping,
     # default that always read this checkout would make the brief describe one tree while
     # the gate checked another -- a mismatch of exactly the kind this function exists to
     # remove.
-    carried = list(open_findings_for(phase, snapshot=snapshot,
-                                     root=review_root, repo=repo).values())
+    fit, origins = open_state_for(phase, snapshot=snapshot, root=review_root,
+                                  repo=repo, before=before)
+    carried = list(fit.values())
     # `ReviewCapsule` bounds `open_findings` by `max_items`, so the size covers both --
     # O229/L6 was a brief that became underivable because an earlier review returned more
     # findings than the phase has items, with no escape that did not erase the history.
@@ -300,6 +319,7 @@ def canonical_brief(*, register: Mapping, matrix: Mapping,
     return capsule_for(phase, register=register, matrix=matrix,
                        max_items=size, max_evidence=len(of_phase) + 1,
                        open_findings=carried,
+                       open_finding_origins=origins,
                        previous_source_digests=baseline,
                        previous_review_id=baseline_id,
                        drift_reason=reason, repo=repo)
@@ -470,15 +490,41 @@ def drift_baseline_for(phase: str, *, before: str | None = None, root: Path | No
 
 
 def open_findings_for(phase: str, *, snapshot=None, root: Path | None = None,
-                      repo: Path | None = None) -> dict:
+                      repo: Path | None = None, before: str | None = None) -> dict:
     """The findings still open, keyed by id, fit to be carried in a brief.
 
     Only findings the product still accepts against `snapshot` are carried, when one is
     given: `ReviewCapsule` refuses a capsule holding a finding naming an item the snapshot
     does not have, and a brief that cannot be built is a gate that cannot close -- which is
     the shape this family of defects keeps taking (D1, E10, the seal check, O229/L6, M2).
+
+    `before` is a review stamp: only reviews stamped strictly earlier are consulted, which
+    is what a supervisor of the review stamped `before` was given. `None` is every
+    preserved review, which is what the operator's CLI builds now.
     """
-    still_open, _resolved = resolution_state(preserved_reviews(root, repo=repo))
+    return open_state_for(phase, snapshot=snapshot, root=root, repo=repo,
+                          before=before)[0]
+
+
+def open_state_for(phase: str, *, snapshot=None, root: Path | None = None,
+                   repo: Path | None = None, before: str | None = None
+                   ) -> tuple[dict, dict[str, list[str]]]:
+    """`(open findings fit for a brief, the reviews that raised each)` for `phase`.
+
+    `before` bounds the reviews consulted to those stamped strictly earlier. Without it a
+    gate that rebuilds the brief of the review it is checking, after that review was
+    preserved, would put that review's own raises and resolutions into the brief it
+    expects the review to have been given -- so any review that settled or raised
+    anything could never match its own rebuilt brief (O231/N2, found by building the
+    brief both ways). Drift has always been bounded the same way (`drift_baseline_for`).
+    """
+    reviews = preserved_reviews(root, repo=repo)
+    if before is not None:
+        limit = _stamp_key(before)
+        reviews = [(name, found) for name, found in reviews
+                   if _stamp_key(name) < limit]
+    still_open, _resolved = resolution_state(reviews)
+    raised_by = resolution_origins(reviews)
     fit: dict = {}
     for fid, body in still_open.items():
         try:
@@ -488,7 +534,102 @@ def open_findings_for(phase: str, *, snapshot=None, root: Path | None = None,
         if snapshot is not None and supervisor.validate(finding, snapshot=snapshot):
             continue
         fit[fid] = finding
-    return fit
+    return fit, {fid: raised_by.get(fid, []) for fid in fit}
+
+
+#: O231/N2. Reviews stamped *after* this resolve a raised finding only by naming it.
+#:
+#: `resolution_state` used to key on the bare finding id: any later `NO_ACTION` of an id
+#: resolved any earlier finding of that id, and nothing checked that the resolver was about
+#: *that* finding. Ids are free text a supervisor picks (`F3`, `M10`, `N2`), so a later
+#: review that reuses one for something else, or a `NO_ACTION` written for a different
+#: concern, settled a critical finding by coincidence of spelling.
+#:
+#: The narrow form: for a review stamped after this instant, a `NO_ACTION` resolves a
+#: raised finding only when its `evidence_refs` carries, verbatim, `review_ref(<the review
+#: that raised it>, <the id>)`. Nothing before it changes: the ten ids the review of
+#: 20260924T134525Z settled (F3, F4, F5, F6, F9, F12, F14, M2, M3, M10) stay resolved by
+#: the old rule, because that review is stamped before this and was judged by the rule of
+#: its time -- re-judging history by a rule it could not have known would reopen findings
+#: no one raised again.
+#:
+#: Why this instant: the change is dated 2026-10-11 and the newest preserved review is
+#: 2026-09-24, so no preserved review lies between. It is a stamp (`_stamp_key` order, as
+#: every other review comparison here), not the clock: a review's stamp is the one time the
+#: gate reads, and the clock would make the verdict depend on when it is asked. What this
+#: does *not* do, said plainly: a stamp is chosen by whoever preserves the review, so a
+#: review given an earlier stamp than this is judged by the old rule. That is the O229/L4
+#: limit (a file can only say a later review found nothing), not a new one.
+NAMED_RESOLUTION_AFTER = "20261011T000000Z"
+
+
+def review_ref(review: str, finding_id: str) -> str:
+    """The `evidence_refs` entry by which a `NO_ACTION` names the finding it resolves:
+    the preserved file that raised it and the id in it, in the form every other ref in a
+    finding takes (`path#anchor`): `dogfood/p2-gate/<stamp>/findings.json#<id>`.
+
+    Both halves matter. The stamp says *which review*; the anchor says *which finding of
+    it*, so a `NO_ACTION` that names the right review and another id resolves nothing."""
+    return f"{'/'.join(_REVIEW_ROOT_PARTS)}/{review}/findings.json#{finding_id}"
+
+
+def _quiet(raw: Mapping) -> bool:
+    """Is this raw finding a finding of nothing (`NO_ACTION`, severity that agrees)?"""
+    return (str(raw.get("kind") or "") == FindingKind.NO_ACTION.value
+            and str(raw.get("severity") or "").strip().casefold()
+            in ReviewRecord.NO_ACTION_SEVERITIES)
+
+
+def _named(raw: Mapping) -> set[str]:
+    """The `evidence_refs` of a raw finding that are strings; anything else names nothing."""
+    refs = raw.get("evidence_refs")
+    return {r for r in refs if isinstance(r, str)} if isinstance(refs, list) else set()
+
+
+def _accumulate(reviews: Iterable[tuple[str, Iterable]]
+                ) -> tuple[dict[str, dict], dict[str, list[str]], dict[str, str],
+                           list[tuple[str, str]]]:
+    """`(raised, raisers, resolved, unnamed)` over every review, in stamp order.
+
+    `raisers[id]` are the reviews that returned `id` since it was last resolved, in order;
+    `unnamed` is `(review, id)` for each `NO_ACTION` that a post-cutoff review returned
+    for a raised id without naming a review that raised it, so that the answer can say
+    why nothing was resolved rather than be silent about it."""
+    raised: dict[str, dict] = {}
+    raisers: dict[str, list[str]] = {}
+    resolved: dict[str, str] = {}
+    unnamed: list[tuple[str, str]] = []
+    cutoff = _stamp_key(NAMED_RESOLUTION_AFTER)
+    for name, findings in sorted(reviews, key=lambda pair: _stamp_key(pair[0])):
+        by_name = _stamp_key(name) > cutoff
+        for raw in findings:
+            if not isinstance(raw, Mapping):
+                continue
+            fid = str(raw.get("finding_id") or "").strip()
+            if not fid:
+                continue
+            if _quiet(raw):
+                if fid not in raised:
+                    continue
+                if not by_name:
+                    resolved[fid] = name
+                elif fid not in resolved:
+                    # Only a review strictly earlier than this one can have raised what
+                    # this one resolves: a review does not settle its own finding.
+                    wanted = {review_ref(r, fid) for r in raisers.get(fid, [])
+                              if _stamp_key(r) < _stamp_key(name)}
+                    if wanted & _named(raw):
+                        resolved[fid] = name
+                    else:
+                        unnamed.append((name, fid))
+                continue
+            if fid in resolved:          # raised again after a resolution: open again
+                del resolved[fid]
+                raisers[fid] = []
+            raised.setdefault(fid, dict(raw))
+            if name not in raisers.setdefault(fid, []):
+                raisers[fid].append(name)
+    return raised, raisers, resolved, unnamed
 
 
 def resolution_state(reviews: Iterable[tuple[str, Iterable]]) -> tuple[dict, list[str]]:
@@ -503,7 +644,9 @@ def resolution_state(reviews: Iterable[tuple[str, Iterable]]) -> tuple[dict, lis
     * a review **raises** every finding it returns that is not a finding of nothing;
     * a later review **resolves** a raised id by returning a finding of nothing that
       names it -- a supervisor looking at the thing again and saying there is nothing
-      there;
+      there. For a review stamped after `NAMED_RESOLUTION_AFTER` *names it* is exact: the
+      finding's `evidence_refs` carries `review_ref(<raising review>, <id>)` (O231/N2);
+      before it, the id alone resolves, as it always did;
     * everything raised and not later resolved is open, and holds the phase.
 
     This accumulates rather than chains, which is the repair for O229/L2. The previous
@@ -512,27 +655,27 @@ def resolution_state(reviews: Iterable[tuple[str, Iterable]]) -> tuple[dict, lis
     `findings.json` was invisible as a review and decisive as history. Under
     accumulation an added directory can only ever raise or resolve; it cannot forget.
     """
-    raised: dict[str, dict] = {}
-    resolved: dict[str, str] = {}
-    for name, findings in sorted(reviews, key=lambda pair: _stamp_key(pair[0])):
-        for raw in findings:
-            if not isinstance(raw, Mapping):
-                continue
-            fid = str(raw.get("finding_id") or "").strip()
-            if not fid:
-                continue
-            quiet = (str(raw.get("kind") or "") == FindingKind.NO_ACTION.value
-                     and str(raw.get("severity") or "").strip().casefold()
-                     in ReviewRecord.NO_ACTION_SEVERITIES)
-            if quiet:
-                if fid in raised:
-                    resolved[fid] = name
-                continue
-            if fid in resolved:          # raised again after a resolution: open again
-                del resolved[fid]
-            raised.setdefault(fid, dict(raw))
+    raised, _raisers, resolved, _unnamed = _accumulate(reviews)
     still_open = {fid: body for fid, body in raised.items() if fid not in resolved}
     return still_open, sorted(resolved)
+
+
+def resolution_origins(reviews: Iterable[tuple[str, Iterable]]) -> dict[str, list[str]]:
+    """For each finding still open: the reviews that raised it and still hold it open.
+
+    What a brief needs to tell a supervisor how to settle each one (`review_ref`)."""
+    reviews = [(name, list(found)) for name, found in reviews]
+    still_open, _resolved = resolution_state(reviews)
+    _raised, raisers, _res, _unnamed = _accumulate(reviews)
+    return {fid: list(raisers.get(fid, [])) for fid in still_open}
+
+
+def unnamed_resolutions(reviews: Iterable[tuple[str, Iterable]]) -> list[tuple[str, str]]:
+    """`(review, id)` of each `NO_ACTION` that did not resolve a finding that is still
+    open because it names no review that raised it (O231/N2)."""
+    reviews = [(name, list(found)) for name, found in reviews]
+    still_open, _resolved = resolution_state(reviews)
+    return sorted((r, f) for r, f in _accumulate(reviews)[3] if f in still_open)
 
 
 def _stamp_key(name: str) -> tuple:
@@ -1061,15 +1204,92 @@ class Selection(Strict):
         return line[:max_chars]
 
 
+class OpenFindingOrigin(Strict):
+    """Where one open finding came from, and the exact words that settle it (O231/N2).
+
+    `raised_by` are the preserved reviews that returned it and still hold it open;
+    `resolve_with` has one `review_ref` per such review. A later review settles the
+    finding by returning a `NO_ACTION` with this `finding_id` whose `evidence_refs`
+    carries one of them, verbatim.
+    """
+
+    finding_id: str
+    raised_by: list[str]
+    resolve_with: list[str]
+
+
+#: The shape of a finding that resolves another (PM4). Every field is what
+#: `supervisor.validate` and `SupervisorFinding` require of a `NO_ACTION`: `item_ids`
+#: names only items of the snapshot or nothing -- a phase such as `P2` is refused for a
+#: `NO_ACTION` ("not an item of the snapshot"), which would make the whole review
+#: INCOMPLETE -- there is no `proposed_action`, `review_id` and `supervisor_provider`
+#: are present, and `severity` is one of `ReviewRecord.NO_ACTION_SEVERITIES`. The one
+#: entry of `evidence_refs` is the `resolve_with` of the finding it answers, a path
+#: with an anchor, which is a shape `evidence_reference_problems` accepts.
+RESOLVER_EXAMPLE: dict = {
+    "finding_id": "<the finding_id of the open finding it answers>",
+    "review_id": "<the id of this review>",
+    "kind": "NO_ACTION",
+    "severity": "low",
+    "item_ids": [],
+    "reason": "<what was looked at again, and why nothing is there>",
+    "evidence_refs": ["<one resolve_with entry of that finding>"],
+    "proposed_action": None,
+    "supervisor_provider": "<the provider of this review>",
+}
+
+#: What a brief says, once, about how its open findings are settled. It is part of the
+#: brief, so it is inside the digest the gate compares: a brief that did not tell the
+#: supervisor how to resolve a finding is not the canonical brief.
+RESOLUTION_RULE = (
+    "An entry of `open_findings` stays open until a later review returns a finding with "
+    "the same `finding_id`, kind NO_ACTION and a severity that agrees with it, whose "
+    "`evidence_refs` contains, verbatim, one of that finding's `resolve_with` entries in "
+    "`open_finding_origins`. For a review stamped after " + NAMED_RESOLUTION_AFTER + " a "
+    "NO_ACTION that names no raising review, another review or another finding resolves "
+    "nothing, whatever its id. Shape of such a finding (a finding the product refuses "
+    "makes the review INCOMPLETE; `item_ids` must be items of this snapshot or empty -- "
+    "a phase is refused for NO_ACTION -- and `proposed_action` must be null): "
+    + json.dumps(RESOLVER_EXAMPLE, sort_keys=True))
+
+
 class ProgrammeCapsule(ReviewCapsule):
     """A `ReviewCapsule` that carries its own selection record.
 
     It is a `ReviewCapsule` in every respect -- including its bound check,
     which runs over the selected items -- plus `selection`, so what was left
     out is inspectable on the object and in its JSON, not only in prose.
+
+    `open_finding_origins` and `resolution_rule` say, for each finding carried in
+    `open_findings`, which review raised it and how a `NO_ACTION` must name it. Both
+    default to empty, and **an empty pair is not serialized**: that is the shape of a
+    capsule preserved before they existed, and a record already bound to one keeps its
+    digest because the dump -- and so `capsule_digest` -- is byte for byte what it was.
+    A capsule that carries findings always has both, and is digested whole.
     """
 
     selection: Selection
+    open_finding_origins: list[OpenFindingOrigin] = Field(default_factory=list)
+    resolution_rule: str = ""
+
+    @model_serializer(mode="wrap")
+    def _omit_an_empty_channel(self, handler):
+        body = handler(self)
+        if not self.open_finding_origins and not self.resolution_rule:
+            body.pop("open_finding_origins", None)
+            body.pop("resolution_rule", None)
+        return body
+
+    @model_validator(mode="after")
+    def _origins_name_the_open_findings(self) -> ProgrammeCapsule:
+        named = [o.finding_id for o in self.open_finding_origins]
+        carried = [f.finding_id for f in self.open_findings]
+        if named and sorted(named) != sorted(carried):
+            raise ValueError("open_finding_origins must name exactly the carried open "
+                             "findings, once each")
+        if named and not self.resolution_rule:
+            raise ValueError("open_finding_origins without the rule that reads them")
+        return self
 
 
 def _rank(item: ChecklistItem) -> tuple[int, int, str]:
@@ -1097,6 +1317,7 @@ def capsule_for(phase: str, *, register: Mapping, matrix: Mapping,
                 previous_source_digests: Mapping[str, str] | None = None,
                 previous_review_id: str | None = None,
                 drift_reason: str | None = None,
+                open_finding_origins: Mapping[str, Iterable[str]] | None = None,
                 repo: Path = HOH) -> ProgrammeCapsule:
     """The bounded brief for a review of `phase`, from the real register and matrix.
 
@@ -1210,11 +1431,22 @@ def capsule_for(phase: str, *, register: Mapping, matrix: Mapping,
     carried = [f if isinstance(f, SupervisorFinding)
                else SupervisorFinding.model_validate(dict(f))
                for f in open_findings]
+    # O231/N2: which review raised each carried finding and how a NO_ACTION must name it.
+    # Built from the carried findings, so what is described is what is carried.
+    origins: list[OpenFindingOrigin] = []
+    if carried and open_finding_origins is not None:
+        for f in carried:
+            by = [str(r) for r in open_finding_origins.get(f.finding_id, ())]
+            origins.append(OpenFindingOrigin(
+                finding_id=f.finding_id, raised_by=by,
+                resolve_with=[review_ref(r, f.finding_id) for r in by]))
     return ProgrammeCapsule(
         phase=phase, snapshot=subset, evidence_summaries=summaries,
         open_findings=carried, changed_source_digests=changed,
         max_items=max_items, max_evidence=max_evidence,
-        max_summary_chars=max_summary_chars, selection=selection)
+        max_summary_chars=max_summary_chars, selection=selection,
+        open_finding_origins=origins,
+        resolution_rule=RESOLUTION_RULE if origins else "")
 
 
 def capsule_digest(capsule: ReviewCapsule) -> str:

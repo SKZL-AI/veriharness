@@ -1099,3 +1099,66 @@ def test_a_review_root_outside_the_repository_fails_the_row(tmp_path, monkeypatc
     assert row.state == rd.FAIL
     assert "dogfood/p2-gate resolves outside the repository" in row.value_
     assert row.value_.startswith("review none:")
+
+
+def _later_review(tmp_path, register, matrix, findings, stamp="20261012T0900Z",
+                  raised_ids=("F-1",)):
+    """Preserve a review stamped after the cutoff of `NAMED_RESOLUTION_AFTER`, over a tree
+    in which `20260924T0030Z` already raised `raised_ids`, and write its record."""
+    raised = tmp_path / "dogfood/p2-gate/20260924T0030Z"
+    raised.mkdir(parents=True, exist_ok=True)
+    (raised / "findings.json").write_text(
+        json.dumps([_finding(i) for i in raised_ids]), encoding="utf-8")
+    snapshot, _ev, _items = ps.reconciled(register, matrix)
+    capsule = rd._canonical_brief(ps, register=register, matrix=matrix)
+    directory = tmp_path / "dogfood/p2-gate" / stamp
+    directory.mkdir(parents=True, exist_ok=True)
+    (directory / "capsule-p2.json").write_text(
+        capsule.model_dump_json(indent=1, by_alias=True), encoding="utf-8")
+    source = f"dogfood/p2-gate/{stamp}/findings.json"
+    (tmp_path / source).write_text(json.dumps(findings), encoding="utf-8")
+    record = ps.record_review("P2", capsule=capsule, findings=findings, snapshot=snapshot,
+                              decisions={}, findings_source=source)
+    (tmp_path / REVIEW).write_text(record.model_dump_json(indent=1), encoding="utf-8")
+    return capsule
+
+
+def test_the_board_says_why_a_no_action_that_names_no_raiser_resolved_nothing(
+        tmp_path, monkeypatch):
+    """O231/N2. A later review returned NO_ACTION for F-1 and the finding is still open;
+    "resolved by none" alone reads as "nobody looked". The cell names the id and the
+    review, and the control -- the same review citing the raising one -- resolves it."""
+    register, matrix = _tree(tmp_path, monkeypatch)
+    unnamed = {**_finding("F-1"), "kind": "NO_ACTION", "proposed_action": None,
+               "severity": "low", "evidence_refs": []}
+    capsule = _later_review(tmp_path, register, matrix, [unnamed])
+    assert [o.finding_id for o in capsule.open_finding_origins] == ["F-1"]
+    row = rd.row_programme_supervisor()
+    assert row.state == rd.FAIL
+    assert "raised by a preserved review and resolved by none: F-1" in row.value_
+    assert "name no review that raised what they answer" in row.value_
+    assert "F-1 in 20261012T0900Z" in row.value_
+
+    named = {**unnamed, "evidence_refs": [
+        "dogfood/p2-gate/20260924T0030Z/findings.json#F-1"]}
+    _later_review(tmp_path, register, matrix, [named])
+    row = rd.row_programme_supervisor()
+    assert "resolved by none" not in row.value_
+    assert "name no review that raised" not in row.value_
+    assert "previously-raised finding(s) resolved by a later review: F-1" in row.value_
+
+
+def test_the_board_names_four_unnamed_answers_and_then_counts_the_rest(tmp_path, monkeypatch):
+    """The cause is a cell, not a dump: five `NO_ACTION`s that named no raiser are listed
+    as the first four (by review, then id) and an ellipsis; the count says five."""
+    register, matrix = _tree(tmp_path, monkeypatch)
+    ids = [f"F-{n}" for n in range(1, 6)]
+    unnamed = [{**_finding(i), "kind": "NO_ACTION", "proposed_action": None,
+                "severity": "low", "evidence_refs": []} for i in ids]
+    _later_review(tmp_path, register, matrix, unnamed, raised_ids=ids)
+    row = rd.row_programme_supervisor()
+    assert "5 NO_ACTION finding(s) name no review that raised what they answer" in row.value_
+    shown = row.value_.split("so resolve nothing: ", 1)[1]
+    assert shown.startswith("F-1 in 20261012T0900Z, F-2 in 20261012T0900Z, "
+                            "F-3 in 20261012T0900Z, F-4 in 20261012T0900Z ...")
+    assert "F-5 in" not in shown
