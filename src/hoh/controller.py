@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import tempfile
+import threading
 import time
 import uuid
 from contextlib import ExitStack, contextmanager
@@ -64,7 +65,38 @@ from .runner import (
 from .capability import CapabilityViolation, SealFailed
 from .store import RunStore
 from .telemetry import NOT_AVAILABLE, TelemetryLog, record_from_role
-from .workspace import commit_candidate, materialize, snapshot, unchanged
+from .workspace import (
+    WorkspaceError,
+    commit_candidate,
+    has_uncommitted_work,
+    is_git_repo,
+    materialize,
+    snapshot,
+    unchanged,
+    working_tree,
+)
+from .wslease import (
+    DEFAULT_TTL_SECONDS as WORKSPACE_LEASE_TTL,
+    WorkspaceHeld,
+    WorkspaceLease,
+    WorkspaceLeaseError,
+    WorkspaceLeaseLost,
+    holder_name,
+)
+
+#: The `blocked_kind` of a run that waits for its worktree (P3-06, slice 2): the lease is
+#: held by another writer, it cannot be read, or the worktree carries changes that are not this
+#: run's. `human` is the product's own word for "a person owns this wait": `sentinel.stuck_run`
+#: reads the owner from `blocked_reason` for exactly that kind, so `hoh stuck` does not call the
+#: wait a control-plane defect, and `hoh unblock` is the way out. Not a provider class, not a
+#: storage class and not routed through the contract (nobody is asked to decide anything).
+WORKSPACE_WAIT_KIND = "human"
+
+#: The longest the end of an iteration waits for its keepalive thread. A renewal in flight ends
+#: within the lock's own half second and one fsync; a file system that hangs must not hold the
+#: iteration's end (and the worktree's release) with it. The thread is a daemon: left behind, it
+#: finds the lease released and ends.
+KEEPALIVE_JOIN_SECONDS = 5.0
 
 
 #: Prefix by which `stages.reject_candidate` tells a QA **outage** apart from
@@ -75,6 +107,10 @@ from .workspace import commit_candidate, materialize, snapshot, unchanged
 #: covered (see `WaitingForApproval`). Whoever changes the wording changes it
 #: here -- and both sides move along with it.
 NO_QA_VERDICT = "NO QA VERDICT"
+#: P3-41 slice 4: the prefix of a rejection that withholds the acceptance of a candidate whose
+#: criteria are all green, because a role runs on a weaker route and the policy's verification is
+#: not met (`Controller._weaker_route_unmet`).
+WEAKER_ROUTE_HOLD = "acceptance withheld on a weaker route"
 
 #: The seal ledger, in the run directory: one JSON line per seal event of a
 #: candidate arena (`planned`, `sealed`, `kept`, `touched`, `releasing`,
@@ -256,11 +292,75 @@ class LoopOutcome:
     waiting_for_approval: bool = False
 
 
+def keepalive_period(ttl_seconds: int) -> float:
+    """How often the holder of a workspace lease renews it: a third of the lease, never under a
+    second (`succession.MasterAuthority.keepalive` renews on the same rule)."""
+    return max(1.0, ttl_seconds / 3)
+
+
+class _WorkspaceHold:
+    """The lease of one iteration, kept alive while the iteration runs.
+
+    A role's dispatch can take longer than the lease; a holder whose only renewal is the next
+    write loses it in the middle of the work and is displaced while still the writer. The thread
+    renews every `period` seconds. It ends at the first refusal (the lease is not this handle's
+    any more: renewing again would not change that, and the commit's own check is what refuses)
+    and when the iteration ends; a transient error is retried at the next period."""
+
+    def __init__(self, lease: WorkspaceLease, period: float) -> None:
+        self.lease = lease
+        self.period = period
+        #: Why the keepalive saw the lease go, or None.
+        self.lost: str | None = None
+        #: Renewals that failed with anything but a lost lease (a full disk, a lock that stayed
+        #: busy), and the last of them: retried at the next period, never silent (`errors` is
+        #: written into the run's history once the commit has been tried, `_note_keepalive_errors`).
+        self.errors = 0
+        self.last_error: str | None = None
+        self.noted = False
+        self._stop = threading.Event()
+        self._thread = threading.Thread(target=self._run, name="hoh-workspace-keepalive",
+                                        daemon=True)
+        self._started = False
+
+    def start(self) -> None:
+        self._started = True
+        self._thread.start()
+
+    def _run(self) -> None:
+        while not self._stop.wait(self.period):
+            try:
+                self.lease.renew()
+            except WorkspaceLeaseLost as exc:
+                self.lost = str(exc)[:300]
+                return
+            except Exception as exc:                  # noqa: BLE001 - retried at the next period
+                self.errors += 1
+                self.last_error = f"{type(exc).__name__}: {exc}"[:300]
+                continue
+
+    def close(self, reason: str) -> None:
+        """Stop renewing, then give the worktree up. A lease that is no longer this handle's is
+        left exactly as it is (the holder that replaced it is not touched); it is never raised."""
+        self._stop.set()
+        if self._started:
+            self._thread.join(timeout=KEEPALIVE_JOIN_SECONDS)
+        try:
+            self.lease.release(reason=reason)
+        except WorkspaceLeaseError:
+            pass
+
+
 class _ScratchRefused(RuntimeError):
     """`run_check(scratch=)` refused the workspace the controller gave it (a
     `ValueError` of the runner's guard): the check did not run. Only a
     `ValueError` out of `run_check` itself becomes one -- never one out of making
     the workspace."""
+
+
+#: P3-INV1: what a run says when it is stopped at the ceiling `hoh run --dispatch-ceiling` told it. The launcher
+#: reads a run that stopped with it as the budget's stop (`RunVerdict.BUDGET_EXHAUSTED`), so the words are one constant.
+DISPATCH_CEILING_REACHED = "dispatch ceiling of this launch reached"
 
 
 class Controller:
@@ -287,6 +387,18 @@ class Controller:
     run exactly like a refused role dispatch. A Controller built **without** it
     -- every library caller and test that does not pass one -- is unchanged: the
     runner's sibling scratch and the host's default temporary directory.
+
+    One writer per worktree (P3-06, slice 2): every iteration takes the lease of
+    ``state.repo_path`` (`hoh.wslease`, the run id as holder) before its first role,
+    renews it from a keepalive thread, hands it to `commit_candidate`, looks at it
+    again after the commit and releases it on every way out of the iteration -- the
+    return, an exception, an interrupt and a park. A worktree another live writer
+    holds is a **wait** that names the holder (the run is BLOCKED, owned by a person --
+    ``blocked_kind`` is ``human`` --, nothing is charged and no role starts), never a failed
+    criterion and never a quota block; a worktree that carries uncommitted changes and was last
+    held by another run is refused the same way, so one run's leftovers are never committed
+    as another's. A path that is not the root of a git worktree
+    gets no lease (the iteration's own `snapshot` refuses it) and says so.
     """
 
     def __init__(
@@ -302,8 +414,24 @@ class Controller:
         steward=None,
         recovery: "dispatchrecovery.RecoveryContext | None" = None,
         ephemeral_roots=None,
+        workspace_lease_ttl: int = WORKSPACE_LEASE_TTL,
+        workspace_keepalive: float | None = None,
+        dispatch_ceiling: int | None = None,
     ) -> None:
         self.store = store
+        #: P3-INV1: the most dispatches (`usage.dispatches`, the run's total) this process may
+        #: reach, told by `hoh run --dispatch-ceiling`: the shared budget's hold for this launch.
+        #: It is never written to the run's state (the run's own `budgets` stay as they are); both
+        #: bounds apply, the lower one first.
+        self.dispatch_ceiling = dispatch_ceiling
+        #: P3-06: how long one iteration's lease of the worktree runs without a renewal, and how
+        #: often it is renewed (None: `keepalive_period(workspace_lease_ttl)`, a third of it).
+        self.workspace_lease_ttl = workspace_lease_ttl
+        self._workspace_keepalive = workspace_keepalive
+        #: The `_WorkspaceHold` of the iteration that is running, or None.
+        self._workspace_hold: _WorkspaceHold | None = None
+        #: `workspace lease: not taken` is said once per controller, not once per iteration.
+        self._lease_not_taken_noted = False
         #: P2-42: the `EphemeralRoots` of this process's registered session, or
         #: None (library use, or a project that is not registered).
         self.ephemeral_roots = ephemeral_roots
@@ -479,7 +607,7 @@ class Controller:
             import secrets
 
             state.arena_secret = secrets.token_hex(8)
-        exhausted = state.budget_exhausted()
+        exhausted = self._dispatches_exhausted(state)
         if exhausted:
             self._block(state, exhausted)
             self.store.write_state(state)
@@ -493,6 +621,7 @@ class Controller:
         # after: the chain is what tells a silent edit apart from a recorded
         # one, and without it every amendment would look like drift.
         chain = self._amendment_chain(state)
+        self._pin_needed: dict[str, set[str]] = {}
         seen_ = len(chain.amendments) if chain is not None else 0
         if seen_ < state.amendments_seen:
             # The chain got shorter. Whatever did that -- a rename, a prune, a
@@ -520,6 +649,7 @@ class Controller:
                 state.spec_digest = chain.current_digest()
                 self.store.write_state(state)
             self._reopen_amended_criteria(chain, state)
+            self._reopen_pin_amended(chain, state, spec_text)
 
         # The specification must not change silently underneath a running run
         # -- otherwise two iterations plan and verify against different truths.
@@ -535,6 +665,14 @@ class Controller:
         halt = self._honor_stop_request(state)
         if halt is not None:
             return halt
+
+        # P3-06: the worktree is leased from here -- after every gate above, before the first
+        # role, before the iteration is charged -- and given back on every way out of the
+        # iteration (`_run_iteration_guarded`'s scope). A worktree another writer holds is a
+        # wait: nothing below runs and nothing is spent.
+        waiting = self._hold_workspace(state)
+        if waiting is not None:
+            return waiting
 
         # --- PLANNING ------------------------------------------------------- #
         stages.begin_iteration(state, reason="new iteration")
@@ -674,11 +812,37 @@ class Controller:
                                result.verdicts)
 
         if result.accepted():
+            # P3-41 slice 4: a run with a role on a weaker route (a failover the routing policy
+            # declared) is accepted only when the verification the policy asks for is met. The
+            # route receipt says "additional verification required"; this is where it is acted on.
+            unmet = self._weaker_route_unmet(result)
+            if unmet:
+                why = (f"{WEAKER_ROUTE_HOLD}: " + "; ".join(unmet))
+                stages.reject_candidate(state, why)        # notes "candidate rejected: <why>"
+                state.working_candidate = candidate
+                self.store.write_state(state)
+                return LoopOutcome(iteration, False, why, candidate.candidate_id,
+                                   result.verdicts)
+            # FID1: the pins are read again at the acceptance itself, from the working tree as it
+            # is now -- QA's verdict, or anything that touched the tree after QA, is not the
+            # decision. A pinned test file that is not the pinned bytes is no acceptance.
+            drift = self._live_pin_findings(state, spec_text, candidate)
+            if drift:
+                why = spec_criteria.refusal(drift)
+                state.note(why)
+                stages.reject_candidate(state, why)
+                state.working_candidate = candidate
+                self.store.write_state(state)
+                return LoopOutcome(iteration, False, why, candidate.candidate_id,
+                                   result.verdicts)
             # The obligation an amendment created is discharged here, once,
             # and recorded. Recomputing it from the chain every iteration meant
             # a criterion re-measured in iteration 2 was demanded again in
             # iteration 3 -- and forever.
             done_ = set(chain.revalidation_needed()) if chain is not None else set()
+            # FID1: a criterion an amendment of the test-pins block reopened is answered by
+            # the same acceptance; the key names the amendment, so a later one asks again.
+            done_ |= {key for keys in self._pin_needed.values() for key in keys}
             if done_:
                 state.revalidated = sorted(set(state.revalidated) | done_)
             self._record_preserved(self._checks_for(plan, state), result.verdicts)
@@ -693,20 +857,29 @@ class Controller:
                 sha = commit_candidate(
                     state.repo_path, candidate,
                     run_id=state.run_id, iteration=iteration,
+                    lease=self._workspace_hold.lease if self._workspace_hold else None,
                 )
                 state.note(f"candidate {candidate.candidate_id} committed as {sha[:12]}.")
+                self._lease_after_commit(state, sha)
             except Exception as exc:
                 state.note(
                     f"candidate {candidate.candidate_id} accepted, but NOT "
                     f"committed: {exc}. The state lives only in the working "
                     "tree and cannot be delivered."
                 )
+            # Whether the commit was made or refused (a lease that ran out under failing renewals
+            # is refused): the reason the lease lapsed is written down either way.
+            self._note_keepalive_errors(state)
             stages.accept_checkpoint(state, candidate)
             self.store.write_state(state)
             reason = "all criteria demonstrated"
+            if self._weaker_route_required() is not None:
+                reason += " -- weaker-route verification met"
             if getattr(self, "_fidelity_not_run", False):
                 # an unrun check is NOT_RUN, never passed: the acceptance says it
                 reason += f" -- {spec_criteria.NOT_DECLARED}"
+            if getattr(self, "_pins_not_run", False):
+                reason += f" -- {spec_criteria.NO_TEST_PINS}"
             return LoopOutcome(
                 iteration, True, reason, candidate.candidate_id,
                 result.verdicts,
@@ -716,7 +889,9 @@ class Controller:
         # "Failed" and "never checked at all" must not sound the same. If QA
         # drops out -- quota exhausted, agent crashed, dialog open -- then no
         # criterion has been refuted; none has been assessed.
-        if result.summary.startswith(NO_QA_VERDICT):
+        if result.summary.startswith(spec_criteria.TEST_CONTENT_FIDELITY):
+            reason = result.summary
+        elif result.summary.startswith(NO_QA_VERDICT):
             reason = f"{stages.UNVERIFIED}: {result.summary}"
         elif open_ids:
             reason = f"not accepted: {', '.join(open_ids)}"
@@ -739,6 +914,48 @@ class Controller:
             iteration, False, reason, candidate.candidate_id, result.verdicts,
             waiting_for_approval=getattr(self, "_waiting_for_approval", False),
         )
+
+    def _weaker_route_required(self) -> dict | None:
+        """The weaker-route verification the routing the dispatcher was built on asks for, or None
+        (no routing, no failover, every role on an equivalent route). `{"measures": {...},
+        "roles": [...]}`; a value this does not understand is `{"measures": None}`: asked for and
+        not readable, which `_weaker_route_unmet` holds."""
+        evidence = getattr(self.dispatcher, "routing_evidence", None)
+        asked = evidence.get("verification") if isinstance(evidence, dict) else None
+        if asked is None:
+            return None
+        if (not isinstance(asked, dict) or asked.get("required") is not True
+                or not isinstance(asked.get("measures"), dict)
+                or not isinstance(asked.get("roles"), list)):
+            return {"measures": None, "roles": []}
+        return {"measures": asked["measures"], "roles": [str(r) for r in asked["roles"]]}
+
+    def _weaker_route_unmet(self, result: RoleResult) -> list[str]:
+        """Why a candidate whose every criterion is green is not accepted: what the policy's
+        weaker-route verification asks for and the result does not have. Empty when nothing is
+        asked or everything is met. `min_discriminating`: at least that many criteria that PASS
+        and demonstrate the increment; `no_open_gaps`: QA reported no open gap."""
+        asked = self._weaker_route_required()
+        if asked is None:
+            return []
+        measures, roles = asked["measures"], ", ".join(asked["roles"]) or "a role"
+        if measures is None:
+            return [f"a route receipt asks for verification this controller cannot read ({roles} "
+                    "runs on a weaker route)"]
+        unmet = []
+        need = measures.get("min_discriminating")
+        have = sum(1 for v in result.verdicts if v.outcome is Outcome.PASS and v.discriminates)
+        if need is not None and (isinstance(need, bool) or not isinstance(need, int)
+                                 or have < need):
+            unmet.append(f"{roles} runs on a weaker route and the routing policy asks for at "
+                         f"least {need} criteria that demonstrate the increment ({have} here)")
+        if measures.get("no_open_gaps") is True and result.open_gaps:
+            unmet.append(f"{roles} runs on a weaker route and the routing policy asks QA for no "
+                         f"open gap ({len(result.open_gaps)} reported)")
+        unknown = set(measures) - {"min_discriminating", "no_open_gaps"}
+        if unknown:
+            unmet.append("the routing policy asks for a measure this controller does not know")
+        return unmet
 
     def _honor_stop_request(self, state: RunState) -> LoopOutcome | None:
         """Evaluates a stop request that was filed without holding the lock.
@@ -782,6 +999,13 @@ class Controller:
         # specification without one is not compared, and the state says so -- and so
         # does the acceptance, should it come (`_fidelity_not_run`).
         declared = spec_criteria.declared_criteria(spec_text)
+        # FID1: the test files the specification pins are read at the same point, for the same
+        # reason; a block that cannot be read, or that leaves a file a criterion runs unpinned,
+        # ends the iteration before any role starts.
+        pins = spec_criteria.declared_pins(spec_text)
+        self._pins_not_run = bool(declared) and not pins
+        if self._pins_not_run:
+            state.note(spec_criteria.NO_TEST_PINS)
         fidelity = None
         self._fidelity_not_run = not declared
         if declared:
@@ -891,6 +1115,13 @@ class Controller:
         """The runner executes, QA assesses. The binding is checked before AND
         after the assessment."""
         stages.assert_binding_intact(state, candidate)
+        # FID1: before any check runs and before QA is asked, the candidate's test files are
+        # compared with the specification's pins -- the object database, not the arena. A
+        # candidate whose tests are not the pinned ones is refused here: no receipt is written
+        # for tests nobody reviewed, and QA is not asked to assess them.
+        findings = self._pin_findings(state, spec_text, candidate.tree_digest)
+        if findings:
+            return self._pin_refusal(state, plan, candidate, findings)
         # An arena an earlier QA dispatch left sealed -- its pane was kept
         # open, or the process was interrupted -- is compared here, at every
         # verification, and never unsealed: the pane may still be open.
@@ -1106,6 +1337,52 @@ class Controller:
             receipts=receipts,
             open_gaps=gaps,
             summary=summary,
+        )
+
+    def _pin_findings(self, state: RunState, spec_text: str, tree: str) -> list[str]:
+        """The candidate tree `tree` against the specification's test pins (`[]` when none)."""
+        base = state.base_candidate
+        return spec_criteria.pin_findings(
+            spec_text, repo=state.repo_path, tree=tree,
+            base_tree=base.tree_digest if base is not None else None)
+
+    def _live_pin_findings(
+        self, state: RunState, spec_text: str, candidate: Candidate
+    ) -> list[str]:
+        """The pins against the working tree as it is at the acceptance. A tree that is not the
+        frozen candidate is a finding in itself, whatever the pins say."""
+        if not spec_criteria.declared_pins(spec_text):
+            return []
+        try:
+            live = working_tree(state.repo_path)
+        except Exception as exc:  # noqa: BLE001 - fail closed
+            return [f"{spec_criteria.TEST_CONTENT_FIDELITY}: the working tree could not be "
+                    f"read at the acceptance: {type(exc).__name__}: {str(exc)[:200]}"]
+        found = self._pin_findings(state, spec_text, live)
+        if live != candidate.tree_digest:
+            found.insert(0, f"the working tree carries {live}, not the frozen candidate "
+                            f"{candidate.tree_digest}")
+        return found
+
+    def _pin_refusal(
+        self, state: RunState, plan: DevelopmentPlan, candidate: Candidate, findings: list[str]
+    ) -> RoleResult:
+        """The verification's answer for a candidate whose test files are not the pinned ones:
+        nothing ran, nothing is demonstrated, and the findings are the open gaps the next plan
+        is shown."""
+        why = spec_criteria.refusal(findings)
+        return RoleResult(
+            run_id=state.run_id, iteration=state.iteration, attempt=state.attempt,
+            role=Role.QA, candidate_id=candidate.candidate_id,
+            plan_digest=plan.plan_digest(), spec_digest=state.spec_digest,
+            verdicts=[
+                CheckVerdict(check_id=c.check_id, outcome=Outcome.INCONCLUSIVE,
+                             note=f"{spec_criteria.TEST_CONTENT_FIDELITY}: not run")
+                for c in self._checks_for(plan, state)
+            ],
+            receipts=[],
+            open_gaps=[f"{spec_criteria.TEST_CONTENT_FIDELITY}: {f}" for f in findings],
+            summary=why,
         )
 
     def _discriminates(
@@ -2489,6 +2766,51 @@ class Controller:
         )
         self._reopened = sorted(needed)
 
+    def _reopen_pin_amended(self, chain, state: RunState, spec_text: str) -> None:
+        """An amendment that changes the specification's `test-pins` block is acceptance-affecting
+        whatever its declared kind (FID1): the tests the criteria run are now other bytes, so
+        every criterion is planned and measured again before an acceptance stands, and the new
+        pins are never adopted silently by a `clarify`.
+
+        Which amendments changed the block is read from the parked texts the chain already
+        proves (`_amendment_chain` hashed each of them); a text that cannot be read counts as
+        changed. The reopened criteria leave the preservation suite exactly as
+        `_reopen_amended_criteria` does, and are answered once per amendment
+        (`state.revalidated` holds `<amendment id>:<check id>`)."""
+        self._pin_needed = {}
+        if chain is None:
+            return
+        try:
+            texts = [Path(a.from_path).read_text(encoding="utf-8") for a in chain.amendments]
+            changed = [a.amendment_id
+                       for a, before, after in zip(chain.amendments, texts, texts[1:] + [spec_text])
+                       if spec_criteria.pins_block(before) != spec_criteria.pins_block(after)]
+        except (OSError, ValueError):
+            changed = [a.amendment_id for a in chain.amendments]
+        if not changed:
+            return
+        try:
+            declared = {c.criterion_id for c in spec_criteria.declared_criteria(spec_text)}
+        except spec_criteria.CriteriaBlockError:
+            declared = set()
+        suite = self.store.read_checks()
+        needed: dict[str, set[str]] = {}
+        for cid in declared | set(suite):
+            keys = {f"{aid}:{cid}" for aid in changed} - set(state.revalidated)
+            if keys:
+                needed[cid] = keys
+        if not needed:
+            return
+        self._pin_needed = needed
+        removed = sorted(set(needed) & set(suite))
+        for cid in removed:
+            del suite[cid]
+        if removed:
+            self.store.write_checks(suite)
+        state.note("test-pins block amended (" + ", ".join(changed) + "): every criterion is "
+                   "measured again before an acceptance stands: " + ", ".join(sorted(needed)))
+        self._reopened = sorted(set(getattr(self, "_reopened", None) or []) | set(needed))
+
     def _revalidation_open(self, chain, state: RunState,
                             plan: DevelopmentPlan, result) -> set[str]:
         """Criteria an amendment reopened that this iteration has not answered.
@@ -2501,6 +2823,7 @@ class Controller:
         """
         needed = set(chain.revalidation_needed()) if chain is not None else set()
         needed -= set(state.revalidated)
+        needed |= set(getattr(self, "_pin_needed", {}))     # FID1: reopened by a pins amendment
         if not needed:
             return set()
         planned_ = {c.check_id for c in plan.acceptance_checks}
@@ -2643,6 +2966,20 @@ class Controller:
         return cap.denied_policy(
             role.value, protected=other_arenas() + evidenz + (repo,))
 
+    def _dispatches_exhausted(self, state: RunState) -> str | None:
+        """Why no further dispatch may be made, or None: the run's own budgets
+        (`RunState.budget_exhausted`) first, then the ceiling this process was told
+        (`dispatch_ceiling`, P3-INV1). `getattr`: a controller assembled with `__new__`
+        (several tests do) has none."""
+        own = state.budget_exhausted()
+        if own:
+            return own
+        ceiling = getattr(self, "dispatch_ceiling", None)
+        if ceiling is not None and state.usage.dispatches >= ceiling:
+            return (f"{DISPATCH_CEILING_REACHED} ({state.usage.dispatches}/{ceiling}): "
+                    "the shared dispatch budget holds nothing more for this run")
+        return None
+
     def _budget_or_refusal(self, state: RunState) -> None:
         """Charges one provider call against the budget, or refuses it.
 
@@ -2661,7 +2998,7 @@ class Controller:
         and calls again. The budget is enforced across processes out of this
         file, so this file has to know about a call that was *started*.
         """
-        exhausted_ = state.budget_exhausted()
+        exhausted_ = self._dispatches_exhausted(state)
         if exhausted_:
             raise DispatchError(f"dispatch refused: {exhausted_}")
         state.usage.dispatches += 1
@@ -2790,6 +3127,145 @@ class Controller:
         if temp is not None:
             temp.enter_context(self._run_temp(state))
 
+    def _hold_workspace(self, state: RunState) -> LoopOutcome | None:
+        """Take the lease of the run's worktree for this iteration, or return the wait.
+
+        None: the iteration goes on -- holding the lease (released with the iteration's scope), or
+        without one where there is nothing to lease (no iteration scope: a caller that did not
+        come through `_run_iteration_guarded`; a halted run, which `begin_iteration` refuses next;
+        not the root of a git worktree: `snapshot` refuses it below, and the note says so). A `WorkspaceHeld` is the wait that names the
+        holder; any other refusal of the lease (one that cannot be read, a lock that stays busy)
+        blocks the run for a person with the lease's own words. Neither is a verdict, neither
+        reads the reason as a quota statement, neither goes through the contract's routing (it is
+        not a decision someone is asked to make) and nothing has been charged.
+        """
+        self._workspace_hold = None
+        scope = getattr(self, "_iteration_temp", None)
+        if scope is None:
+            return None
+        if state.condition in stages.HALTED:
+            return None             # `begin_iteration` refuses a halted run; it takes no lease
+        if not is_git_repo(state.repo_path):
+            if not self._lease_not_taken_noted:
+                self._lease_not_taken_noted = True
+                state.note(f"workspace lease: not taken -- {state.repo_path} is not the root "
+                           "of a git worktree")
+            return None
+        holder = holder_name(state.run_id)
+        try:
+            lease = WorkspaceLease(state.repo_path, holder, ttl_seconds=self.workspace_lease_ttl)
+        except WorkspaceLeaseError as exc:
+            return self._workspace_blocked(
+                state, f"the workspace lease is refused ({exc.reason}): {exc}")
+        period = (self._workspace_keepalive if self._workspace_keepalive is not None
+                  else keepalive_period(self.workspace_lease_ttl))
+        hold = _WorkspaceHold(lease, period)
+        # Registered **before** the lease is taken: an interrupt between the `acquire` and the
+        # next line must still end in a release (the callback of a handle that holds nothing
+        # releases nothing).
+        scope.callback(self._release_workspace, hold)
+        try:
+            lease.acquire(admit=self._admit_worktree(state.repo_path, holder))
+        except WorkspaceHeld as exc:
+            return self._workspace_blocked(state, f"waiting for the workspace: {exc}")
+        except WorkspaceError as exc:
+            reason = getattr(exc, "reason", None)
+            what = ("the workspace carries changes that are not this run's" if reason == "dirty"
+                    else "the workspace could not be examined" if reason == "unexamined"
+                    else f"the workspace lease is refused ({reason or 'git'})")
+            return self._workspace_blocked(state, f"{what}: {exc}")
+        self._workspace_hold = hold
+        if (state.condition is Condition.ACTIVE and state.blocked_kind == WORKSPACE_WAIT_KIND
+                and not state.blocked_reason):
+            # The wait was lifted (`hoh unblock` clears the reason, not the kind): a stale owner
+            # on an ACTIVE run is what `hoh stuck` reads as a run nobody owns.
+            state.blocked_kind = None
+        hold.start()
+        return None
+
+    @staticmethod
+    def _admit_worktree(repo, holder: str):
+        """What `WorkspaceLease.acquire(admit=)` asks, under the lease's lock: may this run have
+        the worktree as it stands? Changes that are in it were made by whoever held it last; a
+        run takes them over only if that was itself. Another holder's uncommitted work would be
+        verified as this run's own and committed under its name (`commit_candidate` takes the
+        whole tree), which is the failure the lease exists for -- so it is refused, written
+        nowhere, and a person decides what the changes are. No previous lease (the first one on
+        this worktree) is no evidence either way and proceeds as before.
+
+        "Another run" is another **run id**: the holder name is the id alone, not (root, id), so
+        the same id under a second `--root` is the same holder (the record has no root field)."""
+        def admit(previous) -> None:
+            if previous is None or previous.holder == holder:
+                return
+            # The commit's own question, not `git status`'s: status follows configuration
+            # (`status.showUntrackedFiles=no`) that `git add -A` does not.
+            try:
+                dirty = has_uncommitted_work(repo)
+            except WorkspaceLeaseError:
+                raise
+            except WorkspaceError as exc:
+                # git could not answer (a foreign `index.lock` held by any concurrent git command, a
+                # damaged index): never "clean", never a crash -- a named refusal for a person.
+                raise WorkspaceLeaseError(
+                    "unexamined", f"git could not answer for {repo}: {exc}; if another git command "
+                                  f"is running there, wait for it, then unblock this run") from exc
+            if not dirty:
+                return
+            left = (f"released at {previous.released_at}" if previous.released_at
+                    else "not released")
+            raise WorkspaceLeaseError(
+                "dirty", f"{repo} has uncommitted changes and was last held by "
+                         f"{previous.holder!r} (generation {previous.generation}, {left}); they "
+                         f"are not this run's -- commit, stash or move them, then unblock this run")
+        return admit
+
+    def _workspace_blocked(self, state: RunState, reason: str) -> LoopOutcome:
+        stages.block(state, reason, scan_for_quota=False)
+        if state.blocked_kind != stages.CAPABILITY_VIOLATION:
+            # `stages.block` leaves a plain block with no kind; a violation hold keeps its own.
+            state.blocked_kind = WORKSPACE_WAIT_KIND
+        self.store.write_state(state)
+        return LoopOutcome(state.iteration, False, state.blocked_reason or reason)
+
+    def _release_workspace(self, hold: "_WorkspaceHold") -> None:
+        """The end of the iteration's scope: stop renewing, release. Never raises (it runs while
+        an exception may be on its way out)."""
+        if self._workspace_hold is hold:
+            self._workspace_hold = None
+        try:
+            hold.close("iteration ended")
+        except Exception:                             # noqa: BLE001 - nothing may mask the way out
+            pass
+
+    def _note_keepalive_errors(self, state: RunState) -> None:
+        """One history note, at most, for the renewals that failed with anything but a lost lease
+        (a disk that keeps failing lets the lease lapse unannounced; it must not be silent). Called
+        after the commit whichever way it went -- a refused commit under a lapsed lease is exactly
+        where the reason is wanted."""
+        hold = self._workspace_hold
+        if hold is None or not hold.errors or hold.noted:
+            return
+        hold.noted = True
+        state.note(f"workspace lease: the keepalive's renewal failed {hold.errors} time(s), "
+                   f"the last with {hold.last_error}")
+
+    def _lease_after_commit(self, state: RunState, sha: str) -> None:
+        """The second look: is the lease still this iteration's now the commit is made? A lease
+        that ran out or was taken between the check and the commit means two writers were
+        possible for that moment; the committed tree was compared with the candidate by
+        `commit_candidate` itself, so the verdict stands and the fact is written down."""
+        hold = self._workspace_hold
+        if hold is None:
+            return
+        try:
+            hold.lease.check(state.repo_path)
+        except Exception as exc:                      # noqa: BLE001 - noted, never fatal here
+            seen = f" (the keepalive saw it go: {hold.lost})" if hold.lost else ""
+            state.note(f"workspace lease LOST around the commit {sha[:12]}: {exc}{seen}; "
+                       "the commit was compared with the verified candidate, but the worktree "
+                       "was not exclusively this run's for that moment")
+
     @contextmanager
     def _run_temp(self, state: RunState):
         """The iteration's workspace is the default temporary directory of this
@@ -2824,7 +3300,7 @@ class Controller:
         reservation = self._storage_gate(state)
         if reservation is None:
             return self._dispatch_admitted(role, prompt, state)
-        from .storage_park import measure_owned_bytes
+        from .storage_park import measure_owned_bytes, measure_owned_inodes
 
         # Only what this run owns is sized -- never any other path, and no
         # link is followed (`measure_owned_bytes`): the run directory, the
@@ -2835,6 +3311,7 @@ class Controller:
         # during the dispatch is added afterwards and counts 0 before.
         owned_before = self._owned_for_sizing()
         before = measure_owned_bytes(owned_before)
+        inodes_before = measure_owned_inodes(owned_before)       # what the owned trees hold when the dispatch starts, arena copies included
         try:
             return self._dispatch_admitted(role, prompt, state)
         finally:
@@ -2846,6 +3323,28 @@ class Controller:
             except Exception as exc:          # noqa: BLE001 - noted, never silent
                 state.note(f"storage admission: releasing {reservation.id} "
                            f"({actual} B) failed: {exc}"[:400])
+            self._record_inodes(reservation, state, inodes_before, measure_owned_inodes(owned_after))
+
+    def _record_inodes(self, reservation, state: RunState, before: int | None, after: int | None) -> None:
+        """P3-39: the inodes the run holds while this dispatch runs go into the admission ledger's inode history, from
+        which the wave's gate predicts a run's inodes. **A footprint, the peak, not a net:** the entries the owned trees
+        hold -- the arena copies of the candidate and the planner's read copy, which the controller makes before the
+        dispatch starts, included -- at the larger of the start and the end of the dispatch. (A transient inside the
+        dispatch that is gone by its end is not seen; the policy's safety factor and the gate's floor stand for it.)
+        **Nothing is recorded, and the dispatch's state says why,** when either walk was unmeasurable or the count is 0
+        (a run whose arenas exist holds entries; 0 measured nothing); an admission with no inode record records nothing;
+        a record that cannot be written never hides the dispatch's own outcome."""
+        record = getattr(self.storage_admission, "record_inodes", None)
+        if not callable(record):
+            return
+        if before is None or after is None or max(before, after) == 0:
+            state.note(f"storage admission: no inode count recorded for {reservation.id} "
+                       f"({'unmeasurable' if before is None or after is None else 'a count of 0 is not a measurement'})"[:400])
+            return
+        try:
+            record(reservation, max(before, after))
+        except Exception:                     # noqa: BLE001 - the dispatch's outcome stands
+            pass
 
     def _owned_for_sizing(self) -> list[Path]:
         """The directories one dispatch's written bytes are measured over."""

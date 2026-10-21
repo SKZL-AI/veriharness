@@ -857,27 +857,54 @@ RECORDED_DIGESTS = {"20260924T0030Z": "dcb933dec61b054f",
                     "20260924T130000Z": "8643917591af63b2"}
 
 
+def _recorded_digest(stamp: str) -> str:
+    """The `capsule_digest` the preserved review records of `stamp` carry: every
+    `REVIEW*.json` (the current record and its rotated versions) whose `review_id` starts
+    with `stamp-`, which must all say one digest."""
+    found = set()
+    for path in sorted(GATE.glob("REVIEW*.json")):
+        record = json.loads(path.read_text(encoding="utf-8"))
+        if str(record.get("review_id", "")).startswith(stamp + "-"):
+            found.add(record["capsule_digest"])
+    assert len(found) == 1, (stamp, sorted(found))
+    return next(iter(found))
+
+
 def test_legacy_capsule_digest_stable_on_the_preserved_reviews():
     """Catches the new Selection fields entering the digest of a capsule preserved
     before they existed, which would unbind every recorded review from its brief:
     `dogfood/p2-gate/20260924T134525Z/capsule-p2.json` digests to the `capsule_digest`
     its `REVIEW.json` records, and the two older ones to theirs; and every preserved
     capsule of the tree still loads (moved here from the NOT_RUN case, Revision 6 item
-    2). Read-only. Control: the newest one with a drift field set no longer does."""
+    2). Read-only. Control: the newest one with a drift field set no longer does.
+
+    Re-stated after the v0.3.0 tag (strand ptests, O267 section 8(a)) because the review
+    record rotated at the sealing commit: `REVIEW.json` is now the closure review of
+    `20261013T093422Z` and the `20260924T134525Z` record is `REVIEW.v12.*`. The digest of
+    each stamp is read from the record whose `review_id` starts with that stamp, so the
+    pin follows the records and not the file name; the closure review's capsule carries
+    the drift fields and the legacy ones do not, and each digests to what its record
+    says. The preserved records do not move: this pins no live state."""
     preserved = sorted(GATE.glob("*/capsule-p2.json"))
     assert {p.parent.name for p in preserved} >= set(RECORDED_DIGESTS)
     for path in preserved:
         ps.ProgrammeCapsule.model_validate(json.loads(path.read_text(encoding="utf-8")))
-    review = json.loads((GATE / "REVIEW.json").read_text(encoding="utf-8"))
-    want = {**RECORDED_DIGESTS, "20260924T134525Z": review["capsule_digest"]}
+    legacy = {**RECORDED_DIGESTS,
+              "20260924T134525Z": _recorded_digest("20260924T134525Z")}
+    want = {**legacy, "20261013T093422Z": _recorded_digest("20261013T093422Z")}
     for stamp, digest in want.items():
-        body = json.loads((GATE / stamp / "capsule-p2.json").read_text(encoding="utf-8"))
+        path = GATE / stamp / "capsule-p2.json"
+        assert path.is_file(), stamp
+        body = json.loads(path.read_text(encoding="utf-8"))
         capsule = ps.ProgrammeCapsule.model_validate(body)
-        assert capsule.selection.has_legacy_drift_fields()
+        assert capsule.selection.has_legacy_drift_fields() is (stamp in legacy), stamp
         assert ps.capsule_digest(capsule).startswith(digest), stamp
+    # Control: the legacy capsule with a drift field set is no longer the recorded one.
+    stamp = "20260924T134525Z"
+    body = json.loads((GATE / stamp / "capsule-p2.json").read_text(encoding="utf-8"))
     body["selection"]["drift_reason"] = "not measured"
     assert not ps.capsule_digest(ps.ProgrammeCapsule.model_validate(body)).startswith(
-        review["capsule_digest"])
+        legacy[stamp])
 
 
 def test_legacy_drift_fields_exempt_only_at_their_defaults(tmp_path):

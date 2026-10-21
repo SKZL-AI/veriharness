@@ -95,14 +95,35 @@ jobs:
       # `ModuleNotFoundError: No module named 'pydantic'` -- a declared runtime
       # dependency that happened to be present on the author's machine and
       # nowhere else. That is precisely the failure this job exists to find.
+      #
+      # Added 2026-10-14. The suite imports one more optional dependency
+      # directly: tests/test_archive_bundle.py and tests/test_archive_verify.py
+      # `import zstandard`, which `pyproject.toml` declares as the `archive`
+      # extra (the product itself imports it lazily and refuses without a
+      # fallback format). `pip install -e .` did not install it, so pytest
+      # stopped at collection with `ModuleNotFoundError: No module named
+      # 'zstandard'` on every push since the tag v0.3.0a1 -- the same class of
+      # failure as the missing `pydantic` above, one optional layer further
+      # out. The extras are named here instead of the tests being skipped: a
+      # skipped archive test would measure nothing. `test` brings pytest from
+      # the same declaration, so there is one list of what the suite needs.
       - name: Install the project and test tooling
         run: |
           python -m pip install --upgrade pip setuptools
-          python -m pip install -e .
-          python -m pip install pytest ruff
+          python -m pip install -e ".[test,archive]"
+          python -m pip install ruff
 
       - name: Ruff (F and E9 only, matching the release gate)
         run: ruff check --select F,E9 src tests tools
+
+      # Added 2026-10-14. Some tests make commits in throw-away repositories (the
+      # merge-identity tests, for two) and git refuses to commit without an
+      # identity. A developer machine has one in its global configuration; a
+      # runner has none, and the failure read "Committer identity unknown".
+      - name: A git identity for the tests that commit
+        run: |
+          git config --global user.name "ci"
+          git config --global user.email "ci@example.invalid"
 
       - name: Test suite
         run: python -m pytest -q

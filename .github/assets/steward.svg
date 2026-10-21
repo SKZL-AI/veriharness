@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="500" viewBox="0 0 1100 500" role="img" aria-labelledby="t d">
+  <title id="t">The storage steward</title>
+  <desc id="d">Disk bytes and inodes are watched. Work asks for a reservation before it starts, a run that meets pressure is parked durably and resumed later. A verified relocation copies reproducible scratch to cold storage, reads the copy back, writes a receipt and only then frees the local copy. Anything not provably owned is left alone.</desc>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#7fe3d8"/>
+    </marker>
+  </defs>
+  <rect width="1100" height="500" rx="16" fill="#0f1c2e"/>
+  <g font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" text-anchor="middle">
+    <text x="550" y="40" font-size="22" font-weight="700" fill="#f2f6fa">The storage steward: free space without losing evidence</text>
+
+    <g font-size="16" fill="#eaf1f7">
+      <rect x="30" y="80" width="230" height="100" rx="12" fill="#1d3552" stroke="#2ec4b6" stroke-width="1.5"/>
+      <text x="145" y="112" font-weight="700">Watch bytes and inodes</text>
+      <text x="145" y="136" font-size="13" fill="#b9c7d6">pressure is a signal,</text>
+      <text x="145" y="154" font-size="13" fill="#b9c7d6">on both axes</text>
+
+      <rect x="310" y="80" width="230" height="100" rx="12" fill="#1d3552" stroke="#2ec4b6" stroke-width="1.5"/>
+      <text x="425" y="112" font-weight="700">Admit by reservation</text>
+      <text x="425" y="136" font-size="13" fill="#b9c7d6">work asks first; under pressure</text>
+      <text x="425" y="154" font-size="13" fill="#b9c7d6">a run is parked, then resumed</text>
+
+      <rect x="590" y="80" width="230" height="100" rx="12" fill="#3a2f12" stroke="#ffbf47" stroke-width="1.5"/>
+      <text x="705" y="112" font-weight="700">Plan a relocation</text>
+      <text x="705" y="136" font-size="13" fill="#e6d3a0">only reproducible scratch or a</text>
+      <text x="705" y="154" font-size="13" fill="#e6d3a0">verified duplicate is a candidate</text>
+
+      <rect x="870" y="80" width="200" height="100" rx="12" fill="#3b1f27" stroke="#ff8a8a" stroke-width="1.5"/>
+      <text x="970" y="112" font-weight="700">Left alone</text>
+      <text x="970" y="136" font-size="13" fill="#f0c4c4">foreign, unknown, single-copy</text>
+      <text x="970" y="154" font-size="13" fill="#f0c4c4">or in-use paths</text>
+    </g>
+    <g stroke="#7fe3d8" stroke-width="2.2" fill="none" marker-end="url(#a)">
+      <path d="M260 130 H302"/>
+      <path d="M540 130 H582"/>
+    </g>
+
+    <g font-size="16" fill="#eaf1f7">
+      <rect x="30" y="260" width="200" height="90" rx="12" fill="#1d3552" stroke="#2ec4b6" stroke-width="1.5"/>
+      <text x="130" y="292" font-weight="700">Copy to cold storage</text>
+      <text x="130" y="316" font-size="13" fill="#b9c7d6">into a verified bundle</text>
+
+      <rect x="290" y="260" width="200" height="90" rx="12" fill="#1d3552" stroke="#2ec4b6" stroke-width="1.5"/>
+      <text x="390" y="292" font-weight="700">Read it back</text>
+      <text x="390" y="316" font-size="13" fill="#b9c7d6">digest of the re-read copy</text>
+
+      <rect x="550" y="260" width="200" height="90" rx="12" fill="#3a2f12" stroke="#ffbf47" stroke-width="1.5"/>
+      <text x="650" y="292" font-weight="700">Receipt, durable</text>
+      <text x="650" y="316" font-size="13" fill="#e6d3a0">what, where, how verified</text>
+
+      <rect x="810" y="260" width="260" height="90" rx="12" fill="#17402f" stroke="#5ad19a" stroke-width="1.5"/>
+      <text x="940" y="292" font-weight="700">Only then free the local copy</text>
+      <text x="940" y="316" font-size="13" fill="#bfe3d0">and re-check the exact paths</text>
+    </g>
+    <g stroke="#7fe3d8" stroke-width="2.2" fill="none" marker-end="url(#a)">
+      <path d="M230 305 H282"/>
+      <path d="M490 305 H542"/>
+      <path d="M750 305 H802"/>
+    </g>
+    <path d="M705 180 V222 H130 V252" stroke="#7fe3d8" stroke-width="2.2" fill="none" marker-end="url(#a)"/>
+
+    <rect x="30" y="394" width="1040" height="76" rx="12" fill="#14243a" stroke="#2b4568" stroke-width="1"/>
+    <text x="550" y="424" font-size="15" fill="#e3ebf3">By design the steward removes nothing unique, current, referenced or foreign. Ownership is proven by a registry,</text>
+    <text x="550" y="448" font-size="15" fill="#e3ebf3">never inferred from a name or an age; what cannot be proven is left where it is.</text>
+  </g>
+</svg>

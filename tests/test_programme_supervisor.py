@@ -497,6 +497,17 @@ def test_this_programmes_p2_capsule_is_built_from_the_real_register():
     which the supervisor review is the one this binding serves: the preserved reviews
     still leave release-blocking findings open against this very snapshot, so the capsule
     is the brief of a review that is due, not the record of one that closed the phase.
+
+    Re-stated after the v0.3.0 tag (strand ptests, O267 section 8(a)) because P2's exit is
+    a live measurement. The closure review (`20261013T093422Z`) answered the findings the
+    earlier reviews left open, and the matrix and the register move with every regeneration,
+    so "every item VERIFIED" and "findings still open" are states of one commit. What this
+    pins is the derivation and the records: one item per P2 row and only phase P2; each
+    item VERIFIED exactly when its matrix row is PROVEN and pending otherwise, on the P2
+    capsule and on the capsule of the first phase whose rows are not all PROVEN (the
+    control, which has a pending item); the open findings are a subset of the preserved
+    release-blocking ones; and, bounded to the reviews before the closure review, they are
+    exactly the findings that review's `findings.json` carries.
     """
     if not ps.REGISTER.is_file() or not ps.MATRIX.is_file():
         pytest.skip("the register and matrix are internal")
@@ -507,31 +518,39 @@ def test_this_programmes_p2_capsule_is_built_from_the_real_register():
     p2 = [r["id"] for r in register["requirements"] if r["target_phase"] == "P2"]
     assert capsule.selection.considered == len(p2)
     assert {i.phase for i in capsule.snapshot.items} == {"P2"}
-    # Capability coverage of P2 is closed (O266): every row PROVEN, every item VERIFIED,
-    # none pending -- and the one follows from the other, nothing here is copied.
-    assert all(measured.get(i) == "PROVEN" for i in p2), \
-        [i for i in p2 if measured.get(i) != "PROVEN"]
-    assert {i.status for i in capsule.snapshot.items} == {Status.VERIFIED}
-    assert not any(i.status is Status.EVIDENCE_PENDING for i in capsule.snapshot.items)
-    # Derived, not copied, shown on the real data: the first phase of the register whose
-    # rows are not all PROVEN has exactly its PROVEN rows VERIFIED and the rest pending
-    # (an item `P2-07+<extra>` shares the measurement of its requirement).
-    control = next(r["target_phase"] for r in register["requirements"]
-                   if measured.get(r["id"]) != "PROVEN")
-    assert control != "P2"
-    other = ps.capsule_for(control, register=register, matrix=matrix)
+
+    def derived(snapshot):
+        """Derived, not copied: an item is VERIFIED exactly when its matrix row is PROVEN
+        (an item `P2-07+<extra>` shares the measurement of its requirement)."""
+        assert snapshot.items
+        for item in snapshot.items:
+            proven = measured.get(item.item_id.split("+", 1)[0]) == "PROVEN"
+            want = Status.VERIFIED if proven else Status.EVIDENCE_PENDING
+            assert item.status is want, (item.item_id, item.status)
+
+    derived(capsule.snapshot)
+    # The control, on the real data: the first phase whose rows are not all PROVEN has a
+    # pending item, so the derivation above is shown to be able to say "not VERIFIED".
+    controls = [r["target_phase"] for r in register["requirements"]
+                if measured.get(r["id"]) != "PROVEN"]
+    assert controls, "every register row is PROVEN: no control phase"
+    other = ps.capsule_for(controls[0], register=register, matrix=matrix)
     assert any(i.status is Status.EVIDENCE_PENDING for i in other.snapshot.items)
-    for item in other.snapshot.items:
-        proven = measured.get(item.item_id.split("+", 1)[0]) == "PROVEN"
-        assert (item.status is Status.VERIFIED) == proven, (item.item_id, item.status)
-    # Not closed: the preserved reviews still hold findings open that fit this snapshot
-    # -- among them every release-blocking one the checklist binding lists -- so the
-    # gate's supervisor-review condition is unmet and this capsule is a brief for a
-    # review that is due. (The final closure sequence resolves them and re-states this.)
+    derived(other.snapshot)
+
+    # Which findings are open is the preserved reviews' state, not pinned: whatever is
+    # open is a release-blocking finding the checklist binding lists.
     still_open = ps.open_findings_for("P2", snapshot=capsule.snapshot)
-    assert still_open, "no open finding: the review condition would be met"
-    blocking = set(ps.programme_checklist._preserved_release_blocking_findings())
-    assert blocking and blocking <= set(still_open), sorted(blocking - set(still_open))
+    assert set(still_open) <= set(
+        ps.programme_checklist._preserved_release_blocking_findings())
+    # The control in the records, which do not move: before the closure review, what was
+    # open is what that review was given and carries.
+    stamp = "20261013T093422Z"
+    earlier = ps.open_findings_for("P2", snapshot=capsule.snapshot, before=stamp)
+    assert earlier
+    carried = json.loads((ps.HOH / "dogfood/p2-gate" / stamp / "findings.json")
+                         .read_text(encoding="utf-8"))
+    assert set(earlier) == {f["finding_id"] for f in carried}
 
 
 # --------------------------------------------------------------------------- #

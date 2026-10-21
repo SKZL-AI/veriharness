@@ -622,7 +622,18 @@ def test_the_gate_agrees_with_the_tools_exit_code_whatever_the_trees_state():
     # readings differ by design (an uncommitted record file).
     rc, blob = su._git_rc("show", f"HEAD:{CAPSULE_REL}")
     if rc != 0:
-        assert met is False and "not committed at HEAD" in why, why
+        # Not committed at HEAD in a repository of its own, or no history of its own at
+        # all (an archive copy): the gate names which, and the second is the
+        # environment's gap (R4), checked before any `git show` so that it is not
+        # misnamed "not committed". Each branch pins its own text, not either of two.
+        assert met is False, why
+        own, _gap = su._own_repository()
+        if own:
+            assert "not committed at HEAD" in why, why
+        else:
+            assert why.startswith("not checkable from here, which is not a pass: "
+                                  "ENVIRONMENT_GAP: not a git repository of its own"), why
+            assert "git show" not in why, why
         return
     committed = json.loads(blob)
     rows = su.check(committed, su._plan_root(None), at_commit="HEAD")

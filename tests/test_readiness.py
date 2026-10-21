@@ -334,6 +334,17 @@ def test_every_gate_shaped_tool_has_a_row():
         "durability_fixture",        # a fixture durability_e2e drives; that is the row
         "evidence_claims",           # an interface over claim files handed to it (P2-32);
                                      # it judges no state of this repository, so no row
+        "merge_gate",                # the orchestrator's merge-time cross-check of `hoh merge-gate`:
+                                     # it decides one merge, not this repository's readiness
+        "bench1",                    # the pre-registered benchmark's runner: its gates (AB2-AB4, the stage approval)
+                                     # decide a benchmark campaign, not this repository's readiness; like "benchmark"
+        "bench1_ports",              # the production ports of that runner (storage guard, image/arm ports, readers):
+                                     # they act for one benchmark campaign and judge no state of this repository
+        "regression_watch",          # the A7 regression obligation of a closed phase: one run of the durability
+                                     # instrument per relevant tree, its verdict a committed watch record
+                                     # (dogfood/<phase>-gate/watch/*.json) that `build_plan`'s closure watch and
+                                     # `capability_matrix`'s `last_watch` read; it decides one commit's durability
+                                     # evidence, not this repository's readiness (the `durability` row re-derives the record)
     }
     source = inspect.getsource(rd.row_list) + "".join(
         inspect.getsource(getattr(rd, n)) for n in dir(rd)

@@ -1207,7 +1207,10 @@ def test_only_two_functions_ask_herdr_to_close_something():
     # pinned by `tests/test_agent_control.py::test_the_dispatcher_closes_only_through_two_functions`.
     assert _close_sites(source) == set()
     control = (Path(dispatchers.__file__).parent / "agentcontrol.py").read_text(encoding="utf-8")
-    assert _close_sites(control, "HerdrAgentControl") == {"close_pane", "close_tab"}
+    # `close_workspace` is the reaper's verb for a run workspace (strand tabreap): the adapter
+    # spells it, and the dispatcher still may not ask for it (`_close_sites(source) == set()`).
+    assert _close_sites(control, "HerdrAgentControl") == {"close_pane", "close_tab",
+                                                          "close_workspace"}
 
     # The scanner itself sees every spelling it claims to.
     for spelling in ("['herdr', 'tab' ,  'close', x]", '["herdr", "pane", "close", x]',

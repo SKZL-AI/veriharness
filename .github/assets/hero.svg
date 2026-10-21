@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="300" viewBox="0 0 1200 300" role="img" aria-labelledby="t d">
+  <title id="t">VeriHarness</title>
+  <desc id="d">VeriHarness is an evidence-bound Harness-of-Harness: a plan, a development step, an independent check and receipts decide whether agent-written work is accepted.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0b1726"/>
+      <stop offset="1" stop-color="#132a43"/>
+    </linearGradient>
+    <linearGradient id="bar" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#2ec4b6"/>
+      <stop offset="1" stop-color="#4f9dff"/>
+    </linearGradient>
+    <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#7fe3d8"/>
+    </marker>
+  </defs>
+  <rect width="1200" height="300" rx="18" fill="url(#bg)"/>
+  <rect x="56" y="62" width="8" height="112" rx="4" fill="url(#bar)"/>
+  <text x="84" y="124" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="68" font-weight="700" fill="#f2f6fa">VeriHarness</text>
+  <text x="86" y="166" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="28" fill="#9fd8d1">An evidence-bound Harness-of-Harness</text>
+  <text x="86" y="226" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="21" fill="#c9d4df">Work is accepted on receipts a deterministic runner produced,</text>
+  <text x="86" y="256" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="21" fill="#c9d4df">not on a model's own report that it is done.</text>
+  <g font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="17" fill="#e8eef4" text-anchor="middle">
+    <rect x="752" y="52" width="150" height="46" rx="10" fill="#1d3552" stroke="#2ec4b6" stroke-width="1.5"/>
+    <text x="827" y="81">plan</text>
+    <rect x="952" y="52" width="150" height="46" rx="10" fill="#1d3552" stroke="#2ec4b6" stroke-width="1.5"/>
+    <text x="1027" y="81">develop</text>
+    <rect x="952" y="127" width="150" height="46" rx="10" fill="#1d3552" stroke="#2ec4b6" stroke-width="1.5"/>
+    <text x="1027" y="156">independent QA</text>
+    <rect x="752" y="127" width="150" height="46" rx="10" fill="#1d3552" stroke="#ffbf47" stroke-width="1.5"/>
+    <text x="827" y="156">receipts</text>
+    <rect x="752" y="202" width="350" height="46" rx="10" fill="#17402f" stroke="#5ad19a" stroke-width="1.5"/>
+    <text x="927" y="231">accept - or replan with the evidence</text>
+  </g>
+  <g stroke="#7fe3d8" stroke-width="2.2" fill="none" marker-end="url(#ah)">
+    <path d="M902 75 H940"/>
+    <path d="M1027 98 V120"/>
+    <path d="M952 150 H914"/>
+    <path d="M827 173 V195"/>
+  </g>
+</svg>

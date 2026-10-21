@@ -1043,6 +1043,14 @@ OVERRIDES: dict[str, dict[str, str]] = {
     # `basis` is in the vocabulary (German Basis -> baseline); this field is the English
     # word ("the basis of the run id") and is pinned to itself, which `remaining` honours.
     "src/hoh/storage_account.py": {"run_id_basis": "run_id_basis"},
+    # BENCH1 (2026-10-15): `parquet` is the name of an external module (pyarrow.parquet), not the German Parkett;
+    # pinned to itself in the one file that imports it.
+    "tools/bench1.py": {"parquet": "parquet"},
+    # P3-DD1 (2026-10-14): `basis` is the English word here (an analyst's basis for a claim of unsolvability);
+    # the reviewed test name is pinned to itself, as run_id_basis above.
+    "tests/test_doubledown.py": {
+        "test_unsolvable_needs_both_analysts_a_basis_and_no_proposal_from_the_floor":
+            "test_unsolvable_needs_both_analysts_a_basis_and_no_proposal_from_the_floor"},
     "tools/attribution.py": {"zeile": "line", "zeilen": "lines"},
     "tools/succession.py": {"zeile": "row", "zeilen": "rows"},
     "src/hoh/sandbox.py": {"zeile": "line", "zeilen": "lines"},
@@ -1429,7 +1437,7 @@ sequential subsequent consequence consequences frequency quest guest
 language languages dialogue catalogue cheque conquer conquest
 subsequently adequate adequately
 rawdescriptionhelpformatter deque queries query querying queried
-scheduled reschedule rescheduled unscheduled
+scheduled reschedule rescheduled unscheduled schedulererror opaque
 squeeze squeezed squeezes ambiguouschain
 discharge discharged discharges discharging dischargeable undischarged
 setupfailed residue glued asserttrue echoed

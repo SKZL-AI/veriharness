@@ -44,6 +44,13 @@ distinctions carry the design:
   an earlier turn -- except the harness's status-area line (`⚠`), which a pane
   draws only while a limit holds: that one is about now, and is never spent.
 
+* **A pane that waits in the limit's own menu is a wait, not a dialog** (P3-08 slice 4,
+  T-UL1). Herdr calls any pane that waits for a key `blocked`, and the dispatcher took every
+  one for an approval; the menu Claude Code opens after `You've hit your weekly limit`
+  (`1. Stop and wait for limit to reset`) offers nothing a person could approve.
+  `blocked_screen_banners` reads that one pattern, whole, and answers the banner line; any
+  other blocked pane stays a dialog.
+
 No routing, no provider or model selection, no failover: those are P3.
 """
 
@@ -217,7 +224,7 @@ _PHRASES: dict[NormalizedFailure, tuple[str, ...]] = {
     ),
     _N.USAGE_LIMIT: (
         r"(?:claude ai )?usage limit reached",
-        rf"you(?:{_APOS})?ve hit your (?:\w+ )?limit",
+        rf"you(?:{_APOS})?ve hit your (?:[\w-]+ ){{0,2}}limit",
         r"quota (?:exceeded|exhausted)",
         r"kontingent (?:erschoepft|aufgebraucht)",
     ),
@@ -437,14 +444,23 @@ _LIMIT_CLASSES = (_N.USAGE_LIMIT, _N.RATE_LIMIT)
 _BANNER_LEAD = r"[ \u00a0]{0,4}[\u25cf\u23bf\u26a0][ \u00a0]*"
 _CLOCK = r"\d{1,2}(?::\d{2})?(?:am|pm)"
 _ZONE = r"\([A-Za-z][A-Za-z_]*(?:/[A-Za-z0-9_+\-]+)+\)"
+#: A weekly limit names the day it resets, not only the hour: `resets Oct 18, 12pm
+#: (Europe/Istanbul)` (recorded 2026-10-15, P3-08 slice 4). The month is one of the
+#: twelve names, whole or in its three-letter form, so that `resets soon` and
+#: `resets Octopus 5, 5pm` stay sentences.
+_DATE = (r"(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?"
+         r"|aug(?:ust)?|sept?(?:ember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)"
+         r"\.? \d{1,2}(?:st|nd|rd|th)?,?")
 #: The provider's own metadata after the phrase, a closed set and never a free
 #: sentence: `continuing automatically at 3:20am`, `esc to cancel`, `resets
-#: 3:20am (Europe/Istanbul)`, `limit resets 3:20am`, `clau.de/wrap-up`, each
-#: also as far as a narrow pane wrapped it (`continuing`, `esc to`, `resets`).
+#: 3:20am (Europe/Istanbul)`, `limit resets 3:20am`, `resets Oct 18, 12pm
+#: (Europe/Istanbul)`, `clau.de/wrap-up`, each also as far as a narrow pane
+#: wrapped it (`continuing`, `esc to`, `resets`).
 _SEGMENT = (
     r"(?:continuing(?: automatically(?: at " + _CLOCK + r")?)?"
     r"|esc(?: to(?: cancel)?)?"
-    r"|(?:limit )?resets(?: " + _CLOCK + r"(?: " + _ZONE + r")?)?"
+    r"|(?:limit )?resets(?: (?:" + _DATE + r"(?: " + _CLOCK + r"(?: " + _ZONE + r")?)?"
+    r"|" + _CLOCK + r"(?: " + _ZONE + r")?))?"
     r"|clau\.de/[\w\-/]+)"
 )
 #: The whole line: lead, one of the two recorded phrases, then one or more
@@ -452,7 +468,7 @@ _SEGMENT = (
 #: so ...` is a sentence, not a banner).
 _USAGE_BANNER = re.compile(
     r"^" + _BANNER_LEAD
-    + r"(?:usage limit reached|you['\u2019]?ve hit your (?:\w+ )?limit)"
+    + r"(?:usage limit reached|you['\u2019]?ve hit your (?:[\w-]+ ){0,2}limit)"
     + r"(?:\s*\u00b7\s*" + _SEGMENT + r")+\s*$", re.I)
 #: The structured error body Claude Code prints for an HTTP error (the shape
 #: pinned for a 529 in `tests/test_failure_classes.py`: `API Error: 529
@@ -564,6 +580,80 @@ def final_screen_limit(view: str, *, before: str | None = None) -> NormalizedFai
     found = {cls for line in final_screen_banners(view, before=before)
              if (cls := _limit_banner(line)) is not None}
     return next((cls for cls in _LIMIT_CLASSES if cls in found), None)
+
+
+# --------------------------------------------------------------------------- #
+# A blocked pane that shows the limit's own menu (P3-08 slice 4, T-UL1)
+# --------------------------------------------------------------------------- #
+
+#: What Claude Code draws between a limit banner and the menu it opens
+#: (`/rate-limit-options`), recorded on the planner and QA panes of run mgrb2
+#: (2026-10-15 02:14Z and 02:15Z): the turn's closing line, the command it echoed,
+#: the rule above the menu, and the reset hint of a session limit. A closed set;
+#: any other line between the banner and the menu is somebody's words.
+_BETWEEN = (
+    re.compile(r"^\u273b \S+ for \d[\dhms ]*(?: \u00b7 .+)?$"),
+    re.compile(r"^\u276f /rate-limit-options$"),
+    re.compile(r"^[\u2500\u2501]{8,}$"),
+    re.compile(r"^Use your limit reset to reset it now:?(?: clau\.de/reset)?$", re.I),
+    re.compile(r"^clau\.de/[\w\-/]+$", re.I),
+)
+#: The menu itself: its question, its three options (the pointer `\u276f` marks the
+#: chosen one), and the hint under it. `Stop and wait for limit to reset` is what
+#: makes a menu the limit's: no approval dialog offers it.
+_MENU_QUESTION = re.compile(r"^What do you want to do\?$")
+_MENU_STOP = "Stop and wait for limit to reset"
+_MENU_OPTION = re.compile(
+    r"^(?:\u276f )?\d\. (?:" + re.escape(_MENU_STOP)
+    + r"|Wait here, then continue automatically(?: at .+)?|Switch to usage credits)$")
+_MENU_HINT = re.compile(r"^Enter to confirm \u00b7 Esc to cancel$")
+
+
+def blocked_screen_banners(view: str) -> list[str]:
+    """The limit banner of a pane whose agent Herdr reports as `blocked` when the
+    dialog it waits in is the limit's own menu -- else an empty list.
+
+    Herdr calls a pane that waits for a keypress `blocked`, whatever it waits for.
+    A permission dialog is a person's to answer; the menu Claude Code opens after
+    `You've hit your weekly limit` (`1. Stop and wait for limit to reset`) is not a
+    question at all: the provider has said no until a time it names, and no answer
+    changes that. Told apart by the screen, and only by a screen that is the whole
+    pattern, in this order (the last `FINAL_SCREEN_LINES` non-blank lines):
+
+    * the last `What do you want to do?` line, with only the recorded options and
+      the hint below it, among them `Stop and wait for limit to reset`;
+    * above it, going up through the closed set of `_BETWEEN` (closing line,
+      echoed command, rule, reset hint) and nothing else, a limit banner
+      (`_limit_banner`).
+
+    Anything else -- a banner with a permission dialog under it, a stale banner
+    above work the role did, a menu without the banner in view, an option nobody
+    recorded, a line of a role between banner and menu -- is `[]`, and the pane
+    stays what it was: a dialog a person looks at. The result is the banner line
+    and nothing else of the screen, so no word of a role can change the class the
+    rest of the product reads off the error, or the reset time it takes from it.
+    Residual, pinned by tests: a role whose own output spells the whole pattern
+    (banner, closing line, rule, question, the three options) as the last lines of a
+    pane that waits for a key is read as the menu; the park it earns is bounded by
+    the stated reset and the resume attempts.
+    """
+    screen = final_screen(view)
+    keys = [_banner_key(ln) for ln in screen]
+    asks = [i for i, k in enumerate(keys) if _MENU_QUESTION.match(k)]
+    if not asks:
+        return []
+    ask = asks[-1]
+    menu = keys[ask + 1:]
+    if not all(_MENU_OPTION.match(k) or _MENU_HINT.match(k) for k in menu):
+        return []
+    if not any(k.endswith(_MENU_STOP) for k in menu):
+        return []
+    for i in range(ask - 1, -1, -1):
+        if _limit_banner(screen[i]) is not None:
+            return [screen[i]]
+        if not any(pattern.match(keys[i]) for pattern in _BETWEEN):
+            return []
+    return []
 
 
 #: This project's own sentences in a failure's first line. Checked before any

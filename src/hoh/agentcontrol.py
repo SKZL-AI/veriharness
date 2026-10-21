@@ -243,6 +243,13 @@ class HerdrAgentControl:
         self._run(["herdr", "pane", "run", pane_id, command],
                   purpose or f"run a command in {pane_id}", text=True)
 
+    def close_workspace(self, workspace_id, *, purpose="") -> None:
+        """Close a whole Herdr workspace (`herdr workspace close`). One verb beyond the
+        protocol, like `run_in_pane`: only the reaper of run workspaces needs it. The worktree
+        directory of a workspace stays on disk."""
+        self._run(["herdr", "workspace", "close", workspace_id],
+                  purpose or f"close workspace {workspace_id}")
+
 
 # --------------------------------------------------------------------------- #
 # Ownership: which agents a run started, and in what role
@@ -588,3 +595,25 @@ class OwnedAgentControl:
             raise DispatchError("run_in_pane: this runtime cannot run a command in a pane; "
                                 "nothing was sent")
         runner(pane_id, command, purpose=purpose)
+
+    def close_workspace(self, workspace_id, *, purpose="") -> None:
+        """`HerdrAgentControl.close_workspace` for a workspace whose every pane this run owns
+        (an acting verb, like `close_tab`): the runtime must show the workspace row by row, and
+        a pane it holds that the registry does not own refuses the close; a runtime without the
+        verb is refused. Nothing is sent otherwise."""
+        snapshot = self._base.snapshot()
+        listed = snapshot.get("panes") if isinstance(snapshot, dict) else None
+        rows = [r for r in listed if isinstance(r, dict)] if isinstance(listed, list) else []
+        held = [str(r.get("pane_id") or "") for r in rows
+                if str(r.get("workspace_id") or "") == str(workspace_id)]
+        self._require(bool(workspace_id) and bool(held),
+                      f"workspace {workspace_id} (the runtime's snapshot does not show it)",
+                      "close_workspace")
+        strangers = [p for p in held if not self.registry.owns_pane(p)]
+        self._require(not strangers, f"workspace {workspace_id} (it holds {', '.join(strangers)})",
+                      "close_workspace")
+        closer = getattr(self._base, "close_workspace", None)
+        if closer is None:
+            raise DispatchError("close_workspace: this runtime cannot close a workspace; "
+                                "nothing was sent")
+        closer(workspace_id, purpose=purpose)

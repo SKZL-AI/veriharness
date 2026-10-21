@@ -334,7 +334,9 @@ RUN_FLAGS = ["--iterations", "4", "--until-accepted", "--planner", "claude", "--
              "qa=high", "--role-account", "planner=acct-a", "--master-session", "s-1",
              "--master-epoch", "7", "--role-timeout", "900", "--approval-policy", "policy.json",
              "--autonomy", "contract.json", "--program-epoch", "5", "--trust-worktree",
-             "--storage-root", "state"]
+             "--routing-policy", "routing.json", "--storage-root", "state",
+             "--preflight-report", "report.json", "--preflight-profile", "unattended",
+             "--preflight-max-age", "3600", "--dispatch-ceiling", "9"]
 DETACH_ONLY = {"--detach", "--detach-timeout", "--require-contract"}
 
 
@@ -356,7 +358,8 @@ def test_the_command_typed_into_the_tab_is_the_same_hoh_run_without_detach(tmp_p
     argv = detach.run_argv(args, ["python3", "-m", "hoh.cli"])
     assert argv[:3] == ["python3", "-m", "hoh.cli"]
     # relative paths are made absolute against the caller's directory
-    for flag in ("--root", "--approval-policy", "--autonomy", "--storage-root"):
+    for flag in ("--root", "--approval-policy", "--autonomy", "--routing-policy",
+                 "--storage-root", "--preflight-report"):
         assert os.path.isabs(_value_of(argv, flag)), flag
     # parsing the typed command gives back the options that were asked for
     again = parser.parse_args(argv[3:])
@@ -364,7 +367,8 @@ def test_the_command_typed_into_the_tab_is_the_same_hoh_run_without_detach(tmp_p
     for key in ("detach", "detach_timeout", "require_contract"):
         assert mine.pop(key) is not None and theirs[key] in (False, None)
         theirs.pop(key)
-    for key in ("root", "approval_policy", "autonomy", "storage_root"):
+    for key in ("root", "approval_policy", "autonomy", "routing_policy", "storage_root",
+                "preflight_report"):
         mine[key] = os.path.abspath(mine[key])
     assert theirs == mine
     # drift guard: every option string of `hoh run` is exercised above or is detach-only
@@ -372,6 +376,7 @@ def test_the_command_typed_into_the_tab_is_the_same_hoh_run_without_detach(tmp_p
                and s != "--help"}
     assert options - DETACH_ONLY - set(RUN_FLAGS) == set(), "an option of hoh run is not covered"
     assert "--detach" not in argv and "--require-contract" not in argv
+    assert _value_of(argv, "--dispatch-ceiling") == "9"       # P3-INV1: the hold's ceiling goes into the tab
     # defaults round-trip too; the storage root is typed even when none was given, resolved here
     bare = parser.parse_args(["--root", "runs", "run", "r1", "--detach"])
     assert bare.storage_root is None

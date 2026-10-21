@@ -1,3 +1,149 @@
+<!-- PUBLIC-FRONT-BEGIN: written 2026-10-14. Everything from the heading "The record" down is this README as it stood on 2026-10-13, unchanged; the dated paragraphs there are the history, this front is the present. -->
+![VeriHarness, an evidence-bound Harness-of-Harness: work is accepted on receipts a deterministic runner produced, not on a model's own report that it is done.](https://raw.githubusercontent.com/SKZL-AI/veriharness/main/.github/assets/hero.svg)
+
+# VeriHarness
+
+[![CI](https://github.com/SKZL-AI/veriharness/actions/workflows/ci.yml/badge.svg)](https://github.com/SKZL-AI/veriharness/actions/workflows/ci.yml)
+
+**VeriHarness drives coding agents through a loop in which an agent's claim that it is done is never the evidence.** A candidate is accepted on receipts that a deterministic runner produced, re-checked by an independent QA role, and attacked by two independent reviewers before it merges. What the system has not shown is written down next to what it has.
+
+`hoh` is the package, the module and the command line that implement the pattern; VeriHarness is the project built on it. It sits on top of [Herdr](https://herdr.dev), a terminal multiplexer for coding agents, and it is an alpha and a research preview.
+
+## What it is
+
+A specification goes in. A planner role turns it into a plan with machine-checkable acceptance criteria. A developer role implements it in an isolated worktree it alone writes to. An independent QA role re-executes the criteria against a frozen, isolated copy of the result. A deterministic runner, not a model, writes the receipts, and the product re-checks every verdict against them. A candidate is accepted only if every criterion passes and at least one of them was genuinely red before the change; a rejected candidate goes back into planning with its evidence attached, not into the trash.
+
+Why that matters: an agent's report that "all tests pass" is a statement, not evidence, and a project that takes it for evidence cannot tell finished work from work that was only described as finished. `docs/EVIDENCE_MODEL.md` makes the full case, and `docs/LIMITATIONS.md` lists what this still does not guarantee, in 31 numbered limits `[V45]`.
+
+![The evidence-bound loop: specification, planner, developer in an isolated worktree, independent QA on a frozen copy, receipts from a deterministic runner, acceptance only when every criterion passes and one was red before; a rejection goes back to planning. Around the run: two independent reviewers, the merge gate, the merge, the capability register.](https://raw.githubusercontent.com/SKZL-AI/veriharness/main/.github/assets/loop.svg)
+
+## It runs itself
+
+VeriHarness has been built with VeriHarness since 2026-09-07. An orchestrating agent session writes the specifications, starts the product runs, has every product-run candidate reviewed by two independent reviewer agents before it merges, merges what passes and keeps the records; the operator sets the direction, answers questions, and approves, or delegates for a stated window, every irreversible external act such as publishing a release. By the operator's own description the session runs mostly on the operator's comments and questions; the figures below are what can be checked of that. They are counted from the project's own records, at the dates they name; they are stated here and not linked, because those records carry working material and are not part of this export (the method and the limits of each figure are in the paragraphs under the table).
+
+| What | Measured |
+|---|---|
+| Span | 2026-09-07 to the base commit: 43 days 20 hours, and 32 of the 44 calendar days carry a commit `[V46]` `[V47]` |
+| History | 1,571 commits, 291 of them merges `[V48]`; 243 numbered ledger entries, O23 to O271 `[V49]` |
+| Orchestrating session | 22 lease epochs from 2026-10-11 to 2026-10-20 (counted on 2026-10-21), of which 17 are verified successions that all ended COMPLETE; every one was requested by the rotation policy, at its context threshold or after its number of auto-compactions |
+| Product runs | 250 run directories from 2026-10-01 on; in 223 of them an independent QA result had every check PASS; 97 product-run merges from 2026-09-25 to 2026-10-11 counted by merge title (the window of that count; later titles are not listed by the counting tool) `[V01]` |
+| Independent review | 1161 review reports carry the machine-bound verdict footer since 2026-10-07; 229 of them (19.7 %) say RELEASE_NO |
+| Who decided | 103 of 2,087 entries (about 5 %) of the orchestrator's running notes are marked as the operator's; 8 operator directives are stored verbatim, one file each; none of 369 attribution entries is booked to a human `[V52]` |
+| Interruptions | 13 stops at the provider's usage limit, 2026-10-03 to 2026-10-07 `[V55]`; a power cut, a full disk, an inode exhaustion and an operator-requested WSL shutdown are recorded as well `[V56]` |
+
+**The chain of sessions.** An orchestrating session works for hours; its context grows until each request is slow and its own earlier decisions blur. The remedy the product implements is a verified handover, not a longer session. A rotation policy asks the running session for a handover note when its context reaches a threshold. The product then freezes a capsule (derived facts that the successor must re-derive, the operator's decisions kept verbatim, advisory context with no authority), starts the successor, waits for its acknowledgement, passes the lease to the next epoch and fences the predecessor. If anything fails to re-derive, the predecessor stays master. At no moment are there two orchestrators.
+
+Since the slice P3-ROTD, the request reaches the master where it works: inside Herdr the hold types a short fixed-form notice into the pane it was started in, which is the master's own, at the request, once more at half of the request's time to live if no handoff has appeared, and when the request ends. Before every typing it reads Herdr's state again and the pane's visible screen, and it types nothing while a dialog is open, while the agent is `blocked` or `unknown`, or when the screen cannot be read; Herdr's state alone is not trusted for dialogs, because an open autocompact choice was once reported `idle`. A request that cannot be typed is written to a request file and recorded as `rotation_undeliverable`. Delivery is on by default and `--rotate-no-deliver` turns it off. It is tested with fakes; the rotation log of the project that built this product holds no `rotation_delivered` row yet (taken on 2026-10-21), so a delivery into a live master has not been observed.
+
+![The chain of orchestrating sessions: a policy asks for a handover note, the capsule is frozen, the successor re-derives every fact and acknowledges, the lease passes to the next epoch and the predecessor is fenced and retired; the chain repeats.](https://raw.githubusercontent.com/SKZL-AI/veriharness/main/.github/assets/succession.svg)
+
+How the figures above were taken, and what they are not.
+
+- **Epochs and successions** are counted from the orchestrator's lease, epoch and rollover logs of this build, which the product's own succession code writes. They start on 2026-10-11 at the first lease taken under the product's own rotation (the canary of amendment A7); earlier orchestrating sessions were handed over by written notes, from 2026-10-07 on, and are not itemised there `[V54]`. Of the 22 epochs, 17 are successions, 4 are recoveries (a re-arm of the lease holder, not a handover: one re-arm after the operator's restart of the machine, two re-arms of the rotation policy at the operator's request, and one re-arm of the holder under P3-ROTD, so that rotation requests are delivered into the master's pane (no operator request is recorded)) and one is the first lease. 43 rotation requests were logged: 16 for the reason `context_tokens` (the context threshold) and 27 for the reason `compactions` (a number of auto-compactions); 26 of them expired without a handover, so nothing rotated, and 17 finished with the outcome COMPLETE. The longest closed epoch lasted 152.6 hours; the median was 0.96 hours.
+- **Product runs and QA** are counted from the run directories of the project's runs tree, which holds the runs of 2026-10-01 and later; earlier runs were kept elsewhere. 260 QA result files exist, 223 with every check PASS and 37 with at least one check not PASS; a QA result with every check PASS is not by itself an accepted merge, which is why the merge count above is the one from git.
+- **Review** counts report files that carry the six-line machine-bound footer (verdict, candidate, base, specification digest, open blockers, completeness) that the merge gate reads; it counts every round, so a candidate that was reviewed three times appears three times. RELEASE_NO is the reviewers' refusal: 225 of all footers declare at least one open blocking finding. A review that says no is the process working, not a defect.
+- **The operator's share** is the share of entries of the orchestrator's running notes (they begin on 2026-10-02 at the ledger entry O252) that carry the word OPERATOR. It is a lower bound on the operator's messages, because not every message is written down as its own entry, and an entry may bundle several. It is not a measure of effort. The attribution file is written by the orchestrating session and is checked for tiling and for the run states it cites, not for authorship, so its count of human-booked entries is the session's own statement and not an independent measurement.
+- **Not unattended.** The operator was reachable and was asked, and the line stopped several times, as the last row names. "Autonomous" here means that the session carried the work, the handovers and the records between the operator's messages for weeks; it does not mean that nobody was there.
+
+**The storage steward.** The build ran its disk and its inode table full more than once, which is why this part exists. The steward watches bytes and inodes, admits work by reservation, parks a run durably under pressure and resumes it, and relocates reproducible scratch to cold storage only through a verified relocation: the copy is read back and digested, a durable receipt is written, and only then is the local copy freed. Ownership is proven by a registry and never inferred from a name or an age; foreign, unknown and single-copy paths are left alone. The mechanism is built and tested (the requirements P2-38 to P2-41, P5-25 to P5-30, P5-32 and P5-33 read PROVEN). A policy and an archive target are configured for this project and no timer runs the steward; its plan-only runs found nothing of this project's to relocate and reported the remaining pressure as not this project's to free. The large cleanups were made by the orchestrating session with manifests, not by the steward: the first covered 4,211 trees with 15,558,933 entries `[V36]`, the second inventoried 2,003 copies, proved 342 of them reproducible and removed 341, 6,562,367 entries in all `[V37]`; later archives of run arenas were made with the session's own archive scripts.
+
+![The storage steward: watch bytes and inodes, admit by reservation, plan a relocation of reproducible scratch only, copy to cold storage, read it back, write a durable receipt, and only then free the local copy; foreign, unknown, single-copy and in-use paths are left alone.](https://raw.githubusercontent.com/SKZL-AI/veriharness/main/.github/assets/steward.svg)
+
+**Other pieces, and their state.**
+
+- **The merge gate.** `hoh merge-gate check` judges the review reports a candidate requires, binds each to the candidate, the base and the specification's digest, and writes the decision as a receipt. P5-36 reads PARTIAL: no merge step of the product calls it yet, and the receipt is not signed.
+- **The double-down method.** A blocked stage, phase or work package that does not clear with time is today listed for a person. Amendment A8 registers the method of the house rules (no negative without a proven root cause; a double-down that leaves the measured verdict alone) as a capability of the autonomous loop, as P3-42. P3-42 reads PARTIAL on the development line at the commit aefef58a (the register's word, set by the slices P3-DD1 to P3-DD3; it is not PROVEN). Built and merged, in the register's words: the double-down, the measurement of proposals and the recording of what becomes of a verified fix are on in `hoh resume-quota` without a flag (the opt-outs are recorded); a proposal that carries a fix is, on a person's command, proven on a scratch copy of the run's candidate (red before and green after, the keep-green rows green before and after, the files written those the fix was read to write) and applied as a new iteration of the blocked run, with the approval recorded; a person can revert it. Still missing, in the register's words: no path applies a proven fix without a person, every verified fix is withheld; a later slice (DD4) lets only an unattended long-horizon contract apply a proven correction itself; the analysts stay opt-in, so by default only the derived proposals of trivial blocks exist and none carries a fix; only the block of a run is applied, not a node's or a project's, and a run whose budget is spent cannot continue; the halt class is not yet persisted on the node; and no capacity broker or budget reservation admits the analysts' dispatches or the runner executions. Until then the method is also applied by hand by the orchestrating session.
+- **A successor that consults its predecessor.** A successor that needs what its predecessor knew can wake it for one question; the woken session's credentials are stale, so the product refuses every act it tries as a stale master. That is a fence, not isolation. It is merged on the development line after `v0.3.0` and is in no release before `v0.4.0a1`.
+- **The dashboard.** The operator watches progress on a generated dashboard that re-measures the capability register and the build plan on the live branch instead of reading a committed record. It is operator tooling kept by the orchestrating session, outside this repository, and not a product feature.
+
+## Where the project stands
+
+`v0.3.0` closed phase P2 (*v0.3 Durable Program Runtime + Autonomy Contract Base*): at the commit of its closure record all 43 requirements of P2 read PROVEN, with the limits that `docs/LIMITATIONS.md` states. Phase P3 (*v0.4 Capacity-Aware Autonomous Parallelism*) is in progress on the development line. Read the next table as a measurement of the development tip at the base commit named in `paper/NUMBERS_V2.md`, the commit aefef58a (2026-10-20 at 20:24 +0300), which is what `tools/capability_matrix.py` and `tools/build_plan.py` print there.
+
+| Phase | Name | At the base commit |
+|---|---|---|
+| P1 | v0.2 Integrity & Productization | 16 of 16 PROVEN |
+| P2 | v0.3 Durable Program Runtime + Autonomy Contract Base | closed at `v0.3.0` (all 43 PROVEN at the closure commit); at this base 37 PROVEN and 6 IMPLEMENTED_NOT_PROVEN `[V10c]` |
+| P3 | v0.4 Capacity-Aware Autonomous Parallelism | in progress: 25 PROVEN, 6 PARTIAL, 3 MISSING of 34 |
+| P4 | v0.5 Evidence Efficiency + Context / Decision Efficiency | 23 MISSING of 23 |
+| P5 | v0.6 Operability + Explainability | partly built ahead of its phase (the storage lifecycle, the merge gate): 10 PROVEN, 5 PARTIAL, 28 MISSING of 43 |
+
+The register holds 236 requirements, 88 PROVEN, 11 PARTIAL, 6 IMPLEMENTED_NOT_PROVEN and 131 MISSING `[V10]`; of those registered for P3 to P12, 131 of 177 MISSING (11 PARTIAL, 35 PROVEN) `[V11b]`. PROVEN is the register's word for an implementation, a test, positive evidence and, where one applies, a discriminating control, each found by a probe the repository can run; it is not a claim that the capability has run in a live session, and `docs/LIMITATIONS.md` states the limits row by row.
+
+**Why six rows of P2 read IMPLEMENTED_NOT_PROVEN again.** The durability evidence of P2 (crash and reboot recovery and the five exit conditions) is bound to digests of source files. The P3 slices merged since the tag changed some of those files, so the register marks that evidence stale until the eight-minute durability run is repeated; the P2 gate in `tools/build_plan.py` counts 0 blocking items for that reason `[V12]`. Amendment A7 treats this as a regression obligation, not as a re-opened phase. The released package `v0.3.0` is the code the closure evidence was taken on.
+
+**Readiness is not claimed.** The readiness board, `docs/READINESS.md`, reads `TECHNICALLY_STABLE_READY = no` `[V13]`. A closed phase is not a stable release. At its last committed measurement (2026-10-13) the board named these open conditions, each blocking: tests, union_invariants, benchmark_v3_preregistration, benchmark_v3, export_manifest, export_sync, docs_consistency and external_ci. Separately, the public CI was red from the push of `v0.3.0a1` on 2026-10-08 on every push; the cause was an optional dependency that two test files import and the workflow did not install, and the workflow now installs it and gives the tests a git identity (`.github/workflows/ci.yml`). Behind that collection error the suite had further failures in a published clone, tests written in the development repository that read records the export withholds or need a live Herdr session; they now skip there with the reason named, only when the export manifest declares the record withheld (`tests/conftest.py`), and run in full in the development tree.
+
+### Releases
+
+| Release | State |
+|---|---|
+| `v0.3.0` | The release at which phase P2 is closed, and the latest GitHub release at the time of writing. Install from the tag. |
+| `v0.4.0a1` | **Pre-release**, the first public release of the `v0.4` line (phase P3, *Capacity-Aware Autonomous Parallelism*, in progress). From its tag on it is a GitHub pre-release and a PyPI pre-release version, which `pip` installs only with `--pre`; until its tag exists this row states an intention. Alpha, research preview; it carries this README. Nothing here claims it exists before its tag does. |
+| `v0.4.0` | Reserved for the closure of phase P3; unreleased. |
+| `v0.1.0` | The first stable release, tagged 2026-09-14, on PyPI since 2026-09-15; its benchmark is explained below. |
+| `v0.3.0a1` to `v0.3.0a3` | Pre-releases of the `v0.3` line, kept for the record. |
+
+## Quick start
+
+```sh
+pip install hoh
+hoh --help
+```
+
+`pip install hoh` installs the newest *stable* release on PyPI, which is `v0.1.0` as of 2026-10-21 (its history is at <https://pypi.org/project/hoh/#history>). The pre-release `v0.4.0a1` is installed only with `pip install --pre hoh` once it has been uploaded; until then PyPI holds `v0.1.0` only. To run a tagged release from source:
+
+```sh
+git clone https://github.com/SKZL-AI/veriharness.git
+cd veriharness
+git checkout v0.3.0
+python -m pip install -e ".[test,archive]"
+```
+
+The package needs Python 3.11 or newer and targets Linux; actual agent runs need Herdr. A run is two commands on purpose, so that spending quota is a deliberate act: `hoh start` records a run, `hoh run <id>` dispatches the roles. `examples/minimal/` ships a recorded rejection that you can read without an API key. Installation details, platform notes (NixOS, macOS, Ubuntu 24.04) and the policy layers are in the record below.
+
+## Benchmarks: what has been measured, and what has not
+
+**What exists.** A matched-budget benchmark of three arms on five small tasks, three repetitions each, pre-registered before the first cell ran (45 cells; protocol `docs/BENCHMARK_PROTOCOL.md`, results `docs/BENCHMARK_RESULTS_v3.md`). Arm A is a plain agent with no harness; arm B is one `hoh run`; arm C is the full control plane with global gates and repair nodes. A hidden test suite per task, which no arm sees, decides the verdict. The budget is matched on the scarce resource, role dispatches: nine per cell, shared between a node and its repair nodes, and enforced.
+
+| arm | hidden suite | false accepts | what it produced |
+|---|---|---|---|
+| A, plain agent | 15 of 15 PASS | 0 | answered |
+| B, one `hoh run` | 14 of 15 PASS | 1 | 15 of 15 accepted |
+| C, full control plane | 14 of 15 PASS | 0 | 15 of 15 BUDGET_EXHAUSTED, 0 of 15 CLOSED |
+
+**How to read arm C, because the table invites a wrong reading.** "15 of 15 BUDGET_EXHAUSTED" is not "our own tests failed 15 of 15". It says that the control plane spent its nine dispatches on the primary node, met a red global gate, spawned a repair node, and was refused the repair for want of budget, in every cell. The hidden suite of arm C passed in 14 of 15 cells; arm C simply never claimed to be finished, which is why its zero false accepts is not a success either. On these five tasks the plain agent was cheaper and at least as correct, and that is the result as it was measured and as it stays published.
+
+**What changed, and what is still published.** The campaign before it, with a separate nine dispatches per run, which is eighteen per cell, closed five of five; the closure was bought with twice the declared resource. A separate test then gave the control plane a budget taken from what that campaign actually spent, eighteen, decided before the run: it reaches a real CLOSED fixpoint through a full repair cycle, 18 of 18 declared dispatches (9 primary, 9 repair), one repair node, zero human decisions. It is a row of the readiness board and reads PASS. Neither result replaces the other; both stay published as they were measured.
+
+**What is not measured.** The benchmark has not been repeated on the `v0.3` code. Five small tasks and three repetitions carry no rate, and nothing here shows that the harness performs better than a plain agent.
+
+**The next benchmark.** A pre-registered agentic benchmark (SWE-bench Verified subset; four arms including a strong plain-agent control; primary endpoint: false accepts) is prepared and reviewed; its campaign runs with release 1.0.0 and its result will be published whatever it shows. No result of it exists: the protocol is pre-registered, and an instrument check that has run is not a result and no figure from it is stated anywhere in this repository. The only benchmark results in this repository are the `v0.1.0` campaigns above, and they are published as they were measured, the unflattering ones included.
+
+## Limitations
+
+`docs/LIMITATIONS.md` is the authority; the short list for a reader deciding whether to try this:
+
+- It is an alpha and a research preview. The interfaces are not stable.
+- Herdr is required for real runs; HoH refuses to start without it, and CI does not stand one up.
+- It targets Linux. macOS is partially supported (no `--isolation strict`), and the Nix packaging was written without a Nix binary and has never been built.
+- The durability evidence is one restart of a virtual machine on one host with fixture role runs, not a power cut, and it is stale on the development line until it is repeated.
+- The orchestrating session of this build is an agent session with an operator behind it. The figures above say how little the operator had to type; they do not say that the system needs no operator.
+
+## A note on the name
+
+A paper titled "VeriHarness: Scaling Agentic Verification for Long-Horizon Tasks" appeared on arXiv on 2026-10-01 (arXiv:2610.00972). This repository is unrelated to it. The first public release of this project, the GitHub release `v0.1.0-rc1`, is dated 2026-09-10, and the repository was created that day.
+
+## Citation
+
+`CITATION.cff` carries the citation metadata (title, authors, version, licence); GitHub's "Cite this repository" button reads it. Cite the release you used, and say that it is an alpha.
+
+## The record
+
+Everything below is this README as it stood on 2026-10-13, unchanged. It is a dated record: later paragraphs correct earlier ones by addition and name what they supersede, so read each statement with its date, and read the front above for the present state. The figures that carry a bracketed tag, such as `[V10]`, are listed with their source and the command that regenerates them in `paper/NUMBERS_V2.md`.
+
+<!-- PUBLIC-FRONT-END -->
+
 # VeriHarness -- Harness-of-Harness
 
 VeriHarness — an evidence-bound Harness-of-Harness for verifiable

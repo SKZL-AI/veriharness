@@ -247,7 +247,8 @@ def test_the_templates_and_the_method_agree_with_each_other(world, capsys):
         assert key in method, key
     assert "RELEASE_YES requires BLOCKING_OPEN 0" in rules
     rotation = (DOCS / "references" / "rotation.md").read_text(encoding="utf-8")
-    assert "No live succession has been run" in rotation, "the status of the product protocol is stated"
+    assert "No live succession has been run" not in rotation, "false since 2026-10-11 (P3-ROTD)"
+    assert "has been run live" in rotation, "the status of the product protocol is stated"
     flat = " ".join(rotation.split())
     for sub in ("hold", "rollover", "rollover-verify", "rollover-accept"):
         assert re.search(rf"hoh project {re.escape(sub)}(?![-\w])", flat), sub

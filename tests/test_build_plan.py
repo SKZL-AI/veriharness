@@ -96,9 +96,16 @@ def test_the_real_register_produces_an_executable_order():
     assert not plan["dangling_dependencies"], plan["dangling_dependencies"]
     where = {item["id"]: wave["wave"]
              for wave in plan["waves"] for item in wave["items"]}
-    assert where["P3-02"] > where["P3-01"], "the executor needs its planner"
-    assert where["P3-02"] > where["P3-04"], "and its budget reservation"
-    assert where["P3-07"] > where["P3-02"], "backpressure needs a wave to slow"
+    # Edited by addition 2026-10-14 (records strand preg2, ledger O271): a PROVEN row is
+    # not an item of any wave, and P3-01 and P3-02 are PROVEN now. The three asserted
+    # edges stay asserted from the register, and the wave order of every pair that is
+    # still open stays asserted.
+    for late, early, why in (("P3-02", "P3-01", "the executor needs its planner"),
+                             ("P3-02", "P3-04", "and its budget reservation"),
+                             ("P3-07", "P3-02", "backpressure needs a wave to slow")):
+        assert early in deps[late], (late, early)
+        if late in where and early in where:
+            assert where[late] > where[early], why
 
 
 def _cap(rid, phase, status="MISSING", **kw):
@@ -330,7 +337,16 @@ def test_the_real_exit_includes_are_bound_and_the_checklist_gates_are_not():
     nothing -- no requirement claims them, and none may (DECISIONS Q2). They are
     not "unmeasured" either: the programme's own instruments measure them
     (`tests/test_build_plan_checklist_gate.py`), so what the gate says about them
-    is a measured reason, or a met condition once the closure has happened."""
+    is a measured reason, or a met condition once the closure has happened.
+
+    Re-stated after the v0.3.0 tag (strand ptests, O267 section 8(a)) because the succession
+    capsule is bound to this exit (`p2succ2`) and P2's exit is a live measurement. The
+    verdict of the real tree is the conjunction of the four instruments (the three
+    checklist ones and the succession capsule), and the succession clause is in the gate
+    line exactly when that instrument is unmet; which of them is unmet is the tree's state
+    and is not pinned. Every state expectation (all four met -> met; each alone unmet ->
+    unmet and the only one named; a bound requirement not PROVEN -> unmet and named) is
+    asserted hermetically, over a matrix with every row PROVEN and measures handed in."""
     needs_evidence(PROGRAM_REGISTER)
     scope = bp._scope()
     requirements = bp._register_requirements()
@@ -347,7 +363,40 @@ def test_the_real_exit_includes_are_bound_and_the_checklist_gates_are_not():
     met, why = bp.phase_gates(proven, requirements)[1]["P2"]
     assert "nothing here measures yet" not in why, why
     measures = bp.checklist_gate_measures()
-    assert met is all(answer for answer, _reason in measures.values()), (met, why)
+    assert set(measures) == {"items", "review", "fsck"}, sorted(measures)
+    answers = [answer for answer, _reason in measures.values()]
+    succession = bp.succession_measure()[0]
+    assert met is all([*answers, succession]), (met, why)
+    labels = bp._GATE_LABELS
+    assert (f"{labels['succession']}: " in why) is (succession is not True), why
+
+    # Hermetically: the four instruments' answers handed in over a matrix with every row
+    # PROVEN, so the verdict is theirs and the tree's state is not in it.
+    def gate_with(unmet, rows=proven):
+        checklist = {k: (k not in unmet, f"answered for the test: {k}")
+                     for k in ("items", "review", "fsck")}
+        return bp.phase_gates(
+            rows, requirements, checklist_measures=lambda: checklist,
+            succession_measures=lambda: ("succession" not in unmet,
+                                         "answered for the test: succession"),
+        )[1]["P2"]
+
+    kinds = ("items", "review", "fsck", "succession")
+    met_all, why_all = gate_with(set())
+    assert met_all is True, why_all
+    for kind in kinds:
+        met_k, why_k = gate_with({kind})
+        assert met_k is False, (kind, why_k)
+        assert f"{labels[kind]}: answered for the test: {kind}" in why_k, (kind, why_k)
+        for other in set(kinds) - {kind}:
+            assert f"{labels[other]}: " not in why_k, (kind, other, why_k)
+    # And an instrument meeting its condition does not stand in for a requirement that
+    # is bound to an exit condition and is not PROVEN.
+    not_proven = [dict(r, status="IMPLEMENTED_NOT_PROVEN") if r["id"] == "P2-33" else r
+                  for r in proven]
+    met_n, why_n = gate_with(set(), rows=not_proven)
+    assert met_n is False, why_n
+    assert "P2-33 IMPLEMENTED_NOT_PROVEN" in why_n, why_n
 
 
 # --- the five P0 measurement rows read their status back ----------------------

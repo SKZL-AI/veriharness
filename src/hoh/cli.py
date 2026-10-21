@@ -56,9 +56,24 @@ def cmd_worktree(args) -> int:
             file=sys.stderr,
         )
         return 2
+    # Born registered: the workspaces Herdr makes for the worktree are recorded in the record of
+    # this runs root (`surfacebook.register_workspaces`) -- the ones the snapshot after the
+    # creation holds and the snapshot before it did not. A snapshot that cannot be had costs the
+    # record, never the worktree: an unrecorded workspace is never closed.
+    from . import surfacebook, surfaces
+
+    repo_path = str(Path(args.repo).expanduser().resolve())
+    notes: list[str] = []
+    control, before = None, None
+    try:
+        control = surfaces.make_control()
+        before = control.snapshot()
+    except Exception as exc:                      # noqa: BLE001 - the worktree is still made
+        notes.append(f"Herdr's snapshot before the creation is unavailable ({exc}): the "
+                     "workspaces will not be recorded")
     try:
         result = herdr_mod.worktree_create(
-            cwd=str(Path(args.repo).expanduser().resolve()),
+            cwd=repo_path,
             branch=args.branch,
             base=args.base,
             label=f"hoh {args.branch}",
@@ -68,7 +83,22 @@ def cmd_worktree(args) -> int:
         return 2
 
     path = (result.get("worktree") or {}).get("path") or result.get("path")
-    _print({"worktree": path, "branch": args.branch, "raw": result})
+    recorded: list[dict] = []
+    if before is not None:
+        try:
+            after = control.snapshot()
+        except Exception as exc:                  # noqa: BLE001
+            notes.append(f"Herdr's snapshot after the creation is unavailable ({exc}): the "
+                         "workspaces were not recorded")
+        else:
+            caller_pane, caller_tab, _inside = surfaces.own_location()
+            recorded, more = surfacebook.register_workspaces(
+                root=args.root, repo=repo_path, worktree=path, before=before, after=after,
+                backend=control.backend, caller_pane=caller_pane, caller_tab=caller_tab)
+            notes.extend(more)
+    for note in notes:
+        print(f"worktree: {note}", file=sys.stderr)
+    _print({"worktree": path, "branch": args.branch, "workspaces": recorded, "raw": result})
     if path:
         print(
             f"\nNext step:\n"
@@ -214,6 +244,14 @@ def cmd_resume_quota(args) -> int:
     violation is reported and left alone: each of those has an owner who is
     not a timer. With `--drive`, a project whose branch was resumed is driven
     on by a new governed master (a new epoch), if it registered a driver.
+
+    The double-down on blocks (P3-42, `hoh.doubledown`) runs in the same call and is ON by default,
+    so the installed continuation unit, which passes no flag, gets it: every block keeps a dossier;
+    the repair spec of a proposal is measured (`--verify-proposals`, on) and a verified fix is
+    recorded as WITHHELD for a person (`--apply-proposals`, on: the pass never applies a fix; only
+    `hoh double-down apply --approved-by` does). Analysts are the one part that stays opt-in
+    (`--analyst-harness`: a provider spend). `--no-double-down`, `--no-verify-proposals` and
+    `--no-apply-proposals` opt out, and an opt-out is recorded.
     """
     from .resumeloop import recover_projects, resume_projects, resume_runs
 
@@ -226,13 +264,289 @@ def cmd_resume_quota(args) -> int:
         except Exception as exc:                          # noqa: BLE001 - reported
             return [{"scope": fn.__name__, "action": "skipped",
                      "why": f"{type(exc).__name__}: {exc}"[:200]}]
+    refused = _double_down_switches(args)
+    if refused is not None:
+        print(f"refused: {refused}", file=sys.stderr)
+        return 2
     runs = phase(resume_runs, args.root, only=args.run_id)
     projects = [] if args.run_id else phase(resume_projects, args.root, drive=args.drive)
     if args.recover and not args.run_id:
         projects += phase(recover_projects, args.root)
-    _print({"checked": len({r.get("target") for r in runs}), "results": runs,
-            "projects": projects})
+    out = {"checked": len({r.get("target") for r in runs}), "results": runs,
+           "projects": projects}
+    opted = _double_down_optouts(args)
+    kept = phase(_record_double_down_optout, args, opted)[0]
+    rows = [kept] if opted else []
+    if args.double_down:
+        passed = phase(_double_down_pass, args)
+        out["double_down_defects"] = sum(1 for r in passed if r.get("defect"))
+        out["double_down"] = rows + passed
+    elif rows:
+        out["double_down"] = rows
+    _print(out)
     return 0
+
+
+def _double_down_switches(args) -> str | None:
+    """Settle the double-down's switches for one `hoh resume-quota` call (P3-42, slice 3), or say
+    why they contradict each other. The double-down, the measurement of proposals and the
+    application of a proven fix are ON by default -- the installed continuation unit passes no
+    flag, so this is how it picks them up -- and each has an explicit opt-out
+    (`--no-double-down`, `--no-verify-proposals`, `--no-apply-proposals`), which is recorded
+    (`_record_double_down_optout`). The positive flags stay as they were: they are accepted and
+    change nothing. Sets `args.double_down`, `args.verify_proposals` and `args.apply_proposals`
+    to what is in force."""
+    off, no_verify, no_apply = args.no_double_down, args.no_verify_proposals, args.no_apply_proposals
+    for flag, positive, negative in (("double-down", args.double_down, off),
+                                     ("verify-proposals", args.verify_proposals, no_verify),
+                                     ("apply-proposals", args.apply_proposals, no_apply)):
+        if positive and negative:
+            return f"--{flag} and --no-{flag} contradict each other"
+    if off and (args.analyst_harness or args.analyst_model or args.analyst_effort):
+        return "--analyst-* only applies with the double-down on (not with --no-double-down)"
+    if not 1 <= args.analyst_timeout <= 3600:
+        return "--analyst-timeout is 1 to 3600 seconds"
+    if off and (args.verify_proposals or args.verify_isolation or args.apply_proposals):
+        return "--verify-* and --apply-proposals only apply with the double-down on (not with --no-double-down)"
+    if args.verify_isolation and no_verify:
+        return "--verify-isolation only applies with --verify-proposals (not with --no-verify-proposals)"
+    if args.apply_proposals and no_verify:
+        return "--apply-proposals needs the measurement of proposals (not --no-verify-proposals)"
+    args.double_down = not off
+    args.verify_proposals = not off and not no_verify
+    args.apply_proposals = not off and not no_verify and not no_apply
+    return None
+
+
+def _double_down_optouts(args) -> list[str]:
+    """The parts of the double-down this call turned off, sorted by name."""
+    return sorted(name for name, flag in (("double-down", args.no_double_down),
+                                          ("verify-proposals", args.no_verify_proposals),
+                                          ("apply-proposals", args.no_apply_proposals)) if flag)
+
+
+def _record_double_down_optout(args, opted: list[str]) -> list[dict]:
+    """The row of a call that turned (part of) the double-down off, with the record of it
+    (`doubledown.record_optout`): an opt-out is a decision, not silence. Asked on every call, also
+    one that opts out of nothing: the call that ends an opt-out is the opt-in that is recorded."""
+    from . import doubledown
+
+    return [{"scope": "double_down", "action": "opted_out", "opted_out": opted,
+             "record": doubledown.record_optout(args.root, opted)}]
+
+
+def _double_down_pass(args) -> list[dict]:
+    """The double-down tick of `hoh resume-quota` (P3-42, slices 1 to 3): every block under the
+    root is classified and keeps a dossier; analysts are dispatched only with
+    `--analyst-harness`, confined (`_analyst_sessions`); the repair spec of a proposal is
+    measured (`--verify-proposals`, on by default) and a verified fix is recorded as WITHHELD for a
+    person (`--apply-proposals`, on by default; it never applies one). Writes dossiers only: a run's
+    specification and block change through `ddapply` when a person approves, never in the pass."""
+    from . import doubledown
+
+    analysts = _analyst_sessions(args) if args.analyst_harness else None
+    verifier = _proposal_verifier(args) if getattr(args, "verify_proposals", False) else None
+    applier = _proposal_applier(args) if getattr(args, "apply_proposals", False) else None
+    return doubledown.double_down_pass(args.root, analysts=analysts,
+                                       provider=args.analyst_harness or "claude",
+                                       only_run=args.run_id, verifier=verifier, applier=applier)
+
+
+def _proposal_applier(args):
+    """`applier(owner_dir, halt_id, now)` for the pass (P3-42, slice 3; on by default, off with
+    `--no-apply-proposals`): `ddapply.apply_if_due` records what is decided about a verified fix
+    without a person (a refusal no measurement can change) or that it is WITHHELD for one. It
+    measures nothing and applies nothing."""
+    from . import ddapply
+
+    session = _verification_sessions(args)
+
+    def applier(owner_dir, halt_id, now):
+        return ddapply.apply_if_due(args.root, owner_dir, halt_id, session=session, now=now)
+    return applier
+
+
+def _proposal_verifier(args):
+    """`verifier(owner_dir, halt_id, now)` for the pass (P3-42, slice 2; opt-in by
+    `--verify-proposals`): the repair spec of a dossier that ended in a PROPOSAL is measured on a
+    scratch copy of the run's candidate (`ddverify.verify_if_due`), under `--verify-isolation`
+    (strict unless said otherwise). A criterion is a command an analyst proposed: spending the
+    runner on it is the operator's decision, as spending the provider on analysts is."""
+    from . import ddverify
+    from .sandbox import Isolation
+
+    isolation = Isolation(getattr(args, "verify_isolation", None) or "strict")
+    session = _verification_sessions(args)
+
+    def verifier(owner_dir, halt_id, now):
+        return ddverify.verify_if_due(args.root, owner_dir, halt_id, session=session,
+                                      isolation=isolation, now=now)
+    return verifier
+
+
+def _verification_sessions(args):
+    """`session(block)` for `ddverify`: opens, for one block, the registered temporary root of its
+    project (the storage state root must be initialised and admit a write; the block's run or
+    project must be a registered project) and yields `make(purpose, name, estimate_bytes)`, a
+    context manager for one admitted, recorded workspace that is given back when it ends. A
+    refusal is a `ddverify.VerifyRefused`: nothing is measured, nothing is recorded."""
+    from contextlib import contextmanager
+
+    from . import ddverify
+
+    shared: dict = {}
+
+    @contextmanager
+    def sessions(block):
+        facts = block.get("facts") or {}
+        try:
+            if "admission" not in shared:
+                shared["admission"], shared["root"] = storage_admission_for(
+                    getattr(args, "storage_root", None))
+            ephemeral, how = _open_ephemeral(
+                shared["root"], str(facts.get("project_name") or block["object_id"]),
+                str(facts.get("repo_path") or ""), f"ddv-{block['halt_id']}", shared["admission"])
+        except StorageRefused as exc:
+            raise ddverify.VerifyRefused(f"storage: {exc}"[:300]) from exc
+        if ephemeral is None:
+            raise ddverify.VerifyRefused(
+                f"no registered temporary root for this block ({how}): nowhere outside the run "
+                f"to measure")
+
+        @contextmanager
+        def make(purpose, name, estimate_bytes):
+            try:
+                workspace = ephemeral.roots.create(creator="hoh.ddverify", purpose=purpose,
+                                                   name=name, estimate_bytes=estimate_bytes)
+            except Exception as exc:                      # noqa: BLE001 - admission, ownership
+                raise ddverify.VerifyRefused(
+                    f"temporary workspace: {type(exc).__name__}: {exc}"[:300]) from exc
+            try:
+                yield workspace.path
+            finally:
+                ephemeral.roots.release(workspace)
+        try:
+            yield make
+        finally:
+            _close_ephemeral(ephemeral)
+
+    return sessions
+
+
+def cmd_double_down(args) -> int:
+    """`hoh double-down verify|renew|apply|revert HALT_ID (--run RUN | --project PROJECT)` (P3-42).
+
+    `verify`: measure the repair spec of the dossier's proposal on a scratch copy of the run's
+    candidate and record RED_REPRODUCED, REFUTED or (when nothing could be measured) INCONCLUSIVE
+    (`hoh.ddverify`); `--isolation strict` (the default) or `none`. `renew`: a person renews the
+    bound a dossier is parked on, naming who and why (`doubledown.renew_bound`). `apply`: prove the
+    fix of a RED_REPRODUCED proposal on a scratch copy and, when a person approves it
+    (`--approved-by` and `--reason`; without them the fix is WITHHELD and nothing is measured),
+    apply it as a new iteration of the blocked run (`hoh.ddapply`). `revert`: a person puts back the
+    specification text an application superseded. Each prints one row. Exit 0: the verdict, the
+    renewal, the decision or the reversal is on record; 1: decided but the record could not be
+    written; 2: refused, withheld, or an attempt that measured nothing (one may be left).
+    Only `apply` and `revert` write a run's specification or state, and only `apply` lifts its
+    block; neither writes its candidate, receipts or results."""
+    from . import ddverify, doubledown
+    from .projectstore import ProjectStore
+    from .sandbox import Isolation
+
+    try:
+        owner = (RunStore(args.root, args.run).dir if args.run
+                 else ProjectStore(args.root, args.project).dir)
+    except (StoreError, UnsafeRunId, ValueError) as exc:
+        print(f"refused: {exc}", file=sys.stderr)
+        return 2
+    if args.dd_cmd == "renew":
+        row = doubledown.renew_bound(owner, args.halt_id, by=args.by, reason=args.reason)
+        _print(row)
+        return 0 if row["action"] == "renewed" else 2
+    if args.dd_cmd == "revert":
+        from . import ddapply
+
+        row = ddapply.revert(args.root, owner, args.halt_id, by=args.by, reason=args.reason)
+        _print(row)
+        return 0 if row["action"] in ("reverted", "closed") else 2
+    if args.dd_cmd == "apply":
+        from . import ddapply
+
+        if bool(args.approved_by) != bool(args.reason):
+            print("refused: --approved-by and --reason go together (a person's approval names who "
+                  "and why)", file=sys.stderr)
+            return 2
+        row = ddapply.apply(args.root, owner, args.halt_id, session=_verification_sessions(args),
+                            approved_by=args.approved_by, approval_reason=args.reason)
+        _print(row)
+        if row["action"] == "unrecorded":
+            return 1
+        decided = row["action"] in ("applied", "not_applied", "closed")
+        return 0 if decided else 2           # withheld, refused, inconclusive: nothing is decided
+    row = ddverify.verify(args.root, owner, args.halt_id, session=_verification_sessions(args),
+                          isolation=Isolation(args.isolation))
+    _print(row)
+    if row["action"] == "unrecorded":
+        return 1
+    terminal = (row["action"] in ("red_reproduced", "refuted", "closed", "inconclusive")
+                and "attempts_left" not in row)
+    return 0 if terminal else 2
+
+
+def _analyst_sessions(args):
+    """`analysts(halt)` for the double-down pass: a context manager that, for one block, opens
+    what an analyst session may live in and yields the confined analysts.
+
+    In this order, each refusal an `AnalystRefused` (nothing is dispatched, the row says why):
+    the harness must be one a role approval policy can be expressed to; the storage state root
+    must be initialised and admit a write; the block's run or project must be a registered
+    project (its registered temporary root is where the session works -- outside the run and
+    the project directories); a workspace of that root is created, admitted and recorded
+    before the session starts, and given back when the round ends."""
+    from contextlib import contextmanager
+
+    from . import doubledown
+
+    harness = args.analyst_harness
+    shared: dict = {}
+
+    @contextmanager
+    def sessions(halt):
+        if harness not in doubledown.CONFINABLE:
+            raise doubledown.AnalystRefused(
+                f"harness {harness!r} cannot be confined: a role approval policy can be "
+                f"expressed to {', '.join(sorted(doubledown.CONFINABLE))} only")
+        try:
+            if "admission" not in shared:
+                shared["admission"], shared["root"] = storage_admission_for(
+                    getattr(args, "storage_root", None))
+            admission, state_root = shared["admission"], shared["root"]
+            ephemeral, how = _open_ephemeral(
+                state_root, str(halt.facts.get("project_name") or halt.object_id),
+                str(halt.facts.get("repo_path") or ""), f"dd-{halt.halt_id}", admission)
+        except StorageRefused as exc:
+            raise doubledown.AnalystRefused(f"storage: {exc}"[:300]) from exc
+        if ephemeral is None:
+            raise doubledown.AnalystRefused(
+                f"no registered temporary root for this block ({how}): an analyst has nowhere "
+                f"outside the run to work")
+        try:
+            try:
+                workspace = ephemeral.roots.create(
+                    creator="hoh.doubledown", purpose="reviewer", name=f"dd-{halt.halt_id}",
+                    estimate_bytes=doubledown.ANALYST_SCRATCH_ESTIMATE)
+            except Exception as exc:                      # noqa: BLE001 - admission, ownership
+                raise doubledown.AnalystRefused(
+                    f"temporary workspace: {type(exc).__name__}: {exc}"[:300]) from exc
+            try:
+                yield doubledown.build_analysts(
+                    workspace.path, harness=harness, model=args.analyst_model,
+                    effort=args.analyst_effort, timeout_s=args.analyst_timeout)
+            finally:
+                ephemeral.roots.release(workspace)
+        finally:
+            _close_ephemeral(ephemeral)
+
+    return sessions
 
 
 # --------------------------------------------------------------------------- #
@@ -721,6 +1035,189 @@ def cmd_storage_account(args) -> int:
     return 0
 
 
+# --------------------------------------------------------------------------- #
+# The capacity registry's command (P3-16, slice 2)
+# --------------------------------------------------------------------------- #
+
+
+def _capacity_refused(verb: str, why: str) -> int:
+    """`capacity <verb> refused: <why>` on stderr, bounded and escaped (`capacity.printable`); exit code 2."""
+    from .capacity import printable
+
+    print(f"capacity {verb} refused: {printable(why)}", file=sys.stderr)
+    return 2
+
+
+def _capacity_target(args, verb: str):
+    """`(state_root, record_file, None)` for the resolved state root (`--storage-root`, else `$HOH_STATE_ROOT`,
+    else the XDG default: the resolution of `hoh run`), or `(None, None, 2)` once the refusal is printed: an empty
+    `--storage-root`, or a directory that is not an initialised VeriHarness state root
+    (`StorageRegistry._require_init`: a valid `OWNER.json` of this owner, plain `projects/` and `ledger/`).
+    Nothing is created."""
+    from . import capacity
+    from .storage_registry import StorageOwnershipError, StorageRegistry
+
+    option = getattr(args, "storage_root", None)
+    if option is not None and option == "":
+        return None, None, _capacity_refused(verb, "--storage-root is empty (it would fall back to another root)")
+    root = resolve_storage_root(option)
+    try:
+        registry = StorageRegistry(root)
+        registry._require_init()
+    except (StorageOwnershipError, OSError, ValueError):
+        return None, None, _capacity_refused(verb, STORAGE_NOT_INITIALISED.format(root=root))
+    return registry.state_root, capacity.location(registry.state_root), None
+
+
+@contextmanager
+def _capacity_lock(root: Path):
+    """An exclusive, non-blocking `flock` on the state root directory itself: no lock file is made (the record is
+    the one file `hoh capacity` creates). Any holder is refused (`CapacityError`, `busy`), never waited for: another
+    `hoh capacity set`, or the runner's shared lock on an owner-only ancestor of a check's scratch."""
+    import fcntl
+
+    from .capacity import CapacityError
+
+    fd = os.open(root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC)
+    try:
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as exc:
+            raise CapacityError("busy", "the state root is locked by another process; run it again") from exc
+        yield
+    finally:
+        os.close(fd)
+
+
+def cmd_capacity_set(args) -> int:
+    """`hoh capacity set KIND NAME LIMIT UNIT [--storage-root PATH]`: declare one capacity in the host's capacity
+    registry, `<state root>/capacity-registry.json` (P3-16 slice 2). The entry is `declared` (what the operator
+    states; `measured` is a probe's) and `as_of` is the clock of this command -- the module reads none. The
+    registry is read, the entry put in place of the one of its kind and name, and the whole record written through
+    `capacity.write`, all under one non-blocking lock. An absent record starts an empty registry; any other
+    record that `capacity.read` refuses (corrupt, non-canonical, oversize, a link, a directory ...) is refused
+    and left exactly as it is -- the command never replaces what it cannot read. Exit 0 with a JSON object
+    (`storage_root`, `path`, `durable`, `entry`, `replaced`, `entries`, `digest`) on stdout; exit 2 with
+    `capacity set refused: <why>` on stderr and the old record in place. `durable: false` (and a warning) means
+    the new record is in place and only its directory entry may not be durable. The state root is never
+    created or initialised here."""
+    from datetime import datetime, timezone
+
+    from . import capacity
+
+    root, path, refused = _capacity_target(args, "set")
+    if refused is not None:
+        return refused
+    as_of = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    durable = True
+    try:
+        entry = capacity.Entry(kind=args.kind, name=args.name, limit=capacity.parse_limit(args.limit),
+                               unit=args.unit, source="declared", as_of=as_of)
+        with _capacity_lock(root):
+            try:
+                current = capacity.read(path)
+            except capacity.CapacityError as exc:
+                if exc.reason != "missing":
+                    raise
+                current = None
+            entries, previous = capacity.set_entry(current, entry)
+            try:
+                capacity.write(path, entries)
+            except DurableWriteNotSynced as exc:
+                durable = False
+                print(f"warning: the capacity registry is written, but its directory entry may not be "
+                      f"durable: {capacity.printable(str(exc))}", file=sys.stderr)
+    except capacity.CapacityError as exc:
+        return _capacity_refused("set", str(exc))
+    except OSError as exc:
+        return _capacity_refused("set", f"the old record stands; {type(exc).__name__}: {exc}")
+    print(json.dumps({
+        "storage_root": str(root), "path": str(path), "durable": durable, "entry": entry.as_dict(),
+        "replaced": None if previous is None else previous.as_dict(), "entries": len(entries),
+        "digest": capacity.parse(capacity.render(entries)).digest,
+    }, indent=2, ensure_ascii=True))
+    return 0
+
+
+def cmd_capacity_show(args) -> int:
+    """`hoh capacity show [--source] [--storage-root PATH]`: the host's capacity registry as JSON (`storage_root`,
+    `path`, `digest`, `entries`), read through `capacity.read` -- so a record it refuses is refused here with its
+    reason, and an absent record is a refusal, never an empty registry. Read-only: no lock, nothing is created or
+    written. Exit 0, or 2 with `capacity show refused: <why>` on stderr and nothing on stdout. The output is ASCII
+    JSON of at most `MAX_ENTRIES` entries; stderr text is bounded and escaped.
+
+    `--source` (P3-16 slice 3) adds the **capacity source** under the key `source`: the snapshot of the registry,
+    of the provider state the runs under `--root` say (`health.read_health`) and of the slots in use there
+    (`capacitysource.take`), each fact with its observation time, its source, its age and its bound, and UNKNOWN
+    (no value) where it is older than the bound or could not be read. Without the flag the output is exactly what it
+    was."""
+    from datetime import datetime, timezone
+
+    from . import capacity, capacitysource
+
+    root, path, refused = _capacity_target(args, "show")
+    if refused is not None:
+        return refused
+    try:
+        current = capacity.read(path)
+    except capacity.CapacityError as exc:
+        return _capacity_refused("show", str(exc))
+    shown = {"storage_root": str(root), "path": str(path), **capacity.view(current)}
+    if getattr(args, "source", False):
+        # `now` is read after the registry was (broker.decide: a fact written after `now` is `future`)
+        now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        shown["source"] = capacitysource.view(
+            capacitysource.take(current, runs_root=Path(args.root).expanduser(), now=now), now=now)
+    print(json.dumps(shown, indent=2, ensure_ascii=True))
+    return 0
+
+
+def cmd_capacity_check(args) -> int:
+    """`hoh capacity check KIND NAME AMOUNT UNIT [--max-age-declared S] [--max-age-measured S] [--storage-root PATH]`
+    (P3-17 slice 2): may AMOUNT UNIT of the capacity KIND/NAME be taken now? One `broker.decide` over the
+    registry of the state root (`capacity.read`), the live holds the product records under the runs root
+    (`--root`: the run leases of every project and the open budget reservations, `capacitycheck.live_holds`) and
+    the clock of this command. Read-only: no lock, nothing created or written. Exit 0 `grant`, 3 `wait` (fits
+    once what is held is given back), 4 `refuse` (the reason is in the JSON); exit 2 with
+    `capacity check refused: <why>` on stderr and nothing on stdout when no decision can be taken (a root that is
+    not an initialised state root, a registry or a hold source that cannot be read, a malformed argument).
+    stdout is one ASCII JSON object: `storage_root`, `path`, `policy` (the ages used), `holds` and `decision`.
+    A `grant` is a judgement at this moment, not a reservation. **Sessions read zero until something takes a run
+    lease**: nothing in `src/hoh` acquires one yet (P3-18 slice 2), so on a real host a `grant` beside
+    `machine/host.sessions` does not count the sessions that are running.
+
+    Since P3-16 slice 3 the decision is taken on the capacity source (`capacitysource.take` / `decide`): what the
+    provider state of the runs under `--root` says narrows a wanted `provider` capacity by holding part of it
+    (`narrowed` in the JSON: the capacity, the rule, the amount held and why), so a limited provider is `wait`, and the
+    registry digest the decision quotes stays the record's. Holds that are UNKNOWN make no decision (exit 2)."""
+    from datetime import datetime, timezone
+
+    from . import capacity, capacitycheck, capacitysource
+    from .broker import Amount, BrokerError
+
+    root, path, refused = _capacity_target(args, "check")
+    if refused is not None:
+        return refused
+    try:
+        want = Amount(args.kind, args.name, capacity.parse_limit(args.amount), args.unit)
+        ages = {}
+        for key, option, default in (("declared", args.max_age_declared, capacitycheck.DEFAULT_DECLARED_AGE),
+                                     ("measured", args.max_age_measured, capacitycheck.DEFAULT_MEASURED_AGE)):
+            ages[key] = default if option is None else capacity.parse_limit(option)
+        used = capacitycheck.policy(**ages)
+        registry = capacity.read(path)
+        # `now` is read after the registry was (broker.decide: a fact written after `now` is `future`)
+        now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        snapshot = capacitysource.take(registry, runs_root=Path(args.root).expanduser(), now=now, policy=used)
+        decision, narrowed = capacitysource.decide(snapshot, [want], now=now)
+    except (capacity.CapacityError, BrokerError, capacitycheck.CheckError) as exc:
+        return _capacity_refused("check", str(exc))
+    print(json.dumps({"storage_root": str(root), "path": str(path), "policy": ages,
+                      "holds": snapshot.holds.as_dict(), "narrowed": [item.as_dict() for item in narrowed],
+                      "decision": decision.as_dict()}, indent=2, ensure_ascii=True))
+    return {"grant": 0, "wait": 3, "refuse": 4}[decision.verdict]
+
+
 def cmd_storage_steward(args) -> int:
     """`hoh storage steward --project P --once [--plan-only]`: exactly one
     optimisation pass of the project's storage steward (STORAGE-D, directive
@@ -814,7 +1311,65 @@ def _worktree_trust_hint(repo_path: str) -> str | None:
     return None
 
 
+#: P3-11 slice 2: the three options that together name an environment requirement.
+_PREFLIGHT_OPTIONS = ("preflight_report", "preflight_profile", "preflight_max_age")
+
+
+def _add_preflight_options(parser) -> None:
+    parser.add_argument(
+        "--preflight-report", metavar="PATH", default=None,
+        help="the report `tools/preflight.py --out` wrote: this command starts only if it says "
+             "READY for --preflight-profile and is at most --preflight-max-age seconds old; "
+             "otherwise it exits 2 and writes nothing. The three options go together.")
+    parser.add_argument(
+        "--preflight-profile", metavar="NAME", default=None,
+        help="the profile the report must have been measured for (`demo`, `unattended`)")
+    parser.add_argument(
+        "--preflight-max-age", metavar="SECONDS", type=int, default=None,
+        help="the oldest the report may be, in seconds (1 to 604800)")
+
+
+def _preflight_gate(args) -> int | None:
+    """The environment preflight of a run start (P3-11 slice 2): None to go on, else the exit code.
+
+    No option, no gate: what every start was. Given, the gate is asked **first** -- before a run
+    directory, a process marker, a storage admission or a tab -- and a refusal is exit 2 with the
+    reason on stderr, written nowhere else: a terminal, visible halt by name, never a skipped
+    check and never a retry (nothing here loops; the report is read once per start)."""
+    given = [getattr(args, name, None) for name in _PREFLIGHT_OPTIONS]
+    if all(value is None for value in given):
+        return None
+    if any(value is None for value in given):
+        print("environment preflight refused: --preflight-report, --preflight-profile and "
+              "--preflight-max-age go together (a report with no profile or no age is no gate)",
+              file=sys.stderr)
+        return 2
+    from .preflightgate import PreflightRefused, PreflightRequirement, check_preflight
+
+    try:
+        requirement = PreflightRequirement(report=args.preflight_report,
+                                           profile=args.preflight_profile,
+                                           max_age_seconds=args.preflight_max_age)
+    except ValueError as exc:
+        print(f"environment preflight refused: {exc}", file=sys.stderr)
+        return 2
+    try:
+        found = check_preflight(requirement)
+    except PreflightRefused as exc:
+        print(f"the environment preflight does not allow a start: {exc}. "
+              f"`tools/preflight.py --profile {requirement.profile} "
+              f"--out {ascii(str(requirement.report))}` writes a new report"[:600],
+              file=sys.stderr)
+        return 2
+    _print({"preflight": {"profile": found.profile, "measured_at": found.measured_at,
+                          "age_seconds": found.age_seconds}})
+    return None
+
+
 def cmd_start(args) -> int:
+    refused = _preflight_gate(args)
+    if refused is not None:
+        return refused
     run_id = args.run_id or new_run_id()
     store = RunStore(args.root, run_id)
     if store.state_exists():
@@ -838,6 +1393,18 @@ def cmd_start(args) -> int:
     if not Path(args.spec).expanduser().is_file():
         print(f"Specification not found: {args.spec}", file=sys.stderr)
         return 2
+    # P3-20 slice 2: a policy offered at the start is validated before the run exists and
+    # pinned to it right after; a refusal creates nothing.
+    start_policy = None
+    if getattr(args, "routing_policy", None) is not None:
+        from . import routing as routing_mod
+
+        try:
+            start_policy = routing_mod.load(
+                os.path.abspath(os.path.expanduser(str(args.routing_policy))))
+        except routing_mod.RoutingRefused as exc:
+            print(f"routing policy refused: {exc}", file=sys.stderr)
+            return 2
 
     state = Controller.new_state(
         run_id=run_id,
@@ -850,6 +1417,15 @@ def cmd_start(args) -> int:
     )
     with store.lock():
         store.write_state(state)
+    if start_policy is not None:
+        if (rc := _write_record(store.dir / ROUTING_RECORD,
+                                _routing_pin_record(start_policy, "hoh start"))) is not None:
+            print(f"run {run_id} EXISTS and is NOT bound to the routing policy: `hoh run "
+                  f"{run_id} --routing-policy {start_policy.source}` binds it; a `hoh run` "
+                  "without the option would run it unrouted", file=sys.stderr)
+            return rc
+        _print({"routing_policy": {"digest": start_policy.digest,
+                                   "source": start_policy.source, "pinned": True}})
     _print(
         {
             "run_id": run_id,
@@ -885,8 +1461,12 @@ def cmd_status(args) -> int:
 
     evidence = store.read_evidence(expect_digest=state.evidence_digest)
     recent = state.history[-3:] if state.history else []
+    from . import routing as routing_mod
+
+    failover_seen = routing_mod.failover_summary(store.dir)
     _print(
         {
+            **({"routing_failover": failover_seen} if failover_seen is not None else {}),
             "run_id": state.run_id,
             "stage": state.stage.value,
             "condition": state.condition.value,
@@ -987,6 +1567,12 @@ def cmd_resume(args) -> int:
     blindly."*
     """
     store = _store(args)
+    # P3-18 slice 2: a run another driver holds is not touched, `--force` or not.
+    from . import rundrive
+
+    if (held := rundrive.refusal_for_resume(args.root, args.run_id)) is not None:
+        print(held, file=sys.stderr)
+        return 2
     try:
         with store.lock():
             state = store.read_state()
@@ -1319,6 +1905,133 @@ def _per_role(pairs: list[str]) -> dict[Role, str]:
                 f"unknown role {key!r} -- known: all, {', '.join(sorted(roles))}"
             )
     return out
+
+
+#: What a role runs under when neither `--planner/--developer/--qa` nor a routing policy says.
+_DEFAULT_PROFILE = {Role.PLANNER: "claude", Role.DEVELOPER: "claude", Role.QA: "kimi"}
+
+
+class _UnsetProfile(str):
+    """The parser default of `--planner/--developer/--qa`: the harness name a role runs on when
+    nobody says (`"kimi"` for QA -- by default QA runs on a different model than the developer),
+    distinguishable from the same word typed. A routing policy's provider may fill an unset one
+    and must not replace a typed one. It is a `str`, equal to the word and hashing as it, so
+    every reader of `args.qa` sees exactly what it saw before P3-20 slice 2; `profile_typed`
+    is the one question that tells the two apart.
+
+    The mark is an **attribute** of the value, read by name, not the identity of this class:
+    `python3 -m hoh.cli` runs this module as `__main__` and `detach` imports a second copy as
+    `hoh.cli`, whose `_UnsetProfile` is another class -- an `isinstance` test across the two
+    would read every default as typed and type all three options into a detached tab."""
+
+    __slots__ = ()
+    hoh_unset_default = True
+
+
+def profile_typed(value) -> bool:
+    """Was a role option given on the command line? `None` (an args object that does not carry
+    the option) and the parser default are not."""
+    return value is not None and not getattr(value, "hoh_unset_default", False)
+
+
+def _profile_of(role: Role, value) -> str:
+    """The harness a role runs on: the typed word, else the parser's default. A typed empty or
+    blank value is refused here -- before the run directory is touched and before anything is
+    built or pinned -- and never replaced by the default (it used to reach the first dispatch
+    and fail there: "no harness configured for role")."""
+    if value is None:
+        return _DEFAULT_PROFILE[role]
+    if not str(value).strip():
+        raise ValueError(f"--{role.value} names no harness: an empty value is refused "
+                         "(leave the option out for the default)")
+    return str(value)
+
+
+#: P3-20 slice 2. The run directory's record of the routing policy the run is bound to.
+ROUTING_RECORD = "routing.json"
+ROUTING_PIN_SCHEMA = "hoh-routing-pin/1"
+_ROUTING_PIN_MAX_BYTES = 64 * 1024
+
+
+class RoutingPinRefused(ValueError):
+    """The run's routing record cannot be read, or the policy offered is not the one the run is
+    bound to. Said by name; nothing is re-routed silently."""
+
+
+def _read_routing_pin(run_dir) -> dict | None:
+    """`<run>/routing.json` as a dict; None when the run has none. Anything that is there and is
+    not one small regular, link-free file holding a UTF-8 JSON object of this schema with a
+    sha256 digest and an absolute source path is refused: a damaged pin is not "no pin"."""
+    import re
+
+    from .durable_io import UnsafeRecordFile, read_single_link
+
+    path = Path(run_dir) / ROUTING_RECORD
+    try:
+        raw = read_single_link(path)
+    except UnsafeRecordFile:
+        raise RoutingPinRefused(
+            f"{ROUTING_RECORD} is a link or not one regular file; the policy a run is bound to "
+            "lives in its run directory") from None
+    except OSError as exc:
+        raise RoutingPinRefused(
+            f"{ROUTING_RECORD} cannot be read ({type(exc).__name__})") from None
+    if raw is None:
+        return None
+    if len(raw) > _ROUTING_PIN_MAX_BYTES:
+        raise RoutingPinRefused(f"{ROUTING_RECORD} is larger than {_ROUTING_PIN_MAX_BYTES} bytes")
+    try:
+        rec = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, ValueError, RecursionError):
+        raise RoutingPinRefused(f"{ROUTING_RECORD} is not one UTF-8 JSON document") from None
+    if not (isinstance(rec, dict) and rec.get("schema") == ROUTING_PIN_SCHEMA
+            and isinstance(rec.get("digest"), str)
+            and re.fullmatch(r"[0-9a-f]{64}", rec["digest"])
+            and isinstance(rec.get("source"), str) and os.path.isabs(rec["source"])):
+        raise RoutingPinRefused(
+            f"{ROUTING_RECORD} is not a routing pin of this version (schema "
+            f"{ROUTING_PIN_SCHEMA}, a sha256 digest, an absolute source path)")
+    return rec
+
+
+def _routing_decide(run_dir, offered):
+    """`(policy | None, pin | None)` for a run: the policy `hoh run` / `hoh start` works under.
+
+    Nothing offered and nothing pinned: no routing (what every run had before). Offered and
+    nothing pinned: the offered policy, to be pinned by the caller. Pinned: the policy whose
+    digest is the pinned one -- the offered file, or, with none offered, the file the pin names;
+    a different digest, or a pinned file that is gone or invalid, is `RoutingPinRefused`. Reads
+    only; the caller writes the pin. `routing.RoutingRefused` is raised for an offered file that
+    is not a valid policy."""
+    from . import routing
+
+    pin = _read_routing_pin(run_dir)
+    if offered is None and pin is None:
+        return None, None
+    if offered is None:
+        try:
+            policy = routing.load(pin["source"])
+        except routing.RoutingRefused as exc:
+            raise RoutingPinRefused(
+                f"routing policy changed: this run is bound to policy {pin['digest'][:12]} "
+                f"({pin['source']}), which cannot be read again: {exc}") from None
+    else:
+        policy = routing.load(os.path.abspath(os.path.expanduser(str(offered))))
+    if pin is not None and policy.digest != pin["digest"]:
+        raise RoutingPinRefused(
+            f"routing policy changed: this run is bound to policy {pin['digest'][:12]} "
+            f"({pin['source']}), but {'the policy offered' if offered is not None else 'that file'}"
+            f" declares {policy.digest[:12]}; a bound run is not re-routed -- start a new run "
+            "for another policy")
+    return policy, pin
+
+
+def _routing_pin_record(policy, by: str) -> dict:
+    from .contracts import utcnow
+
+    return {"schema": ROUTING_PIN_SCHEMA, "digest": policy.digest,
+            "file_sha256": policy.file_sha256, "source": policy.source, "pinned_by": by,
+            "pinned_at": utcnow(), "policy": policy.evidence()}
 
 
 def _waiting_for_approval(exc: BaseException) -> bool:
@@ -1688,31 +2401,141 @@ def cmd_surface_reap(args) -> int:
     return 1 if any(r["outcome"] == "refused" for r in results) else 0
 
 
+def cmd_surface_register(args) -> int:
+    """`hoh surface register --project P --kind reviewer|drafter|orchestrator [--pane ID]
+    [--strand S --perspective a] [--round N] [--candidate FULL-SHA] [--storage-root PATH]`:
+    record a surface that exists (the pane; `--pane` is required for a reviewer or a drafter, an
+    orchestrator defaults to `$HERDR_PANE_ID`) in the project's surface book, after Herdr's
+    snapshot showed it. Exit 0 with the record on stdout; exit 2 with
+    `surface register refused: <reason>` on stderr and nothing written."""
+    from . import herdr as herdr_mod
+    from . import surfacebook, surfaces
+    from .controller import DispatchError
+
+    try:
+        if not args.pane and args.kind in (surfacebook.KIND_REVIEWER, surfacebook.KIND_DRAFTER):
+            raise surfacebook.Refused(
+                "--pane is required for a reviewer or a drafter: the default, $HERDR_PANE_ID, is "
+                "the pane of the process that registers (the orchestrator's), not the agent's")
+        pane = args.pane or surfaces.own_location()[0]
+        registry = surfacebook.open_registry(resolve_storage_root(args.storage_root))
+        info = surfacebook.register(
+            registry=registry, project_id=args.project, control=surfaces.make_control(),
+            kind=args.kind, pane_id=pane, strand=args.strand, perspective=args.perspective,
+            round_=args.round, candidate=args.candidate, into=args.into)
+    except surfacebook.Refused as exc:
+        print(f"surface register refused: {exc}", file=sys.stderr)
+        return 2
+    except (herdr_mod.HerdrError, DispatchError, OSError) as exc:
+        print(f"surface register refused: {exc}", file=sys.stderr)
+        return 2
+    _print(info)
+    return 0
+
+
+def cmd_surface_release(args) -> int:
+    """`hoh surface release --project P --strand S --reason TEXT [--storage-root PATH]`: the
+    explicit terminal fact of a strand -- its reviewers and drafters are over and the next
+    `hoh reap --apply` closes them. Idempotent."""
+    from . import surfacebook
+
+    try:
+        registry = surfacebook.open_registry(resolve_storage_root(args.storage_root))
+        info = surfacebook.release_strand(registry=registry, project_id=args.project,
+                                          strand=args.strand, reason=args.reason)
+    except (surfacebook.Refused, OSError) as exc:
+        print(f"surface release refused: {exc}", file=sys.stderr)
+        return 2
+    _print(info)
+    return 0
+
+
+def cmd_reap(args) -> int:
+    """`hoh reap [--project P] [--storage-root PATH] [--runs-root DIR]... [--strand S] [--apply]`:
+    judge every surface of the project's surface book and of the runs roots by its lifecycle
+    (a reviewer's strand is merged or released; a run workspace's runs have all ended; an
+    orchestrator is never reaped) and, with `--apply`, close those the reaper proves safe. A dry
+    run otherwise. Exit 1 when a surface is refused (unprovable), 2 when the input cannot be used
+    or Herdr cannot be reached."""
+    from . import herdr as herdr_mod
+    from . import surfacebook, surfaces
+    from .controller import DispatchError
+
+    roots = [Path(r).expanduser() for r in (args.runs_roots or [])]
+    if not roots and not args.project:
+        roots = [Path(args.root).expanduser()]
+    pane, tab, inside = surfaces.own_location()
+    try:
+        registry = (surfacebook.open_registry(resolve_storage_root(args.storage_root))
+                    if args.project else None)
+        result = surfacebook.sweep(registry=registry, project_id=args.project or "",
+                                   roots=roots, strand=args.strand or "",
+                                   apply=bool(args.apply), self_pane=pane, self_tab=tab,
+                                   self_inside=inside)
+    except surfacebook.Refused as exc:
+        print(f"reap refused: {exc}", file=sys.stderr)
+        return 2
+    except (herdr_mod.HerdrError, DispatchError, OSError) as exc:
+        print(f"reap failed: {exc}", file=sys.stderr)
+        return 2
+    # ASCII JSON: a reason may quote a name from a record, and a record is not trusted to be encodable
+    print(json.dumps(result, indent=2, sort_keys=True))
+    return 1 if any(r["outcome"] == "refused" for r in result["surfaces"]) else 0
+
+
 def cmd_run(args) -> int:
     """`hoh run`, with a process marker around the whole of it (review B3, C):
     a replacement master can tell a run still being executed between two
     iterations -- when its lock is free -- from one whose process is gone."""
-    if (getattr(args, "detach", False) or getattr(args, "detach_timeout", None) is not None
-            or getattr(args, "require_contract", False)):
+    detaching = (getattr(args, "detach", False) or getattr(args, "detach_timeout", None) is not None
+                 or getattr(args, "require_contract", False))
+    # P3-INV1: the dispatch ceiling is checked before anything is written or opened (a tab
+    # included: `detach.run_argv` types it into the tab's own `hoh run`).
+    ceiling = getattr(args, "dispatch_ceiling", None)
+    if ceiling is not None and (isinstance(ceiling, bool) or not isinstance(ceiling, int)
+                                or ceiling < 1):
+        print(f"--dispatch-ceiling must be a whole number of at least 1, not {ceiling!r}",
+              file=sys.stderr)
+        return 2
+    # P3-11 slice 2: the environment is asked before anything is written or opened -- before a
+    # tab as well: a refused start is refused here, where the operator is, and the tab's own
+    # `hoh run` (the options are typed into it, `detach.run_argv`) asks again when it starts.
+    refused = _preflight_gate(args)
+    if refused is not None:
+        return refused
+    if detaching:
         # P5-42 slice 1: the run starts in a tab of its own (`hoh.detach`); nothing below runs here.
         from . import detach
         return detach.cmd_detach(args)
     store = RunStore(args.root, args.run_id)
     if not store.state_exists():
         return _cmd_run(args)
+    # P3-18 slice 2: the run's lease is held for as long as this process drives it, taken inside the process
+    # lock and before the run body writes anything; a lease another holder has refuses the run. Slice 3: a driver a
+    # master started (`--master-epoch`) says so in its lease.
+    from . import rundrive
+
     try:
-        with store.process_marker():
+        with store.process_marker(), rundrive.drive_lease(
+                args.root, args.run_id, master_epoch=getattr(args, "master_epoch", None)) as lease:
+            args.run_lease = lease
             rc = _cmd_run(args)
     except LockBusy as exc:
         if "already being executed" not in str(exc):
             raise
         print(str(exc), file=sys.stderr)
         return 2
+    except rundrive.DriveRefused as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
     # The marker is released, so `run_over` can now say the run is over: the
     # first moment the surfaces opened for it (`hoh surface open`) can be closed.
     # Never raises, never changes `rc`; a run with no surfaces record does nothing.
-    from . import surfaces
+    from . import surfacebook, surfaces
     surfaces.reap_after_run(store.dir)
+    # ... and the workspaces `hoh worktree` recorded for this runs root, once every run there has
+    # ended (`surfacebook.runs_over`). Same promise: never raises, never changes `rc`.
+    surfacebook.reap_root_after_run(store.dir.parent)
     return rc
 
 
@@ -1729,6 +2552,12 @@ def _cmd_run(args) -> int:
     """
     with ExitStack() as scope:
         return _run_in(args, scope)
+
+
+def _lease_lost(args) -> str | None:
+    """P3-18 slice 2: why the keepalive of this `hoh run` gave its run lease up, or None."""
+    lease = getattr(args, "run_lease", None)
+    return None if lease is None or not lease.lost else f"run lease lost: {lease.lost}"
 
 
 def _run_in(args, scope: ExitStack) -> int:
@@ -1794,11 +2623,15 @@ def _run_in(args, scope: ExitStack) -> int:
         _print({"ephemeral_roots": {"state": "not registered", "why": matched,
                                     "scratch": "runner sibling scratch"}})
 
-    profile = {
-        Role.PLANNER: args.planner,
-        Role.DEVELOPER: args.developer,
-        Role.QA: args.qa,
-    }
+    try:
+        profile = {
+            Role.PLANNER: _profile_of(Role.PLANNER, args.planner),
+            Role.DEVELOPER: _profile_of(Role.DEVELOPER, args.developer),
+            Role.QA: _profile_of(Role.QA, args.qa),
+        }
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
     try:
         models = _per_role(args.role_model)
         efforts = _per_role(args.role_effort)
@@ -1812,6 +2645,68 @@ def _run_in(args, scope: ExitStack) -> int:
             "note": "recorded here because a verdict is only comparable when "
                     "it is known which model produced it",
         })
+    # P3-20 slice 2. The routing policy is decided here, before any role can start, and pinned
+    # to the run (below) after the last refusal that precedes the first dispatch: a refused
+    # invocation -- the policy not fitting the roles' options, an approval policy, a contract,
+    # a recovery declaration, a trust grant, the dispatcher, the isolation -- leaves no pin.
+    from . import routing as routing_mod
+
+    routing_policy = None
+    failover = None
+    try:
+        routing_policy, routing_pin = _routing_decide(
+            store.dir, getattr(args, "routing_policy", None))
+        if routing_policy is not None:
+            for role_, given in ((Role.PLANNER, args.planner), (Role.DEVELOPER, args.developer),
+                                 (Role.QA, args.qa)):
+                declared = routing_policy.roles.get(role_)
+                if (not profile_typed(given) and declared is not None
+                        and declared.provider is not None):
+                    profile[role_] = declared.provider      # an unset profile takes the policy's
+            routed = routing_mod.resolve(routing_policy, profiles=profile, models=models,
+                                         efforts=efforts)
+            # P3-41 slice 2. The failover decision is *planned* here, from the verified provider
+            # health without this run's own park, and committed below -- after the master is
+            # declared and before the first dispatch -- so that a stale master and an invocation
+            # refused in between leave no record. A policy with no fallback and a run with no
+            # record read no health and change nothing.
+            from . import dispatchrecovery as _recovery
+            from .health import read_verified_health
+
+            try:
+                master_ = (_recovery.check_master_args(
+                    getattr(args, "master_session", None), getattr(args, "master_epoch", None))
+                    or _recovery.read_master(store.dir, recorded_only=True))
+            except ValueError:
+                master_ = None          # refused in full below, before anything is committed
+            failover = routing_mod.plan_failover(
+                routing_policy, run_dir=store.dir, profiles=profile, models=models,
+                efforts=efforts, reader=read_verified_health, master=master_,
+                begun=bool(state.iteration or state.usage.iterations))
+            scope.callback(failover.close)
+            if failover.decided:
+                routed = failover.resolved
+    except RoutingPinRefused as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+    except routing_mod.RoutingRefused as exc:
+        print(f"routing policy refused: {exc}", file=sys.stderr)
+        return 2
+    if routing_policy is not None:
+        _print({"routing_policy": {"digest": routing_policy.digest,
+                                   "source": routing_policy.source,
+                                   "pinned_before": routing_pin is not None,
+                                   "resolved": routed.evidence["resolved"],
+                                   **({"failover": routed.evidence["failover"]["decisions"]}
+                                      if failover is not None and failover.decided else {}),
+                                   **({"verification_required": routed.evidence["verification"]}
+                                      if failover is not None and failover.decided
+                                      and "verification" in routed.evidence else {}),
+                                   **({"failover_not_decided": failover.stayed}
+                                      if failover is not None and failover.stays else {})}})
+        if failover is not None and failover.stays:
+            print(f"routing failover: not decided ({failover.stayed}); the run starts on its "
+                  "declared route", file=sys.stderr)
     # P1-09. Both decided before any role starts, both written into the run
     # directory, so the record says what the agents could do and which
     # directory was trusted on whose instruction.
@@ -1880,6 +2775,17 @@ def _run_in(args, scope: ExitStack) -> int:
     except ValueError as exc:
         print(f"recovery declaration refused: {exc}", file=sys.stderr)
         return 2
+    # P3-41 slice 4: a role that failed over to an `account` route runs under that route's
+    # operator-registered handle, so its receipts and the health reading name it. A handle typed
+    # for the same role with --role-account (`hoh start` forwards it to every `hoh run`) named the
+    # declared route's account: it is replaced by the route's handle, and said -- a provider stop
+    # is not turned into a refusal by an option the operator typed for the route it left.
+    if failover is not None and failover.decided:
+        for role_, handle in failover.resolved.accounts.items():
+            if role_ in recovery.accounts and recovery.accounts[role_] != handle:
+                print(f"routing failover: --role-account for {role_.value} is not used: the role "
+                      f"runs under the account route {handle}", file=sys.stderr)
+            recovery.accounts[role_] = handle
     if getattr(args, "trust_worktree", False):
         from .trust import TrustRefused, trust_run_worktree
         try:
@@ -1891,15 +2797,19 @@ def _run_in(args, scope: ExitStack) -> int:
             return rc
         _print({"worktree_trust": granted})
     try:
+        # a decided failover: the dispatcher is built from the plan's own tables and providers
+        # (`routing=` would assert the declared provider against them)
+        failed_over = failover is not None and failover.decided
         dispatcher = build_dispatcher(
             answers_dir=store.dir / "answers",
-            profiles=profile,
+            profiles=failover.resolved.profiles if failed_over else profile,
             cwd=state.repo_path,
             prefer_herdr=not args.no_herdr,
             timeout_ms=args.role_timeout * 1000,
-            models=models,
-            efforts=efforts,
+            models=failover.resolved.models if failed_over else models,
+            efforts=failover.resolved.efforts if failed_over else efforts,
             approval_policy=policy,
+            routing=None if failed_over else routing_policy,
             # P2-42: a run of a registered project keeps its roles' scratch in the iteration's
             # registered workspace (`Controller._run_temp` binds it); any other run keeps the
             # `.hoh-scratch-role-<role>` directories of the arena root.
@@ -1908,6 +2818,8 @@ def _run_in(args, scope: ExitStack) -> int:
     except Exception as exc:   # DispatchError and HerdrUnavailable
         print(str(exc), file=sys.stderr)
         return 2
+    if failed_over:
+        dispatcher.routing_evidence = failover.resolved.evidence
 
     if args.no_herdr:
         print(
@@ -1991,6 +2903,37 @@ def _run_in(args, scope: ExitStack) -> int:
                          "route_policy": f"{dispatchrecovery.ROUTE_POLICY_ID}/"
                                          f"{dispatchrecovery.ROUTE_POLICY_VERSION}"}})
 
+    # P3-41 slice 2: the failover decision is made durable here -- after the master declaration
+    # (a stale master was refused above, with nothing written) and before the first dispatch. A
+    # decision that cannot be recorded is a refusal, never a silent fallback.
+    made_now = failover is not None and failover.pending
+    if made_now:
+        try:
+            failover.commit()
+        except routing_mod.RoutingRefused as exc:
+            print(f"routing policy refused: {exc}", file=sys.stderr)
+            return 2
+    if made_now and failover.decided:
+        said = ", ".join(
+            f"{r} runs on {d['route']['provider']}/{d['route'].get('model', '-')}"
+            f" ({d['reason']} at the declared provider)"
+            for r, d in failover.resolved.evidence["failover"]["decisions"].items()
+            if d["outcome"] == "FALLBACK")
+        if said:
+            state.note(f"routing failover: {said}")
+            with store.lock():
+                store.write_state(state)
+            print(f"routing failover: {said}", file=sys.stderr)
+
+    # P3-20 slice 2: the pin, last, after every refusal above; nothing has been dispatched.
+    if routing_policy is not None and routing_pin is None and (rc := _write_record(
+            store.dir / ROUTING_RECORD,
+            _routing_pin_record(routing_policy, "hoh run"))) is not None:
+        return rc
+
+    # P3-INV1: what this invocation was told, read from the arguments (not back from the controller: the
+    # tests that drive `cmd_run` with stand-in controllers have none to give)
+    told_ceiling = getattr(args, "dispatch_ceiling", None)
     controller = Controller(
         store, dispatcher, spec_path=state.spec_path, isolation=isolation,
         storage_admission=storage_admission,
@@ -1998,11 +2941,22 @@ def _run_in(args, scope: ExitStack) -> int:
                               storage_admission),
         recovery=recovery,
         ephemeral_roots=ephemeral.roots if ephemeral is not None else None,
+        dispatch_ceiling=told_ceiling,
     )
+    if told_ceiling is not None:
+        _print({"dispatch_ceiling": {"ceiling": told_ceiling,
+                                     "dispatched": state.usage.dispatches,
+                                     "run_max_dispatches": state.budgets.max_dispatches}})
 
     ran = 0
     waiting_for_approval = False
+    lease_lost = False
     while ran < args.iterations:
+        if (gone := _lease_lost(args)) is not None:
+            # P3-18 slice 2: a holder that was replaced starts no further iteration.
+            print(f"{gone}; no further iteration is started", file=sys.stderr)
+            lease_lost = True
+            break
         try:
             out = controller.run_iteration(state)
         except LockBusy as exc:
@@ -2078,6 +3032,9 @@ def _run_in(args, scope: ExitStack) -> int:
         if out.accepted and args.until_accepted:
             break
 
+    if not lease_lost and (gone := _lease_lost(args)) is not None:
+        print(f"{gone}; the run ended under it", file=sys.stderr)      # the last iteration ran under no lease
+        lease_lost = True
     if not _integrity_close(store, integrity_before):
         return 3
 
@@ -2088,7 +3045,7 @@ def _run_in(args, scope: ExitStack) -> int:
                               waiting_for_approval=waiting_for_approval,
                               run_id=args.run_id, ran=ran)
     _print(payload)
-    return rc
+    return 2 if lease_lost and rc == 0 else rc
 
 
 def cmd_agent_setup(args) -> int:
@@ -2572,7 +3529,34 @@ def cmd_merge_gate(args) -> int:
         outcome = mergegate.run_check(
             repo=args.repo, candidate=args.candidate, base=args.base, spec=args.spec,
             reviews=args.review, receipt=args.receipt, min_reviews=args.min_reviews,
-            min_age=args.min_age)
+            min_age=args.min_age, suite_receipt=args.suite_receipt)
+    sys.stdout.write(outcome.out)
+    sys.stderr.write(outcome.err)
+    return outcome.code
+
+
+def cmd_phase(args) -> int:
+    """`hoh phase close|status|reopen` (amendment A7): a phase is closed at a commit.
+
+    `close PHASE --record ENTRY` verifies the closure entry against the blobs at its closing
+    commit and writes the receipt (exit 0; exit 1 refused, nothing written). `status [PHASE]`
+    reads the committed receipt and re-derives it: CLOSED at the commit with the regression watch
+    beside it, or OPEN / REOPENED with the reason (exit 0 every phase asked about is closed, 1 one
+    is not, 2 the repository cannot be judged). `reopen PHASE --request FILE --reason TEXT`
+    records the operator's decision to reopen (exit 0; exit 1 refused). Nothing commits, and
+    nothing else reopens a phase. The logic and its contract are in `hoh.phases`.
+    """
+    from . import phases
+
+    if args.phase_cmd == "close":
+        outcome = phases.run_close(repo=args.repo, phase=args.phase, record=args.record,
+                                   gate_dir=args.gate_dir)
+    elif args.phase_cmd == "reopen":
+        outcome = phases.run_reopen(repo=args.repo, phase=args.phase, request=args.request,
+                                    reason=args.reason, gate_dir=args.gate_dir)
+    else:
+        outcome = phases.run_status(repo=args.repo, phase=args.phase, gate_dir=args.gate_dir,
+                                    as_json=args.json)
     sys.stdout.write(outcome.out)
     sys.stderr.write(outcome.err)
     return outcome.code
@@ -2590,6 +3574,21 @@ def cmd_list(args) -> int:
         except StoreError as exc:
             print(f"{rid}  UNREADABLE: {exc}")
     return 0
+
+
+def cmd_mission(args) -> int:
+    """`hoh mission overview [--json]` (rows P3-33/37/38, slice 1): one read-only look at every run
+    under the root, row by row, from what the product already writes (`hoh.missioncontrol`).
+    `hoh mission board|needs-you --project ID [--json]` (rows P3-35/36, slice 1): the same for one
+    project -- what runs, what can run, what waits, what waits for a person.
+    `hoh mission map|timeline|evidence --project ID [--json]` (rows P3-34/37/38): the project's
+    graph as a structure, its dated records in order, and the health of its gates and evidence.
+    Exit 0 everything looked at, 1 something could not be (a row or a listed log that says why),
+    2 refused (the root or the project is not usable, or the arguments do not fit the view).
+    Writes nothing."""
+    from . import missioncontrol
+
+    return missioncontrol.run(args.view, args.root, project=args.project, as_json=args.json)
 
 
 def cmd_pin(args) -> int:
@@ -2618,7 +3617,7 @@ def cmd_import(args) -> int:
 
     outcome = importref.run_import(
         repo=args.repo, run_state=args.run_state, commit=args.commit, name=args.id, receipt=args.receipt,
-        base=args.base, against=args.against, against_unmerged=args.against_unmerged)
+        base=args.base, against=args.against, against_unmerged=args.against_unmerged, spec=args.spec)
     sys.stdout.write(outcome.out)
     sys.stderr.write(outcome.err)
     return outcome.code
@@ -2783,6 +3782,43 @@ def cmd_migrate(args) -> int:
 # --------------------------------------------------------------------------- #
 
 
+def _project_leases(args) -> int:
+    """`hoh project leases [--archive]` (P3-18 slice 3): the run leases `hoh run` keeps under `--root`, one line each,
+    judged now; with `--archive` the ones that ended at least `--older-than-days` ago are moved aside (never
+    removed) under `projects/hoh-runs/run-leases-archive/<stamp>/` with a manifest. Exit 0; 3 when a lease file
+    cannot be read exactly (listed, never skipped); 4 when the archive is refused."""
+    from . import rundrive
+    from .leaseadmin import MAX_ARCHIVE_FILES
+    from .runlease import RunLeaseError
+
+    try:
+        if args.archive:
+            done = rundrive.archive(args.root, args.older_than_days * 86400)
+            if done.directory is None:
+                print(f"nothing to archive: no lease ended {args.older_than_days} day(s) ago or more")
+            else:
+                print(f"archived {len(done.moved)} file(s) of {len(done.runs)} run(s) to {done.directory}")
+            for run_id in done.deferred:
+                print(f"deferred {run_id}: a pass moves at most {MAX_ARCHIVE_FILES} files; run it again")
+            for run_id, why in done.skipped:
+                print(f"skipped {run_id}: {why}")
+            return 0
+        rows = rundrive.listing(args.root)
+    except (RunLeaseError, OSError, ValueError) as exc:
+        print(f"refused: {exc}", file=sys.stderr)
+        return 4
+    counts: dict[str, int] = {}
+    for row in rows:
+        counts[row.state] = counts.get(row.state, 0) + 1
+        lease = row.lease
+        detail = ("" if lease is None else
+                  f" gen={lease.generation} holder={lease.holder} epoch={lease.master_epoch or '-'}"
+                  f" parked={row.parked}")
+        print(f"{row.run_id}  {row.state:10s}{detail}  {'reclaimable' if row.reclaimable else ''}".rstrip())
+    print(f"{len(rows)} lease(s): " + (", ".join(f"{k} {v}" for k, v in sorted(counts.items())) or "none"))
+    return 3 if counts.get("UNREADABLE") else 0
+
+
 def cmd_project(args) -> int:
     """The orchestration layer above a single run.
 
@@ -2796,10 +3832,14 @@ def cmd_project(args) -> int:
     project, `unblock` and `record-action` need the current master's session
     and epoch (AC7).
     """
+    from . import rundrive
     from .projectstore import (
         ProjectStore, UnsafeProjectId, list_projects, record_external_action, resume_decision,
         unblock,
     )
+
+    if args.project_cmd == "leases":
+        return _project_leases(args)
 
     if args.project_cmd == "list":
         projekte = list_projects(args.root)
@@ -2809,7 +3849,7 @@ def cmd_project(args) -> int:
         for pid in projekte:
             try:
                 st = ProjectStore(args.root, pid).read_state()
-                verdict_text, _ = resume_decision(st)
+                verdict_text, _ = resume_decision(st, rundrive.consult_nodes(args.root, st))
                 open_ = sum(1 for n in st.nodes if not n.settled)
                 print(f"{pid}  {verdict_text:9s}  nodes={len(st.nodes)} open={open_} "
                       f"closure_gen={st.closure_generation}")
@@ -2838,6 +3878,18 @@ def cmd_project(args) -> int:
 
         print(json.dumps(authority_status(store.dir), indent=2))
         return 0
+
+    if args.project_cmd == "budget":
+        return _project_budget(args, store)
+
+    if args.project_cmd == "wake":
+        return _project_wake(args, store, st)
+
+    if args.project_cmd == "route-decisions":
+        return _project_route_decisions(args, store)
+
+    if args.project_cmd == "continue":
+        return _project_continue(args, store)
 
     if args.project_cmd == "drive":
         return _project_drive(args, store, st)
@@ -2909,7 +3961,8 @@ def cmd_project(args) -> int:
         print(f"{args.node} is now {n.lifecycle.value}; recorded as {st.decisions[-1].id}")
         return 0
 
-    verdict_text, why = resume_decision(st)
+    # P3-18 slice 3: what the RUNNING nodes' run leases say (read-only).
+    verdict_text, why = resume_decision(st, rundrive.consult_nodes(args.root, st))
 
     from .taskstate import PROJECT_SCOPE, from_project, render
 
@@ -3132,6 +4185,156 @@ def _claimed_master(args, store):
     return authority, None
 
 
+def _project_route_decisions(args, store) -> int:
+    """`hoh project route-decisions ID --autonomy PATH` (row P3-31, slice 1): route the open
+    EXTERNAL decisions of a project through an autonomy contract and record the ones the
+    contract hands to an automatic resolver (`governance.route_project_decisions`).
+
+    It approves nothing and acts on nothing: the record names a resolver. A decision the
+    contract does not hand to one stays open for the operator. Needs the live master's
+    credential (or, on a governed project with no master alive, an operator epoch of its
+    own) unless `--dry-run`, which writes nothing. Exit 0: every open decision routed or
+    left open for a reason that is a fact about it; 1: something could not be read or
+    recorded (the report says what); 2: refused (contract file, digest, graph); 5: no
+    authority."""
+    from . import governance
+    from .store import StaleWrite
+    from .succession import LeaseError
+
+    try:
+        contract = governance.load_contract_file(args.autonomy, program_epoch=args.program_epoch)
+    except governance.RoutingRefused as exc:
+        print(f"refused: {exc}", file=sys.stderr)
+        return 2
+    authority, operator = None, False
+    if not args.dry_run:
+        authority, operator, refusal = _command_authority(args, store)
+        if refusal:
+            print(f"refused: {refusal}", file=sys.stderr)
+            return 5
+    try:
+        with _authority_section(store, authority, operator, "route-decisions"):
+            report = governance.route_project_decisions(
+                store, contract, args.root, expect_digest=args.expect_digest,
+                dry_run=args.dry_run)
+    except governance.RoutingRefused as exc:
+        print(f"refused: {exc}", file=sys.stderr)
+        return 2
+    except (StaleWrite, LeaseError, LockBusy, StoreError) as exc:
+        print(f"refused: {exc}", file=sys.stderr)
+        return 5
+    _print(report.as_json())
+    return 1 if report.failed else 0
+
+
+def _project_continue(args, store) -> int:
+    """`hoh project continue ID --autonomy PATH --wave WAVE` (row P3-32, slice 1): what a wave
+    may continue under the contract, written down once (`governance.continue_by_policy`).
+
+    Consumes the routing records of `route-decisions` only as a way out for the decision they
+    name -- never as an approval -- and holds the wave, with the reason, when the contract is
+    not pinned by the project's runs, a limit is reached, a node has no way out, or the wave
+    itself must hold. Dispatches nothing: the loop reads the record. Authority as
+    `route-decisions` (`--dry-run` takes none and writes nothing). Exit 0: the record says
+    CONTINUE; 1: it says HOLD or could not be written (the record or the report says why);
+    2: refused before anything was read of a log; 5: no authority."""
+    from . import governance
+    from .store import StaleWrite
+    from .succession import LeaseError
+
+    try:
+        contract = governance.load_contract_file(args.autonomy, program_epoch=args.program_epoch)
+    except governance.RoutingRefused as exc:
+        print(f"refused: {exc}", file=sys.stderr)
+        return 2
+    authority, operator = None, False
+    if not args.dry_run:
+        authority, operator, refusal = _command_authority(args, store)
+        if refusal:
+            print(f"refused: {refusal}", file=sys.stderr)
+            return 5
+    try:
+        with _authority_section(store, authority, operator, "continue"):
+            result = governance.continue_by_policy(
+                store, contract, args.root, wave_id=args.wave, dry_run=args.dry_run)
+    except governance.RoutingRefused as exc:
+        print(f"refused: {exc}", file=sys.stderr)
+        return 2
+    except governance.ContinuationError as exc:
+        print(f"not recorded: {exc}", file=sys.stderr)
+        return 1
+    except (StaleWrite, LeaseError, LockBusy, StoreError) as exc:
+        print(f"refused: {exc}", file=sys.stderr)
+        return 5
+    _print({**result.as_json(), "dry_run": args.dry_run})
+    return 0 if result.outcome == "CONTINUE" else 1
+
+
+def _project_wake(args, store, st) -> int:
+    """The master consults its predecessor: print the wake plan, and with
+    `--execute` open a surface, resume the predecessor's Claude session in it and
+    send it one prompt. Exit 0: planned or woken; 2: a value of the command line or
+    the environment is not usable; 5: not the live master, the succession records
+    do not bear it out, or the wake failed after a surface was opened (it is left
+    open, never closed). See `hoh.wake`."""
+    from . import wake
+
+    authority, refusal = _claimed_master(args, store)
+    if refusal:
+        print(f"refused: {refusal}", file=sys.stderr)
+        return 5
+    try:
+        plan = wake.plan_wake(authority, store.dir, project_id=st.project_id,
+                              resume_id=args.resume_id, brief=args.brief,
+                              answer=args.answer, nonce=wake.new_nonce(), cwd=args.cwd,
+                              token_file=os.path.expanduser(args.token_file or ""))
+        wake.validate_timeout(args.timeout)
+        if not args.execute:
+            print(json.dumps({**plan.as_dict(), "executed": False}, indent=2))
+            return 0
+        if not args.predecessor_surface_closed:
+            raise wake.WakeUsage(
+                "--execute needs --predecessor-surface-closed: a wake resumes the "
+                "predecessor's session, which must not be running in another surface "
+                "(if it is, message that surface instead)")
+        from .herdr import HerdrUnavailable
+
+        try:
+            control = wake.make_control()
+        except HerdrUnavailable as exc:
+            print(f"refused: {exc}", file=sys.stderr)
+            return 2
+        done = wake.perform_wake(plan, control, timeout_s=args.timeout,
+                                 predecessor_surface_closed=True,
+                                 workspace=os.environ.get("HERDR_WORKSPACE_ID") or None)
+    except wake.WakeFailed as exc:
+        out = {"outcome": "FAILED", "detail": str(exc), "agent": plan.agent_name,
+               "agent_started": exc.agent_started,
+               "pane_id": exc.surface.pane_id if exc.surface else None,
+               "tab_id": exc.surface.tab_id if exc.surface else None,
+               "answer_file": plan.answer_file,
+               "hint": (
+                   "the predecessor's session may be running in that surface now (it may "
+                   "still write the answer file): do NOT run this command again with "
+                   "--predecessor-surface-closed while it is open -- message that surface, "
+                   "or close it yourself first"
+                   if exc.agent_started else
+                   "no agent was started; the surface (if any) is yours to close, and the "
+                   "command may be run again")}
+        print(json.dumps(out, indent=2))
+        print("refused: the wake failed; any surface it opened is left open (this command "
+              "never closes a predecessor's surface)", file=sys.stderr)
+        return 5
+    except wake.WakeUsage as exc:
+        print(f"refused: {exc}", file=sys.stderr)
+        return 2
+    except wake.WakeRefused as exc:
+        print(f"refused: {exc}", file=sys.stderr)
+        return 5
+    print(json.dumps({**plan.as_dict(), "executed": True, **done}, indent=2))
+    return 0
+
+
 def _command_authority(args, store):
     """(authority, is_operator_epoch, refusal) for unblock / record-action.
 
@@ -3292,7 +4495,8 @@ def _project_hold(args, store, st) -> int:
     sys.stdout.flush()
     result = hold_lease(authority, interval=args.interval, watch_pid=args.watch_pid,
                         hold_for=args.hold_for,
-                        on_tick=_rotation_tick(store, authority, rotation, args.token_out))
+                        on_tick=_rotation_tick(store, authority, rotation, args.token_out,
+                                               deliver=not args.rotate_no_deliver))
     _print({"project_id": st.project_id, "ended": result.reason,
             "renewals": result.renewals, "released": result.released})
     return 0
@@ -3311,12 +4515,15 @@ def _rotation_policy(args, store):
     import re
 
     from . import herdr as herdr_mod
-    from .rotation import PolicyError, load_policy
+    from .rotation import MIN_TTL_WITH_DELIVERY_S, PolicyError, load_policy
 
     want = getattr(args, "rotate_policy_sha256", None)
     if not getattr(args, "rotate_policy", None):
         if want is not None:
             return None, ("--rotate-policy-sha256 names the digest of the policy file and "
+                          "needs --rotate-policy")
+        if getattr(args, "rotate_no_deliver", False):
+            return None, ("--rotate-no-deliver opts out of a rotation policy's notices and "
                           "needs --rotate-policy")
         return None, None
     if want is not None and not re.fullmatch(r"[0-9a-f]{64}", want):
@@ -3324,6 +4531,11 @@ def _rotation_policy(args, store):
     if getattr(args, "watch_pid", None) is None:
         return None, ("a rotation policy needs --watch-pid: the hold must know when the "
                       "session it rotates is gone, or a dead master's lease would be kept alive")
+    if (not getattr(args, "rotate_no_deliver", False)
+            and getattr(args, "ttl", None) is not None and args.ttl < MIN_TTL_WITH_DELIVERY_S):
+        return None, (f"--ttl {args.ttl} is shorter than {MIN_TTL_WITH_DELIVERY_S} s: a notice "
+                      "may block a renewal for up to 45 s while Herdr hangs; use a longer lease "
+                      "or --rotate-no-deliver")
     try:
         loaded = load_policy(args.rotate_policy, directory=store.dir)
     except PolicyError as exc:
@@ -3346,7 +4558,8 @@ def _rotation_event(row: dict) -> None:
         pass                    # a closed stdout never ends a hold; the row is in the log
 
 
-def _rotation_tick(store, authority, loaded, token_out, *, fresh=False, keepalive_s=None):
+def _rotation_tick(store, authority, loaded, token_out, *, fresh=False, keepalive_s=None,
+                   deliver=True):
     """The hold loop's `on_tick`: the rotation policy applied at every renewal, or None.
 
     The controller decides (`hoh.rotation`); the move is `run_rollover`, the same call
@@ -3354,10 +4567,15 @@ def _rotation_tick(store, authority, loaded, token_out, *, fresh=False, keepaliv
     that it rotates the same way in its turn. `fresh` is the successor's: it starts in a
     cool-down (`RotationController.arm`). The rotation runs under the lease's keepalive
     (renewed every `keepalive_s`, default a third of the ttl): starting the successor can
-    take longer than the lease is valid, and the hold loop cannot renew while it waits."""
+    take longer than the lease is valid, and the hold loop cannot renew while it waits.
+
+    `deliver` (on unless the operator passed `--rotate-no-deliver`): the controller types its
+    requests and their outcomes into the pane this hold was started in (`HERDR_PANE_ID`, the
+    master's own) through Herdr, besides the line on stdout; `False` is recorded in the log and
+    the successor's command carries the opt-out on."""
     if loaded is None:
         return None
-    from .rollover import hand_token_over
+    from .rollover import HerdrNotifier, hand_token_over
     from .rotation import RotationController, make_trigger
 
     policy = loaded.policy
@@ -3378,12 +4596,15 @@ def _rotation_tick(store, authority, loaded, token_out, *, fresh=False, keepaliv
                 ack_timeout_s=policy.ack_timeout_s, takeover_s=policy.takeover_s,
                 poll_s=policy.poll_s,
                 accept_args=("--rotate-policy", str(loaded.path),
-                             "--rotate-policy-sha256", loaded.sha256))
+                             "--rotate-policy-sha256", loaded.sha256,
+                             *(() if deliver else ("--rotate-no-deliver",))))
 
     controller = RotationController(
         loaded, directory=store.dir, project_id=store.project_id,
         session=authority.session_id, trigger=make_trigger(policy), perform=perform,
-        on_reclaimed=lambda: hand_token_over(authority, token_out), emit=_rotation_event)
+        on_reclaimed=lambda: hand_token_over(authority, token_out), emit=_rotation_event,
+        notifier=HerdrNotifier(), pane_id=os.environ.get("HERDR_PANE_ID") or None,
+        deliver=deliver)
     controller.arm(fresh=fresh)
     return controller.tick
 
@@ -3565,7 +4786,7 @@ def _project_rollover_accept(args, store, st) -> int:
     result = hold_lease(took.authority, interval=args.interval, watch_pid=args.watch_pid,
                         hold_for=args.hold_for,
                         on_tick=_rotation_tick(store, took.authority, rotation, args.token_out,
-                                               fresh=True))
+                                               fresh=True, deliver=not args.rotate_no_deliver))
     print(f"hold ended: {result.reason} after {result.renewals} renewals")
     return 0
 
@@ -3633,6 +4854,57 @@ def _project_drive(args, store, st) -> int:
     return 6 if result.halt is HaltClass.SUPERSEDED else 1
 
 
+def _project_budget(args, store) -> int:
+    """`hoh project budget`: declare (or read back) the project's dispatch budget (P3-23).
+
+    With `--dispatch-budget` the declaration `<project>/dispatch-budget.json` is written, under
+    the command authority of `unblock` (the live master's credential, or an operator epoch when
+    none is alive); without it the declaration is printed. Every drive binds it to its launcher.
+    The epoch it records is the one it acted under (the master's, or the operator epoch it took),
+    `null` on an ungoverned project. A declaration that is not readable is not repaired by this verb
+    (it reads the current one first and refuses, exit 4): a person renames the file by a version.
+    Exit 0 done, 2 usage, 4 refused value or unreadable declaration, 5 authority."""
+    from dataclasses import asdict
+
+    from . import budgetconfig
+    from .succession import LeaseError, StaleMaster
+
+    try:
+        current = budgetconfig.read_config(store.dir)
+        if args.dispatch_budget is None:
+            if args.dispatch_reservation is not None or args.qa_reserve is not None:
+                print("refused: --dispatch-reservation and --qa-reserve go with --dispatch-budget",
+                      file=sys.stderr)
+                return 2
+            _print({"project_id": args.project_id,
+                    "declared": None if current is None else asdict(current)})
+            return 0
+        if not args.reason:
+            print("refused: --reason is required to declare a budget", file=sys.stderr)
+            return 2
+        budgetconfig.check_values(args.dispatch_budget, args.dispatch_reservation,
+                                  args.qa_reserve or 0)
+        authority, operator, refusal = _command_authority(args, store)
+        if refusal:
+            print(f"refused: {refusal}", file=sys.stderr)
+            return 5
+        with _authority_section(store, authority, operator, "budget"):
+            made = budgetconfig.write_config(
+                store.dir, dispatch_budget=args.dispatch_budget,
+                dispatch_reservation=args.dispatch_reservation, qa_reserve=args.qa_reserve or 0,
+                set_by=args.session or f"operator-{os.getpid()}",
+                epoch=getattr(authority, "epoch", None), reason=args.reason)
+    except budgetconfig.BudgetConfigError as exc:
+        print(f"refused: {exc}", file=sys.stderr)
+        return 4
+    except (LeaseError, StaleMaster, StoreError) as exc:     # superseded between the claim and the write
+        print(f"refused: {exc}", file=sys.stderr)
+        return 5
+    _print({"project_id": args.project_id, "declared": asdict(made),
+            "replaced": None if current is None else asdict(current)})
+    return 0
+
+
 # --------------------------------------------------------------------------- #
 
 
@@ -3673,6 +4945,12 @@ def build_parser() -> argparse.ArgumentParser:
         default="local-only",
         help="delivery mode. yolo always stays off.",
     )
+    s.add_argument(
+        "--routing-policy", metavar="PATH", default=None,
+        help="a routing policy (schema hoh-routing-policy/1) the run is bound to from its "
+             "start: model, effort and, optionally, provider per role. Validated before the "
+             "run exists, pinned in <run>/routing.json; `hoh run` then works under it.")
+    _add_preflight_options(s)
     s.set_defaults(func=cmd_start)
 
     r = sub.add_parser("run", help="Run iterations")
@@ -3680,11 +4958,30 @@ def build_parser() -> argparse.ArgumentParser:
     r.add_argument("--iterations", type=int, default=1, help="how many iterations")
     r.add_argument("--until-accepted", action="store_true",
                    help="stop after the first acceptance")
-    r.add_argument("--planner", default="claude")
-    r.add_argument("--developer", default="claude")
-    r.add_argument("--qa", default="kimi",
-                   help="a different model in a fresh context is the strongest "
-                        "setup for the independent review")
+    r.add_argument("--planner", default=_UnsetProfile(_DEFAULT_PROFILE[Role.PLANNER]),
+                   help="harness of the planner (default claude; a routing policy's provider "
+                        "for the role fills it when the option is not typed)")
+    r.add_argument("--developer", default=_UnsetProfile(_DEFAULT_PROFILE[Role.DEVELOPER]),
+                   help="harness of the developer (default claude; a routing policy's "
+                        "provider for the role fills it when the option is not typed)")
+    r.add_argument("--qa", default=_UnsetProfile(_DEFAULT_PROFILE[Role.QA]),
+                   help="harness of QA (default kimi; a routing policy's provider for the "
+                        "role fills it when the option is not typed). A different model in a "
+                        "fresh context is the strongest setup for the independent review")
+    r.add_argument("--routing-policy", metavar="PATH", default=None,
+                   help="a routing policy (schema hoh-routing-policy/1): model, effort and, "
+                        "optionally, provider per role, read fail-closed. Pinned to the run "
+                        "in <run>/routing.json on first use; a resumed run obeys the policy "
+                        "it began under, and a policy with another digest is refused, never "
+                        "applied. Explicit --role-model/--role-effort values win and are "
+                        "recorded as overriding it.")
+    r.add_argument("--dispatch-ceiling", type=int, default=None, metavar="N",
+                   help="the most dispatches (the run's total, `usage.dispatches`) this process "
+                        "may reach: the shared dispatch budget's hold for this launch, which a "
+                        "launcher with a `dispatch_budget` types. Never written to the run's "
+                        "state; the run's own `--max-dispatches` still applies, the lower of the "
+                        "two first. N is a whole number of at least 1")
+    _add_preflight_options(r)
     r.add_argument("--no-herdr", action="store_true",
                    help="run without Herdr -- no acceptance value for A01/A02/A12")
     r.add_argument(
@@ -3843,7 +5140,92 @@ def build_parser() -> argparse.ArgumentParser:
                     help="also replace the master of a project whose lease holder "
                          "died (killed, rebooted away, lease expired), with a new "
                          "governed epoch; a released lease or a live holder is left alone")
+    fs.add_argument("--double-down", action="store_true",
+                    help="double down on blocks (P3-42; ON by default, this flag changes nothing): "
+                         "classify every blocked run and node, keep a create-only dossier under "
+                         "dd/ and, with --analyst-harness, run analyst rounds; proposals and "
+                         "escalations show in `hoh mission needs-you`")
+    fs.add_argument("--no-double-down", action="store_true",
+                    help="opt out of the double-down altogether for this call (the opt-out is "
+                         "recorded in <root>/.double-down-optouts.jsonl and said in the output)")
+    fs.add_argument("--no-verify-proposals", action="store_true",
+                    help="opt out of measuring the repair spec of proposals (recorded); this "
+                         "also leaves the application of fixes off, which needs the measurement")
+    fs.add_argument("--apply-proposals", action="store_true",
+                    help="record what is decided about a verified fix without a person: WITHHELD "
+                         "for one, or NOT_APPLIED with a reason. The pass never applies a fix; only "
+                         "`hoh double-down apply --approved-by` does (ON by default, this flag "
+                         "changes nothing)")
+    fs.add_argument("--no-apply-proposals", action="store_true",
+                    help="opt out of recording what becomes of a verified fix (recorded): it is "
+                         "measured and left for a person")
+    fs.add_argument("--analyst-harness", choices=("claude", "codex", "kimi", "pi"), default=None,
+                    help="with --double-down: the harness the two analysts of a round run on, "
+                         "non-interactive and read-only under a role approval policy, in a "
+                         "registered temporary workspace outside the run. Only claude can be "
+                         "confined; another harness is refused, never started unconfined. "
+                         "Without it dossiers are opened and no analyst is dispatched")
+    fs.add_argument("--analyst-model", default=None, metavar="MODEL",
+                    help="with --double-down: the analysts' model")
+    fs.add_argument("--analyst-effort", default=None, metavar="LEVEL",
+                    help="with --double-down: the analysts' effort level")
+    fs.add_argument("--analyst-timeout", type=int, default=900, metavar="SEC",
+                    help="with --double-down: deadline per analyst answer, 1 to 3600 "
+                         "(default 900)")
+    fs.add_argument("--storage-root", metavar="PATH", default=None,
+                    help="with --analyst-harness: the storage state root whose admission and "
+                         "registered temporary roots the analysts work under, as for `hoh run` "
+                         "(default: $HOH_STATE_ROOT, else the XDG state directory). Without an "
+                         "initialised root no analyst is started")
+    fs.add_argument("--verify-proposals", action="store_true",
+                    help="measure the repair spec of every proposal that carries one, on a "
+                         "scratch copy of the run's candidate in a registered temporary "
+                         "workspace, and record RED_REPRODUCED, REFUTED or INCONCLUSIVE (a "
+                         "criterion is a command the analysts proposed: it runs only under the "
+                         "runner's guards and --verify-isolation). ON by default, this flag "
+                         "changes nothing")
+    fs.add_argument("--verify-isolation", choices=("strict", "none"), default=None,
+                    help="with --verify-proposals: how the criteria are executed (default "
+                         "strict: a read-only candidate, no network; none: no sandbox)")
     fs.set_defaults(func=cmd_resume_quota)
+
+    ddp = sub.add_parser(
+        "double-down",
+        help="Act on a double-down dossier: verify a proposal's repair spec, renew a bound, "
+             "apply a proven fix, revert an application",
+    )
+    ddc = ddp.add_subparsers(dest="dd_cmd", required=True)
+    for name, helptext in (
+        ("verify", "Measure the repair spec of a PROPOSAL dossier on a scratch copy of the "
+                   "run's candidate and record RED_REPRODUCED, REFUTED or INCONCLUSIVE"),
+        ("renew", "A person renews the bound a dossier is parked on (names who and why)"),
+        ("apply", "Prove the fix of a RED_REPRODUCED proposal on a scratch copy and, if the run's "
+                  "autonomy contract allows it, apply it as a new iteration of the blocked run"),
+        ("revert", "A person puts back the specification text an application superseded "
+                   "(names who and why)"),
+    ):
+        dc = ddc.add_parser(name, help=helptext)
+        dc.add_argument("halt_id", help="the dossier: dd/<halt_id> of the run or project")
+        owner_ = dc.add_mutually_exclusive_group(required=True)
+        owner_.add_argument("--run", default=None, help="the run whose dossier it is")
+        owner_.add_argument("--project", default=None, help="the project whose dossier it is")
+        if name in ("verify", "apply"):
+            if name == "verify":
+                dc.add_argument("--isolation", choices=("strict", "none"), default="strict",
+                                help="how the criteria are executed (default strict)")
+            dc.add_argument("--storage-root", metavar="PATH", default=None,
+                            help="the storage state root whose admission and registered "
+                                 "temporary roots the measurement works under, as for `hoh run`")
+            if name == "apply":
+                dc.add_argument("--approved-by", default=None, metavar="NAME",
+                                help="a person's approval: the fix is proven on a scratch copy and, if "
+                                     "proven, applied, and the approval is recorded (without "
+                                     "--approved-by and --reason the fix is only WITHHELD)")
+                dc.add_argument("--reason", default=None, help="why the person approves it")
+        else:
+            dc.add_argument("--by", required=True, help="who renews")
+            dc.add_argument("--reason", required=True, help="why the double-down may go on")
+        dc.set_defaults(func=cmd_double_down)
 
     rsg = sub.add_parser(
         "resume-storage",
@@ -3931,6 +5313,47 @@ def build_parser() -> argparse.ArgumentParser:
                      help="the storage state root, named explicitly (no fallback)")
     sgr.set_defaults(func=cmd_storage_adopt_legacy)
 
+    cg = sub.add_parser("capacity", help="The host's capacity registry (P3-16): what the scheduler may count "
+                                         "on, declared by the operator")
+    cgs = cg.add_subparsers(dest="capacity_cmd", required=True)
+    cgt = cgs.add_parser("set", help="Declare one capacity (read-modify-write of the registry under a lock; "
+                                     "as_of is the time of this command)")
+    cgt.add_argument("kind", metavar="KIND", help="dependency, machine or provider")
+    cgt.add_argument("name", metavar="NAME", help="a lower-case token: [a-z][a-z0-9_.-], at most 64 characters")
+    cgt.add_argument("limit", metavar="LIMIT",
+                     help="a whole number from 0 to 10**15 (digits only: no sign, space or leading zero)")
+    cgt.add_argument("unit", metavar="UNIT", help="bytes, items, requests, sessions or tokens")
+    cgt.add_argument("--storage-root", metavar="PATH", default=None,
+                     help="the storage state root (same resolution as `hoh run`); never created")
+    cgt.set_defaults(func=cmd_capacity_set)
+    cgw = cgs.add_parser("show", help="Print the capacity registry (read-only; an absent or unreadable "
+                                      "record is refused, never shown as empty)")
+    cgw.add_argument("--source", action="store_true",
+                     help="also print the capacity source: the registry, the provider state and the slots in use "
+                          "under --root, each fact with its time, source and age; UNKNOWN where older than its bound")
+    cgw.add_argument("--storage-root", metavar="PATH", default=None,
+                     help="the storage state root (same resolution as `hoh run`); never created")
+    cgw.set_defaults(func=cmd_capacity_show)
+    cgc = cgs.add_parser("check", help="One broker decision (P3-17): may AMOUNT UNIT of KIND/NAME be taken "
+                                       "now, beside the live run leases and open budget reservations under "
+                                       "--root? Exit 0 grant, 3 wait, 4 refuse, 2 no decision (read-only). "
+                                       "Sessions read zero until something takes a run lease",
+                         description="One broker decision over the capacity registry and the live holds under "
+                                     "--root (the runs root). Exit 0 grant, 3 wait, 4 refuse, 2 no decision. "
+                                     "Read-only. Sessions read zero until something takes a run lease: nothing "
+                                     "acquires one yet, so a grant does not count the sessions that are running.")
+    cgc.add_argument("kind", metavar="KIND", help="dependency, machine or provider")
+    cgc.add_argument("name", metavar="NAME", help="the capacity's name in the registry")
+    cgc.add_argument("amount", metavar="AMOUNT", help="a whole number (digits only) of UNITs wanted")
+    cgc.add_argument("unit", metavar="UNIT", help="bytes, items, requests, sessions or tokens")
+    cgc.add_argument("--max-age-declared", metavar="SECONDS", default=None,
+                     help="how old a declared limit may be (default 604800: a week)")
+    cgc.add_argument("--max-age-measured", metavar="SECONDS", default=None,
+                     help="how old a measured figure may be (default 300: five minutes)")
+    cgc.add_argument("--storage-root", metavar="PATH", default=None,
+                     help="the storage state root (same resolution as `hoh run`); never created")
+    cgc.set_defaults(func=cmd_capacity_check)
+
     asu = sub.add_parser(
         "agent-setup",
         help="Print or install the text that makes an agent session use VeriHarness",
@@ -3970,6 +5393,23 @@ def build_parser() -> argparse.ArgumentParser:
 
     c = sub.add_parser("list", help="All runs")
     c.set_defaults(func=cmd_list, run_id=None)
+
+    mc = sub.add_parser(
+        "mission",
+        help="A thin read-only view over the runs and projects under the root (writes nothing; "
+             "exit 0, 1 a run or a log could not be read, 2 refused)")
+    mc.add_argument("view", choices=["overview", "board", "needs-you", "map", "timeline", "evidence"],
+                    help="overview: one row per run -- its phase, stage, condition and process, "
+                         "as `hoh wait` would answer; board: the nodes of one project as running, "
+                         "ready, queued, blocked; needs-you: the open decisions of one project "
+                         "and what each holds; map: the nodes of one project as a graph -- "
+                         "level, place, dependencies, cycles; timeline: its dated records, "
+                         "oldest first; evidence: its gates against the head they measured and "
+                         "the evidence bundle of each run its nodes name")
+    mc.add_argument("--project", default=None, metavar="ID",
+                    help="the project of the project views (refused for overview)")
+    mc.add_argument("--json", action="store_true", help="the same rows as one JSON document")
+    mc.set_defaults(func=cmd_mission, run_id=None)
 
     from . import runwait
 
@@ -4039,6 +5479,9 @@ def build_parser() -> argparse.ArgumentParser:
                      help="also preview against refs/imports/ID (repeatable)")
     imp.add_argument("--against-unmerged", action="store_true",
                      help="also preview against every other import that is not yet in the base")
+    imp.add_argument("--spec", default=None, metavar="FILE",
+                     help="a copy of the specification the run was accepted under, when its spec_path is gone "
+                          "(its digest must be the run's spec_digest); the test pins are read from it")
     imp.add_argument("--repo", default=".", metavar="DIR", help="the repository (default: .)")
     imp.set_defaults(func=cmd_import, run_id=None)
 
@@ -4089,6 +5532,49 @@ def build_parser() -> argparse.ArgumentParser:
     sr.add_argument("--close", action="store_true",
                     help="actually close; without it only say what would be closed")
     sr.set_defaults(func=cmd_surface_reap)
+    sgr = sfs.add_parser(
+        "register",
+        help="Record a surface that exists (a reviewer, a drafter, an orchestrator session) in "
+             "the project's surface book")
+    sgr.add_argument("--project", required=True)
+    sgr.add_argument("--kind", required=True, help="reviewer, drafter or orchestrator")
+    sgr.add_argument("--pane", default=None,
+                     help="the pane id (required for a reviewer or a drafter; an orchestrator "
+                          "defaults to $HERDR_PANE_ID)")
+    sgr.add_argument("--strand", default="", help="the work item the surface belongs to")
+    sgr.add_argument("--perspective", default="", help="the reviewer's or drafter's name, e.g. a")
+    sgr.add_argument("--round", type=int, default=1)
+    sgr.add_argument("--candidate", default="",
+                     help="a full commit id whose merge ends the strand")
+    sgr.add_argument("--into", default="",
+                     help="the branch (refs/heads/<name>) the candidate is merged into; default "
+                          "the branch HEAD of the project repository is on")
+    sgr.add_argument("--storage-root", metavar="PATH", default=None)
+    sgr.set_defaults(func=cmd_surface_register, run_id=None)
+    sgl = sfs.add_parser(
+        "release",
+        help="Declare a strand finished: its reviewers and drafters are over (explicit, "
+             "recorded, idempotent)")
+    sgl.add_argument("--project", required=True)
+    sgl.add_argument("--strand", required=True)
+    sgl.add_argument("--reason", required=True)
+    sgl.add_argument("--storage-root", metavar="PATH", default=None)
+    sgl.set_defaults(func=cmd_surface_release, run_id=None)
+
+    rp = sub.add_parser(
+        "reap",
+        help="Close the surfaces whose lifecycle is over -- by the records, never by a name or an "
+             "agent's status (a dry run unless --apply)")
+    rp.add_argument("--project", default=None,
+                    help="the project whose surface book is swept")
+    rp.add_argument("--storage-root", metavar="PATH", default=None)
+    rp.add_argument("--runs-root", dest="runs_roots", action="append", default=None,
+                    metavar="DIR", help="a runs root (or a directory of them) whose workspace "
+                    "records are swept; default the --root of hoh when no --project is given")
+    rp.add_argument("--strand", default=None, help="only this strand's surfaces")
+    rp.add_argument("--apply", action="store_true",
+                    help="actually close; without it only say what would be closed")
+    rp.set_defaults(func=cmd_reap, run_id=None)
 
     dc = sub.add_parser(
         "decision",
@@ -4140,6 +5626,9 @@ def build_parser() -> argparse.ArgumentParser:
                      help="how many distinct required reviews must be named (default 2)")
     mgc.add_argument("--min-age", type=float, default=60.0, metavar="SECONDS",
                      help="a report modified more recently than this is not stable (default 60)")
+    mgc.add_argument("--suite-receipt", default=None, metavar="FILE",
+                     help="the suite-comparison receipt of the merge (hoh-suite-receipt/1); required "
+                          "when a review is carried forward from an older base")
     mgv = mgs.add_parser(
         "verify",
         help="Decide a receipt's inputs again, now; exit 0 verified, 1 not verified, 2 not a receipt",
@@ -4153,12 +5642,63 @@ def build_parser() -> argparse.ArgumentParser:
                      help="the tip about to receive it (pass HEAD): it must be the receipt's base")
     mgp.set_defaults(func=cmd_merge_gate, run_id=None)
 
+    phs = sub.add_parser(
+        "phase",
+        help="A phase is closed at a commit (A7): close it, read its state, reopen it by decision",
+    )
+    phss = phs.add_subparsers(dest="phase_cmd", required=True)
+    phc = phss.add_parser(
+        "close",
+        help="Verify a closure entry against the blobs at its closing commit and write the "
+             "receipt (commit it yourself); exit 0 written, 1 refused",
+    )
+    phc.add_argument("phase", metavar="PHASE", help="P0 .. P99")
+    phc.add_argument("--record", required=True, metavar="ENTRY",
+                     help="the closure entry: a JSON file (hoh-phase-closure-entry/1) naming the "
+                          "closing commit, the sealed snapshot and the evidence files with sha256")
+    phst = phss.add_parser(
+        "status",
+        help="Read the committed receipt and re-derive it: CLOSED at a commit with its watch, or "
+             "OPEN / REOPENED with the reason; exit 0 closed, 1 not closed, 2 not judged",
+    )
+    phst.add_argument("phase", metavar="PHASE", nargs="?", default=None,
+                      help="a phase (default: every phase with a record under .hoh/phases)")
+    phst.add_argument("--json", action="store_true", help="print the states as JSON")
+    phr = phss.add_parser(
+        "reopen",
+        help="Record the operator's decision to reopen the standing closure, answering a reopen "
+             "request (commit it yourself); exit 0 written, 1 refused",
+    )
+    phr.add_argument("phase", metavar="PHASE", help="P0 .. P99")
+    phr.add_argument("--request", required=True, metavar="FILE",
+                     help="the reopen request (REOPEN-REQUEST-*.json) in the phase's gate "
+                          "directory, committed")
+    phr.add_argument("--reason", required=True, metavar="TEXT",
+                     help="why the closure is withdrawn (1 to 2000 characters)")
+    for sp in (phc, phst, phr):
+        sp.add_argument("--repo", default=".", metavar="DIR",
+                        help="the top of the project's git repository (default: .)")
+        sp.add_argument("--gate-dir", default=None, metavar="PATH",
+                        help="where the phase's records live, relative to the repository "
+                             "(default: .hoh/phases/<phase>)")
+    phs.set_defaults(func=cmd_phase, run_id=None)
+
     pr = sub.add_parser(
         "project",
         help="The orchestration layer above a run: which runs happen at all",
     )
     ps = pr.add_subparsers(dest="project_cmd", required=True)
     ps.add_parser("list", help="All projects with their resume verdict")
+    pls = ps.add_parser(
+        "leases",
+        help="The run leases `hoh run` keeps (one per run) and what each says; --archive moves the old "
+             "ended ones aside, never removing them",
+    )
+    pls.add_argument("--archive", action="store_true",
+                     help="move the leases that ended at least --older-than-days ago, with their parked "
+                          "copies, to projects/hoh-runs/run-leases-archive/<stamp>/ with a manifest")
+    pls.add_argument("--older-than-days", type=int, default=7, choices=range(1, 3651), metavar="DAYS",
+                     help="with --archive: how long ago a lease ended at the latest (1 to 3650, default 7)")
     pcr = ps.add_parser(
         "create",
         help="Create a project's governed record (idempotent): what hold and rollover need",
@@ -4190,6 +5730,71 @@ def build_parser() -> argparse.ArgumentParser:
         cmd_parser.add_argument("--token", default=None, help="the current master's token")
         cmd_parser.add_argument("--token-file", default=None,
                                 help="file holding the current master's token")
+    bg = ps.add_parser(
+        "budget",
+        help="Declare the project's dispatch budget, share and QA reserve (recorded in the "
+             "project; every drive binds it to its launcher), or read it back",
+    )
+    bg.add_argument("project_id")
+    bg.add_argument("--dispatch-budget", type=int, default=None,
+                    help="the ceiling on role dispatches shared by every run of the project")
+    bg.add_argument("--dispatch-reservation", type=int, default=None,
+                    help="the most one run holds of it (default: everything that is left)")
+    bg.add_argument("--qa-reserve", type=int, default=None,
+                    help="dispatches never granted to a node that is not a repair (default 0)")
+    bg.add_argument("--reason", default="", help="why; recorded in the declaration")
+    bg.add_argument("--session", default=None,
+                    help="the current master's session id (governed projects)")
+    bg.add_argument("--epoch", type=int, default=None,
+                    help="the current master's epoch (governed projects)")
+    bg.add_argument("--token", default=None, help="the current master's token")
+    bg.add_argument("--token-file", default=None, help="file holding the current master's token")
+    rd = ps.add_parser(
+        "route-decisions",
+        help="Route a project's open EXTERNAL decisions through an autonomy contract and record "
+             "the ones it hands to an automatic resolver (approves nothing; P3-31)",
+    )
+    rd.add_argument("project_id")
+    rd.add_argument("--autonomy", required=True, metavar="PATH",
+                    help="the autonomy contract to route under (as `hoh run --autonomy`)")
+    rd.add_argument("--program-epoch", type=int, default=None, metavar="N",
+                    help="pin the contract to this programme epoch before routing")
+    rd.add_argument("--expect-digest", default=None, metavar="DIGEST",
+                    help="refuse unless the contract digests to this (what a loop planned under)")
+    rd.add_argument("--dry-run", action="store_true",
+                    help="report what would be recorded; write nothing, take no authority")
+    rd.add_argument("--reason", default="route open decisions",
+                    help="noted on an operator epoch taken for the command")
+    rd.add_argument("--session", default=None,
+                    help="the current master's session id (governed projects)")
+    rd.add_argument("--epoch", type=int, default=None,
+                    help="the current master's epoch (governed projects)")
+    rd.add_argument("--token", default=None, help="the current master's token")
+    rd.add_argument("--token-file", default=None,
+                    help="file holding the current master's token")
+    cn = ps.add_parser(
+        "continue",
+        help="What a wave of a project may continue under an autonomy contract, within its "
+             "horizon and budget, written down once; dispatches nothing (P3-32)",
+    )
+    cn.add_argument("project_id")
+    cn.add_argument("--autonomy", required=True, metavar="PATH",
+                    help="the autonomy contract to continue under (as `hoh run --autonomy`)")
+    cn.add_argument("--wave", required=True, metavar="WAVE",
+                    help="the wave id: its record is created once under this name")
+    cn.add_argument("--program-epoch", type=int, default=None, metavar="N",
+                    help="pin the contract to this programme epoch first")
+    cn.add_argument("--dry-run", action="store_true",
+                    help="decide and report; write nothing, take no authority")
+    cn.add_argument("--reason", default="continue by policy",
+                    help="noted on an operator epoch taken for the command")
+    cn.add_argument("--session", default=None,
+                    help="the current master's session id (governed projects)")
+    cn.add_argument("--epoch", type=int, default=None,
+                    help="the current master's epoch (governed projects)")
+    cn.add_argument("--token", default=None, help="the current master's token")
+    cn.add_argument("--token-file", default=None,
+                    help="file holding the current master's token")
     ra = ps.add_parser(
         "record-action",
         help="Record a repository change made outside the loop, so closure can be traced",
@@ -4210,6 +5815,39 @@ def build_parser() -> argparse.ArgumentParser:
                          "measured afterwards, so it has to be supplied")
     au = ps.add_parser("authority", help="Who holds the project: lease and epoch chain")
     au.add_argument("project_id")
+    wk = ps.add_parser(
+        "wake",
+        help="The master consults its predecessor: plan (default) or, with --execute, "
+             "resume the predecessor's session in a surface of its own and send it one "
+             "prompt; the surface is never closed",
+    )
+    wk.add_argument("project_id")
+    wk.add_argument("--session", required=True, help="the current master's session id")
+    wk.add_argument("--epoch", type=int, required=True, help="the current master's epoch")
+    wk.add_argument("--token", default=None,
+                    help="the current master's token (visible in the process list; "
+                         "prefer --token-file)")
+    wk.add_argument("--token-file", default=None, help="file holding that token")
+    wk.add_argument("--resume-id", required=True,
+                    help="the predecessor's Claude session id (a UUID; the records do not "
+                         "hold it)")
+    wk.add_argument("--brief", required=True,
+                    help="a file the predecessor reads: the question (a normalized "
+                         "absolute path, outside the project's rollover directory)")
+    wk.add_argument("--answer", required=True,
+                    help="the file the predecessor writes its answer to: an absolute "
+                         "path that does not exist yet, in a directory that does, outside "
+                         "the project's rollover directory")
+    wk.add_argument("--cwd", default=None,
+                    help="the directory the predecessor's session was started in; needed "
+                         "only when the records do not know it")
+    wk.add_argument("--execute", action="store_true",
+                    help="open the surface and send the prompt (without it: print the plan)")
+    wk.add_argument("--predecessor-surface-closed", action="store_true",
+                    help="with --execute: the predecessor's own surface is closed (its "
+                         "session must not run in two places)")
+    wk.add_argument("--timeout", type=float, default=600.0,
+                    help="seconds to wait for the predecessor's turn to end (0 to 3600)")
     dr = ps.add_parser(
         "drive",
         help="Become the governed master (new epoch) and drive the project",
@@ -4257,7 +5895,11 @@ def build_parser() -> argparse.ArgumentParser:
     hd.add_argument("--rotate-policy", default=None, metavar="FILE",
                     help="apply this rotation policy at every renewal: when the master's "
                          "context is over its threshold, ask for a handoff and rotate the "
-                         "session (inside Herdr only)")
+                         "session (inside Herdr only). Each request is also typed into this "
+                         "session's own Herdr pane (see --rotate-no-deliver)")
+    hd.add_argument("--rotate-no-deliver", action="store_true",
+                    help="do not type rotation requests into this session's pane: the line on "
+                         "stdout is then the only notice (recorded in the rotation log)")
     ro = ps.add_parser(
         "rollover",
         help="Roll the orchestrator session over: freeze a capsule, start a successor "
@@ -4343,6 +5985,9 @@ def build_parser() -> argparse.ArgumentParser:
     ra2.add_argument("--rotate-policy", default=None, metavar="FILE",
                      help="keep applying this rotation policy while holding the lease "
                           "(the predecessor's pointer carries it)")
+    ra2.add_argument("--rotate-no-deliver", action="store_true",
+                     help="do not type rotation requests into this session's pane (the "
+                          "predecessor's pointer carries the opt-out on)")
     ra2.add_argument("--rotate-policy-sha256", default=None, metavar="HEX",
                      help="the sha256 of the policy file that started this rotation; a "
                           "policy file that changed since is refused (the pointer carries it)")

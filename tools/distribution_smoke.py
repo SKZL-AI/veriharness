@@ -2,6 +2,7 @@
 import importlib.metadata
 import importlib.resources
 import json
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -14,7 +15,9 @@ from hoh.runner import HouseRuleViolation, assert_command_allowed
 
 def main():
     distribution = importlib.metadata.distribution("hoh")
-    assert distribution.version == "0.1.0"
+    # The workflow names the version it published; there is no default, so a
+    # run that was not told what to expect fails instead of passing on any.
+    assert distribution.version == os.environ["HOH_EXPECT_VERSION"]
     assert Path(hoh.__file__).resolve().is_relative_to(Path(sys.prefix).resolve())
     assert any(e.name == "hoh" and e.value == "hoh.cli:main"
                for e in distribution.entry_points if e.group == "console_scripts")

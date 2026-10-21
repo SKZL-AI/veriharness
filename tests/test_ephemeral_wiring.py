@@ -1291,6 +1291,12 @@ CREATION_SITES = {
         "PROCESS_TEMPDIR: the iteration's workspace is tempfile's default directory (W3)",
     ("workspace.py", "materialize", "NamedTemporaryFile"):
         "PROCESS_TEMPDIR: the iteration's workspace is tempfile's default directory (W3)",
+    ("mergegate.py", "_matrix_reading", "TemporaryDirectory"):
+        "PROCESS_TEMPDIR: the private object store and the written-out merge tree of one matrix reading by "
+        "the merge gate (tempfile's default directory, a few megabytes, removed when the reading ends)",
+    ("mergegate.py", "_merge_tree", "TemporaryDirectory"):
+        "PROCESS_TEMPDIR: the private object store of one `git merge-tree` run by the merge gate "
+        "(tempfile's default directory, a few kilobytes, removed when the measurement ends)",
 }
 _MAKERS = {"mkdtemp", "mkstemp", "NamedTemporaryFile", "TemporaryDirectory", "TemporaryFile",
            "SpooledTemporaryFile"}

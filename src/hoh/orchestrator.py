@@ -36,13 +36,20 @@ possible, and what keeps the fault-injection tests free of agent quota.
 
 from __future__ import annotations
 
+import os
+import re
+import secrets
+import threading
 import time
 from collections.abc import Iterator
 from contextlib import ExitStack, contextmanager, nullcontext
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import StrEnum
 from typing import Protocol
 
+from . import backpressure, budgetconfig, waverecovery
+from .broker import Policy
+from .frontier import SEMANTIC_DEPENDENCY, FrontierPlan, ReadyFrontierPlanner
 from .project import (
     ActionClass,
     DecisionKind,
@@ -59,9 +66,39 @@ from .projectactivity import (
     outcome_digest, start as start_dispatch,
 )
 from .projectstore import ProjectStore
+from .reservation import BudgetReservations, CapacityReservations
 from .store import LockBusy, StaleWrite, StoreError
 from .succession import MasterAuthority, StaleMaster
 from .timers import TimerKind, TimerStore, TimerStoreError, check_time
+from .wave import (
+    MAX_WAVE_WIDTH, NodeState, ParallelismDegradationReason, ParallelWaveExecutor, WaveBudget,
+    WaveError, WaveNotSettled, settle_wave,
+)
+
+#: What a launcher has to offer for the project loop to launch a wave through it
+#: (`HohRunLauncher` does): the worktree of a prepared node as an observed lease,
+#: the hold its `prepare` took, and what each run has spent.
+WAVE_LAUNCHER_API = ("lease_for", "release_prepared_hold", "spent_by_run", "take_hold", "prepared_hold")
+
+#: The node-id grammar of the wave record (`wave.py`): a node whose id is outside it runs
+#: in the one-node-per-round loop.
+_WAVE_NODE_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}")
+
+#: The environment variable an operator sets to widen the loop without editing
+#: the project's driver: a whole number from 1 to `MAX_WAVE_WIDTH`.
+WAVE_WIDTH_ENV = "HOH_WAVE_WIDTH"
+
+#: P3-30 slice 2. A project registers the autonomy contract it continues under the way it registers its
+#: driver: a file in the project directory (the contract file `hoh run --autonomy` takes). The launcher
+#: passes it to every run it starts, so the runs are pinned to it; the loop reads it to continue beside a
+#: parked branch. Absent: the loop is what it was.
+AUTONOMY_FILE = "autonomy-contract.json"
+
+#: Continuation passes one drive makes beside the branches that wait. A pass is one decision
+#: (`governance.continue_by_policy`, recorded before anything is dispatched) and, when it says CONTINUE,
+#: one restricted drive of the nodes it names. A drive that wants more than this ends with the halt it has;
+#: the next drive decides again.
+CONTINUATION_PASSES = 3
 
 
 @contextmanager
@@ -184,6 +221,13 @@ class HaltClass(StrEnum):
     #: refused its next role dispatch. A wait with a durable STORAGE_RECHECK
     #: timer that `hoh resume-storage` consumes -- not a human's decision.
     STORAGE_WAIT = "STORAGE_WAIT"
+    #: A wave could not start because capacity is not available or cannot be
+    #: known (P3-19 slice 2): the capacity registry or the holds were asked for
+    #: the wave's nodes and none may start now. Nothing was prepared or
+    #: launched and no node was blocked -- every node stays READY, so the
+    #: sentinel has nothing to call stuck -- and driving again asks again. The
+    #: reason names why (a limit held, a figure stale, a capacity unrecorded).
+    CAPACITY_WAIT = "CAPACITY_WAIT"
     #: Storage admission could not be used at all -- the state root is not
     #: initialised, WSL without an observed host volume, an unwritable ledger,
     #: or a recheck timer that could not be armed. Fail closed: a person is
@@ -223,6 +267,13 @@ NEEDS_A_HUMAN = frozenset(
         HaltClass.AMBIGUOUS,
     }
 )
+
+
+#: The halts after which a branch may be parked: a node waiting for a decision (`BLOCKED_EXTERNAL`: an
+#: external action at the head, a run waiting for an approval) or a run the contract parked, which the
+#: loop cannot classify (`AMBIGUOUS`). A continuation pass is made only after one of these, and only
+#: when the state holds an open decision (`governance.route_project_decisions` lists them).
+PARKED_HALTS = frozenset({HaltClass.BLOCKED_EXTERNAL, HaltClass.AMBIGUOUS})
 
 
 class RunVerdict(StrEnum):
@@ -418,6 +469,12 @@ class Result:
     steps: list[Step] = field(default_factory=list)
     rounds: int = 0
     repairs_created: int = 0
+    #: True only for the end of a drive restricted to a continuation record's nodes (`_allowed`): they are
+    #: done (or its rounds are), and the open decisions still wait.
+    continuation_spent: bool = False
+    #: P3-32 slice 3, revision 1: True only for the halt of a plain round that found a limit of the autonomy contract
+    #: reached before it dispatched (`BUDGET_EXHAUSTED`); `_drive_continuing` then lets the contract's policy act.
+    limit_held: bool = False
 
     @property
     def ambiguous_halts(self) -> int:
@@ -446,12 +503,45 @@ class ProjectController:
         max_rounds: int = 40,
         max_repairs: int = 5,
         authority: MasterAuthority | None = None,
+        planner: ReadyFrontierPlanner | None = None,
+        width: int | None = None,
+        capacity_policy: Policy | None = None,
+        autonomy=None,
     ) -> None:
         self.store = store
         self.launcher = launcher
         self.gates = gates
+        #: How many independent READY nodes one round may launch together
+        #: (P3-02 slice 2). Chosen, in this order, from `width`, the environment
+        #: (`HOH_WAVE_WIDTH`), the launcher's own `wave_width`, else 1 -- LINEAR,
+        #: the one-node-per-round loop of before -- until the modes of P3-25 and
+        #: P3-26 compute one. Anything that is not a whole number from 1 to
+        #: `MAX_WAVE_WIDTH` is a `ValueError`, never a silent 1.
+        self.width = self._width_of(width, launcher)
+        #: P3-23 (slice 4): the dispatch budget the project declares (`hoh project budget`,
+        #: `<project>/dispatch-budget.json`) is bound to the launcher here, once, by the one
+        #: place every drive of every path builds a controller. A declaration that cannot be
+        #: read or that the launcher refuses is a `ValueError` (the drive halts by name).
+        store_dir = getattr(store, "dir", None)
+        self.declared_budget = (budgetconfig.bind(store_dir, launcher)
+                                if store_dir is not None else None)
+        self._wave_unavailable_said = False
+        #: The broker policy (ages of declared and measured facts) the wave's
+        #: capacity admission judges by, or None for `capacitycheck.policy()`.
+        self.capacity_policy = capacity_policy
+        self._capacity_opt_out_said = False
+        #: Chooses the node of each round from the READY frontier. Injectable
+        #: so a test can make it say something else and require the loop to
+        #: follow; the default is the product planner.
+        self.planner = planner if planner is not None else ReadyFrontierPlanner()
         self.max_rounds = max_rounds
         self.max_repairs = max_repairs
+        #: P3-30 slice 2: the contract this controller continues under beside a parked branch -- the one
+        #: given, else the one the project registered (`AUTONOMY_FILE`). A registered file that cannot be
+        #: loaded is a `ValueError`, never "no contract": a drive does not quietly become an ungoverned one.
+        self.autonomy = autonomy if autonomy is not None else self._registered_contract(store)
+        #: The READY nodes a continuation pass lets `_drive` dispatch (None: all of them).
+        self._allowed: frozenset[str] | None = None
         #: The master authority this controller drives under, or None for the
         #: pre-P2 behaviour (fenced by `write_seq` and the project lock only).
         #: With one, every authoritative act -- a state write, a dispatch that
@@ -459,6 +549,35 @@ class ProjectController:
         #: that this session still holds its epoch, and a stale one halts
         #: SUPERSEDED having written nothing.
         self.authority = authority
+
+    def _width_of(self, explicit: object, launcher: object) -> int:
+        env = os.environ.get(WAVE_WIDTH_ENV)
+        if explicit is not None:
+            source, value = "width", explicit
+        elif env is not None and env != "":
+            source = WAVE_WIDTH_ENV
+            value = int(env) if re.fullmatch(r"[0-9]{1,3}", env) else env
+        elif (declared := self._declared_width()) is not None:
+            source, value = "the parallelism declaration", declared
+        else:
+            source, value = "the launcher's wave_width", getattr(launcher, "wave_width", 1)
+        if isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= MAX_WAVE_WIDTH:
+            raise ValueError(f"{source} must be a whole number from 1 to {MAX_WAVE_WIDTH}, "
+                             f"not {value!r}")
+        return value
+
+    def _declared_width(self) -> int | None:
+        """P3-25/26: the widest wave the project's `parallelism.json` can offer, None without one. A
+        declaration that is refused is a `ValueError` (the drive halts by name), never a silent 1."""
+        from . import parallelmode
+
+        directory = getattr(self.store, "dir", None)
+        if directory is None:
+            return None
+        try:
+            return parallelmode.outer_width(directory)
+        except parallelmode.ParallelismError as exc:
+            raise ValueError(f"the parallelism declaration is refused: {exc}") from exc
 
     # -- persistence ------------------------------------------------------- #
 
@@ -551,7 +670,7 @@ class ProjectController:
                 # block every successor for as long as it stays frozen.
                 self.authority.check()
                 with self.authority.keepalive():
-                    return self._drive()
+                    return self._drive_continuing()
             if (self.store.dir / "epochs.json").is_file():
                 # A governed project is driven only by a master. An ungoverned
                 # controller re-reads the current epoch from disk and would pass
@@ -561,7 +680,7 @@ class ProjectController:
                     f"project {self.store.project_id} is governed by a master epoch; "
                     "a controller without authority may not drive it"))
             with self.store.lock():
-                return self._drive()
+                return self._drive_continuing()
         except StaleMaster as exc:
             # Before StaleWrite, which it subclasses: a superseded master is a
             # known, healthy state that belongs to a successor. Nothing was
@@ -591,9 +710,243 @@ class ProjectController:
         except StoreError as exc:
             return Result(halt=HaltClass.CORRUPT_STATE, reason=str(exc))
 
+    @staticmethod
+    def _registered_contract(store: ProjectStore):
+        path = store.dir / AUTONOMY_FILE
+        if not os.path.lexists(path):
+            return None
+        from .governance import RoutingRefused, load_contract_file
+
+        try:
+            return load_contract_file(path)
+        except RoutingRefused as exc:
+            raise ValueError(f"autonomy contract refused: {exc}") from None
+
+    def _drive_continuing(self) -> Result:
+        """`_drive`, then -- only for a project that has a contract and only after a halt beside which a
+        branch may be parked -- the continuation passes of `_continue_beside_parked`."""
+        result = self._drive()
+        if self.autonomy is None or (result.halt not in PARKED_HALTS and not result.limit_held):
+            return result
+        return self._continue_beside_parked(result)
+
+    def _continue_beside_parked(self, result: Result) -> Result:
+        """P3-30 slice 2: the READY work that is independent of a parked branch carries on.
+
+        Per pass, in this order: (1) `governance.route_project_decisions` -- the open decisions of the
+        project, and a record for each one the contract hands to a resolver (one that cannot be routed or
+        recorded is not hidden: `continue_by_policy` then finds a node with no way out and holds); (2)
+        `governance.resolve_routed_decisions` -- the answer, create-only, to each routed EXTERNAL decision
+        the contract has pre-authorised (it executes nothing; a failure is a step and does not hold the
+        independent work back); (3) `governance.continue_by_policy` -- what the contract allows to
+        continue, written down (create-only, one record per state version and contract) **before**
+        anything is dispatched; (3b) when that record is a hold for a reached limit whose policy is DEGRADE or
+        REPLAN, `governance.act_on_limit` -- the wave at width one (recorded in `limit-acts/`), or the
+        replanning step added to the graph and dispatched in the next pass (P3-32 slice 3); (4) when it says
+        CONTINUE, `_drive()` restricted to them: the loop's own rounds, sequential or wave, over the nodes the
+        record names and no others. There is no second dispatcher.
+
+        Fences, each with a node: only a halt in `PARKED_HALTS` starts a pass; a block no routing explains
+        (`_unexplained_blocks`) refuses it; no open decision ends it.
+
+        Bounded: at most `CONTINUATION_PASSES` passes, and a state version that already has its record
+        is not decided again (the record is the counter, and it exists before the attempt it counts; the one
+        exception is a hold for a reached limit whose act was never recorded, `limit_act_unfinished`). A
+        decision that holds, a refusal and a record that cannot be written end the passes with the halt
+        in hand and a step that says why; nothing is dispatched on any of them.
+        """
+        from . import governance
+
+        steps_: list[Step] = list(result.steps)
+        runs_root = getattr(self.launcher, "root", None) or self.store.root
+        #: the halt of a plain round that found the contract's limit reached: the passes act on the policy, and
+        #: the drive ends held at the limit whatever they did (the restricted drives are the policy's, not a
+        #: way past it)
+        limit_result = result if result.limit_held else None
+        for pass_ in range(1, CONTINUATION_PASSES + 1):
+            state = self.store.read_state()
+            if not any(n.action_class is not ActionClass.EXTERNAL for n in state.ready()):
+                break                                    # nothing could carry on
+            wave_id = f"c{state.write_seq}-{self.autonomy.digest()}{self._review_suffix(runs_root)}"
+            decided = os.path.lexists(self.store.dir / governance.POLICY_DIR / f"{wave_id}.json")
+            # the one record that is not final: a hold for a reached limit whose act (below) was never
+            # recorded -- the pass ended between the two. The hold is read again (nothing is rewritten).
+            unfinished = decided and governance.limit_act_unfinished(self.store, self.autonomy, wave_id)
+            if decided and not unfinished:
+                steps_.append(Step(pass_, "CONTINUATION_DECIDED", wave_id,
+                                   "this state version was decided before; not decided again"))
+                break
+            unexplained = self._unexplained_blocks(state, runs_root)
+            if unexplained:
+                steps_.append(Step(pass_, "CONTINUATION_REFUSED", wave_id,
+                                   f"blocked for a reason no routing log or decision explains: "
+                                   f"{', '.join(unexplained)}; nothing continues beside it"[:300]))
+                break
+            try:
+                with (write_lock(self.store) if self.authority is not None else nullcontext()):
+                    self._authorise("routing and continuation of the open decisions")
+                    report = governance.route_project_decisions(
+                        self.store, self.autonomy, runs_root)
+                    if not report.decisions and limit_result is None:
+                        break                            # no branch is parked: nothing to continue beside
+                    answered = governance.resolve_routed_decisions(
+                        self.store, self.autonomy, runs_root)
+                    # said at once: an answer that is recorded is never spent invisibly, whatever the
+                    # decision of the wave does next (it may refuse)
+                    for d in answered.decisions:
+                        if d.outcome == governance.ANSWERED and d.recorded:
+                            steps_.append(Step(pass_, "RESOLUTION_ANSWERED", d.node_id,
+                                               f"decision {d.decision_digest} answered within the "
+                                               f"pre-authorisation (recorded now); nothing is executed"))
+                        elif d.reason in governance.RESOLUTION_FAILURES:
+                            steps_.append(Step(pass_, "RESOLUTION_FAILED", d.node_id,
+                                               f"decision {d.decision_digest} not answered: {d.reason}"))
+                    plan = governance.continue_by_policy(
+                        self.store, self.autonomy, runs_root, wave_id=wave_id,
+                        depends_on=self.launcher.depends_on, dry_run=unfinished)
+                    if unfinished and not (plan.outcome == "HOLD" and plan.reason == governance.LIMIT_REACHED):
+                        # decided again without a record to stand on: nothing is dispatched from it
+                        raise governance.ContinuationError(
+                            "the limit of the recorded hold is not reached any more; nothing is acted on")
+                    act = None
+                    if (plan.outcome == "HOLD" and plan.reason == governance.LIMIT_REACHED
+                            and self.autonomy.horizon.on_limit in governance.ACTING_POLICIES):
+                        act = governance.act_on_limit(
+                            self.store, self.autonomy, runs_root, plan,
+                            depends_on=self.launcher.depends_on)
+            except (governance.RoutingRefused, governance.ContinuationError) as exc:
+                steps_.append(Step(pass_, "CONTINUATION_REFUSED", wave_id, str(exc)[:300]))
+                break
+            steps_.append(Step(pass_, "CONTINUATION", wave_id,
+                               f"{plan.outcome}{': ' + plan.reason if plan.reason else ''}; continued "
+                               f"{list(plan.continued)}; withheld {[w[0] for w in plan.withheld]}"))
+            if act is not None:
+                # what the drive prints of a step is `kind:node`, so the act and its reason are the node
+                steps_.append(Step(pass_, "LIMIT_ACT", act.kind + (f":{act.reason}" if act.reason else ""),
+                                   act.describe()[:300]))
+                if act.kind == governance.REPLAN_REQUEST:
+                    refused = self._request_replan(act, wave_id)
+                    if refused:
+                        steps_.append(Step(pass_, "REPLAN_NOT_REQUESTED", act.node.id, refused[:300]))
+                        break
+                    steps_.append(Step(pass_, "REPLAN_REQUESTED", act.node.id,
+                                       "the step is a node of the graph now; the next pass dispatches it"))
+                    continue                             # decided again at the state it changed
+                plan = act.plan
+            if not plan.continued:                       # a HOLD continues nothing
+                break
+            self._allowed = frozenset(plan.continued)
+            try:
+                inner = self._drive()
+            finally:
+                self._allowed = None
+            steps_.extend(inner.steps)
+            result = inner
+            if not (inner.continuation_spent or inner.halt in PARKED_HALTS):
+                break                                    # a halt of another kind ends the drive as it is
+        else:
+            steps_.append(Step(CONTINUATION_PASSES, "CONTINUATION_PASSES_USED", None,
+                               f"{CONTINUATION_PASSES} passes made; the next drive decides again"))
+        if limit_result is not None:
+            if result is not limit_result and not result.continuation_spent:
+                # a restricted drive ended on something of its own (a merge conflict, a rejection ...): the drive
+                # is held at the limit, and the halt it superseded stays in the reason and as a step, so whoever
+                # reads the result (`hoh project drive`, `hoh resume-quota --drive`) is not told only "limit"
+                steps_.append(Step(CONTINUATION_PASSES, "LIMIT_SUPERSEDED_HALT", result.halt.value, result.reason[:300]))
+                limit_result = replace(
+                    limit_result, reason=f"{limit_result.reason}; the last drive restricted to the policy's "
+                                         f"nodes ended {result.halt.value}: {result.reason[:240]}")
+            result = limit_result
+        result.steps = steps_
+        return result
+
+    def _limit_held(self, state: ProjectState, ready_: list, round_: int, steps_: list[Step],
+                    reparaturen: int) -> Result | None:
+        """P3-32 slice 3, revision 1: the contract's limits bind every round, not only the pass beside a parked
+        branch. Before a plain round dispatches anything it asks `governance.limit_reached` (the reading
+        `continue_by_policy` makes); a limit that is reached, or named and not measurable, ends the drive
+        `BUDGET_EXHAUSTED` with `limit_held`, nothing dispatched, and the passes act on the policy (REPLAN: only
+        the replanning step; DEGRADE: width one, three waves; PARK, STOP: the hold). Not asked by a drive
+        restricted to a continuation record's nodes (the record is the policy's answer), nor when no contract
+        governs the project, nor when nothing READY could be dispatched (an EXTERNAL action halts as before)."""
+        if self.autonomy is None or self._allowed is not None:
+            return None
+        if not any(self.launcher.action_class(n) is not ActionClass.EXTERNAL for n in ready_):
+            return None
+        from . import governance
+
+        runs_root = getattr(self.launcher, "root", None) or self.store.root
+        if not governance.limit_reached(state, self.autonomy, runs_root):
+            return None
+        why = (f"a limit of the autonomy contract is reached (policy {self.autonomy.horizon.on_limit.value}): "
+               "the plain rounds dispatch nothing; the policy decides what may continue")
+        steps_.append(Step(round_, "LIMIT_HELD", self.autonomy.horizon.on_limit.value, why))
+        return Result(HaltClass.BUDGET_EXHAUSTED, why, steps_, round_, reparaturen, limit_held=True)
+
+    def _request_replan(self, act, wave_id: str) -> str:
+        """P3-32 slice 3: the replanning step a REPLAN limit policy asks for, added to the graph as a
+        READY node (its specification is already written, `governance.act_on_limit`) with the decision
+        that says why. "" when it is there (it may already have been: a pass that ended after this),
+        else why it is not. The project state is written the way every other write of the loop is."""
+        try:
+            state = self.store.read_state()
+            if any(n.id == act.node.id for n in state.nodes):
+                return ""
+            if state.write_seq != act.plan.state["write_seq"]:
+                return "the project state moved since the limit was decided"
+            state.nodes.append(act.node)
+            self._record(state, DecisionKind.POLICY_DISPOSITION,
+                         "the limit of the autonomy contract was reached and its policy is REPLAN: "
+                         "a replanning step is requested",
+                         {"node": act.node.id, "wave": wave_id, "policy": "REPLAN",
+                          "contract": act.plan.contract["digest"]})
+            self._persist(state)
+        except StaleMaster:
+            raise                                        # a master that lost the lease stops the drive
+        except StoreError as exc:
+            return f"{type(exc).__name__}: {exc}"
+        return ""
+
+    def _review_suffix(self, runs_root) -> str:
+        """`-<timer id>` of the earliest REVIEW_DUE timer of this project that is armed and due, else "".
+
+        A hold is decided once per state version (its record exists and moves nothing), so a review that
+        falls due while the state stands still would never be read again. A due review is therefore part of
+        the wave's name: it is decided once more, once per timer -- `continue_by_policy` finds it due, holds
+        the wave (`REVIEW_DUE`) and fires it, so the drive after that is a normal one. The timers are those
+        of the runs root, where `governance.apply_mode` arms them, and the filter is governance's own
+        (`due_reviews`: this project, this programme epoch, the clock `governance` reads); an unreadable
+        store gives no suffix (the review's own reader refuses it)."""
+        from . import governance
+
+        ids = governance.due_reviews(self.autonomy, runs_root, self.store.project_id)
+        return f"-{ids[0]}" if ids else ""
+
+    @staticmethod
+    def _unexplained_blocks(state: ProjectState, runs_root) -> list[str]:
+        """The BLOCKED nodes that are neither a timed wait nor an open decision: no routing of the contract
+        stopped their run and no decision kind names them (a merge of unknown state, a capability violation,
+        a run that ended with nothing logged). The policy would give such a node a human gate whenever the
+        contract expects a person, so the pass does not leave it to the policy: it continues beside a branch
+        the contract parked, not beside a block nobody has looked at. An unreadable graph is refused too."""
+        from pathlib import Path
+
+        from .decisionfrontier import TIMED_KINDS, FrontierError, derive_frontier
+        from .governance import _collect_logs
+
+        stops, unreadable = _collect_logs(state, Path(runs_root))
+        try:
+            frontier = derive_frontier(state, stops=stops, unreadable=unreadable)
+        except FrontierError as exc:
+            return [f"the graph has no frontier ({str(exc)[:80]})"]
+        by_id = {n.id: n for n in state.nodes}
+        return [i for i in frontier.other_blocked if by_id[i].blocked_kind not in TIMED_KINDS]
+
     def _drive(self) -> Result:
         steps_: list[Step] = []
         reparaturen = 0
+        if self.declared_budget is not None:
+            steps_.append(Step(0, "DISPATCH_BUDGET", None, self.declared_budget.describe()))
 
         try:
             state = self.store.read_state()
@@ -625,6 +978,17 @@ class ProjectController:
                    "flight: " + "; ".join(disagree_))
             steps_.append(Step(0, HaltClass.AMBIGUOUS, detail=why))
             return Result(HaltClass.AMBIGUOUS, why, steps_)
+
+        # P3-22 slice 3: the holds a controller that died left (its wave's OPEN outcome names
+        # them) are recovered once, here, before the loop decides anything. Bounded on every
+        # path: a recovery that cannot be bounded halts by name instead of being left.
+        unbounded_ = self._recover_open_waves(steps_)
+        if unbounded_ is not None:
+            return Result(HaltClass.AMBIGUOUS, unbounded_, steps_)
+        try:
+            state = self.store.read_state()              # the recovery may have written it
+        except StoreError as exc:
+            return Result(halt=HaltClass.CORRUPT_STATE, reason=str(exc), steps=steps_)
 
         # A RUNNING node means a previous session died mid-dispatch. Rather
         # than halting on principle, ask the run's own recorded state what
@@ -668,8 +1032,20 @@ class ProjectController:
                 state.steps = steps_
                 return state
 
-        for round_ in range(1, self.max_rounds + 1):
+        # A continuation pass (`self._allowed`) dispatches only the nodes its record names, and takes at
+        # most that many rounds; every other READY node is left as it is.
+        allowed = self._allowed
+        rounds_ = self.max_rounds if allowed is None else min(self.max_rounds, len(allowed))
+        for round_ in range(1, rounds_ + 1):
             ready_ = state.ready()
+            if allowed is not None and ready_:
+                ready_ = [n for n in ready_ if n.id in allowed]
+                if not ready_:
+                    why = ("the nodes the continuation record names are done; the open decisions "
+                           "still wait for an answer")
+                    steps_.append(Step(round_, "CONTINUATION_SPENT", None, why))
+                    return Result(HaltClass.BLOCKED_EXTERNAL, why, steps_, round_, reparaturen,
+                                  continuation_spent=True)
 
             if not ready_:
                 result, state, new_ = self._closure(state, round_, steps_, reparaturen)
@@ -681,7 +1057,28 @@ class ProjectController:
                     return result
                 continue
 
-            task = ready_[0]
+            held_ = self._limit_held(state, ready_, round_, steps_, reparaturen)
+            if held_ is not None:
+                return held_
+
+            # The planner is handed a snapshot, not the loop's own list: what it
+            # returns is checked against `ready_`, and a planner that could add
+            # to that list could vouch for its own answer.
+            plan = self.planner.plan(tuple(ready_), self.launcher.depends_on)
+            task = plan.head
+            # The plan is an answer about `ready_`, not a source of nodes: no
+            # head, a head that is not one of the nodes just read as READY, or
+            # one that is no longer READY would dispatch something the state
+            # never offered, so it halts.
+            if (not any(task is n for n in ready_)
+                    or task.lifecycle is not Lifecycle.READY):
+                why = (f"the frontier planner chose "
+                       f"{'nothing' if task is None else 'node ' + task.id} from "
+                       f"{len(ready_)} ready node(s): not a READY node of the ready "
+                       "frontier, so nothing is dispatched")
+                steps_.append(Step(round_, HaltClass.AMBIGUOUS,
+                                   None if task is None else task.id, why))
+                return Result(HaltClass.AMBIGUOUS, why, steps_, round_, reparaturen)
 
             if self.launcher.action_class(task) is ActionClass.EXTERNAL:
                 why = (
@@ -693,12 +1090,24 @@ class ProjectController:
 
             # Serialise only where a dependency is actually measured. A blanket
             # rule would be safe and would also throw away every parallel round.
-            for other_ in ready_[1:]:
-                if self.launcher.depends_on(task, other_):
+            for later_ in plan.deferred:
+                if later_.blocked_by is task and later_.reason == SEMANTIC_DEPENDENCY:
                     steps_.append(
-                        Step(round_, "SERIALISED", f"{task.id}<->{other_.id}",
+                        Step(round_, "SERIALISED", f"{task.id}<->{later_.node.id}",
                              "measured semantic dependency")
                     )
+
+            # P3-02 slice 2: with a width above one, and a launcher that can take
+            # part, the independent nodes of the plan are launched together.
+            if self._waves_wanted(plan, round_, steps_):
+                out = self._wave_round(state, plan, round_, steps_)
+                if isinstance(out, Result):
+                    out.steps = steps_
+                    out.rounds = round_
+                    out.repairs_created = reparaturen
+                    return out
+                state = out
+                continue
 
             # A node with no run behind it -- a repair node, typically -- has to
             # be made runnable first. If the launcher cannot, it blocks: a
@@ -785,9 +1194,630 @@ class ProjectController:
             state = result
             continue
 
+        if allowed is not None:
+            left = [n.id for n in state.ready() if n.id in allowed]
+            why = (f"the {rounds_} round(s) of this continuation pass are used; "
+                   f"{', '.join(left)} not dispatched yet" if left else
+                   "the nodes the continuation record names are done; the open decisions "
+                   "still wait for an answer")
+            steps_.append(Step(rounds_, "CONTINUATION_SPENT", None, why))
+            return Result(HaltClass.BLOCKED_EXTERNAL, why, steps_, rounds_, reparaturen,
+                          continuation_spent=True)
         why = f"{self.max_rounds} rounds without reaching a fixpoint"
         steps_.append(Step(self.max_rounds, HaltClass.ROUND_LIMIT, detail=why))
         return Result(HaltClass.ROUND_LIMIT, why, steps_, self.max_rounds, reparaturen)
+
+    # -- waves (P3-02 slice 2) --------------------------------------------- #
+
+    def _waves_wanted(self, plan: FrontierPlan, round_: int, steps_: list[Step]) -> bool:
+        if self.width < 2 or len(plan.selected) < 2:
+            return False
+        if not all(_WAVE_NODE_ID.fullmatch(n.id) for n in plan.selected[: self.width]):
+            return False                   # an id the wave record cannot hold: one node per round
+        missing = [a for a in WAVE_LAUNCHER_API if not callable(getattr(self.launcher, a, None))]
+        if not missing and getattr(self.launcher, "root", None) is None:
+            missing = ["root"]
+        if missing:
+            if not self._wave_unavailable_said:
+                self._wave_unavailable_said = True
+                steps_.append(Step(round_, "WAVE_UNAVAILABLE", None,
+                                   f"width {self.width} asked for; this launcher lacks "
+                                   f"{', '.join(missing)}: one node per round"))
+            return False
+        return True
+
+    def _block_node(self, state: ProjectState, node: TaskNode, note: str) -> ProjectState:
+        node.lifecycle = Lifecycle.BLOCKED
+        node.blocked_kind = None
+        node.retry_after = None
+        node.note = note
+        return self._persist(state)
+
+    def _wave_round(self, state: ProjectState, plan: FrontierPlan, round_: int,
+                    steps_: list[Step]) -> "ProjectState | Result":
+        """One round that launches the independent READY nodes of `plan` together.
+
+        The sequential round's steps, per node and in the same order -- prepare,
+        evaluate, persist RUNNING, authorise, launch, settle -- with three
+        differences that are the whole slice: the nodes that survive prepare and
+        evaluate are admitted and launched by `ParallelWaveExecutor` (each in its
+        own thread, on the run's own worktree and hold); RUNNING is persisted
+        once for the wave, after its write-ahead record and before the first
+        dispatch; and every outcome is settled, in plan order, before the first
+        halting one ends the round -- a parked or failed sibling does not stop
+        the members that did not need it.
+        """
+        launcher = self.launcher
+        head = plan.head
+        wave: list[TaskNode] = []
+        #: P3-24 slice 4: every node this round leaves out before the executor is asked, with its
+        #: reason of the outcome's vocabulary (`ParallelismDegradationReason` + `CutReason`): written into the wave's outcome
+        #: (or, for a round that launches nothing, the project's `latest-cuts` outcome).
+        cuts: list[waverecovery.Cut] = []
+        cut_ids: set[str] = set()
+        ready_total = len(plan.selected) + len(plan.deferred)
+
+        def cut(node_id: str, reason, detail: str) -> None:
+            if node_id not in cut_ids:
+                cut_ids.add(node_id)
+                cuts.append(waverecovery.Cut(
+                    node_id, reason.value, waverecovery._ascii(detail, waverecovery.MAX_CUT_DETAIL)))
+
+        def cut_from(mark: int, kind: str, reason) -> None:
+            for step in steps_[mark:]:
+                if step.kind == kind and step.node:
+                    cut(step.node, reason, step.detail)
+
+        width_cut = [ParallelismDegradationReason.WIDTH.value] if len(plan.selected) > self.width else []
+        # P3-19 slice 2: before anything is prepared (no hold exists yet to give back) the nodes this
+        # round would prepare are put to the resource scheduler; a node it does not admit is skipped
+        # below, ahead of `prepared.append`, and stays READY.
+        asked = [n for n in plan.selected[: self.width]
+                 if n is head or launcher.action_class(n) is not ActionClass.EXTERNAL]
+        mark = len(steps_)
+        allowed = self._capacity_admission(asked, round_, steps_, state, ready_total)
+        cut_from(mark, "CAPACITY_WAIT", waverecovery.CutReason.CAPACITY)
+        if isinstance(allowed, Result):
+            self._record_round_cuts(cuts, ready_total, width_cut, round_, steps_)
+            return allowed
+        # P3-07 slice 2: then the providers the runs of this launcher use are asked how wide the wave may be; the
+        # nodes past that width are skipped below, like the capacity waits (READY, unprepared, offered again).
+        mark = len(steps_)
+        allowed = self._backpressure_admission(state, asked, allowed, round_, steps_)
+        cut_from(mark, "BACKPRESSURE_WAIT", waverecovery.CutReason.BACKPRESSURE)
+        # Every hold taken below -- by `prepare` for a new run, by `take_hold` for a resumed one --
+        # is the launcher's until the executor has the node. Whatever ends this block other than
+        # "the wave goes on" (a halt, an exception out of `prepare` / `evaluate` / `_block_node`, an
+        # interrupt) gives back the holds **taken in this round**; a node left out of the wave gives
+        # its own back. A hold the launcher kept from an earlier launch (the run was IN_FLIGHT: another
+        # process executes it) is not this round's and is never released here -- `prepared_hold` read
+        # before the node is touched is what tells the two apart.
+        prepared: list[tuple[TaskNode, str | None]] = []
+        proceed = False
+        try:
+            for node in plan.selected[: self.width]:
+                is_head = node is head
+                if not is_head and launcher.action_class(node) is ActionClass.EXTERNAL:
+                    cut(node.id, ParallelismDegradationReason.EXTERNAL,
+                        "carries an irreversible external action: not decided here, the head of a later round")
+                    continue                  # not decided here; it is the head of a later round
+                if allowed is not None and node.id not in allowed:
+                    continue                  # waits for capacity: not prepared, no hold, not blocked, READY
+                # before `prepare`: it can take a hold and then raise
+                prepared.append((node, launcher.prepared_hold(node)))
+                try:
+                    obstacle = launcher.prepare(node)
+                except BudgetExhausted as empty:
+                    state = self._block_node(state, node, str(empty))
+                    why = f"node {node.id} has no budget left: {empty}"
+                    steps_.append(Step(round_, HaltClass.BUDGET_EXHAUSTED, node.id, why))
+                    cut(node.id, ParallelismDegradationReason.BUDGET, why)
+                    if is_head:
+                        self._record_round_cuts(cuts, ready_total, width_cut, round_, steps_)
+                        return Result(HaltClass.BUDGET_EXHAUSTED, why)
+                    continue                  # a sibling is blocked alone; the others still run
+                if obstacle:
+                    state = self._block_node(state, node, obstacle)
+                    why = f"node {node.id} cannot be made runnable: {obstacle}"
+                    steps_.append(Step(round_, HaltClass.BLOCKED_DEPENDENCY, node.id, why))
+                    cut(node.id, waverecovery.CutReason.BLOCKED, why)
+                    if is_head:
+                        self._record_round_cuts(cuts, ready_total, width_cut, round_, steps_)
+                        return Result(HaltClass.BLOCKED_DEPENDENCY, why)
+                    continue
+                in_advance = launcher.evaluate(node)
+                if in_advance.verdict is RunVerdict.IN_FLIGHT:
+                    why = (f"node {node.id} is READY but a live process still executes its "
+                           f"run ({in_advance.detail}); dispatching again would duplicate it")
+                    cut(node.id, waverecovery.CutReason.IN_FLIGHT, why)
+                    if is_head:
+                        steps_.append(Step(round_, HaltClass.RUN_IN_FLIGHT, node.id, why))
+                        self._record_round_cuts(cuts, ready_total, width_cut, round_, steps_)
+                        return Result(HaltClass.RUN_IN_FLIGHT, why)
+                    steps_.append(Step(round_, "WAVE_SKIPPED", node.id, why))
+                    continue
+                if in_advance.verdict is RunVerdict.ACCEPTED:
+                    # Settled alone, exactly as the sequential round does; the nodes prepared
+                    # before it give their holds back and the next round plans again.
+                    steps_.append(Step(round_, "ALREADY_ACCEPTED", node.id, in_advance.detail))
+                    self._record_round_cuts(cuts, ready_total, width_cut, round_, steps_)
+                    return self._settle(state, node.id, in_advance, round_, steps_)
+                # A run that already existed took no hold in `prepare`: it takes one now, so no
+                # node is admitted to a budgeted wave without a share held for it. A node the
+                # budget cannot hold for is left out of this wave (it stays READY) -- or ends
+                # the round when it is the head, as a new run does at `prepare`.
+                try:
+                    launcher.take_hold(node)
+                except BudgetExhausted as empty:
+                    why = f"node {node.id} has no budget to hold: {empty}"
+                    cut(node.id, ParallelismDegradationReason.BUDGET, why)
+                    if is_head:
+                        steps_.append(Step(round_, HaltClass.BUDGET_EXHAUSTED, node.id, why))
+                        self._record_round_cuts(cuts, ready_total, width_cut, round_, steps_)
+                        return Result(HaltClass.BUDGET_EXHAUSTED, why)
+                    steps_.append(Step(round_, "WAVE_SKIPPED", node.id, why))
+                    continue
+                wave.append(node)
+
+            if not wave:
+                self._record_round_cuts(cuts, ready_total, width_cut, round_, steps_)
+                return state
+            proceed = True
+        finally:
+            self._release_all(
+                [n for n, before in prepared
+                 if (not proceed or all(n is not w for w in wave))
+                 and self._taken_this_round(launcher, n, before)],
+                launcher, "the wave was not run for this node")
+
+        budget_ceiling = getattr(launcher, "dispatch_budget", None)
+        budget = (None if budget_ceiling is None else WaveBudget(
+            BudgetReservations(launcher.root), budget_ceiling, launcher.spent_by_run, 1,
+            adopt=True))
+        waves_dir = self.store.dir / "waves"
+        wave_id = f"w{state.write_seq}-{round_}-{secrets.token_hex(2)}"
+        running: dict[str, TaskNode] = {}
+        persisted: list[ProjectState] = []
+
+        def make_running(admitted: tuple[TaskNode, ...]) -> None:
+            for admitted_node in admitted:
+                member = state.node(admitted_node.id)
+                assert member is not None
+                # what `prepare` set on the node object, in case a sibling's block was
+                # persisted since and replaced the state this node belongs to
+                member.branch = admitted_node.branch or member.branch
+                member.run_id = admitted_node.run_id or member.run_id
+                member.spec_path = admitted_node.spec_path or member.spec_path
+                member.lifecycle = Lifecycle.RUNNING
+                start_dispatch(state, member.id)
+                member.accepted_before = launcher.accepted_baseline(member)
+            fresh = self._persist(state)
+            persisted.append(fresh)
+            for admitted_node in admitted:
+                member = fresh.node(admitted_node.id)
+                assert member is not None
+                running[member.id] = member
+            self._authorise("dispatch of wave " + wave_id)
+
+        def launch(node: TaskNode, admission) -> RunOutcome:
+            return launcher.launch(running[node.id])
+
+        try:
+            waves_dir.mkdir(exist_ok=True)
+            # P3-22 slice 3: the wave's outcome is written before the executor starts, naming the
+            # holds adopted from the launcher and who the controller is: a crash at any later
+            # point leaves a name for every hold. A wave whose holds cannot be named is not run.
+            outcome_path = waverecovery.open_outcome(
+                self.store.dir / waverecovery.OUTCOME_DIR, wave_id,
+                session=getattr(self.authority, "session_id", None),
+                epoch=getattr(self.authority, "epoch", None),
+                holds=self._adopted_holds(wave), cuts=cuts)
+            executor = ParallelWaveExecutor(
+                waves_dir, width=self.width, budget=budget, lease_for=launcher.lease_for,
+                depends_on=launcher.depends_on, action_class=launcher.action_class)
+            result = executor.run_wave(
+                wave_id, FrontierPlan(tuple(wave), plan.deferred), launch,
+                on_admitted=make_running)
+            note = ""
+        except WaveNotSettled as exc:
+            result, note = exc.result, f" (the final wave record could not be written: {exc})"
+        except StaleWrite as exc:
+            # The executor gave back its leases; the holds adopted from the launcher are the
+            # launcher's to end, here, whatever stopped the wave -- and `StaleMaster` is a
+            # `StaleWrite`, so it is told apart only by being re-raised.
+            self._release_all(wave, launcher, f"the wave stopped: {type(exc).__name__}")
+            if isinstance(exc, StaleMaster):
+                raise
+            why = f"another orchestrator advanced this project: {exc}"
+            steps_.append(Step(round_, HaltClass.AMBIGUOUS, None, why))
+            return Result(HaltClass.AMBIGUOUS, why)
+        except (WaveError, OSError, waverecovery.OutcomeError) as exc:
+            # Refused whole, before any node ran. RUNNING may already be persisted (a raise
+            # after the replace): the next drive evaluates that node as it does for a
+            # controller that died between the write and the dispatch.
+            return self._give_back_prepared(
+                wave, launcher, state, f"the wave could not be run: {type(exc).__name__}: {exc}"[:300])
+        except BaseException as exc:                    # KeyboardInterrupt, SystemExit, a bug
+            self._release_all(wave, launcher, f"the wave stopped: {type(exc).__name__}")
+            raise
+
+        if persisted:
+            state = persisted[-1]
+        record = result.record
+        self._close_wave_outcome(outcome_path, record, round_, steps_,
+                                 ready=ready_total, extra_reasons=width_cut)
+        refused = [n for n in record.nodes if n.state is NodeState.REFUSED]
+        steps_.append(Step(
+            round_, "WAVE", wave_id,
+            f"width {self.width}: launched {[n.node_id for n in record.nodes if n.state is not NodeState.REFUSED]}"
+            f"; refused {[(n.node_id, n.refusal) for n in refused]}{note}"))
+        for node in wave:
+            row = record.node(node.id)
+            if row is not None and row.state is NodeState.REFUSED:
+                launcher.release_prepared_hold(node, f"the wave refused the node: {row.refusal}")
+        self._report_wave_end(launcher, record, waves_dir / f"wave-{wave_id}.json", round_, steps_)
+        admitted = [n for n in record.nodes if n.state is not NodeState.REFUSED]
+        if not admitted:
+            why = ("the wave admitted none of its nodes: "
+                   + "; ".join(f"{n.node_id}: {n.refusal} ({n.detail})" for n in refused))[:400]
+            steps_.append(Step(round_, HaltClass.BLOCKED_DEPENDENCY, None, why))
+            return Result(HaltClass.BLOCKED_DEPENDENCY, why)
+
+        first_halt: Result | None = None
+        for row in admitted:
+            outcome = result.outcomes.get(row.node_id)
+            if row.state is NodeState.ERRORED or outcome is None:
+                # The dispatch raised: the node stays RUNNING with its activity open, and the
+                # next drive evaluates it, as for a controller that died mid-dispatch.
+                why = f"node {row.node_id}: the dispatch raised: {row.detail}"
+                steps_.append(Step(round_, HaltClass.AMBIGUOUS, row.node_id, why))
+                first_halt = first_halt or Result(HaltClass.AMBIGUOUS, why)
+                continue
+            if outcome.verdict is RunVerdict.ACCEPTED and not row.usable:
+                # Accepted, and the worktree was written by someone else while the run ran:
+                # it is not merged on this evidence.
+                task = state.node(row.node_id)
+                assert task is not None
+                close_dispatch(state, row.node_id, EventKind.FAILED,
+                               failure="accepted, but the worktree's lease was not held at the end"[:300])
+                state = self._block_node(
+                    state, task, "accepted, but the worktree was written by another holder while "
+                                 "the run executed; not merged")
+                why = f"node {row.node_id}: accepted but its worktree lease was not held at the end"
+                steps_.append(Step(round_, HaltClass.AMBIGUOUS, row.node_id, why))
+                first_halt = first_halt or Result(HaltClass.AMBIGUOUS, why)
+                continue
+            settled = self._settle(state, row.node_id, outcome, round_, steps_)
+            if isinstance(settled, Result):
+                first_halt = first_halt or settled
+                state = self.store.read_state()
+            else:
+                state = settled
+        return first_halt if first_halt is not None else state
+
+    @staticmethod
+    def _report_wave_end(launcher, record, path, round_: int, steps_: list[Step]) -> None:
+        """What a finished wave says about itself, and the second chance of its holds.
+
+        `WAVE_DEGRADED` (node = `<wave id>:<reasons>`, so the reasons reach the
+        `steps` of `hoh project drive`) when the wave admitted fewer nodes than
+        the plan was made from; the reasons are those the persisted record
+        yields (`WaveRecord.degradation`). Then, with a shared budget, the wave's
+        record is read back and every hold it names that is still open is ended
+        by its id (`settle_wave`): the launcher's `launch` ends its own hold, and
+        one that it could not end (a busy ledger) would otherwise stay open for a
+        dispatch that is over. A node whose launch came back IN_FLIGHT is skipped
+        there -- another process still executes it. `WAVE_SETTLED` is reported
+        only when a hold was ended, so a wave in which every launch ended its own
+        adds no step. Nothing here halts the loop: a refusal is a note.
+        """
+        degraded = record.degradation
+        if degraded is not None:
+            steps_.append(Step(
+                round_, "WAVE_DEGRADED",
+                f"{record.wave_id}:{','.join(r.value for r in degraded.reasons)}",
+                f"{degraded.admitted} of {degraded.ready} ready nodes ran"))
+        ProjectController._settle_capacity(launcher, record, round_, steps_)
+        if getattr(launcher, "dispatch_budget", None) is None or getattr(launcher, "dry_run", False):
+            return
+        try:
+            settlement = settle_wave(path, BudgetReservations(launcher.root), launcher.spent_by_run)
+        except Exception as exc:                          # noqa: BLE001 - a note, never a halt
+            steps_.append(Step(round_, "WAVE_SETTLE_FAILED", record.wave_id,
+                               f"{type(exc).__name__}: {exc}"[:300]))
+            return
+        ended = [n.node_id for n in settlement.nodes if n.state == "ENDED"]
+        if ended:
+            steps_.append(Step(
+                round_, "WAVE_SETTLED", record.wave_id,
+                f"ended the hold of {ended}, which the launch could not end"))
+
+    @staticmethod
+    def _settle_capacity(launcher, record, round_: int, steps_: list[Step]) -> None:
+        """P3-04 (C4b): the capacity the gate admitted this controller's wave against is given back when the wave
+        ends, whatever its outcome (settled, partial, failed, halted: the executor has returned and no run of the
+        wave is left to start). Every open row of this controller -- its `(pid, thread)` -- is ended `SETTLED`, **except**
+        those of a node whose launch came back IN_FLIGHT (another process still executes the run) or raised (the
+        process may be alive): they stay open until the controller's next ask, its death or the ttl. A
+        second call finds none and writes nothing, and a host with no capacity ledger gets none (nothing is created).
+        A ledger that cannot be read or written is **not** a silent release: the rows stay as they are, the step
+        `WAVE_CAPACITY_UNSETTLED` says why, and the next ask of the gate refuses on the same ledger. Never a halt."""
+        root = getattr(launcher, "root", None)
+        if root is None:
+            return
+        wave_id = record.wave_id
+        maybe_alive = [n.node_id for n in record.nodes
+                       if n.state is NodeState.ERRORED or n.verdict == RunVerdict.IN_FLIGHT.value]
+        try:
+            CapacityReservations(root).settle_owned(f"wave {wave_id} ended: its capacity is given back",
+                                                    keep=maybe_alive)
+        except Exception as exc:                          # noqa: BLE001 - visible, never a halt
+            steps_.append(Step(round_, "WAVE_CAPACITY_UNSETTLED", wave_id,
+                               f"{type(exc).__name__}: {exc}"[:300]))
+
+    def _adopted_holds(self, wave: list[TaskNode]) -> tuple:
+        """The open hold of each node's run, as the executor will adopt it (`WaveBudget.adopt`).
+
+        Nothing with no shared budget. A node whose run holds none, or more than one, is not
+        named (the executor admits the first without a hold and refuses the second). A ledger
+        that cannot be read is `OutcomeError`: a wave whose holds cannot be named is not run,
+        because a crash would leave them with no name on disk."""
+        launcher = self.launcher
+        if getattr(launcher, "dispatch_budget", None) is None or getattr(launcher, "dry_run", False):
+            return ()
+        try:
+            open_ = BudgetReservations(launcher.root).held()
+        except Exception as exc:                          # noqa: BLE001 - fail closed
+            raise waverecovery.OutcomeError(
+                f"the holds of the wave cannot be named: {type(exc).__name__}: {exc}"[:300]) from exc
+        named = []
+        for node in wave:
+            run_id = node.run_id or node.id
+            mine = [r for r in open_ if r.run_id == run_id]
+            if len(mine) == 1:
+                named.append(waverecovery.AdoptedHold(
+                    node.id, run_id, mine[0].reservation_id, mine[0].amount))
+        return tuple(named)
+
+    @staticmethod
+    def _close_wave_outcome(path, record, round_: int, steps_: list[Step], *,
+                            ready: int | None = None, extra_reasons=()) -> None:
+        """Closes the wave's outcome with the round's degradation reason: the executor's own
+        (`WaveRecord.degradation`), the controller's cuts the outcome was opened with and the
+        width. A failure is a note, never a halt: the outcome stays OPEN and the next drive's
+        recovery bounds it."""
+        try:
+            waverecovery.close_outcome(path, record, ready=ready, extra_reasons=extra_reasons)
+        except Exception as exc:                          # noqa: BLE001 - a note, never a halt
+            steps_.append(Step(round_, "WAVE_OUTCOME_UNWRITTEN", record.wave_id,
+                               f"{type(exc).__name__}: {exc}"[:300]))
+
+    def _record_round_cuts(self, cuts: list, ready: int, extra_reasons, round_: int,
+                           steps_: list[Step]) -> None:
+        """P3-24 slice 4: a round that launches no wave (it halted before the executor, or every
+        node was cut) still says why in `<project>/wave-outcomes/wave-latest-cuts.json`. One
+        file, replaced only when its content changes. A failure is a note, never a halt."""
+        if not cuts:
+            return
+        try:
+            waverecovery.record_round(
+                self.store.dir / waverecovery.OUTCOME_DIR,
+                session=getattr(self.authority, "session_id", None),
+                epoch=getattr(self.authority, "epoch", None),
+                ready=ready, cuts=cuts, extra_reasons=extra_reasons)
+        except Exception as exc:                          # noqa: BLE001 - a note, never a halt
+            steps_.append(Step(round_, "WAVE_OUTCOME_UNWRITTEN", waverecovery.ROUND_ID,
+                               f"{type(exc).__name__}: {exc}"[:300]))
+
+    _RECOVERY_STEPS = {
+        "RECOVERED": "WAVE_RECOVERED", "SETTLED": "WAVE_SETTLED", "LEFT": "WAVE_RECOVERY_LEFT",
+        "ABANDONED": "WAVE_RECOVERY_ABANDONED", "UNREADABLE": "WAVE_RECOVERY_UNREADABLE",
+        "UNBOUNDED": "WAVE_RECOVERY_UNBOUNDED",
+        "CAPACITY_SETTLED": "WAVE_CAPACITY_SETTLED", "CAPACITY_UNSETTLED": "WAVE_CAPACITY_UNSETTLED",
+    }
+
+    def _recover_open_waves(self, steps_: list[Step]) -> str | None:
+        """P3-22 slice 3: ends the holds a dead controller left, once per drive.
+
+        Looks only at OPEN outcomes (`<project>/wave-outcomes/`); a project with none writes
+        no state and probes nothing. The master check, the claim (the persisted state read
+        and written back through `_persist`: master stamp and `write_seq`
+        compare-and-swap) and the idleness proof (the launcher's own `evaluate`: a live
+        process or a busy run lock is IN_FLIGHT, an unreadable state UNDETERMINED) are the
+        preconditions, in `waverecovery.recover_open`. Each outcome of the pass is a step
+        (`kind:wave id`). Returns None, or -- a path that cannot be bounded -- the reason of
+        the AMBIGUOUS halt, which starts `WAVE_RECOVERY_UNBOUNDED:`. `StaleMaster` propagates."""
+        launcher = self.launcher
+        directory = self.store.dir / waverecovery.OUTCOME_DIR
+        if not directory.is_dir():
+            return None
+        budgeted = (getattr(launcher, "dispatch_budget", None) is not None
+                    and not getattr(launcher, "dry_run", False)
+                    and getattr(launcher, "root", None) is not None)
+
+        def claim() -> ProjectState:
+            return self._persist(self.store.read_state())
+
+        def probe(node: TaskNode) -> str | None:
+            seen = launcher.evaluate(node)
+            verdict = getattr(seen, "verdict", None)
+            if not isinstance(verdict, RunVerdict):
+                return f"the run's state gave no verdict ({type(seen).__name__})"
+            if verdict in (RunVerdict.IN_FLIGHT, RunVerdict.UNDETERMINED):
+                return f"its run is {verdict.value}: {getattr(seen, 'detail', '')}"[:300]
+            return None
+
+        capacity_root = getattr(launcher, "root", None)
+
+        def capacity(outcome, reason: str) -> int:
+            """The gone controller's open capacity rows (its pid and process identity; in this very process, this
+            thread's only -- another thread of it may be a live controller of another project)."""
+            if capacity_root is None:
+                return 0
+            if outcome.pid != os.getpid() and outcome.pid_start is None:
+                return 0            # a foreign pid whose identity was not recorded cannot be told from a reused one: left
+            return CapacityReservations(capacity_root).settle_owned(
+                reason, pid=outcome.pid, thread=threading.get_ident() if outcome.pid == os.getpid() else None,
+                identity=outcome.pid_start)
+
+        report = waverecovery.recover_open(
+            directory,
+            authorise=lambda: self._authorise("recovery of a wave's holds"),
+            session=getattr(self.authority, "session_id", None),
+            epoch=getattr(self.authority, "epoch", None),
+            claim=claim, probe=probe,
+            reservations=BudgetReservations(launcher.root) if budgeted else None,
+            spent=launcher.spent_by_run if budgeted else None,
+            waves_dir=self.store.dir / "waves", capacity=capacity)
+        for event in report.events:
+            steps_.append(Step(0, self._RECOVERY_STEPS[event.kind], event.wave_id, event.detail))
+        if report.unbounded is not None:
+            event = report.unbounded
+            steps_.append(Step(0, self._RECOVERY_STEPS["UNBOUNDED"], event.wave_id, event.detail))
+            return (f"WAVE_RECOVERY_UNBOUNDED: wave {event.wave_id}: {event.detail} -- a recovery "
+                    "that cannot be bounded is not attempted; this needs a person")[:600]
+        return None
+
+    @staticmethod
+    def _taken_this_round(launcher, node: TaskNode, before: str | None) -> bool:
+        """The launcher holds a share for the node's run that it did not hold when
+        the round began. Fail closed: an error is "not this round's", so nothing
+        that may belong to a running process is ended on a guess."""
+        try:
+            now = launcher.prepared_hold(node)
+        except Exception:                              # noqa: BLE001
+            return False
+        return now is not None and now != before
+
+    def _capacity_admission(self, asked: list[TaskNode], round_: int, steps_: list[Step],
+                            state: ProjectState, ready: int) -> "set[str] | Result | None":
+        """P3-19 slice 2: the wave's nodes go through the resource scheduler before any is prepared.
+
+        None -- nothing is configured (no capacity registry at the state root the operator's `hoh capacity`
+        commands use): every node is asked for as before, and the opt-out is said once. A set -- the ids that may
+        be prepared and launched; each other node waits (a `CAPACITY_WAIT` step with its reason), stays READY and
+        is asked again next round. A `Result` (`CAPACITY_WAIT`) -- none may start now, or capacity cannot be
+        known: nothing was prepared, nothing is blocked, the round ends.
+
+        The state root is resolved by `cli.resolve_storage_root`, the resolver of `hoh capacity set` and
+        `check`, from the launcher's own configured root (`--storage-root`'s place), else `$HOH_STATE_ROOT`,
+        else `$XDG_STATE_HOME/veriharness`: one rule, so a registry the operator declared is the one asked.
+
+        P3-39: with a `storage-policy.json` in that state root the nodes also want the bytes and inodes of a run
+        (`capacitycheck.storage_reader`, over the launcher's own admission factory when it has one), and the admitted
+        nodes hold them in the capacity ledger with their sessions.
+
+        P3-17 slice 3 / P3-19 slice 3 / P3-16 slice 4: the admission is **recorded** (`<project>/capacity/capacity-<id>.json`,
+        create-only, bound by its own digest, written before the nodes are held; a record that cannot be written admits
+        nobody, so the round is a `CAPACITY_WAIT`); the nodes that may take the operator's reserve are the **critical** ones
+        -- a repair node (`repair_of`) and a node whose run already started (`run_id`); the providers the launcher's runs
+        use (`backpressure.providers_of`) are the ones whose declared session capacity a node wants one of, so a provider
+        that is limited or unreadable admits none; and the capacity source's snapshot is what the decision is made on.
+        `ready` is how many nodes were ready, quoted in the record beside the controller's width."""
+        from . import capacitycheck, capacityrecord
+        from .cli import resolve_storage_root
+        from .contracts import utcnow
+
+        launcher = self.launcher
+        try:
+            configured = getattr(launcher, "storage_root", None)
+            state_root = resolve_storage_root(str(configured) if configured else None)
+            runs_root = launcher.root
+        except Exception as exc:                          # noqa: BLE001 - fail closed, never into the loop
+            why = f"capacity cannot be judged ({type(exc).__name__}): the state or runs root is not known"
+            for n in asked:
+                steps_.append(Step(round_, "CAPACITY_WAIT", n.id, why))
+            return Result(HaltClass.CAPACITY_WAIT, why)
+        gate = capacitycheck.admit_wave(
+            [n.id for n in asked], runs_root=runs_root, state_root=state_root, now=utcnow,
+            policy_=self.capacity_policy,
+            storage=capacitycheck.storage_reader(
+                state_root, factory=getattr(launcher, "_storage_admission_factory", None)),
+            critical=[n.id for n in asked if n.repair_of is not None or n.run_id is not None],
+            providers=backpressure.providers_of(launcher),
+            record_dir=self.store.dir / capacityrecord.DIRNAME,
+            decision_id=f"c{state.write_seq}-{round_}-{secrets.token_hex(3)}",
+            width=self.width, ready=ready)
+        if not gate.configured:
+            if not self._capacity_opt_out_said:
+                self._capacity_opt_out_said = True
+                steps_.append(Step(round_, "CAPACITY_OPT_OUT", None, gate.why))
+            return None
+        if gate.record is not None:
+            steps_.append(Step(round_, "ADMISSION_RECORD", None, f"{capacityrecord.DIRNAME}/{gate.record}"))
+        for node_id, why in gate.waits:
+            steps_.append(Step(round_, "CAPACITY_WAIT", node_id, why))
+        if not gate.admitted:
+            return Result(HaltClass.CAPACITY_WAIT, gate.why)
+        steps_.append(Step(round_, "CAPACITY", None, gate.why))
+        return set(gate.admitted)
+
+    def _fenced_write(self, write) -> None:
+        """P3-25/26: runs `write` (the replacement of the adaptation's state file) as an authoritative act: under a
+        master authority, inside the program lock and after the epoch check, so a superseded master (`StaleMaster`)
+        writes nothing; without one, as it is (the drive already holds the project lock)."""
+        if self.authority is None:
+            write()
+            return
+        with write_lock(self.store):
+            self._authorise("the write of the parallelism state")
+            write()
+
+    def _backpressure_admission(self, state: ProjectState, asked: list[TaskNode],
+                                allowed: "set[str] | None", round_: int,
+                                steps_: list[Step]) -> "set[str] | None":
+        """P3-07 slice 2: the nodes the wave would prepare (those of `asked` the capacity gate admits) are cut to
+        the width `backpressure.admit_wave` allows for the providers of this launcher's runs.
+
+        Returns `allowed` unchanged when nothing is cut, else the ids that may be prepared. **It never halts
+        the project and never leaves a round empty**: the width is at least 1 and the first node offered always
+        passes, so a narrowed round is the sequential round; a node it cuts is a `BACKPRESSURE_WAIT` step, stays
+        READY with no hold, and is offered again next round (the rounds are `max_rounds`-bounded and each one
+        runs at least its head, so the frontier drains). A pressure that is read is a `BACKPRESSURE` step; a
+        gate that could not judge is `BACKPRESSURE_UNJUDGED` and is the floor. The decision is on disk
+        (`<project>/backpressure/backpressure-<id>.json`) before it is used."""
+        from . import parallelmode
+
+        candidates = [n.id for n in asked if allowed is None or n.id in allowed]
+        if not candidates:
+            return allowed
+        # P3-25/26: the project's declared parallelism mode offers the gate at most its profile's width of the
+        # candidates (a prefix); without a declaration the gate is asked about all of them, as before.
+        modal = parallelmode.admit_wave(
+            candidates, project_dir=self.store.dir,
+            gate=lambda offered, decision_id: backpressure.admit_wave(
+                offered, launcher=self.launcher, record_dir=self.store.dir / "backpressure",
+                decision_id=decision_id),
+            fenced=self._fenced_write,
+            decision_id=f"b{state.write_seq}-{round_}-{secrets.token_hex(2)}",
+            active=sum(1 for n in state.nodes if n.lifecycle is Lifecycle.RUNNING))
+        for kind, node_id, text in modal.notes:
+            steps_.append(Step(round_, kind, node_id, text))
+        gate = modal.gate
+        if gate is not None and not gate.judged:
+            steps_.append(Step(round_, "BACKPRESSURE_UNJUDGED", None, gate.why))
+        elif gate is not None and gate.decision is not None and gate.decision.reason is not backpressure.Reason.NONE:
+            steps_.append(Step(round_, "BACKPRESSURE", None, gate.why))
+        for node_id, why in (gate.waits if gate is not None else ()):
+            steps_.append(Step(round_, "BACKPRESSURE_WAIT", node_id, why))
+        keep = list(modal.admitted) or candidates[:1]
+        return allowed if keep == candidates else set(keep)
+
+    @staticmethod
+    def _release_all(wave: list[TaskNode], launcher, why: str) -> None:
+        """Ends the holds `prepare`/`take_hold` took for the wave's nodes; never
+        raises (a hold that cannot be ended stays open: smaller, never larger)."""
+        for node in wave:
+            try:
+                launcher.release_prepared_hold(node, why[:200])
+            except Exception:                          # noqa: BLE001 - the original error stands
+                pass
+
+    def _give_back_prepared(self, wave: list[TaskNode], launcher, state: ProjectState,
+                            why: str) -> "ProjectState | Result":
+        for node in wave:
+            launcher.release_prepared_hold(node, why[:200])
+        return Result(HaltClass.BLOCKED_DEPENDENCY, why)
 
     def _settle_storage_wait(
         self, state: ProjectState, task, node_id: str, outcome_: RunOutcome,

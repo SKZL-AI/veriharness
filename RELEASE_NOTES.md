@@ -1,3 +1,81 @@
+# Release notes -- v0.4.0a1 (pre-release)
+
+**This is a pre-release and, until its tag is cut, an unreleased draft.** `v0.4.0a1` is the first public release of the `v0.4` line:
+an alpha and a research preview, published as a GitHub pre-release and to PyPI as a pre-release version (`pip install --pre hoh`).
+`v0.4.0` is reserved for the closure of phase P3 (*v0.4 Capacity-Aware Autonomous Parallelism*) and is unreleased; P3 is in
+progress and nothing in this section says it is closed. The facts about P3 are written from the register at the cut and not
+before. The operator decided on 2026-10-20 to publish this pre-release (instead of waiting for the closure of P3) so that the
+public README, the CI of the public repository and the PyPI path are brought up to date.
+
+The slice P3-ROTD is part of it: a rotation request is typed, as a fixed-form notice, into the master's own pane when that pane is reachable, after a fresh read of Herdr's state and of the pane's visible screen and never into an open dialog; otherwise it is written to a request file and recorded as `rotation_undeliverable`; delivery is on by default and `--rotate-no-deliver` turns it off. It is tested with fakes and has not been observed delivering into a live master (taken on 2026-10-21).
+
+This is not a readiness claim: the board, `docs/READINESS.md`, reads `TECHNICALLY_STABLE_READY = no` `[V13]`, as it did at `v0.3.0`.
+The sections of the earlier releases further down in this file are the text of their tags with their dated corrections, and their
+figures are the figures of their own cuts; the `[Vnn]` figures of this section are the ones that `paper/NUMBERS_V2.md` carries, taken
+at the commit aefef58a (committed on 2026-10-20 at 20:24 +0300). No benchmark result exists for this line: the matched-budget campaigns of
+`v0.1.0` are published as they were measured and have not been repeated on this code; the pre-registered agentic benchmark has
+a protocol and no result.
+
+## Added
+
+* **A front for the README.** What VeriHarness is in one paragraph, the loop as a diagram, the facts of how the project has been built
+  (a measured table with the method and the limit of each figure), the chain of orchestrating sessions and the storage steward as
+  diagrams, the status of phases P1 to P5 from the capability register, a quick start, the benchmark explained, the limitations, the
+  note on the name and the citation. The README of 2026-10-13 follows it unchanged, as the dated record. The diagrams are hand-authored
+  SVG under `.github/assets/` (no external fonts or scripts), with a 1280 by 640 PNG for a social preview.
+* **The measured autonomy facts.** At the base of this section the build's lease records hold 22 epochs, 17 of them
+  verified successions that all ended COMPLETE, each requested by the rotation policy; 250 run
+  directories since 2026-10-01; 1161 review reports with the machine-bound footer, 229 of them RELEASE_NO; and 103 of
+  2,087 entries of the orchestrator's running notes marked as the operator's. The history is 1,571 commits, 291 of them
+  merges `[V48]`, over 43 days 20 hours `[V46]`, and 32 of the 44 calendar days carry a commit `[V47]`; the ledger runs to O271 with 243 numbered entries `[V49]`.
+* **A release table in the distribution tool.** `tools/distribution_release.py` accepts a tag only if it is listed in `RELEASES` with
+  its pinned tag object and commit; a listed release whose identity is not pinned is refused. `v0.4.0a1` is declared as a pre-release and
+  unpinned: the two values are added after the tag exists. The workflow compares the GitHub release's pre-release flag with the table. The checks of `v0.1.0` are unchanged.
+
+## Changed
+
+* **`.github/workflows/publish-pypi.yml`** takes the release tag as its input and derives the file names, the index addresses, the
+  environment addresses and the artifact name from it. The file name and the two environment names (`testpypi`, `pypi`) are unchanged
+  because the trusted publishers on the indexes are registered against them. The build-once rule, the full-file-set check against an
+  existing index release and the refusal of an unknown tag are unchanged.
+* **`tools/distribution_smoke.py`** reads the version it must find from the workflow instead of the literal `0.1.0`; a run that was
+  not told what to expect fails.
+* **`.github/workflows/ci.yml`** installs the project with its `test` and `archive` extras.
+
+## Fixed
+
+* **The public CI.** From the push of `v0.3.0a1` on 2026-10-08 the `suite` job stopped at collection: `tests/test_archive_bundle.py`
+  and `tests/test_archive_verify.py` import `zstandard` directly, which `pyproject.toml` declares as the `archive` extra, and the
+  workflow installed the package without it. The other four jobs were green. The cause was reproduced in a fresh virtual environment
+  (collection error, exit 2, the same two files) and the workflow now names the extras instead of skipping the tests.
+* **The suite behind that stop.** Collection no longer stops, and the suite shows what the stop had been hiding: in a clean one-commit
+  checkout of the exported `v0.3.0` tree, with `zstandard` installed, 59 tests failed and 6,942 passed. Almost all of the failures
+  are tests of the development repository that read records the export withholds (the requirement register and what is derived from
+  it, the pinned scope of the planning package, one acceptance record, the preserved reviews of the P2 gate, one runbook); two need a git
+  identity, which the workflow now sets, and one needs a live Herdr session. The tests that need withheld records or Herdr are listed in
+  `tests/conftest.py` and skip where the record or the session is absent, with the reason named, and only when the export manifest
+  declares the record withheld; `tests/test_export_gap_table.py` guards the list. In the development tree nothing is skipped.
+
+## Known limitations
+
+* **Everything the `v0.3.0` section below says about its limits stands.** The documentation, CI and packaging changes of this draft lift no requirement and change no source file.
+* **Two sentences of the `v0.3.0` section are superseded when `v0.4.0a1` is cut.** That section says the release is "not published
+  to PyPI" and that the distribution workflow "accepts only the audited `v0.1.0`". The workflow accepts a tag that is listed and
+  pinned in `tools/distribution_release.py`; until `v0.4.0a1` is uploaded PyPI holds `v0.1.0` only (read on 2026-10-21), and a pre-release is installed only with `--pre`. The section is
+  kept as it was written.
+* **The sections of `v0.3.0a1` and `v0.3.0a2` below say that the context rollover had not run live** (`v0.3.0a1`: "no live succession has been run").
+  That was true of their code on their dates and stands as written. The `rotation.md` packaged with this pre-release was corrected by the slice P3-ROTD
+  and says the protocol has been run live; the account above and in the README front is the current one.
+* **The count of product-run merges is by merge title** `[V01]`, in the window 2026-09-25 to 2026-10-11; the tool that counts them has not been
+  changed for the slices merged since the third alpha, whose titles it does not list.
+* **The development line reads differently from `v0.3.0`.** On it the register's durability rows of P2 read IMPLEMENTED_NOT_PROVEN
+  again, because the P3 slices changed source files that the evidence is bound to (a regression obligation under amendment A7, not a
+  re-opened phase); `v0.3.0` is the code the closure evidence was taken on. At this base the register holds 236
+  requirements, 88 PROVEN and 11 PARTIAL `[V10]`, and the P2 gate reads 0 blocking open; 0 exit conditions bound to requirements not PROVEN; 0 exit conditions nothing measures yet; 148 open requirements, 125 behind a phase gate `[V12]`; of the requirements
+  registered for P3 to P12, 131 of 177 MISSING (11 PARTIAL, 35 PROVEN) `[V11b]`.
+
+---
+
 # Release notes -- v0.3.0
 
 **This is a release, not a pre-release.** `v0.3.0` is the first release of the

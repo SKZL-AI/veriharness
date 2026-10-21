@@ -35,7 +35,7 @@ from hoh.epoch import EpochStore, Reason
 from hoh.orchestrator import write_lock
 from hoh.projectstore import ProjectStore
 from hoh.rollover import Outcome, RolloverResult
-from hoh.succession import MasterAuthority
+from hoh.succession import MasterAuthority, utc_now
 from hoh.succession_capsule import load_capsule
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -175,6 +175,13 @@ class Performer:
         self.calls.append((inp, trigger))
         return RolloverResult(self.outcome, capsule_id="rc-test", detail=f"fake {self.outcome}",
                               predecessor_is_master=self.master, successor_epoch=2)
+
+
+@pytest.fixture(autouse=True)
+def _no_herdr_pane(monkeypatch):
+    """A hold started in a Herdr pane reads that pane's agent and types its notices into it
+    (P3-ROTD): a test run from such a pane must not reach it. The delivery tests set it."""
+    monkeypatch.delenv("HERDR_PANE_ID", raising=False)
 
 
 @pytest.fixture
@@ -1297,10 +1304,11 @@ def test_project_create_makes_the_governed_record_once_and_refuses_what_it_shoul
 class Wired:
     """`cli._rotation_tick` around a real project store and a real master, on the real clock, with
     `run_rollover` replaced by a spy that records what the cli handed it and answers `answer`
-    (or runs `act`)."""
+    (or runs `act`). `clock`, when given, is the lease's own clock (a `LeaseClock`); the
+    controller's wall clock stays the real one."""
 
     def __init__(self, tmp_path: Path, monkeypatch, *, outcome: Outcome = Outcome.COMPLETE,
-                 ttl: int = 1800, act=None) -> None:
+                 ttl: int = 1800, act=None, clock=None) -> None:
         self.scene = Scene(tmp_path, tokens=20_000)
         self.scene.repo = make_repo(tmp_path)
         self.root = tmp_path / "hohroot"
@@ -1311,7 +1319,8 @@ class Wired:
         self.scene.write_policy()
         self.loaded = rotation.load_policy(self.scene.policy_file, directory=self.store.dir)
         self.authority = MasterAuthority(self.store.dir, "pred", ttl_seconds=ttl,
-                                         serialize=lambda: write_lock(self.store))
+                                         serialize=lambda: write_lock(self.store),
+                                         clock=utc_now if clock is None else clock)
         self.authority.acquire(program_generation=1)
         self.token_out = tmp_path / "pred.token"
         self.forwarded: dict = {}
@@ -1369,22 +1378,54 @@ def test_the_cli_hands_the_masters_token_back_when_a_rotation_ends_in_a_reclaim(
     assert other.token_out.read_text() == "token-of-the-old-epoch\n"
 
 
+class LeaseClock:
+    """The lease's clock, in the whole seconds a lease records, moved only by the test: nothing
+    that uses it depends on how long the machine takes or on the host's wall clock. (The test that
+    used the real clock slept 3.7 s against a 3 s lease; a host whose wall clock steps forward by
+    3.6 s, as WSL2 does every half minute or so, lapsed that lease whatever the keepalive did.)"""
+
+    def __init__(self, t: float = T0) -> None:
+        self.t = t
+
+    def __call__(self) -> str:
+        return self.at(0)
+
+    def at(self, offset: float) -> str:
+        return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(self.t + offset))
+
+    def advance(self, seconds: float) -> None:
+        self.t += seconds
+
+
 def test_the_master_keeps_its_lease_while_the_successor_is_being_started(
         tmp_path, monkeypatch, herdr_stub):
     """Starting the successor (`herdr` calls that retry, a prompt delay) can take longer than the
     lease lasts, and the hold loop cannot renew while it waits: the rotation runs under the
-    lease's keepalive, or the master would lose its lease to its own rotation (SUPERSEDED)."""
-    slept = []
+    lease's keepalive, or the master would lose its lease to its own rotation (SUPERSEDED).
+
+    The launch takes four seconds of the lease's clock against a lease of three. That clock moves
+    one second at a time, and only once the keepalive has renewed at the new time: a keepalive
+    that never runs, or stops after one renewal, is caught by the clock having passed the lease;
+    a slow machine or a step of the host's wall clock is not (the test only takes longer)."""
+    clock = LeaseClock()
+    renewed = []
 
     def slow_launch(authority):
-        time.sleep(3.7)                    # longer than the whole lease (ttl 3 s)
-        slept.append(authority.renew())    # StaleMaster here is the lease having lapsed meanwhile
+        for _ in range(4):
+            clock.advance(1)
+            now = clock()
+            wait_for(lambda: authority.read_lease().renewed_at == now, "the keepalive's renewal")
+            assert authority.read_lease().expires_at == clock.at(3)    # renewed by it, to a full ttl
+        renewed.append(authority.renew())  # StaleMaster here is the lease having lapsed meanwhile
 
-    wired = Wired(tmp_path, monkeypatch, ttl=3, act=slow_launch)
+    wired = Wired(tmp_path, monkeypatch, ttl=3, act=slow_launch, clock=clock)
+    taken_at = clock()
+    assert wired.authority.read_lease().expires_at == clock.at(3)         # three seconds, from T0
     tick = wired.drive(keepalive_s=0.1)
-    assert tick.stop is True and len(slept) == 1
+    assert tick.stop is True and len(renewed) == 1
     assert "rotation_error" not in wired.scene.events()
     assert wired.scene.events()[-1] == "rotation_finished"
+    assert clock.t == T0 + 4 and clock() != taken_at                      # four seconds went by
 
 
 def test_a_closed_stdout_never_fails_a_request_or_ends_a_hold(tmp_path, monkeypatch):
@@ -1525,8 +1566,8 @@ def test_hold_with_a_policy_rotates_the_session_end_to_end_through_the_real_comm
     # the operator-facing channel: one event per line, whole
     shown = [json.loads(ln) for ln in text.splitlines() if ln.startswith('{"')]
     mine = [r["event"] for r in shown if r["session"] == "pred"]
-    assert mine == ["rotation_armed", "rotation_requested", "rotation_started",
-                    "rotation_finished"], text
+    assert mine == ["rotation_armed", "rotation_requested", "rotation_undeliverable",
+                    "rotation_started", "rotation_finished"], text      # (no pane in this scene)
     [req] = [r for r in shown if r["event"] == "rotation_requested" and r["session"] == "pred"]
     assert (req["context_tokens"], req["threshold"]) == (262_144, 250_000)
     assert req["handoff"] == str(scene.handoff) and "Write your handoff" in req["instruction"]
@@ -1570,7 +1611,8 @@ def test_hold_with_a_policy_rotates_the_session_end_to_end_through_the_real_comm
     # the successor applied the same policy, in its own turn, and did not rotate again at once --
     # although the predecessor's closing row was not yet in the log when the successor armed, so
     # that only a cool-down of the successor's own can have held it back (M13)
-    assert [r["event"] for r in held_back["rows"] if r["event"] != "rotation_handoff_waiting"] == [
+    quiet = {"rotation_handoff_waiting", "rotation_delivery_target", "rotation_undeliverable"}
+    assert [r["event"] for r in held_back["rows"] if r["event"] not in quiet] == [
         "rotation_armed", "rotation_requested", "rotation_handoff_ready", "rotation_started",
         "rotation_armed"]
     rows = log_events(log)
@@ -1681,7 +1723,7 @@ def test_a_policy_that_cannot_be_applied_is_refused_before_any_lease_is_taken(
     assert hold(scene.policy_file) == 0
     assert [e.epoch for e in EpochStore(store.dir).chain()] == [1]
     assert [r["event"] for r in log_events(store.dir / "rotation" / "policy.log.jsonl")] == [
-        "rotation_armed"]
+        "rotation_armed", "rotation_delivery_target"]
     # and without a policy nothing of this exists
     other = ProjectStore(root, "q")
     assert cli.main(["--root", str(root), "project", "create", "q", "--repo",
@@ -1720,4 +1762,15 @@ def test_the_shipped_rotation_text_names_the_record_command_and_the_automatic_pr
                  "handoff", "cool-down", "first line names the request id", "digest",
                  "never one the product or the harness writes"):
         assert word in flat, word
-    assert "No live succession has been run" in flat            # still true, and still said
+    # P3-ROTD: the sentence "No live succession has been run" was false from 2026-10-11 on (the
+    # rotation log of this product's own build holds 17 COMPLETE rotations); the doc says what the
+    # log holds, and that a request now reaches the master by itself
+    assert "No live succession has been run" not in flat
+    assert "has been run live" in flat and "rotation_finished" in flat and "COMPLETE" in flat
+    assert "17" not in flat and "43 requests" not in flat         # (no count that goes stale)
+    for word in ("rotation_delivered", "rotation_undeliverable", "rotation_delivery_target",
+                 "rotation/requests/", "--rotate-no-deliver", "HERDR_PANE_ID", "blocked",
+                 "most likely", "**submits**", "at least two minutes",
+                 "only to agents it started", "not trusted for dialogs", "pane read --source visible",
+                 "screen unreadable", "esc not now"):
+        assert word in flat, word

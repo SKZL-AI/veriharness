@@ -95,8 +95,13 @@ def run_argv(args, hoh_prefix: list[str]) -> list[str]:
             _opt("--iterations", args.iterations)]
     if args.until_accepted:
         argv.append("--until-accepted")
-    argv += [_opt("--planner", args.planner), _opt("--developer", args.developer),
-             _opt("--qa", args.qa)]
+    # a role option the caller did not type is not typed: the tab's `hoh run` then applies the
+    # same rule (the routing policy's provider, else the default) to the same absence
+    from .cli import profile_typed
+    for flag, value in (("--planner", args.planner), ("--developer", args.developer),
+                        ("--qa", args.qa)):
+        if profile_typed(value):
+            argv.append(_opt(flag, value))
     if args.no_herdr:
         argv.append("--no-herdr")
     if args.isolation is not None:
@@ -114,6 +119,24 @@ def run_argv(args, hoh_prefix: list[str]) -> list[str]:
         argv.append(_opt("--approval-policy", _abs(args.approval_policy)))
     if args.autonomy:
         argv.append(_opt("--autonomy", _abs(args.autonomy)))
+    if args.routing_policy is not None:
+        argv.append(_opt("--routing-policy", _abs(args.routing_policy)))
+    # P3-INV1: the ceiling of the shared dispatch budget's hold goes into the tab, so the tab's
+    # `hoh run` stops where the hold ends (an option dropped here would leave the run unbounded)
+    if getattr(args, "dispatch_ceiling", None) is not None:
+        argv.append(_opt("--dispatch-ceiling", args.dispatch_ceiling))
+    # P3-11 slice 2: the environment requirement goes into the tab, so the tab's own `hoh run`
+    # asks the report again when it starts (the caller asked once, now; a tab can start later).
+    # Three together or none: `hoh run` refused a partial set before it came here.
+    given = [getattr(args, name, None) for name in
+             ("preflight_report", "preflight_profile", "preflight_max_age")]
+    if any(value is not None for value in given):
+        if any(value is None for value in given):
+            raise DetachRefused("--preflight-report, --preflight-profile and --preflight-max-age "
+                                "go together")
+        argv.append(_opt("--preflight-report", _abs(given[0])))
+        argv.append(_opt("--preflight-profile", given[1]))
+        argv.append(_opt("--preflight-max-age", given[2]))
     if args.program_epoch is not None:
         argv.append(_opt("--program-epoch", args.program_epoch))
     if args.trust_worktree:
@@ -176,6 +199,12 @@ def preflight(args, store):
         raise DetachRefused(str(exc)) from exc
 
     try:
+        # a blank role option (`--qa "  "`) names no harness: the words `hoh run` gives. An empty
+        # one (`--qa ""`) keeps its existing refusal, from `_opt` when the command is built.
+        for role_, value in ((cli.Role.PLANNER, args.planner), (cli.Role.DEVELOPER, args.developer),
+                             (cli.Role.QA, args.qa)):
+            if value != "":
+                cli._profile_of(role_, value)
         cli._per_role(args.role_model)
         cli._per_role(args.role_effort)
     except ValueError as exc:
@@ -187,6 +216,12 @@ def preflight(args, store):
             load(args.approval_policy)
         except PolicyRefused as exc:
             raise DetachRefused(f"approval policy refused: {exc}") from exc
+
+    from . import routing
+    try:
+        cli._routing_decide(store.dir, args.routing_policy)
+    except (cli.RoutingPinRefused, routing.RoutingRefused) as exc:
+        raise DetachRefused(f"routing policy refused: {exc}") from exc
 
     from .governance import ContractRefused, bind
     offered = None

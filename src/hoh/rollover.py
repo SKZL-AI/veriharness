@@ -60,8 +60,8 @@ from .succession_capsule import (
 )
 
 __all__ = [
-    "DEFAULT_THRESHOLD", "HerdrLauncher", "HoldResult", "LaunchHandle", "LauncherError",
-    "Outcome", "RolloverError", "RolloverLog", "RolloverResult", "State", "Successor",
+    "DEFAULT_THRESHOLD", "HerdrLauncher", "HerdrNotifier", "HoldResult", "LaunchHandle",
+    "LauncherError", "NOTICE_TIMEOUT_S", "Outcome", "RolloverError", "RolloverLog", "RolloverResult", "State", "Successor",
     "SuccessorLauncher", "Tick", "TokenOutError", "TookOver", "TriggerError", "TriggerResult",
     "evaluate_trigger", "hand_token_over", "hold_lease", "pointer_prompt",
     "product_invocation", "run_rollover",
@@ -327,6 +327,19 @@ def expire_stale(log: RolloverLog, now: str) -> dict[str, Any] | None:
 
 POINTER_MAX_CHARS = 2500
 
+#: Told to a successor whose command carries `--rotate-policy` (it keeps rotating by the same
+#: rules): where its rotation requests come from, so that it does not depend on a lesson it
+#: never read. The command types them into this pane itself; a harness that cannot receive
+#: typed text watches the command's output. Three forms, longest first: a pointer that would
+#: pass `POINTER_MAX_CHARS` with one gets the next shorter, and the last is none -- the
+#: paragraph never makes a successor fail to start.
+ROTATION_PARAGRAPH = (
+    "4. Rotation requests are typed here (\"[hoh rotation request\"); follow them. "
+    "If typed text cannot reach you, monitor the command for \"rotation_requested\".\n")
+ROTATION_PARAGRAPH_SHORT = (
+    "4. Rotation requests are typed into this pane: notices starting \"[hoh rotation "
+    "request\"; follow them.\n")
+
 #: The one piece of the pointer's command that a shell expands: the process the
 #: lease is bound to. `$CLAUDE_PID` is the Claude Code process, which Claude
 #: Code exports to its Bash tool; `$PPID` is the same process when it is not
@@ -368,6 +381,22 @@ def product_invocation(*, python: str | None = None,
     return ("env", f"PYTHONPATH={root}", interpreter, "-P", "-m", "hoh.cli")
 
 
+#: The same, for a command that carries `--rotate-no-deliver` (the operator opted out of the
+#: typed notice): the output of the command is then the only place a request appears.
+ROTATION_PARAGRAPH_NO_DELIVERY = (
+    "4. Rotation requests are not typed into this pane (opted out): watch that command's "
+    "output with a monitor for \"rotation_requested\".\n")
+
+
+def _rotation_paragraphs(extra: list[str]) -> tuple[str, ...]:
+    """The paragraph forms to try, longest first, ending with none."""
+    if "--rotate-policy" not in extra:
+        return ("",)
+    if "--rotate-no-deliver" in extra:
+        return (ROTATION_PARAGRAPH_NO_DELIVERY, "")
+    return (ROTATION_PARAGRAPH, ROTATION_PARAGRAPH_SHORT, "")
+
+
 def pointer_prompt(*, root: str, project_id: str, capsule_file: str,
                    capsule_digest: str, session: str, token_out: str,
                    invocation: Sequence[str] = ("hoh",),
@@ -387,7 +416,7 @@ def pointer_prompt(*, root: str, project_id: str, capsule_file: str,
             "--capsule", capsule_file, "--digest", capsule_digest,
             "--session", session, "--token-out", token_out, *map(str, extra_args)]
     command = " ".join(shlex.quote(a) for a in argv) + f" --watch-pid {SESSION_PID_EXPR}"
-    text = (
+    head = (
         f"You are the successor orchestrator session {shlex.quote(session)} for project "
         f"{shlex.quote(project_id)}.\n"
         "This message is a pointer, not a briefing, and you carry no history. "
@@ -397,11 +426,16 @@ def pointer_prompt(*, root: str, project_id: str, capsule_file: str,
         f"  {command}\n"
         "2. Act as the master only after it prints \"took over\". Until then do "
         "nothing.\n"
-        "3. If it prints \"refused\" or exits, do nothing and tell the operator.\n"
+        "3. If it prints \"refused\" or exits, do nothing and tell the operator.\n")
+    tail = (
         "\n"
         f"Capsule: {capsule_file}\n"
         f"Capsule digest: {capsule_digest}\n"
         f"Session id: {session}\n")
+    for paragraph in _rotation_paragraphs(list(map(str, extra_args))):
+        text = head + paragraph + tail
+        if len(text) < POINTER_MAX_CHARS:
+            break
     if not text.isascii():
         raise RolloverError("the pointer prompt must be ASCII; a value in it is not")
     if len(text) >= POINTER_MAX_CHARS:
@@ -551,6 +585,50 @@ class HerdrLauncher:
 
     def stop(self, handle: LaunchHandle) -> None:
         self._close(getattr(handle, "tab_id", None))
+
+
+#: The longest one Herdr call of a notice may take. A delivery is three calls (read the pane's
+#: agent, read its visible screen, type the notice), so a delivery blocks the hold loop for 45 s
+#: at the most.
+NOTICE_TIMEOUT_S = 15.0
+
+
+class HerdrNotifier(HerdrLauncher):
+    """The same Herdr transport as the launcher, used for the two calls of a notice: which
+    agents Herdr shows, and a line typed to one of them (no waiting for its turn: the master's turn
+    can last for hours)."""
+
+    def __init__(self, *, run: Callable[..., Any] | None = None,
+                 timeout_s: float = NOTICE_TIMEOUT_S) -> None:
+        super().__init__(run=run, timeout_s=timeout_s)
+
+    def agents(self) -> list[dict[str, Any]]:
+        """The agent rows of Herdr's snapshot (`pane_id`, `name`, `agent`, `agent_status`); one
+        call, fresh every time."""
+        data = self._cli(["herdr", "api", "snapshot"], "read Herdr's state")
+        result = data.get("result") if isinstance(data.get("result"), dict) else {}
+        snap = result.get("snapshot") if isinstance(result.get("snapshot"), dict) else {}
+        rows = snap.get("agents") if isinstance(snap.get("agents"), list) else []
+        return [a for a in rows if isinstance(a, dict)]
+
+    def screen(self, pane_id: str) -> str:
+        """What the pane shows now: `herdr pane read PANE --source visible`, as text. Herdr's
+        agent state is not trusted for dialogs (a dialog has been reported as `idle`, and
+        `herdr agent read` showed a stale screen), so the visible screen of the pane is read
+        before anything is typed. Any failure is `LauncherError`."""
+        argv = ["herdr", "pane", "read", pane_id, "--source", "visible"]
+        try:
+            proc = self._run(argv, capture_output=True, text=True, timeout=self.timeout_s)
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            raise LauncherError(f"read the screen of {pane_id} failed: {exc}") from exc
+        if proc.returncode != 0:
+            raise LauncherError(f"read the screen of {pane_id} failed: "
+                                f"{(proc.stderr or '').strip()[:300]}")
+        out = proc.stdout
+        return out if isinstance(out, str) else ""
+
+    def notify(self, agent: str, text: str) -> None:
+        self._cli(["herdr", "agent", "prompt", agent, text], f"type a notice to {agent}")
 
 
 # --------------------------------------------------------------------------- #

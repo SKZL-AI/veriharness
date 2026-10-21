@@ -177,3 +177,40 @@ def test_the_foreign_prototype_is_pinned_and_still_exists():
     assert "starte_lauf" in sample, (
         "the pin outlived the call it was protecting; drop the pin or restore "
         "the call, but do not leave a rule guarding nothing")
+
+
+def test_the_english_name_schedulererror_is_not_german_and_german_names_still_are():
+    """P3-19f. `is_german` does not split CamelCase, so the English `SchedulerError` is one part,
+    `schedulererror`, and the `sch` spelling rule fired on it: the release sweep's check went from 0 files to 2
+    (one source and one test file). The name is English and is listed out loud in `_NOT_GERMAN`, next to
+    `scheduler`, `scheduled` and `valueerror`. The same class on HEAD: the English `opaque` (one part, the `ue`
+    spelling rule) made `tests/test_rotation_compactions.py` the one file the check reported; it is listed
+    too, with a `ue` control. The controls make this a fix and not a silenced rule: a German
+    name from the module's own vocabulary that contains `sch`, a German name found by spelling alone, and a
+    German compound that merely starts with the allowed word are all still German; splitting is unchanged."""
+    assert not ident.is_german("SchedulerError")
+    assert not ident.is_german("scheduler_error")
+    assert not ident.is_german("AdmissionError")
+    assert "schedulererror" in ident._NOT_GERMAN
+    assert not ident.is_german("opaque")
+    assert not ident.is_german("Opaque")
+    assert not ident.is_german("opaque_value")
+    assert "opaque" in ident._NOT_GERMAN
+    vocabulary = sorted(w for w in ident.GERMAN_PARTS if "sch" in w)
+    assert vocabulary, "the module's own table has German words with sch"
+    for word in vocabulary[:5]:
+        assert ident.is_german(word), word
+    # spelling alone: not in the vocabulary, found only because of `sch`
+    for spelled in ("Schlafmodus", "fehlerschleife"):
+        assert not any(p in ident.GERMAN_PARTS for p in spelled.lower().split("_")), spelled
+        assert ident.is_german(spelled), spelled
+    # the `ue` rule is not silenced either: a vocabulary word and names found by the spelling alone
+    ue_vocabulary = sorted(w for w in ident.GERMAN_PARTS if "ue" in w)
+    assert ue_vocabulary and all(ident.is_german(w) for w in ue_vocabulary[:5])
+    for spelled in ("Fuehrung", "Tuerschild"):
+        assert not any(p in ident.GERMAN_PARTS for p in spelled.lower().split("_")), spelled
+        assert ident.is_german(spelled), spelled
+    # exact entries, not prefixes: a German compound that starts with an allowed word is still caught
+    assert ident.is_german("schedulerfehler")
+    assert ident.is_german("SchedulerErrorx")
+    assert ident.is_german("opaquefehler")

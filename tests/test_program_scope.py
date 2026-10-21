@@ -231,18 +231,40 @@ def test_a_v3_3_contract_nobody_carries_is_caught():
 
 def test_the_real_register_is_complete_against_the_real_plan():
     """The positive control over the actual programme, with both expected
-    sides parsed from the pinned plan and neither from the register."""
+    sides parsed from the pinned plan and neither from the register.
+
+    Re-stated after the v0.3.0 tag (strand ptests, O267 section 8(b)) because the register
+    is complete against the plan **and its pinned operator amendments A1..A7**, which is
+    what the product's own check (`tools/program_scope.py --check`) asks: the register
+    carries a requirement for each amendment item, and compared with the bare plan it
+    reads 46 problems, each of them an amendment item. So this asks the same question the
+    tool asks (amendments loaded and sound, the inventory merged with them, completeness
+    over the merge, the amendments' own consistency against the register), and keeps the
+    bare-plan comparison as the control: it must still be non-empty, and every problem it
+    reads names an amendment item, which is what shows the merge is what closes it."""
     plan = _plan()
     import json
     scope = ps.build(plan)
     register = json.loads(ps.REGISTER.read_text())
     master = json.loads((plan.parent.parent / ps.MASTER_FILE).read_text())
-    problems = ps.completeness(scope, register, scope["plan_sha256"],
+    amendments = ps.load_amendments()
+    assert amendments["amendments"], "no pinned amendment: the merge below would be vacuous"
+    assert amendments["problems"] == [], amendments["problems"][:5]
+    merged = ps.merged(scope, amendments)
+    problems = ps.completeness(merged, register, scope["plan_sha256"],
                                master["new_in_v3_3"])
     assert problems == [], problems[:5]
+    assert ps.amendment_problems(scope, amendments, register) == []
     # And the scope it was checked against is the whole programme, not P1-P3.
-    phases = {i["phase"] for i in scope["items"] if i["capability"]}
+    phases = {i["phase"] for i in merged["items"] if i["capability"]}
     assert {"P4", "P5", "P6", "P8", "P9", "P10", "P11", "P12"} <= phases
+    # Control: the bare plan is not what the register is complete against. Every problem
+    # it reads names one of the amendments' items.
+    bare = ps.completeness(scope, register, scope["plan_sha256"], master["new_in_v3_3"])
+    assert bare, "the bare plan reads complete: the amendments' items are not in the register"
+    ids = [i["id"] for i in amendments["items"]]
+    assert all(any(f"'{item}'" in p for item in ids) for p in bare), \
+        [p for p in bare if not any(f"'{item}'" in p for item in ids)][:5]
 
 
 def test_a_skipped_or_repeated_phase_is_caught():

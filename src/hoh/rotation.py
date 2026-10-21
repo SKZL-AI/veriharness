@@ -37,6 +37,12 @@ reachable (re-derivable) and digest-bound. `RotationPolicy` says when, the
 existing Layer-A protocol (`hoh.rollover.run_rollover`), which the controller
 calls and never re-implements. Its files, clock and the rollover itself arrive
 through seams, so the controller is driven by fakes in tests.
+
+A rotation is due at the first of two things: the context of the master's last request
+reaching `threshold_tokens` (the ceiling), or -- when the policy sets `rotate_after_compactions`
+-- the conversation having been compacted that many times, counted from the compaction
+boundaries the harness writes into the master's own transcript. The transcript's session id is
+carried into the decision log and the capsule, so a successor can name the session it replaces.
 """
 
 from __future__ import annotations
@@ -77,6 +83,7 @@ from hoh.rollover import (
     evaluate_trigger,
 )
 from hoh.succession_capsule import (
+    AdvisoryIn,
     CapsuleInput,
     Section,
     check_capsule_id,
@@ -379,9 +386,26 @@ MAX_LOG_BYTES = 32 * 1024 * 1024
 #: A handoff modified further in the future than this (seconds) is not a fresh one.
 FUTURE_SLACK_S = 5.0
 
+#: How a compaction of the master's conversation shows in its transcript: one top-level record
+#: `{"type": "system", "subtype": "compact_boundary", ...}` per compaction.
+COMPACT_BOUNDARY_TYPE = "system"
+COMPACT_BOUNDARY_SUBTYPE = "compact_boundary"
+#: A boundary record is a few hundred bytes; a longer line is never parsed and never one.
+MAX_BOUNDARY_LINE_BYTES = 1024 * 1024
+#: The largest transcript the compactions are counted in. Above it the count is "not measured",
+#: never a number (and never zero).
+MAX_COMPACTION_SCAN_BYTES = 4 * 1024 ** 3
+#: The ceiling of `rotate_after_compactions`.
+MAX_ROTATE_AFTER_COMPACTIONS = 100
+#: The capsule entry that names the transcript session id of the session being rotated out.
+#: Reserved: a capsule input of the operator's may not use the name.
+ROTATING_SESSION_ENTRY = "rotating-session"
+
 _TIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 _SESSION_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{7,63}\Z")
 _ENV_NAME = re.compile(r"[A-Z][A-Z0-9_]{0,63}\Z")
+_BOUNDARY_NEEDLE = COMPACT_BOUNDARY_SUBTYPE.encode("ascii")
+_UUID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
 _MODEL_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}")
 
 
@@ -456,7 +480,12 @@ class RotationPolicy(Strict):
     #: context. It must contain the `handoff` entry (see `HANDOFF_ENTRY`).
     capsule_input: str
     transcript: TranscriptSpec
+    #: The ceiling: a rotation is due at this context, whatever else the policy says.
     threshold_tokens: int = Field(DEFAULT_THRESHOLD, strict=True, ge=10_000, le=10_000_000)
+    #: Also due once the master's conversation was compacted this many times (counted from the
+    #: boundary records of its transcript). Absent (or null): the threshold alone decides.
+    rotate_after_compactions: int | None = Field(
+        None, strict=True, ge=1, le=MAX_ROTATE_AFTER_COMPACTIONS)
     successor_permission_mode: Literal["auto"] | None = "auto"
     successor_effort: Literal["low", "medium", "high", "xhigh", "max"] | None = None
     prompt_delay_s: float = Field(0.0, strict=True, ge=0, le=300, allow_inf_nan=False)
@@ -617,6 +646,11 @@ def validate_capsule_input(data: Mapping[str, Any], policy: RotationPolicy) -> C
         raise PolicyError("the capsule input binds no run_set in RUNS: a capsule needs one "
                           "(an empty run set is a fact, an absent one is not), and every "
                           "rotation would otherwise be refused at the freeze")
+    if any(e.entry_id == ROTATING_SESSION_ENTRY
+           for e in (*inp.derive, *inp.decisions, *inp.advisory)):
+        raise PolicyError(f"the capsule input uses the entry id {ROTATING_SESSION_ENTRY!r}, "
+                          "which the product reserves for the transcript session id of the "
+                          "session it rotates out")
     for d in inp.derive:
         key = {"file_digest": "path", "run_set": "runs_root", "ref_state": "repo"}.get(d.deriver)
         value = d.params.get(key) if key else None
@@ -688,12 +722,131 @@ def resolve_transcript(spec: TranscriptSpec, environ: Mapping[str, str] | None =
     return found[0]
 
 
+@dataclass(frozen=True)
+class RotationTrigger(TriggerResult):
+    """What `make_trigger` measured: the context (as `TriggerResult`), and -- when the policy
+    asks for it -- the compactions of the transcript, with the transcript's own session id."""
+
+    #: Compaction boundaries in the transcript; None when the policy does not count them, or
+    #: when they could not be counted and the ceiling decided without them.
+    compactions: int | None = None
+    #: The policy's `rotate_after_compactions`.
+    compaction_limit: int | None = None
+    #: The session id the transcript's file name carries (see `transcript_session_id`).
+    transcript_session_id: str | None = None
+
+    def as_dict(self) -> dict[str, Any]:
+        return {**super().as_dict(), "compactions": self.compactions,
+                "compaction_limit": self.compaction_limit,
+                "transcript_session_id": self.transcript_session_id}
+
+
+def count_compactions(transcript: Path | str, *,
+                      max_bytes: int = MAX_COMPACTION_SCAN_BYTES) -> int:
+    """How many times the conversation was compacted: the top-level records of the
+    transcript that are `{"type": "system", "subtype": "compact_boundary"}`, a record of a
+    sub-agent (`"isSidechain": true`, the literal value) excluded.
+
+    Read once, in full, as it was when it was opened (a transcript that grows meanwhile is
+    counted up to its size then). Torn lines are skipped, as the trigger skips them. A line of
+    more than `MAX_BOUNDARY_LINE_BYTES` is not a boundary and is not parsed. Anything that is
+    not a plain regular file of at most `max_bytes` raises `TriggerError`: a count that was not
+    taken is not zero.
+    """
+    path = os.fspath(transcript)
+    try:
+        fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK | os.O_CLOEXEC)
+    except (OSError, ValueError) as exc:
+        raise TriggerError(f"cannot read the transcript {path}: {exc}") from exc
+    try:
+        st = os.fstat(fd)
+        if not stat.S_ISREG(st.st_mode):
+            raise TriggerError(f"the transcript {path} is not a regular file")
+        if st.st_size > max_bytes:
+            raise TriggerError(f"the transcript {path} is {st.st_size} bytes, over the "
+                               f"{max_bytes} the compactions are counted in")
+        count = 0
+        remaining = st.st_size
+        with os.fdopen(fd, "rb", closefd=False) as fh:
+            while remaining > 0:
+                line = fh.readline(MAX_BOUNDARY_LINE_BYTES + 1)
+                if not line:
+                    break
+                remaining -= len(line)
+                if len(line) > MAX_BOUNDARY_LINE_BYTES and not line.endswith(b"\n"):
+                    while remaining > 0:                      # the rest of a line too long
+                        rest = fh.readline(MAX_BOUNDARY_LINE_BYTES)
+                        if not rest:
+                            break
+                        remaining -= len(rest)
+                        if rest.endswith(b"\n"):
+                            break
+                    continue
+                if _BOUNDARY_NEEDLE not in line:
+                    continue
+                try:
+                    record = json.loads(line)
+                except (ValueError, RecursionError):
+                    continue                                  # torn or foreign: skipped
+                if (isinstance(record, dict) and record.get("type") == COMPACT_BOUNDARY_TYPE
+                        and record.get("subtype") == COMPACT_BOUNDARY_SUBTYPE
+                        and record.get("isSidechain") is not True):
+                    count += 1
+        return count
+    except OSError as exc:
+        raise TriggerError(f"cannot read the transcript {path}: {exc}") from exc
+    finally:
+        os.close(fd)
+
+
+def transcript_session_id(spec: TranscriptSpec, transcript: Path) -> str | None:
+    """The session id the master's transcript file is named after, or None.
+
+    The harness names a transcript `<session id>.jsonl`. Where the policy names the id through
+    the environment, the file's stem is what was looked up and is accepted as a session id;
+    where it names a path, only a canonical UUID stem is (a file called `transcript.jsonl`
+    names no session). The path is not resolved: a link's own name is the name.
+    """
+    if transcript.suffix != ".jsonl":
+        return None
+    stem = transcript.stem
+    ok = _SESSION_ID.match(stem) if spec.session_id_env is not None else _UUID.fullmatch(stem)
+    return stem if ok else None
+
+
 def make_trigger(policy: RotationPolicy,
                  environ: Mapping[str, str] | None = None) -> Callable[[], TriggerResult]:
-    """`evaluate_trigger` over the master's own transcript, at the policy's threshold."""
+    """`evaluate_trigger` over the master's own transcript, at the policy's threshold -- and,
+    with `rotate_after_compactions`, a count of its compaction boundaries.
+
+    Due at the first of: the context reaching the threshold (the ceiling: decided without the
+    count, which is then recorded where it could be taken), or the count reaching the limit
+    (reason `compactions`, a measurement and never an estimate). When the context is not at the
+    ceiling the count decides, so a count that cannot be taken raises `TriggerError` (the
+    controller records it as blind): an unreadable transcript is not evidence that no
+    rotation is due."""
+    limit = policy.rotate_after_compactions
+
     def trigger() -> TriggerResult:
-        return evaluate_trigger(resolve_transcript(policy.transcript, environ),
-                                threshold=policy.threshold_tokens)
+        path = resolve_transcript(policy.transcript, environ)
+        base = evaluate_trigger(path, threshold=policy.threshold_tokens)
+        ceiling = base.fire and not base.estimate
+        count: int | None = None
+        if limit is not None:
+            try:
+                count = count_compactions(path, max_bytes=MAX_COMPACTION_SCAN_BYTES)
+            except TriggerError:
+                if not ceiling:
+                    raise                   # the count decides here, and it was not taken
+        fire, reason, estimate = base.fire, base.reason, base.estimate
+        if count is not None and count >= limit and not ceiling:
+            fire, reason, estimate = True, "compactions", False
+        return RotationTrigger(fire=fire, context_tokens=base.context_tokens,
+                               threshold=base.threshold, reason=reason, estimate=estimate,
+                               size_bytes=base.size_bytes, compactions=count,
+                               compaction_limit=limit,
+                               transcript_session_id=transcript_session_id(
+                                   policy.transcript, path))
     return trigger
 
 
@@ -781,6 +934,33 @@ def _not_the_handoff(loaded: LoadedPolicy, directory: str | os.PathLike[str],
     return out
 
 
+_ROTATING_SESSION_KEY = "transcript_session_id: "
+
+
+def rotating_session_text(session_id: str, *, request_id: str, compactions: int | None) -> str:
+    """The advisory entry that tells the successor which session it replaces. Its first line is
+    `transcript_session_id: <id>` (read back by `rotating_session_id`); the rest is prose."""
+    seen = "not counted" if compactions is None else str(compactions)
+    return (f"{_ROTATING_SESSION_KEY}{session_id}\n"
+            f"The session being rotated out (request {request_id}; compactions counted in its "
+            f"transcript: {seen}). Recorded by the rotation controller from the name of the "
+            "master's own transcript file: it names a session to consult, it is not a "
+            "re-derived fact.")
+
+
+def rotating_session_id(text: object) -> str | None:
+    """The session id in the first line of a `rotating-session` entry's text, or None: the
+    line must be exactly `transcript_session_id: <id>` with an id of a shape the product
+    produces (no edge whitespace, no other spelling)."""
+    if not isinstance(text, str):
+        return None
+    first = text.split("\n", 1)[0]
+    if not first.startswith(_ROTATING_SESSION_KEY):
+        return None
+    sid = first[len(_ROTATING_SESSION_KEY):]
+    return sid if (_UUID.fullmatch(sid) or _SESSION_ID.match(sid)) else None
+
+
 def _iso(t: float) -> str:
     return datetime.fromtimestamp(t, UTC).strftime(_TIME_FORMAT)
 
@@ -804,6 +984,151 @@ def _own_dir(path: Path) -> Path:
     return path
 
 
+# --------------------------------------------------------------------------- #
+# delivery of a request into the master's own session
+# --------------------------------------------------------------------------- #
+
+#: The request files of the fallback, one per request id, beside the decision log.
+REQUESTS_DIRNAME = "requests"
+
+#: The states of the master's agent in which a notice is typed into its pane. `blocked` is a
+#: dialog waiting for an answer (a typed notice would answer it), `unknown` proves nothing
+#: (Herdr's own documentation says so): neither ever receives a keystroke. `working` is
+#: assumed to queue the typed text for after the turn (Claude Code; SUSPECTED, not run live
+#: here): if the text were lost instead, the one re-delivery and the request file answer it.
+DELIVERABLE_STATES = frozenset({"idle", "done", "working"})
+
+#: Herdr's state alone is not trusted for dialogs: Claude Code's autocompact choice ("Want to
+#: autocompact at 400k tokens instead? ... enter confirm . esc not now") was reported `idle` by
+#: `herdr agent get`, `herdr agent read` showed a stale screen, and only the pane's visible
+#: screen showed it; a line typed there is swallowed and the Enter of `agent prompt` CONFIRMS the
+#: highlighted option. So the visible screen is read before every typing and nothing is typed
+#: when its last `DIALOG_TAIL_LINES` non-blank lines carry one of these markers (lower case,
+#: blanks collapsed) or a selected numbered option (an arrow on `1.`), or when the screen cannot
+#: be read or is empty. A dialog sits at the bottom of the screen; the words in a conversation
+#: higher up do not count.
+DIALOG_TAIL_LINES = 20
+DIALOG_MARKERS = ("esc not now", "enter confirm", "enter to confirm", "esc to cancel",
+                  "do you want to")
+_SELECTED_OPTION = re.compile(r"^\s*[\u276f\u203a\u25b6\u27a4]\s*[0-9]+[.)]\s+\S")
+
+
+def dialog_on_screen(screen: str) -> str | None:
+    """The marker that shows a dialog in the visible `screen`, or None."""
+    lines = [" ".join(line.split()) for line in screen.splitlines() if line.strip()]
+    tail = lines[-DIALOG_TAIL_LINES:]
+    low = " ".join(tail).lower()                  # (blanks: a marker a narrow pane wrapped is found)
+    for marker in DIALOG_MARKERS:
+        if marker in low:
+            return marker
+    for line in tail:
+        if _SELECTED_OPTION.match(line):
+            return "a selected numbered option"
+    return None
+
+
+#: A notice is one line of printable ASCII built from validated fields, at most this long.
+NOTICE_MAX_CHARS = 1100
+
+_PANE_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9:_.-]{0,63}\Z")
+_AGENT_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,63}\Z")
+_REASON = re.compile(r"[a-z][a-z_]{0,31}\Z")
+_OUTCOME = re.compile(r"[A-Z][A-Z_]{0,31}\Z")
+#: The only path a typed notice may carry: absolute, segments of letters, digits and `._+-`
+#: (no space, quote, backtick, dollar or any other character that could turn a path into a
+#: sentence), no `.` or `..` segment, at most `NOTICE_PATH_MAX` characters. Any other handoff
+#: path is not typed: the notice names the request file instead.
+NOTICE_PATH_MAX = 300
+_NOTICE_PATH = re.compile(r"(?:/[A-Za-z0-9._+-]+)+\Z")
+_DEADLINE = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z\Z")
+#: A lease shorter than this cannot be held while a delivery may block a tick (3 Herdr calls of
+#: `NOTICE_TIMEOUT_S` each): `hold` and `rollover-accept` refuse it unless delivery is opted out.
+MIN_TTL_WITH_DELIVERY_S = 120
+_REQUEST_ID = re.compile(r"rq-[0-9]{8}T[0-9]{6}Z-[0-9a-f]{8}\Z")
+
+
+class NoticeError(ValueError):
+    """A field of a request row that a notice may not carry: nothing is typed."""
+
+
+class Undeliverable(Exception):
+    def __init__(self, reason: str) -> None:
+        super().__init__(reason)
+        self.reason = reason
+
+
+def _field(value: object, pattern: re.Pattern[str], what: str) -> str:
+    if not isinstance(value, str) or pattern.match(value) is None:
+        raise NoticeError(f"the {what} of the request is not in the form a notice carries")
+    return value
+
+
+def plain_path(value: object) -> bool:
+    """Is `value` a path a typed notice may carry (see `_NOTICE_PATH`)?"""
+    return (isinstance(value, str) and len(value) <= NOTICE_PATH_MAX
+            and _NOTICE_PATH.match(value) is not None
+            and all(seg not in (".", "..") for seg in value.split("/")))
+
+
+def request_notice(row: Mapping[str, Any], *, reminder: bool = False) -> str:
+    """The notice of a `rotation_requested` row. Everything typed is composed here: fixed words,
+    the request id, the reason (a word), the deadline, and either the handoff path -- only when it
+    passes `plain_path`, the path being chosen by the capsule input, a file the product does not
+    write -- or, for any other path, the name of the request file the product derives
+    (`rotation/requests/<id>.request.md` beside the log). No text of a file, no token.
+    `NoticeError` when the id, the reason or the deadline is not in its form (nothing is typed)."""
+    rid = _field(row.get("request_id"), _REQUEST_ID, "request id")
+    reason = _field(row.get("reason"), _REASON, "reason")
+    deadline = _field(row.get("deadline"), _DEADLINE, "deadline")
+    where = (f"Write your handoff to {row['handoff']} now, replacing its content,"
+             if plain_path(row.get("handoff")) else
+             f"The handoff path is not typed here: read the request file "
+             f"{ROTATION_DIRNAME}/{REQUESTS_DIRNAME}/{rid}.request.md beside this project's "
+             "rotation log, write your handoff to the path it names, replacing its content,")
+    text = (f"[hoh rotation request {rid}] "
+            + ("Reminder, no usable handoff has been read yet. " if reminder else "")
+            + f"Your context is due for rotation (reason: {reason}). {where} and make its first "
+            f"line name {rid}: writing it is your consent to be rotated out. Deadline "
+            f"{deadline}. From then on start no run, merge or commit until a rotation_finished, "
+            "rotation_request_expired, rotation_withdrawn or rotation_error notice follows. If "
+            "you cannot stop now, do not write it: the request expires and nothing rotates.")
+    if len(text) > NOTICE_MAX_CHARS:
+        raise NoticeError("the notice is longer than a notice may be")
+    return text
+
+
+def request_file_text(row: Mapping[str, Any]) -> str:
+    """The request as the file of the fallback holds it: the row's own fields and the
+    instruction the controller wrote into it. It is read by the master, never typed, so it
+    does not have to be a notice."""
+    return (f"request_id: {row.get('request_id')}\ndeadline: {row.get('deadline')}\n"
+            f"handoff: {row.get('handoff')}\n\n{row.get('instruction')}")
+
+
+def outcome_notice(kind: str, request_id: object, outcome: object = None) -> str:
+    """The notice that ends a request: `kind` is one of expired, withdrawn, finished, error."""
+    rid = _field(request_id, _REQUEST_ID, "request id")
+    head = f"[hoh rotation request {rid}] "
+    if kind == "expired":
+        return head + ("Expired: no handoff was taken. Nothing rotates and you remain the "
+                       "master; the reason is in the rotation log, and a new request comes only "
+                       "after the cool-down.")
+    if kind == "withdrawn":
+        return head + ("Withdrawn: the context is no longer due. Nothing rotates and you "
+                       "remain the master.")
+    if kind == "error":
+        return head + ("Error: the rotation was abandoned (the detail is in the rotation log). "
+                       "You remain the master.")
+    if kind == "finished":
+        out = _field(outcome, _OUTCOME, "outcome")
+        if out == Outcome.COMPLETE.value:
+            return head + ("Finished (COMPLETE): the successor holds the lease and you are "
+                           "fenced. Do nothing more and leave this tab to the operator.")
+        return head + (f"Finished without a handover ({out}): you remain the master; the "
+                       "rotation log has the detail.")
+    raise NoticeError(f"no notice for {kind!r}")
+
+
 #: How each outcome of `run_rollover` ends a request. `None` keeps it open (retried).
 _KEEP_OPEN = frozenset({Outcome.DEFERRED, Outcome.IN_FLIGHT})
 
@@ -822,6 +1147,17 @@ class RotationController:
     capsule binds, so the master may keep writing), and calls `perform`. Every other
     path ends the request, on record, and starts a cool-down of `cooldown_s`: the
     master stays master. Nothing here raises into the hold loop.
+
+    **Delivery.** The line on stdout reaches the master only if something watches the process,
+    and a master that runs the hold as a plain background job does not. So, given a `notifier`
+    (Herdr) and the pane the hold was started in (`pane_id`, the master's own), the controller
+    types a fixed-form notice into that pane: at the request, once more at half the request's
+    time to live while no handoff has appeared, and when the request ends. It reads the agent's
+    state and its visible screen first and types nothing into a pane that is `blocked`,
+    `unknown`, shows a dialog (the state alone is not trusted: see `DIALOG_MARKERS`), cannot be
+    read, or holds no single named agent. Whatever cannot be delivered is a `rotation_undeliverable` row and, for the
+    request itself, a request file the master can read; whatever is delivered is a
+    `rotation_delivered` row. The target is one `rotation_delivery_target` row at `arm`.
     """
 
     def __init__(self, loaded: LoadedPolicy, *, directory: Path | str, project_id: str,
@@ -829,7 +1165,9 @@ class RotationController:
                  perform: Callable[[CapsuleInput, Callable[[], TriggerResult]], RolloverResult],
                  on_reclaimed: Callable[[], None] | None = None,
                  emit: Callable[[dict[str, Any]], None] | None = None,
-                 wall: Callable[[], float] = time.time) -> None:
+                 wall: Callable[[], float] = time.time,
+                 notifier: Any = None, pane_id: str | None = None,
+                 deliver: bool = True) -> None:
         self.loaded = loaded
         self.policy = loaded.policy
         self.directory = Path(directory)
@@ -844,6 +1182,13 @@ class RotationController:
         self.cooldown_until = 0.0
         self._request: dict[str, Any] | None = None
         self._said: set[str] = set()
+        #: Delivery: `notifier.agents()` -> the agent rows of Herdr's snapshot, and
+        #: `notifier.notify(agent, text)`. None: the controller delivers nothing (the line on
+        #: stdout only). `deliver=False` is the operator's opt-out, recorded at `arm`.
+        self.notifier = notifier
+        self.pane_id = pane_id
+        self.deliver = deliver
+        self._target: dict[str, Any] | None = None
 
     # --- the record ----------------------------------------------------------------
 
@@ -906,9 +1251,145 @@ class RotationController:
             self._record("rotation_armed", show=True, policy_sha256=self.loaded.sha256,
                          policy=str(self.loaded.path),
                          threshold_tokens=self.policy.threshold_tokens,
+                         rotate_after_compactions=self.policy.rotate_after_compactions,
                          cooldown_until=_iso(self.cooldown_until) if self.cooldown_until else None)
         except Exception as exc:                                # noqa: BLE001 - reported
             self.emit(self._row("rotation_error", where="arm", detail=str(exc)[:300]))
+        self._arm_delivery()
+
+    # --- delivery ------------------------------------------------------------------
+
+    def _locate(self) -> tuple[str, str, str]:
+        """(name, kind, state) of the one agent in the master's pane, read from Herdr's snapshot
+        NOW (every call asks again: a state is never remembered from an earlier call), or
+        `Undeliverable`. The agent's name must be plain and the only one of its name in the whole
+        snapshot: the notice is addressed by name."""
+        pane = self.pane_id
+        if not pane:
+            raise Undeliverable("no Herdr pane is known for this hold (HERDR_PANE_ID is not set)")
+        if not isinstance(pane, str) or _PANE_ID.match(pane) is None:
+            raise Undeliverable("the Herdr pane of this hold is not a pane id")
+        rows = self.notifier.agents()
+        here = [a for a in rows if str(a.get("pane_id") or "") == pane]
+        if len(here) != 1:
+            raise Undeliverable(f"Herdr shows {len(here)} agents in pane {pane}, not exactly one")
+        row = here[0]
+        name = row.get("name")
+        if not isinstance(name, str) or _AGENT_NAME.match(name) is None:
+            raise Undeliverable(f"Herdr gives the agent in pane {pane} no plain name to address")
+        same = [a for a in rows if a.get("name") == name]
+        if len(same) != 1:
+            raise Undeliverable(f"{len(same)} agents in Herdr are named {name!r}: a notice "
+                                "addressed by name could reach another one")
+        state = str(row.get("agent_status") or "unknown")
+        return name, str(row.get("agent") or ""), state
+
+    def _arm_delivery(self) -> None:
+        """The one `rotation_delivery_target` row: where this hold's master runs, as Herdr
+        shows it now. A target that cannot be found is recorded as such, never an error."""
+        if self.notifier is None:
+            return
+        target: dict[str, Any] = {
+            "delivery": "on" if self.deliver else "off", "opt_out": not self.deliver,
+            "pane_id": self.pane_id or None, "source": "HERDR_PANE_ID" if self.pane_id else "none",
+            "agent": None, "agent_kind": None, "agent_state": None, "problem": None}
+        if self.deliver:
+            try:
+                target["agent"], target["agent_kind"], target["agent_state"] = self._locate()
+            except Undeliverable as exc:
+                target["problem"] = exc.reason
+            except Exception as exc:                            # noqa: BLE001 - recorded
+                target["problem"] = f"{type(exc).__name__}: {exc}"[:300]
+        self._target = target
+        try:
+            self._record("rotation_delivery_target", **target)
+        except Exception as exc:                                # noqa: BLE001 - reported
+            self.emit(self._row("rotation_error", where="arm-delivery", detail=str(exc)[:300]))
+
+    def _request_file(self, request_id: str, text: str) -> str | None:
+        """The fallback: the request as a file only its owner can read, created once per
+        request id (an existing one is the same request's, kept)."""
+        _field(request_id, _REQUEST_ID, "request id")              # it becomes a file name
+        folder = _own_dir(self.directory / ROTATION_DIRNAME / REQUESTS_DIRNAME)
+        path = folder / f"{request_id}.request.md"
+        try:
+            durable_create(path, text + "\n", mode=0o600)
+        except FileExistsError:
+            if not stat.S_ISREG(os.lstat(path).st_mode):          # (a link or a directory is no file)
+                raise OSError(f"{path} exists and is not a regular file") from None
+        return str(path)
+
+    def _deliver(self, notice: str, request_id: object, build: Callable[[], str],
+                 *, file_text: str | None = None, file_first: bool = False) -> None:
+        """One delivery attempt, one durable row: `rotation_delivered`, or
+        `rotation_undeliverable` (with the request file when `file_text` is given). With
+        `file_first` the typed text points at the request file, so the file is written before
+        anything is typed (and nothing is typed when it cannot be). Never raises: a failed
+        delivery never ends the hold, a request or a tick."""
+        if self.notifier is None or not self.deliver:
+            return
+        if file_text is None and not self.pane_id:
+            return                  # an outcome has nowhere to go; the request itself was recorded
+        rid = request_id if isinstance(request_id, str) else None
+        try:
+            text = ""
+            state: str | None = None
+            with_file: str | None = None
+            try:
+                text = build()
+                name, _kind, state = self._locate()
+                known = self._target.get("agent") if self._target else None
+                if known and name != known:
+                    raise Undeliverable(f"pane {self.pane_id} now holds the agent {name!r}, not "
+                                        f"{known!r}")
+                if state not in DELIVERABLE_STATES:
+                    raise Undeliverable(f"the agent is {state}: nothing is typed into a pane "
+                                        "that may hold a dialog")
+                try:
+                    screen = self.notifier.screen(self.pane_id)
+                except Exception as exc:                        # noqa: BLE001 - fail closed
+                    raise Undeliverable(f"screen unreadable ({type(exc).__name__}: "
+                                        f"{exc})"[:300]) from None
+                if not isinstance(screen, str) or not screen.strip():
+                    raise Undeliverable("screen unreadable (empty)")
+                shown = dialog_on_screen(screen)
+                if shown:
+                    raise Undeliverable(f"a dialog is on the target's screen ({shown}); the "
+                                        f"agent state is {state}, which is not trusted for "
+                                        "dialogs")
+                if file_first and file_text is not None and rid:
+                    with_file = self._request_file(rid, file_text)
+                self.notifier.notify(name, text)
+            except (Undeliverable, NoticeError) as exc:
+                reason = getattr(exc, "reason", None) or str(exc)
+            except Exception as exc:                            # noqa: BLE001 - recorded
+                reason = f"{type(exc).__name__}: {exc}"[:300]
+            else:
+                self._record("rotation_delivered", request_id=rid, notice=notice,
+                             pane_id=self.pane_id, agent=name, agent_state=state,
+                             chars=len(text), text_sha256=hashlib.sha256(text.encode()).hexdigest(),
+                             request_file=with_file)
+                return
+            path: str | None = None
+            if file_text is not None and rid:
+                try:
+                    path = self._request_file(rid, file_text)
+                except Exception as exc:                        # noqa: BLE001 - recorded
+                    reason = f"{reason}; the request file could not be written: {exc}"[:400]
+            self._record("rotation_undeliverable", show=file_text is not None, request_id=rid,
+                         notice=notice, pane_id=self.pane_id, agent_state=state,
+                         reason=reason[:400], request_file=path)
+        except Exception as exc:                                # noqa: BLE001 - never into the hold
+            self.emit(self._row("rotation_error", where="delivery", detail=str(exc)[:300],
+                                unrecorded=True))
+
+    def _deliver_request(self, row: dict[str, Any], notice: str) -> None:
+        reminder = notice == "redelivery"
+        self._deliver(notice, row.get("request_id"), lambda: request_notice(row, reminder=reminder),
+                      file_text=request_file_text(row), file_first=not plain_path(row.get("handoff")))
+
+    def _deliver_outcome(self, kind: str, request_id: object, outcome: object = None) -> None:
+        self._deliver(kind, request_id, lambda: outcome_notice(kind, request_id, outcome))
 
     # --- the tick --------------------------------------------------------------------
 
@@ -920,6 +1401,7 @@ class RotationController:
 
     def _fault(self, exc: BaseException) -> Tick:
         now = self.wall()
+        open_request = self._request
         self._request = None
         self.cooldown_until = now + self.policy.cooldown_s
         detail = f"{type(exc).__name__}: {exc}"[:300]
@@ -927,6 +1409,8 @@ class RotationController:
             self._record("rotation_error", show=True, detail=detail)
         except Exception:                                       # noqa: BLE001 - best effort
             self.emit(self._row("rotation_error", detail=detail, unrecorded=True))
+        if open_request is not None:
+            self._deliver_outcome("error", open_request["id"])
         return Tick()
 
     def _tick(self) -> Tick:
@@ -968,7 +1452,10 @@ class RotationController:
         row = self._record(
             "rotation_requested", show=True, request_id=request_id, reason=fired.reason,
             context_tokens=fired.context_tokens, threshold=fired.threshold,
-            size_bytes=fired.size_bytes, handoff=path, deadline=_iso(deadline),
+            size_bytes=fired.size_bytes, compactions=getattr(fired, "compactions", None),
+            rotate_after_compactions=getattr(fired, "compaction_limit", None),
+            transcript_session_id=getattr(fired, "transcript_session_id", None),
+            handoff=path, deadline=_iso(deadline),
             instruction=(f"Write your handoff to {path} now (replace its content), and make "
                          f"its first line name this request ({request_id}): writing it is "
                          "your consent to be rotated out. From then on start no run, merge or "
@@ -977,7 +1464,9 @@ class RotationController:
                          "stop now, do not write it: the request expires and nothing rotates."))
         self._request = {"id": request_id, "started": now, "deadline": deadline,
                          "handoff": path, "waiting": None, "ready": None, "deferred": False,
-                         "row": row}
+                         "row": row, "redeliver_at": now + self.policy.request_ttl_s / 2,
+                         "redelivered": False}
+        self._deliver_request(row, "request")
         return Tick(next_in=self.policy.poll_s)
 
     def _advance(self, now: float) -> Tick:
@@ -993,6 +1482,9 @@ class RotationController:
                 if exc.reason != req["waiting"]:
                     req["waiting"] = exc.reason
                     self._record("rotation_handoff_waiting", request_id=req["id"], reason=exc.reason)
+                if not req["redelivered"] and now >= req["redeliver_at"]:
+                    req["redelivered"] = True                   # counted before the attempt
+                    self._deliver_request(req["row"], "redelivery")
                 return Tick(next_in=self.policy.poll_s)
             handoffs = _own_dir(self.directory / ROTATION_DIRNAME / "handoffs")
             copy = handoffs / f"{req['id']}.handoff.md"
@@ -1005,6 +1497,13 @@ class RotationController:
                                if d["entry_id"] == HANDOFF_ENTRY else d)
                               for d in body["derive"]]
             inp = validate_capsule_input(body, self.policy)
+            sid = req["row"].get("transcript_session_id")
+            if sid is not None:
+                # after the validation: the name is the product's, not the operator's input's
+                inp = inp.model_copy(update={"advisory": (*inp.advisory, AdvisoryIn(
+                    entry_id=ROTATING_SESSION_ENTRY, section=Section.CONTEXT,
+                    text=rotating_session_text(sid, request_id=req["id"],
+                                               compactions=req["row"].get("compactions"))))})
             req["ready"] = (inp, digest, copy)
             self._record("rotation_handoff_ready", request_id=req["id"], handoff=req["handoff"],
                          sha256=digest, copy=str(copy), bytes=len(data))
@@ -1031,6 +1530,7 @@ class RotationController:
         self.cooldown_until = now + self.policy.cooldown_s
         self._record("rotation_request_expired", show=True, request_id=req["id"], reason=why,
                      cooldown_until=_iso(self.cooldown_until))
+        self._deliver_outcome("expired", req["id"])
         return Tick()
 
     def _finish(self, req: dict[str, Any], result: RolloverResult, now: float) -> Tick:
@@ -1046,6 +1546,7 @@ class RotationController:
             self._request = None
             if outcome is Outcome.NOT_TRIGGERED:
                 self._record("rotation_withdrawn", show=True, request_id=req["id"], detail=result.detail)
+                self._deliver_outcome("withdrawn", req["id"])
                 return Tick()
             self.cooldown_until = self.wall() + self.policy.cooldown_s
             if outcome is Outcome.RECLAIMED and self.on_reclaimed is not None:
@@ -1055,7 +1556,10 @@ class RotationController:
                          predecessor_is_master=result.predecessor_is_master,
                          successor_epoch=result.successor_epoch,
                          context_tokens=req["row"].get("context_tokens"),
-                         threshold=req["row"].get("threshold"))
+                         threshold=req["row"].get("threshold"),
+                         compactions=req["row"].get("compactions"),
+                         transcript_session_id=req["row"].get("transcript_session_id"))
+            self._deliver_outcome("finished", req["id"], outcome.value)
         except Exception as exc:                                # noqa: BLE001 - fail closed
             fault = self._fault(exc)
             return Tick(stop=True) if stop else fault

@@ -84,8 +84,10 @@ def next_attempt_at(text: str, *, now: datetime | None = None) -> datetime:
 
     # The provider's own banner first: its stated reset (with its zone) is the
     # best evidence there is, and a role's `finished in 5m` elsewhere must not
-    # outrank it.
-    stated = _stated_clock(text or "", now)
+    # outrank it. A weekly limit states a day as well as an hour.
+    stated = _stated_date(text or "", now)
+    if stated is None:
+        stated = _stated_clock(text or "", now)
     if stated is not None:
         return stated if stated is not _UNTRUSTED else now + DEFAULT_WAIT
 
@@ -148,6 +150,78 @@ def _stated_duration(text: str) -> timedelta | None:
 
 #: A stated time whose zone this machine does not know: no evidence.
 _UNTRUSTED = object()
+
+#: `resets Oct 18, 12pm (Europe/Istanbul)`: the banner of a weekly limit (recorded
+#: 2026-10-15, P3-08 slice 4). The day without a year, the hour with am/pm.
+_STATED_DATE = re.compile(
+    r"\bresets?(?:\s+at)?\s+(?:on\s+)?([A-Za-z]{3,9})\.?\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+"
+    r"(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)(?![\w:])", re.I)
+_MONTHS = ("january", "february", "march", "april", "may", "june", "july", "august",
+           "september", "october", "november", "december")
+
+#: The longest a dated reset may lie ahead: a week and a day. A weekly limit resets
+#: within seven days; a stamp further out is a typo or a role's, and reading it
+#: would park a run for good. Outside it (or already past) the stamp is no evidence
+#: and the default wait applies.
+MAX_STATED_DATE_WAIT = timedelta(days=8)
+
+
+def _month_of(name: str) -> int | None:
+    word = name.lower()
+    for number, month in enumerate(_MONTHS, start=1):
+        if word == month or word == month[:3] or (word == "sept" and month == "september"):
+            return number
+    return None
+
+
+def _stated_date(text: str, now: datetime) -> datetime | None:
+    """The moment a weekly limit's banner says it resets (`resets Oct 18, 12pm
+    (Europe/Istanbul)`), plus the margin -- or None when the text states no such
+    time, names no zone, names one this machine does not know, names a day that
+    does not exist, or names a moment that is not within `MAX_STATED_DATE_WAIT`
+    ahead (the default wait then applies, as for every unreadable stamp).
+
+    Read only from lines that open like a provider banner (`_BANNER_OPENER`). The
+    zone is the one **directly after the date's hour on the same line**
+    (`12pm (Europe/Istanbul)`): a zone further along the line, or on another banner
+    line, is not read (unlike `_stated_clock`, which takes one from any banner line).
+    The year is not printed: the day is taken in the year of `now` in the zone and the
+    year after, and the earliest of those that lies ahead decides (the year before is
+    tried too, defensively, and can never win: that wall time is always past)."""
+    from zoneinfo import ZoneInfo
+
+    lines = [ln for ln in text.splitlines() if _BANNER_OPENER.match(_LEAD.sub("", ln))]
+    first = None
+    zone_name = None
+    for ln in lines:
+        for m in _STATED_DATE.finditer(ln):
+            if first is None and _month_of(m.group(1)) is not None:
+                first = m
+                z = _STATED_ZONE.match(ln, m.end())
+                if z is not None:
+                    zone_name = z.group(1)
+    if first is None or zone_name is None:
+        return None
+    month, day = _month_of(first.group(1)), int(first.group(2))
+    hour, minute = int(first.group(3)), int(first.group(4) or 0)
+    if not (1 <= hour <= 12 and minute < 60):
+        return None
+    hour = hour % 12 + (12 if first.group(5).lower() == "pm" else 0)
+    try:
+        zone = ZoneInfo(zone_name)
+    except (KeyError, ValueError, OSError):
+        return None
+    year = now.astimezone(zone).year
+    best = None
+    for candidate in (year - 1, year, year + 1):
+        try:
+            wall = datetime(candidate, month, day, hour, minute, tzinfo=zone)
+        except ValueError:                       # Feb 30, or Feb 29 in a common year
+            continue
+        moment = wall.astimezone(timezone.utc) + STATED_RESET_MARGIN
+        if now < moment <= now + MAX_STATED_DATE_WAIT and (best is None or moment < best):
+            best = moment
+    return None if best is None else best.astimezone(now.tzinfo or timezone.utc)
 
 
 def _stated_clock(text: str, now: datetime):

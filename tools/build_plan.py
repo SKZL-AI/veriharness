@@ -27,8 +27,10 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import importlib.util
 import json
+import re
 import stat
 import sys
 from datetime import UTC, datetime
@@ -160,7 +162,10 @@ def _ready_now(open_: dict, phase_order: list[str] | None,
 
 
 def build(body: dict, phase_order: list[str] | None = None,
-          phase_gates: dict[str, tuple[bool, str]] | None = None) -> dict:
+          phase_gates: dict[str, tuple[bool, str]] | None = None, *,
+          closures: dict[str, dict] | None = None,
+          watch: dict[str, dict] | None = None,
+          closure_notes: dict[str, str] | None = None) -> dict:
     """The DAG and the checklist, from one measured matrix.
 
     With `phase_order`, the plan's sequence is part of the graph: every
@@ -170,6 +175,14 @@ def build(body: dict, phase_order: list[str] | None = None,
     wait on -- P0's deliverables exist or they do not; P7's product proof has
     been run or it has not. A phase absent from it with no open blocking work
     is open.
+
+    `closures` (A7, from `verified_closures`) names the phases that are **closed**:
+    such a phase has no blocking work and no unmet condition for the gates behind
+    it, and its state carries `closed_at`, `closure_entry`, `release_tag` and the
+    `watch` -- the phase's open blocking requirements as `blocking_open_live` beside
+    what `phase_gate_report` measured -- so what a closure stopped holding shut is
+    still in the plan. `closure_notes` is the reason a closure record that exists
+    was not honoured; that phase is judged as it would be without one.
     """
     caps = {r["id"]: r for r in body["capabilities"]}
     open_ = {rid: r for rid, r in caps.items() if not _satisfied(r)}
@@ -190,6 +203,22 @@ def build(body: dict, phase_order: list[str] | None = None,
             blockers = sorted(rid for rid, r in open_.items()
                               if r["target_phase"] == ph and _blocking(r))
             given = gates.get(ph)
+            closure = (closures or {}).get(ph)
+            if isinstance(closure, dict):
+                # Closed at a commit (A7): its open requirements are the watch, not
+                # a hold on the gates behind it.
+                gate_state[ph] = {
+                    "blocking_open": [],
+                    "external": (given[1] if given else None),
+                    "external_met": True,
+                    "closed_at": closure.get("closed_at"),
+                    "closure_entry": closure.get("entry"),
+                    "release_tag": closure.get("tag"),
+                    "watch": {**((watch or {}).get(ph) or {}),
+                              "blocking_open_live": blockers,
+                              "regression_watch": closure.get("watch_state")}}
+                nodes[f"gate:{ph}"] = ([f"gate:{phase_order[i - 1]}"] if i else [])
+                continue
             gate_deps = list(blockers)
             if given is not None and not given[0]:
                 # A gate nothing in the register can close -- an unmeasured
@@ -201,12 +230,14 @@ def build(body: dict, phase_order: list[str] | None = None,
             gate_state[ph] = {"blocking_open": blockers,
                               "external": (given[1] if given else None),
                               "external_met": (given[0] if given else None)}
+            if (closure_notes or {}).get(ph):
+                gate_state[ph]["closure_ignored"] = closure_notes[ph]
         for rid, r in open_.items():
             i = phase_order.index(r["target_phase"]) if r["target_phase"] in phase_order else -1
             if i > 0 and not _pulled_forward(r):
                 nodes[rid] = nodes[rid] + [f"gate:{phase_order[i - 1]}"]
         for ph, (met, _) in gates.items():
-            if not met:
+            if not met and not isinstance((closures or {}).get(ph), dict):
                 nodes[f"unmet:{ph}"] = [f"unmet:{ph}"]     # a self-loop: never placed
     waves, unplaced = layers(nodes)
     # A gate is open *now* when its phase has no open blocking requirement, no
@@ -511,6 +542,17 @@ def _succession():
     return su
 
 
+def _regression_watch():
+    """`tools/regression_watch.py`, loaded per call like the other tools: what the
+    watch records and requests say is read through it, from the blobs at HEAD."""
+    spec = importlib.util.spec_from_file_location(
+        "regression_watch_for_build_plan", HERE / "regression_watch.py")
+    rw = importlib.util.module_from_spec(spec)
+    sys.modules["regression_watch_for_build_plan"] = rw
+    spec.loader.exec_module(rw)
+    return rw
+
+
 def _other_tree(*tools) -> str:
     """Why the loaded `tools` do not all judge this repository, or `""`.
 
@@ -624,7 +666,8 @@ def _review_causes(record: dict, register: dict, matrix: dict) -> list[str]:
         if loaded.blocking_findings:
             causes.append(f"{len(loaded.blocking_findings)} blocking finding(s)")
         return causes + ps.stale_against(
-            loaded, snapshot=snapshot, matrix_digest=ps.matrix_digest(matrix))
+            loaded, snapshot=snapshot, matrix_digest=ps.matrix_digest(matrix),
+            matrix=matrix)
     except Exception as exc:  # noqa: BLE001 - a diagnostic that fails says so
         return [f"the record is refused ({type(exc).__name__})"]
 
@@ -704,6 +747,520 @@ def checklist_gate_measures() -> dict[str, tuple[bool, str]]:
     return out
 
 
+# --------------------------------------------------------------------------- #
+# a closed phase (amendment A7): the closure record and what the gate reads of it
+# --------------------------------------------------------------------------- #
+
+#: A7: "a phase is closed at the commit of its closure record; later changes create
+#: regression obligations, not a reopened phase". The record is the machine-readable
+#: twin of the records entry (for P2: ledger O268) and sits in the phase's gate
+#: directory. The gate believes it only after `closure_record` has re-derived
+#: every digest it names from the blobs at the commit it names.
+CLOSURE_FILE = "CLOSURE.json"
+CLOSURE_VERSION = 1
+#: An explicit reopen decision (A7 rule 3) is a committed `<gate dir>/reopen/*.json`
+#: naming the closure; nothing in this tool writes one.
+REOPEN_DIR = "reopen"
+#: More reopen records than this are not read: each is one git read, and a directory
+#: that grows without bound must not turn the gate into a long wait. Refused, not cut.
+REOPEN_MAX = 64
+CLOSURE_KEYS = frozenset({
+    "what", "record_version", "phase", "closure_entry", "closure_date", "amendment",
+    "closed_at_commit", "sealing_commit", "capsule_commit", "release", "instruments",
+    "rows"})
+#: The instrument files a closure names, by their fixed repository path. The record
+#: carries digests, never paths: a record cannot point the gate at another file.
+MATRIX_JSON = "program/v3_3/VERIHARNESS_CAPABILITY_MATRIX.json"
+REGISTER_JSON = "program/v3_3/REQUIREMENTS.json"
+DURABILITY_RECORD = "dogfood/p2-durability/P2_DURABILITY_ACCEPTANCE.json"
+LEDGER = "DOGFOOD_LEDGER.md"
+AMENDMENTS_ROOT = "program/v3_3/amendments"
+_PHASE = re.compile(r"P[0-9]{1,2}")
+_FULL_SHA = re.compile(r"[0-9a-f]{40}")
+_SHA256 = re.compile(r"[0-9a-f]{64}")
+_ENTRY = re.compile(r"O[0-9]{1,5}")
+_TAG = re.compile(r"v[0-9]+\.[0-9]+\.[0-9]+[A-Za-z0-9.+-]{0,24}")
+_DATE = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")
+_AMENDMENT_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,120}")
+_AMENDMENT_ID = re.compile(r"A[0-9]{1,3}")
+#: A closing commit as a reopen record may spell it: the full id or an abbreviation of at
+#: least seven hex digits (the gate itself prints twelve), in either case.
+_COMMIT_PREFIX = re.compile(r"[0-9a-fA-F]{7,40}")
+_PHASE_WORD = re.compile(r"[Pp]0*([0-9]{1,2})")
+
+
+def _phase_of(value) -> str | None:
+    """A phase as a record may spell it (`P2`, `p2`, ` P02 `) in its one canonical
+    spelling (`P2`), or None when it is not a phase name at all."""
+    if not isinstance(value, str):
+        return None
+    m = _PHASE_WORD.fullmatch(value.strip())
+    return f"P{int(m.group(1))}" if m else None
+
+
+class _Refused(Exception):
+    """A closure record the gate does not honour; the message is the reason."""
+
+
+def _is_object(value) -> bool:
+    return isinstance(value, dict)
+
+
+def _field(body: dict, key: str, what: str, pattern=None):
+    """`body[key]`: a non-empty string, matching `pattern` entirely when one is given."""
+    value = body.get(key)
+    if not isinstance(value, str) or not value or (
+            pattern is not None and not pattern.fullmatch(value)):
+        raise _Refused(f"{what}: `{key}` is missing or not in its shape")
+    return value
+
+
+def _section(body: dict, key: str, keys: set, what: str) -> dict:
+    value = body.get(key)
+    if not _is_object(value) or set(value) != keys:
+        raise _Refused(f"{what}: `{key}` is missing or does not hold exactly "
+                       f"{sorted(keys)}")
+    return value
+
+
+def _read_object(blob: bytes, what: str) -> dict:
+    try:
+        body = json.loads(blob.decode("utf-8"))
+    except (ValueError, RuntimeError) as exc:
+        raise _Refused(f"{what} cannot be read ({type(exc).__name__})") from None
+    if not _is_object(body):
+        raise _Refused(f"{what} is not a JSON object")
+    return body
+
+
+def _git_blob(su, rev: str, path: str, what: str) -> bytes:
+    """The bytes of `path` as committed at `rev`, or a refusal naming the exit."""
+    rc, text = su._git_rc("cat-file", "blob", f"{rev}:{path}")
+    if rc != 0:
+        raise _Refused(f"{what} is not a file of {rev[:12]} (git exit {rc})")
+    data = text.encode("utf-8", "surrogateescape")
+    if len(data) > _GATE_INPUT_MAX_BYTES:
+        raise _Refused(f"{what} at {rev[:12]} is larger than {_GATE_INPUT_MAX_BYTES} bytes")
+    return data
+
+
+def _git_commit(su, rev: str, what: str) -> str:
+    rc, out = su._git_rc("rev-parse", "--verify", "--quiet", f"{rev}^{{commit}}")
+    full = out.strip()
+    if rc != 0 or not _FULL_SHA.fullmatch(full):
+        raise _Refused(f"{what} {rev[:12]} is not a commit of this repository")
+    return full
+
+
+def _git_ancestor(su, older: str, newer: str, what: str) -> None:
+    """`older` is `newer` or one of its ancestors; otherwise refuse (exit 1 is "no",
+    any other exit is "git could not say" -- never a pass)."""
+    rc, _ = su._git_rc("merge-base", "--is-ancestor", older, newer)
+    if rc == 1:
+        raise _Refused(f"{what}: {older[:12]} is not an ancestor of {newer[:12]}")
+    if rc != 0:
+        raise _Refused(f"{what}: git could not relate {older[:12]} to {newer[:12]} "
+                       f"(exit {rc})")
+
+
+def _digest(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def _same_digest(data: bytes, claimed: str, what: str, rev: str) -> None:
+    if _digest(data) != claimed:
+        raise _Refused(f"{what} at {rev[:12]} has sha256 {_digest(data)[:12]}..., "
+                       f"the record says {claimed[:12]}...")
+
+
+def _verify_closure(phase: str) -> dict:
+    """The closure of `phase` as the committed record states it, every claim
+    re-derived from the blobs of the commit it names; raises `_Refused` otherwise.
+
+    Order matters: the tool must judge this tree (`_other_tree`), it must be a
+    repository of its own (`_own_repository`, *before* any `git` read: on an archive
+    copy `git` answers for whatever repository lies above it), and the record must
+    be the one committed at HEAD and the one in the working tree."""
+    if not isinstance(phase, str) or not _PHASE.fullmatch(phase):
+        raise _Refused(f"{phase!r} is not a phase name")
+    su = _succession()
+    other = _other_tree(su)
+    if other:
+        raise _Refused(other)
+    own, why = su._own_repository()
+    if not own:
+        raise _Refused("ENVIRONMENT_GAP: " + why)
+    gate_dir = f"dogfood/{phase.lower()}-gate"
+    path = f"{gate_dir}/{CLOSURE_FILE}"
+    head = _git_commit(su, "HEAD", "HEAD")
+    blob = _git_blob(su, head, path, "the closure record")
+    working, why = _gate_input(HOH / path, "the closure record")
+    if working is None:
+        raise _Refused(why)
+    if (HOH / path).resolve(strict=True).read_bytes() != blob:
+        raise _Refused("the closure record in the working tree differs from the one "
+                       "committed at HEAD; the gate reads the committed one")
+    rec = _read_object(blob, "the closure record")
+    what = "the closure record"
+    if set(rec) != CLOSURE_KEYS:
+        raise _Refused(f"{what} does not hold exactly its keys (extra {sorted(set(rec) - CLOSURE_KEYS)[:3]}, "
+                       f"missing {sorted(CLOSURE_KEYS - set(rec))[:3]})")
+    if rec["record_version"] != CLOSURE_VERSION or isinstance(rec["record_version"], bool):
+        raise _Refused(f"{what} is version {rec['record_version']!r}, not {CLOSURE_VERSION}")
+    if rec["phase"] != phase:
+        raise _Refused(f"{what} is about {rec['phase']!r}, not {phase}")
+    _field(rec, "what", what)
+    entry = _field(rec, "closure_entry", what, _ENTRY)
+    _field(rec, "closure_date", what, _DATE)
+    x = _field(rec, "closed_at_commit", what, _FULL_SHA)
+    sealing = _field(rec, "sealing_commit", what, _FULL_SHA)
+    capsule_commit = _field(rec, "capsule_commit", what, _FULL_SHA)
+    ins = rec["instruments"]
+    if not _is_object(ins) or set(ins) != {"matrix", "snapshot", "review", "register",
+                                           "capsule", "durability"}:
+        raise _Refused(f"{what}: `instruments` does not name exactly the matrix, snapshot, "
+                       "review, register, capsule and durability record")
+    matrix_c = _section(ins, "matrix", {"file_sha256", "matrix_digest"}, what)
+    snap_c = _section(ins, "snapshot", {"file_sha256", "seal"}, what)
+    review_c = _section(ins, "review", {"file_sha256", "review_id", "snapshot_seal",
+                                        "matrix_digest"}, what)
+    register_c = _section(ins, "register", {"file_sha256"}, what)
+    capsule_c = _section(ins, "capsule", {"file_sha256", "internal_commit"}, what)
+    dur_c = _section(ins, "durability", {"file_sha256", "evidence_head"}, what)
+    for group in (matrix_c, snap_c, review_c, register_c, capsule_c, dur_c):
+        for key in ("file_sha256", "matrix_digest", "seal", "snapshot_seal"):
+            if key in group:
+                _field(group, key, what, _SHA256)
+    for group, key in ((capsule_c, "internal_commit"), (dur_c, "evidence_head")):
+        _field(group, key, what, _FULL_SHA)
+    review_id = _field(review_c, "review_id", what)
+    rows_c = _section(rec, "rows", {"phase_rows", "proven"}, what)
+    release_c = _section(rec, "release", {"tag", "commit"}, what)
+    tag = _field(release_c, "tag", what, _TAG)
+    release_commit = _field(release_c, "commit", what, _FULL_SHA)
+    amend = _section(rec, "amendment", {"id", "file", "file_sha256", "ruling_file",
+                                        "ruling_sha256"}, what)
+    for key in ("file_sha256", "ruling_sha256"):
+        _field(amend, key, what, _SHA256)
+    for key in ("file", "ruling_file"):
+        _field(amend, key, what, _AMENDMENT_NAME)
+    _field(amend, "id", what, _AMENDMENT_ID)
+    if not (amend["file"].startswith(amend["id"] + "_")
+            and amend["ruling_file"].startswith(amend["id"] + "_")):
+        raise _Refused(f"{what}: amendment {amend['id']} is not the one its files name")
+
+    # the commits: X is on this line, S and C lead to it, the release descends from it
+    if _git_commit(su, x, "the closing commit") != x:
+        raise _Refused(f"{what}: `closed_at_commit` is not a full commit id")
+    _git_ancestor(su, x, head, "the closing commit is not in this tree's history")
+    _git_ancestor(su, sealing, capsule_commit, "the sealing commit does not lead to the capsule")
+    _git_ancestor(su, capsule_commit, x, "the capsule commit does not lead to the closing commit")
+    _git_ancestor(su, x, release_commit, "the release does not descend from the closing commit")
+    _git_ancestor(su, release_commit, head, "the release is not in this tree's history")
+    rc, out = su._git_rc("rev-parse", "--verify", "--quiet", f"refs/tags/{tag}^{{commit}}")
+    if rc == 0 and out.strip() != release_commit:
+        raise _Refused(f"the tag {tag} here names {out.strip()[:12]}, the record says "
+                       f"{release_commit[:12]}")
+    #: Printed only when it resolves here and names the release commit: a name that
+    #: nothing in this repository backs is a claim, and the gate does not repeat it.
+    tag_here = tag if rc == 0 else None
+
+    # the instruments at X: digests of the files, then the facts the record states
+    def at_x(file: str, group: dict, name: str) -> bytes:
+        data = _git_blob(su, x, file, name)
+        _same_digest(data, group["file_sha256"], name, x)
+        return data
+
+    matrix_blob = at_x(MATRIX_JSON, matrix_c, "the capability matrix")
+    snap_blob = at_x(f"{gate_dir}/CHECKLIST_SNAPSHOT.json", snap_c, "the checklist snapshot")
+    review_blob = at_x(f"{gate_dir}/REVIEW.json", review_c, "the supervisor review")
+    register_blob = at_x(REGISTER_JSON, register_c, "the requirement register")
+    capsule_blob = at_x(SUCCESSION_CAPSULE, capsule_c, "the succession capsule")
+    dur_blob = at_x(DURABILITY_RECORD, dur_c, "the durability record")
+    for file, claimed, name in ((MATRIX_JSON, matrix_c, "the capability matrix"),
+                                (f"{gate_dir}/CHECKLIST_SNAPSHOT.json", snap_c,
+                                 "the checklist snapshot"),
+                                (f"{gate_dir}/REVIEW.json", review_c, "the supervisor review")):
+        _same_digest(_git_blob(su, sealing, file, name), claimed["file_sha256"], name, sealing)
+    _same_digest(_git_blob(su, capsule_commit, SUCCESSION_CAPSULE, "the succession capsule"),
+                 capsule_c["file_sha256"], "the succession capsule", capsule_commit)
+    for key, name in (("file", "the amendment"), ("ruling_file", "the operator ruling")):
+        digest_key = "file_sha256" if key == "file" else "ruling_sha256"
+        _same_digest(_git_blob(su, x, f"{AMENDMENTS_ROOT}/{amend[key]}", name),
+                     amend[digest_key], name, x)
+    ledger = _git_blob(su, x, LEDGER, "the ledger").decode("utf-8", "replace")
+    if not re.search(rf"(?m)^### {entry} -- {rec['closure_date']}\b", ledger):
+        raise _Refused(f"the ledger at {x[:12]} has no entry {entry} of {rec['closure_date']}")
+
+    matrix = _read_object(matrix_blob, "the capability matrix")
+    ps = _programme_supervisor()
+    if ps.matrix_digest(matrix) != matrix_c["matrix_digest"]:
+        raise _Refused("the capability matrix at the closing commit does not re-digest "
+                       f"to {matrix_c['matrix_digest'][:12]}...")
+    rows = [c for c in matrix.get("capabilities") or []
+            if _is_object(c) and c.get("target_phase") == phase]
+    proven = sum(1 for c in rows if c.get("status") == "PROVEN")
+    if (not rows or proven != len(rows) or rows_c["phase_rows"] != len(rows)
+            or rows_c["proven"] != proven or isinstance(rows_c["phase_rows"], bool)):
+        raise _Refused(f"the matrix at the closing commit has {proven} of {len(rows)} "
+                       f"{phase} row(s) PROVEN; the record says {rows_c['proven']} of "
+                       f"{rows_c['phase_rows']}, and closing lifts no row (A7 rule 2)")
+    # the register and the matrix agree on which requirements the phase has
+    register = _read_object(register_blob, "the requirement register")
+    members = {r["id"] for r in register.get("requirements") or []
+               if _is_object(r) and isinstance(r.get("id"), str)
+               and _phase_of(r.get("target_phase")) == phase}
+    if members != {c.get("id") for c in rows}:
+        raise _Refused(f"the register and the matrix at {x[:12]} disagree about the "
+                       f"requirements of {phase} ({len(members)} against {len(rows)})")
+    snapshot = _read_object(snap_blob, "the checklist snapshot")
+    verdict = (snapshot.get("gates") or {}).get(phase)
+    if (snapshot.get("seal") != snap_c["seal"] or not _is_object(verdict)
+            or verdict.get("closed") is not True or verdict.get("blockers") != []):
+        raise _Refused(f"the checklist snapshot at the closing commit is not sealed "
+                       f"{snap_c['seal'][:12]}... with {phase} closed and no blocker")
+    review = _read_object(review_blob, "the supervisor review")
+    if (review.get("review_id") != review_id or review.get("phase") != phase
+            or review.get("complete") is not True or review.get("blocking_findings") != []
+            or review.get("snapshot_seal") != snap_c["seal"]
+            or review.get("matrix_digest") != matrix_c["matrix_digest"]
+            or review_c["snapshot_seal"] != snap_c["seal"]
+            or review_c["matrix_digest"] != matrix_c["matrix_digest"]):
+        raise _Refused(f"the supervisor review at the closing commit is not complete, "
+                       f"blocking-free, about {phase} and bound to the sealed snapshot "
+                       f"and matrix ({review_id})")
+    capsule = _read_object(capsule_blob, "the succession capsule")
+    if (capsule.get("internal_commit") != capsule_c["internal_commit"]
+            or capsule_c["internal_commit"] != sealing
+            or capsule.get("internal_tree_clean") is not True):
+        raise _Refused("the succession capsule at the closing commit does not describe "
+                       "the sealing commit on a clean tree")
+    durability = _read_object(dur_blob, "the durability record")
+    if (durability.get("evidence_head") != dur_c["evidence_head"]
+            or durability.get("requirement_satisfied") is not True):
+        raise _Refused("the durability record at the closing commit does not name the "
+                       "recorded evidence head or does not read satisfied")
+    _git_ancestor(su, dur_c["evidence_head"], x, "the durability evidence head")
+
+    # an explicit reopen decision naming this closure (A7 rule 3). A decision is read
+    # as a person writes it: the phase in any case and with leading zeros, the closing
+    # commit as the full id or as an abbreviation of at least seven hex digits (the gate
+    # prints twelve). A record that names this phase and a closing commit the gate cannot
+    # read is not "another closure": cannot tell -> not honoured. Deleting a reopen record
+    # does not end it: the history of the directory is read, and a reopen is ended only by
+    # a committed RESOLVED record that names it.
+    reopen_dir = f"{gate_dir}/{REOPEN_DIR}"
+    rc, listed = su._git_rc("ls-tree", "-r", "-z", "--name-only", head, "--", reopen_dir + "/")
+    if rc != 0:
+        raise _Refused(f"git could not list {reopen_dir} (exit {rc})")
+    names = sorted(n for n in listed.split("\0") if n)
+    rc, past = su._git_rc("log", "--name-only", "--format=", "--no-renames", "-z", head,
+                          "--", reopen_dir + "/")
+    if rc != 0:
+        raise _Refused(f"git could not read the history of {reopen_dir} (exit {rc})")
+    ever = {n for n in past.split("\0") if n.strip()}
+    if len(names) > REOPEN_MAX or len(ever) > REOPEN_MAX:
+        raise _Refused(f"{reopen_dir} holds or held {max(len(names), len(ever))} files, "
+                       f"more than {REOPEN_MAX}; whether one of them reopens this closure "
+                       "is not read")
+    def reading(found: dict, name: str):
+        """What one reopen file says about THIS closure: `(None, "")` when it is about
+        another phase or another closure, else `("KEEP" | "RESOLVED" | "REOPEN", detail)`;
+        a file that names this phase and cannot be read refuses (cannot tell)."""
+        named_phase = _phase_of(found.get("phase"))
+        if named_phase is None or not isinstance(found.get("closed_at_commit"), str):
+            raise _Refused(f"{name} does not name a phase and a closing commit")
+        if named_phase != phase:
+            return None, ""
+        prefix = found["closed_at_commit"].strip()
+        if not _COMMIT_PREFIX.fullmatch(prefix):
+            raise _Refused(f"{name} names {phase} and a closing commit that cannot be read "
+                           f"({prefix[:12]!r}): whether it reopens this closure cannot be told")
+        if not x.startswith(prefix.lower()):
+            return None, ""             # another closure of the same phase
+        decision = found.get("decision")
+        if decision == "KEEP_CLOSED":
+            return "KEEP", ""           # a records entry that answers a reopen request
+        if decision == "RESOLVED":
+            target = found.get("resolves")
+            if not isinstance(target, str) or not target.strip():
+                raise _Refused(f"{name} is RESOLVED and names no record it resolves")
+            return "RESOLVED", target.strip().rsplit("/", 1)[-1]
+        if decision != "REOPEN":
+            raise _Refused(f"{name} names this closure and its decision is neither "
+                           "REOPEN, KEEP_CLOSED nor RESOLVED")
+        by = found.get("entry")
+        return "REOPEN", (f" ({by})" if isinstance(by, str) and by else "")
+
+    def commits_of(name: str, *args: str) -> list[str]:
+        rc, out = su._git_rc("log", "--format=%H", "--no-renames", *args, head, "--", name)
+        listed = out.split()
+        if rc != 0 or any(not _FULL_SHA.fullmatch(c) for c in listed):
+            raise _Refused(f"git could not read the history of {name} (exit {rc})")
+        return listed
+
+    def after(older: str, newer: str) -> bool:
+        """`newer` was committed strictly after `older`: a descendant by ancestry."""
+        if older == newer:
+            return False
+        rc, _ = su._git_rc("merge-base", "--is-ancestor", older, newer)
+        if rc not in (0, 1):
+            raise _Refused(f"git could not relate {older[:12]} to {newer[:12]} (exit {rc})")
+        return rc == 0
+
+    # A reopen is judged by the version that was COMMITTED as a reopen: every commit that
+    # added the file is read (oldest first), and an in-place edit later -- another
+    # decision, another commit id, another phase -- never cancels it. Only a RESOLVED
+    # record does, and only one committed strictly AFTER the reopen it names (by
+    # ancestry): a RESOLVED that names a reopen that does not exist yet is ignored.
+    anchors: dict[str, list[str]] = {}       # file name -> commits that made it a reopen
+    reopens: dict[str, str] = {}             # file name -> " (entry)" of its committed reopen
+    resolvers: dict[str, list[str]] = {}     # target file name -> commits of RESOLVED records
+    for name in sorted(ever | set(names)):
+        if not name.endswith(".json"):
+            if name in names:
+                raise _Refused(f"{name} is in {reopen_dir} and is not a JSON record; whether "
+                               "it reopens this closure cannot be told")
+            continue
+        base = name.rsplit("/", 1)[-1]
+        added = list(reversed(commits_of(name, "--diff-filter=A")))
+        anchors[name] = list(added)
+        for commit in added:
+            found = _read_object(_git_blob(su, commit, name, name), name)
+            kind, detail = reading(found, name)
+            if kind == "REOPEN":
+                reopens[name] = detail
+                if commit not in anchors[name]:
+                    anchors[name].append(commit)
+        if name in names:
+            found = _read_object(_git_blob(su, head, name, name), name)
+            kind, detail = reading(found, name)
+            touch = commits_of(name, "-1")
+            if kind == "REOPEN":
+                reopens[name] = detail
+                anchors[name] += [c for c in touch if c not in anchors[name]]
+            elif kind == "RESOLVED":
+                resolvers.setdefault(detail, []).extend(touch)
+    for name in sorted(anchors):
+        if name not in reopens and name in names:
+            continue                         # present and never a reopen: nothing to end
+        base = name.rsplit("/", 1)[-1]
+        if any(all(after(a, r) for a in anchors[name]) for r in resolvers.get(base, [])):
+            continue                         # ended by a RESOLVED committed after it
+        if name in names:
+            raise _Refused(f"reopened by {name}{reopens[name]}")
+        raise _Refused(f"{name} was committed to {reopen_dir} and is no longer there; "
+                       "a reopen is ended only by a committed RESOLVED record that "
+                       "names it (committed after it), never by removing it")
+    state = _watch_state(phase, head, x, dur_c["evidence_head"])
+    return {"phase": phase, "closed_at": x, "entry": entry, "date": rec["closure_date"],
+            "tag": tag_here, "tag_claimed": tag, "release_commit": release_commit, "sealing_commit": sealing,
+            "capsule_commit": capsule_commit, "review_id": review_id,
+            "snapshot_seal": snap_c["seal"], "matrix_digest": matrix_c["matrix_digest"],
+            "evidence_head": dur_c["evidence_head"], "verified_at_head": head,
+            "watch_state": state}
+
+
+def _watch_state(phase: str, head: str, closed_at: str, evidence_head: str) -> dict:
+    """What the regression watch says about a verified closure at `head`, from the
+    committed records only: the newest watch record, the first commit that made the
+    evidence stale, and the reopen requests nobody has answered. Never raises and never
+    changes the closure: an unreadable piece is reported as unknown, not as a pass."""
+    state: dict = {"stale_since": None, "stale": None, "last_watch": None,
+                   "last_watch_current": None, "requests": []}
+    try:
+        rw = _regression_watch()
+        if rw.PHASE != phase:
+            return state
+        changed = rw.changed_paths(HOH, evidence_head, head)
+        state["stale"] = None if changed is None else bool(changed)
+        if changed:
+            state["stale_since"] = rw.stale_since(HOH, evidence_head, head)
+        last = rw.last_watch(HOH, head, phase)
+        if last is not None:
+            state["last_watch"] = {k: last[k] for k in ("stamp", "verdict", "commit")}
+            state["last_watch_current"] = last["relevant_tree"] == rw.relevant_tree(HOH, head)
+        state["requests"] = [
+            {"file": r["file"], "commit": r["commit"], "failed": r["failed"]}
+            for r in rw.open_requests(HOH, head, closed_at, phase)][:8]
+    except Exception as exc:  # noqa: BLE001 - the watch is information, not a verdict
+        state["error"] = _bound(f"{type(exc).__name__}: {exc}", 120)
+    return state
+
+
+def closure_record(phase: str) -> tuple[dict | None, str]:
+    """`(closure, "")` when the committed closure record of `phase` verifies, else
+    `(None, reason)` and the gate behaves as it would without a record (fail closed).
+    Never raises. See `_verify_closure` for what is re-derived."""
+    try:
+        return _verify_closure(phase), ""
+    except _Refused as exc:
+        return None, _bound(str(exc))
+    except Exception as exc:  # noqa: BLE001 - a verifier that fails refuses
+        return None, _bound(f"the closure record could not be verified "
+                            f"({type(exc).__name__}): {exc}")
+
+
+def verified_closures(order: list[str] | None = None
+                      ) -> tuple[dict[str, dict], dict[str, str]]:
+    """`(closed, ignored)` over the phases that have a closure record file: the
+    verified closures by phase, and for each record that was not honoured the reason.
+    A phase without a record file is in neither. P0 has deliverables, not a closure."""
+    if order is None:
+        scope = _scope()
+        order = [p["phase"] for p in scope["phases"]] if scope else []
+    closed: dict[str, dict] = {}
+    ignored: dict[str, str] = {}
+    for ph in order:
+        if not isinstance(ph, str) or ph == "P0" or not _PHASE.fullmatch(ph):
+            continue
+        path = HOH / f"dogfood/{ph.lower()}-gate" / CLOSURE_FILE
+        try:
+            present = path.exists() or path.is_symlink()
+        except OSError:
+            present = True
+        if not present:
+            continue
+        closure, why = closure_record(ph)
+        if closure is None:
+            ignored[ph] = why
+        else:
+            closed[ph] = closure
+    return closed, ignored
+
+
+def _closed_line(closure: dict, watch: dict) -> str:
+    """What the gate prints for a closed phase: the closure, then the watch."""
+    tag = closure.get("tag")
+    head = (f"CLOSED at {closure['closed_at'][:12]} "
+            f"({closure['entry']}{', ' + tag if tag else ''})")
+    state = closure.get("watch_state") or {}
+    for request in state.get("requests") or []:
+        failed = ", ".join(str(x) for x in request.get("failed") or []) or "a watched requirement"
+        head += (f"; REGRESSION at {str(request.get('commit'))[:12]}: {failed} FAILED, "
+                 f"reopen decision pending (A7 rule 3; {request.get('file')})")
+        break
+    if state.get("error"):
+        head += f"; regression watch unreadable ({state['error']})"
+    last = state.get("last_watch")
+    if last:
+        head += (f"; last re-run {last['stamp']} {last['verdict']} at "
+                 f"{str(last['commit'])[:12]}")
+        if state.get("stale") and state.get("last_watch_current") is False:
+            head += f", stale since {str(state.get('stale_since'))[:12]}: re-run pending"
+    elif state.get("stale"):
+        head += f"; evidence stale since {str(state.get('stale_since'))[:12]}, re-run pending"
+    rows = list(watch["rows_not_proven"])
+    if rows:
+        more = f" and {len(rows) - 6} more" if len(rows) > 6 else ""
+        seen = f"{len(rows)} row(s) not PROVEN on this tree ({', '.join(rows[:6])}{more})"
+    else:
+        seen = "every row PROVEN on this tree"
+    live = ", ".join(f"{kind} {'met' if v['met'] else 'UNMET'}"
+                     for kind, v in watch["instruments"].items() if v["met"] is not None)
+    return _bound(f"{head}; watch: {seen}" + (f"; live instruments: {live}" if live else ""))
+
+
 def succession_measure() -> tuple[bool, str]:
     """P2's succession exit question (F13/M9): does the committed succession capsule
     still describe this tree?
@@ -729,6 +1286,12 @@ def succession_measure() -> tuple[bool, str]:
         other = _other_tree(su)
         if other:
             return False, _bound(other)
+        # Before any `git show`: on an archive copy git answers for the repository
+        # above it, or exits 128, and "not committed at HEAD" misnames the cause.
+        own, gap = su._own_repository()
+        if not own:
+            return False, _bound("not checkable from here, which is not a pass: "
+                                 f"{su.GAP}: {gap}")
         working, why = _gate_input(HOH / SUCCESSION_CAPSULE, "the succession capsule")
         if working is None:
             return False, _bound(why)
@@ -817,8 +1380,20 @@ def _gate_measurements(provider) -> dict[str, tuple[bool, str]]:
 
 def phase_gates(capabilities: list[dict] | None = None,
                 requirements: list[dict] | None = None, *,
-                checklist_measures=None, succession_measures=None,
+                checklist_measures=None, succession_measures=None, closures=None,
                 ) -> tuple[list[str], dict[str, tuple[bool, str]]]:
+    """`phase_gate_report` without the watch: the phase order and, per phase, the
+    gate's `(met, reason)`. See there."""
+    order, gates, _watch = phase_gate_report(
+        capabilities, requirements, checklist_measures=checklist_measures,
+        succession_measures=succession_measures, closures=closures)
+    return order, gates
+
+
+def phase_gate_report(capabilities: list[dict] | None = None,
+                      requirements: list[dict] | None = None, *,
+                      checklist_measures=None, succession_measures=None, closures=None,
+                      ) -> tuple[list[str], dict[str, tuple[bool, str]], dict[str, dict]]:
     """The plan's phase order and, per phase, whether its non-requirement
     conditions are met. Three sources, each for one question:
 
@@ -850,10 +1425,22 @@ def phase_gates(capabilities: list[dict] | None = None,
     also claims it, when that requirement is PROVEN as well: a claim never
     stands in for the instrument. An unmet one is reported with its reason, not
     as unmeasured. A phase with no gate-kind item is absent from the result.
+
+    `closures` -- `{phase: closure}` as `verified_closures` returns it (a closure
+    this tool has already re-derived from the blobs at its commit; nothing else
+    is believed) -- makes the phase **closed** (amendment A7): its gate is
+    `(True, "CLOSED at <commit> (<entry>, <tag>); watch: ...")` whatever the
+    instruments answer, the succession capsule is not asked (it is the rotation
+    instrument of the board, R4), and the third result, `watch`, keeps what the
+    instruments and the matrix say on this tree -- `live_met`, `live_reason`, the
+    phase's rows that are not PROVEN, each instrument's answer -- so a closure never
+    hides a measurement. Without `closures` the result is what it was.
     """
     scope = _scope()
     if scope is None:
-        return [], {}
+        return [], {}, {}
+    closures = closures if isinstance(closures, dict) else {}
+    watch: dict[str, dict] = {}
     if requirements is None:
         requirements = _register_requirements()
     status = {c["id"]: c.get("status") for c in capabilities or []}
@@ -876,14 +1463,16 @@ def phase_gates(capabilities: list[dict] | None = None,
         instrument = {i["id"]: CHECKLIST_GATE_ITEMS[i["id"]] for i in conditions
                       if i["id"] in CHECKLIST_GATE_ITEMS}
         checklist_kinds = {k for k in instrument.values() if k in _CHECKLIST_KINDS}
+        closure = closures.get(ph)
         measured = _gate_measurements(checklist_measures) if checklist_kinds else {}
-        if "succession" in instrument.values():
+        if "succession" in instrument.values() and not isinstance(closure, dict):
             measured["succession"] = _one_measurement(
                 succession_measures or succession_measure, "succession")
         unmeasured = [i for i in conditions
                       if not bindings[i["id"]] and i["id"] not in instrument]
         instrument_unmet = [(instrument[i["id"]], measured[instrument[i["id"]]][1])
                             for i in conditions if i["id"] in instrument
+                            and instrument[i["id"]] in measured
                             and not measured[instrument[i["id"]]][0]]
         succession_unmet = [(k, r) for k, r in instrument_unmet if k == "succession"]
         instrument_unmet = [(k, r) for k, r in instrument_unmet if k != "succession"]
@@ -896,45 +1485,71 @@ def phase_gates(capabilities: list[dict] | None = None,
             if short:
                 unmet_bound += 1
                 not_proven += [rid for rid in short if rid not in not_proven]
+        live = None
         if (not unmeasured and not unmet_bound and not instrument_unmet
                 and not succession_unmet):
-            gates[ph] = (True, f"{len(conditions)} exit condition(s), each bound "
-                               "to a PROVEN requirement" if not instrument else
-                               f"{len(conditions)} exit condition(s) met: "
-                               f"{len(conditions) - len(instrument)} bound to a "
-                               f"PROVEN requirement, "
-                               f"{len(instrument) - len(succession_items)} measured by "
-                               "the checklist instruments"
-                               + (f", {len(succession_items)} measured by the "
-                                  "succession instrument"
-                                  + (" (its claimant PROVEN besides)"
-                                     if any(bindings[i["id"]] for i in succession_items)
-                                     else "") if succession_items else ""))
+            live = (True, f"{len(conditions)} exit condition(s), each bound "
+                          "to a PROVEN requirement" if not instrument else
+                          f"{len(conditions)} exit condition(s) met: "
+                          f"{len(conditions) - len(instrument)} bound to a "
+                          f"PROVEN requirement, "
+                          f"{len(instrument) - len(succession_items)} measured by "
+                          "the checklist instruments"
+                          + (f", {len(succession_items)} measured by the "
+                             "succession instrument"
+                             + (" (its claimant PROVEN besides)"
+                                if any(bindings[i["id"]] for i in succession_items)
+                                else "") if succession_items else ""))
+        if live is None:
+            why = []
+            if unmet_bound:
+                named = ", ".join(f"{rid} {status.get(rid) or 'not measured'}"
+                                  for rid in not_proven[:5])
+                if len(not_proven) > 5:
+                    named += f" and {len(not_proven) - 5} more"
+                why.append(f"{unmet_bound} exit condition(s) bound to requirement(s) "
+                           f"not PROVEN: {named}")
+            if instrument_unmet:
+                named = "; ".join(f"{_GATE_LABELS[kind]}: {reason}"
+                                  for kind, reason in instrument_unmet)
+                why.append(f"{len(instrument_unmet)} checklist-gate exit condition(s) "
+                           f"measured by the checklist instruments and unmet -- {named}")
+            if succession_unmet:
+                named = "; ".join(f"{_GATE_LABELS[kind]}: {reason}"
+                                  for kind, reason in succession_unmet)
+                why.append(f"{len(succession_unmet)} exit-includes condition(s) measured "
+                           f"by the succession instrument and unmet -- {named}")
+            if unmeasured:
+                why.append(f"{len(unmeasured)} exit condition(s) nothing "
+                           "here measures yet, e.g. "
+                           f"{unmeasured[0]['text'][:60]!r}")
+            live = (False, "; ".join(why))
+        if not isinstance(closure, dict):
+            gates[ph] = live
             continue
-        why = []
-        if unmet_bound:
-            named = ", ".join(f"{rid} {status.get(rid) or 'not measured'}"
-                              for rid in not_proven[:5])
-            if len(not_proven) > 5:
-                named += f" and {len(not_proven) - 5} more"
-            why.append(f"{unmet_bound} exit condition(s) bound to requirement(s) "
-                       f"not PROVEN: {named}")
-        if instrument_unmet:
-            named = "; ".join(f"{_GATE_LABELS[kind]}: {reason}"
-                              for kind, reason in instrument_unmet)
-            why.append(f"{len(instrument_unmet)} checklist-gate exit condition(s) "
-                       f"measured by the checklist instruments and unmet -- {named}")
-        if succession_unmet:
-            named = "; ".join(f"{_GATE_LABELS[kind]}: {reason}"
-                              for kind, reason in succession_unmet)
-            why.append(f"{len(succession_unmet)} exit-includes condition(s) measured "
-                       f"by the succession instrument and unmet -- {named}")
-        if unmeasured:
-            why.append(f"{len(unmeasured)} exit condition(s) nothing "
-                       "here measures yet, e.g. "
-                       f"{unmeasured[0]['text'][:60]!r}")
-        gates[ph] = (False, "; ".join(why))
-    return order, gates
+        # A closed phase (A7): the gate is the closure; the instruments' answers and
+        # the phase's rows stay, as the watch, exactly as measured on this tree.
+        rows = {c["id"]: c.get("status") for c in capabilities or []
+                if isinstance(c, dict) and c.get("target_phase") == ph
+                and c.get("status") != "PROVEN"}
+        shown = {kind: {"met": measured[kind][0], "reason": measured[kind][1]}
+                 for kind in (*_CHECKLIST_KINDS, "succession")
+                 if kind in set(instrument.values()) and kind in measured}
+        if "succession" in instrument.values() and "succession" not in measured:
+            shown["succession"] = {"met": None, "reason": (
+                "not asked after closure: the capsule is the rotation instrument of "
+                "the board's `succession` row and `tools/succession.py verify`")}
+        # With the capsule not asked, "every asked instrument met" is not "met": it is
+        # unknown, and says so. Unmet stays unmet whatever the capsule would say.
+        unasked = "succession" in instrument.values() and "succession" not in measured
+        live_met = (None if live[0] else False) if unasked else live[0]
+        live_reason = live[1] + ("; the succession capsule was not asked after closure"
+                                 if unasked else "")
+        watch[ph] = {"live_met": live_met, "live_reason": live_reason,
+                     "rows_not_proven": dict(sorted(rows.items())),
+                     "instruments": shown}
+        gates[ph] = (True, _closed_line(closure, watch[ph]))
+    return order, gates, watch
 
 
 def start_label(rid: str | None, status: str, waits_for_gate: str | None,
@@ -1011,6 +1626,219 @@ def render_dispositions(plan: dict, body: dict) -> str | None:
     return "\n".join(out)
 
 
+# --------------------------------------------------------------------------- #
+# the gate counter says why it moved (P3 analysis R-5)
+# --------------------------------------------------------------------------- #
+
+#: The statuses a matrix row can hold, lowest first, when the matrix module is not
+#: the one that answers (a test's stub): `capability_matrix.ORDER` is preferred.
+_COUNTER_ORDER = ("MISSING", "PREPARED", "PARTIAL", "IMPLEMENTED_NOT_PROVEN", "PROVEN")
+#: At most this many ids of one kind are named in the line; the DAG carries them all.
+_COUNTER_IDS_SHOWN = 5
+
+
+def counter_baseline() -> tuple[dict | None, str]:
+    """The committed capability matrix as of the newest commit that changed it -- the
+    last records checkpoint that regenerated it -- as `{commit, rows: {id: row}}`, or
+    `(None, reason)`. Read from git blobs of this repository only (never the working
+    tree: the baseline is a commit), and only in a repository of its own."""
+    try:
+        su = _succession()
+        other = _other_tree(su)
+        if other:
+            return None, _bound(other)
+        own, why = su._own_repository()
+        if not own:
+            return None, _bound("ENVIRONMENT_GAP: " + why, 120)
+        rc, out = su._git_rc("log", "-1", "--format=%H", "HEAD", "--", MATRIX_JSON)
+        commit = out.strip()
+        if rc != 0 or not _FULL_SHA.fullmatch(commit):
+            return None, "the capability matrix has no commit in this history"
+        body = _read_object(_git_blob(su, commit, MATRIX_JSON, "the committed matrix"),
+                            "the committed capability matrix")
+    except _Refused as exc:
+        return None, _bound(str(exc), 120)
+    except Exception as exc:  # noqa: BLE001 - provenance is information, never a verdict
+        return None, _bound(f"{type(exc).__name__}: {exc}", 120)
+    rows = {c["id"]: c for c in body.get("capabilities") or []
+            if isinstance(c, dict) and isinstance(c.get("id"), str)}
+    if not rows:
+        return None, "the committed capability matrix holds no rows"
+    return {"commit": commit, "rows": rows}, ""
+
+
+def introduced_at(ids: list[str], since: str | None = None) -> dict[str, str | None]:
+    """For each id, the short id of the first commit **after `since`** (the baseline;
+    the whole history without it) that put it into the register -- `git log --reverse
+    -S` over the register file, so a commit that only edits the row does not date it --
+    or None where git cannot say. Read-only; one call per id."""
+    out: dict[str, str | None] = {}
+    try:
+        su = _succession()
+        for rid in ids:
+            rc, text = su._git_rc("log", "--reverse", "--format=%h",
+                                  f"-S\"id\": {json.dumps(rid)}",
+                                  f"{since}..HEAD" if since else "HEAD", "--",
+                                  REGISTER_JSON)
+            first = text.split()[0] if rc == 0 and text.split() else None
+            out[rid] = first
+    except Exception:  # noqa: BLE001 - a missing provenance is a "?", not a failure
+        out = {rid: None for rid in ids}
+    return out
+
+
+def blocking_counter(phase: str, live_rows: list[dict], baseline: dict,
+                     order: tuple | list = _COUNTER_ORDER) -> dict:
+    """Why the number of blocking requirements of `phase` is what it is, against the
+    committed matrix. Pure, and **complete**: every row that is open now and was not open
+    then (`entered`), and every row that was open then and is not now (`left`), is in
+    exactly one named list.
+
+    A row is *blocking open* when it holds its phase's gate shut and is not satisfied
+    (`_blocking`, `_satisfied`: the build's own two tests). With `then` the baseline's
+    rows of the phase and `now` the live ones, `entered = now_open - previous_open` is
+    partitioned into
+
+    * `added` -- not in the baseline at all (a requirement registered since);
+    * `moved_in` -- in the baseline, but under another phase;
+    * `regressed` -- in `then`, blocking there and **satisfied** there (PROVEN, or a
+      waiver that has since gone), open now;
+    * `newly_blocking` -- in `then`, **not blocking** there (optional provider / UI
+      only), blocking and open now: the gate grew by a flag, not by a status;
+
+    and `left = previous_open - now_open` into
+
+    * `lifted` -- present now and satisfied (PROVEN or waived);
+    * `no_longer_blocking` -- present now, not satisfied, no longer blocking;
+    * `removed` -- gone from the matrix;
+    * `moved_out` -- present now under another phase.
+
+    `regressed` also lists the rows that stayed open at a **lower** status
+    (`regressed_still_open`: they change no count); it never lists a row that left.
+    The arithmetic of the line is therefore exact:
+    `len(now_open) == len(previous_open) + added + moved_in + newly_blocking +
+    regressed_entering - lifted - no_longer_blocking - removed - moved_out`, and
+    `reconciled` says that the partitions cover the differences. Nothing here decides
+    anything: it is the reading of the number, printed beside the number.
+    """
+    rank = {s: i for i, s in enumerate(order)}.get
+    live_all = {r["id"]: r for r in live_rows
+                if isinstance(r, dict) and isinstance(r.get("id"), str)}
+    then_all = baseline["rows"]
+    live = {i: r for i, r in live_all.items() if r.get("target_phase") == phase}
+    then = {i: r for i, r in then_all.items() if r.get("target_phase") == phase}
+
+    def satisfied(row: dict) -> bool:
+        return _satisfied({"status": None, **row})
+
+    def is_open(row: dict) -> bool:
+        return _blocking(row) and not satisfied(row)
+    previous = sorted(i for i, r in then.items() if is_open(r))
+    now = sorted(i for i, r in live.items() if is_open(r))
+    entered = [i for i in now if i not in previous]
+    left = [i for i in previous if i not in now]
+    added = [i for i in entered if i not in then_all]
+    moved_in = [i for i in entered if i not in then and i in then_all]
+    newly_blocking = [i for i in entered if i in then and not _blocking(then[i])]
+    regressed_entering = [i for i in entered if i in then and _blocking(then[i])
+                          and satisfied(then[i])]
+    lowered = sorted(i for i in live if i in then and i in previous and i in now
+                     and rank(live[i].get("status"), -1) < rank(then[i].get("status"), -1))
+    lifted = [i for i in left if i in live and satisfied(live[i])]
+    no_longer_blocking = [i for i in left if i in live and not satisfied(live[i])
+                          and not _blocking(live[i])]
+    removed = [i for i in left if i not in live and i not in live_all]
+    moved_out = [i for i in left if i not in live and i in live_all]
+    grouped_in = added + moved_in + newly_blocking + regressed_entering
+    grouped_out = lifted + no_longer_blocking + removed + moved_out
+    reconciled = (sorted(grouped_in) == sorted(entered) and sorted(grouped_out) == sorted(left)
+                  and len(set(grouped_in)) == len(grouped_in)
+                  and len(set(grouped_out)) == len(grouped_out)
+                  and len(now) == len(previous) + len(entered) - len(left))
+    return {
+        "phase": phase, "baseline_commit": baseline["commit"],
+        "previous_open": previous, "now_open": now, "entered": entered, "left": left,
+        "added": added, "moved_in": moved_in, "newly_blocking": newly_blocking,
+        "regressed": sorted(regressed_entering + lowered),
+        "regressed_entering": sorted(regressed_entering), "regressed_still_open": lowered,
+        "lifted": lifted, "no_longer_blocking": no_longer_blocking, "removed": removed,
+        "moved_out": moved_out, "reconciled": reconciled}
+
+
+def _named(ids: list[str], shown: int = _COUNTER_IDS_SHOWN) -> str:
+    more = f" and {len(ids) - shown} more" if len(ids) > shown else ""
+    return ", ".join(ids[:shown]) + more
+
+
+def counter_text(counter: dict, introduced: dict[str, str | None] | None = None) -> str:
+    """The one-line provenance printed after `N blocking open`:
+    `(25 at f78d1cb9; +1 added: P3-42 at f03b5801; -1 lifted: P3-06; 0 regressed)`. The
+    four fixed clauses are always there; the others only when they are not empty."""
+    introduced = introduced or {}
+    if counter.get("reconciled") is not True:
+        return "(unreconciled: the named lists do not account for the difference)"
+    added = counter["added"]
+    parts = [f"{len(counter['previous_open'])} at {counter['baseline_commit'][:12]}"]
+    if added:
+        shown = [f"{i} at {introduced.get(i) or '?'}" for i in added[:_COUNTER_IDS_SHOWN]]
+        more = f" and {len(added) - _COUNTER_IDS_SHOWN} more" if len(added) > _COUNTER_IDS_SHOWN else ""
+        parts.append(f"+{len(added)} added: {', '.join(shown)}{more}")
+    else:
+        parts.append("+0 added")
+    for key, label in (("moved_in", "moved in"), ("newly_blocking", "newly blocking")):
+        if counter[key]:
+            parts.append(f"+{len(counter[key])} {label}: {_named(counter[key])}")
+    lifted = counter["lifted"]
+    parts.append(f"-{len(lifted)} lifted" + (f": {_named(lifted)}" if lifted else ""))
+    for key, label in (("no_longer_blocking", "no longer blocking"), ("removed", "removed"),
+                       ("moved_out", "moved out")):
+        if counter[key]:
+            parts.append(f"-{len(counter[key])} {label}: {_named(counter[key])}")
+    regressed = counter["regressed"]
+    clause = f"{len(regressed)} regressed" + (f": {_named(regressed)}" if regressed else "")
+    if counter["regressed_still_open"]:
+        clause += f" ({len(counter['regressed_still_open'])} already open, at a lower status)"
+    parts.append(clause)
+    return "(" + "; ".join(parts) + ")"
+
+
+def annotate_counters(plan: dict, rows: list[dict], order=_COUNTER_ORDER) -> dict[str, str]:
+    """For every phase of `plan` with blocking requirements open, put `counter` into
+    its gate state (JSON-able: the ids and the commit, or `{"unavailable": reason}`) and
+    return the printed text per phase. Git is touched only when some phase is open.
+
+    Never raises and never withholds the number: a baseline row of a shape the reading
+    cannot take, or a counter whose `now_open` is not the gate's own `blocking_open`,
+    prints as unavailable / unreconciled with its reason."""
+    open_phases = [ph for ph, g in plan["phase_gates"].items() if g.get("blocking_open")]
+    if not open_phases:
+        return {}
+    baseline, why = counter_baseline()
+    texts: dict[str, str] = {}
+    if baseline is None:
+        for ph in open_phases:
+            plan["phase_gates"][ph]["counter"] = {"unavailable": why}
+            texts[ph] = f"(provenance unavailable: {why})"
+        return texts
+    for ph in open_phases:
+        gate = plan["phase_gates"][ph]
+        try:
+            counter = blocking_counter(ph, rows, baseline, order)
+            if sorted(counter["now_open"]) != sorted(gate.get("blocking_open") or []):
+                counter["reconciled"] = False
+                counter["unreconciled_with_the_gate"] = True
+            introduced = introduced_at(counter["added"][:_COUNTER_IDS_SHOWN],
+                                       baseline["commit"])
+            gate["counter"] = {**counter, "introduced_at": introduced}
+            texts[ph] = counter_text(counter, introduced)
+        except Exception as exc:  # noqa: BLE001 - provenance is information, never a verdict
+            reason = _bound(f"the baseline could not be read as rows "
+                            f"({type(exc).__name__}: {exc})", 120)
+            gate["counter"] = {"unavailable": reason}
+            texts[ph] = f"(provenance unavailable: {reason})"
+    return texts
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--dag", type=Path, default=None)
@@ -1031,9 +1859,14 @@ def main(argv=None) -> int:
     for r in body["capabilities"]:
         r["depends_on"] = deps.get(r["id"], [])
 
-    phase_order, gates = phase_gates(body["capabilities"], register["requirements"])
-    plan = build(body, phase_order, gates)
+    closed, ignored = verified_closures()
+    phase_order, gates, watch = phase_gate_report(
+        body["capabilities"], register["requirements"], closures=closed)
+    plan = build(body, phase_order, gates, closures=closed, watch=watch,
+                 closure_notes=ignored)
     check = checklist(plan)
+    counters = annotate_counters(plan, body["capabilities"],
+                                 tuple(getattr(cm, "ORDER", _COUNTER_ORDER)))
     for wave in plan["waves"]:
         blocking = sum(1 for i in wave["items"] if i["core_required_1_0"])
         print(f"  wave {wave['wave']}: {len(wave['items'])} item(s), "
@@ -1043,8 +1876,13 @@ def main(argv=None) -> int:
           "held behind a phase gate")
     print(f"ready now: {', '.join(plan['ready_now']) or 'nothing'}")
     for ph, g in plan["phase_gates"].items():
-        if g["blocking_open"] or g["external_met"] is False:
+        if g.get("closure_ignored"):
+            print(f"  gate {ph}: closure record ignored: {g['closure_ignored']}")
+        if g.get("closed_at"):
+            print(f"  gate {ph}: {g['external']}")
+        elif g["blocking_open"] or g["external_met"] is False:
             why = (f"{len(g['blocking_open'])} blocking open"
+                   + (f" {counters[ph]}" if ph in counters else "")
                    + (f"; {g['external']}" if g["external_met"] is False else ""))
             print(f"  gate {ph}: {why}")
     if plan["unplaceable"]:

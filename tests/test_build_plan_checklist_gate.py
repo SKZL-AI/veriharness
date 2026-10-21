@@ -505,7 +505,10 @@ def test_p2_opens_when_all_three_instruments_agree_and_not_before(real_gate):
 
 
 def _stale(tree):
-    tree.matrix["capabilities"][0]["evidence"] = ["src/changed-after-the-review.py:1"]
+    # A row of the reviewed phase: since R3 a review is bound to its own phase's
+    # matrix rows, so P1's row (index 0) no longer stales a review of P2.
+    row = next(r for r in tree.matrix["capabilities"] if r["id"] == "P2-01")
+    row["evidence"] = ["src/changed-after-the-review.py:1"]
     tree.write()
 
 
@@ -541,7 +544,7 @@ def _waived(tree):
 
 DEGRADED = {
     # name: (what to do after a complete review, kinds that must read unmet, reason fragment)
-    "stale": (_stale, {"review"}, "matrix digest changed"),
+    "stale": (_stale, {"review"}, "matrix rows of P2 changed"),
     "missing": (_missing, {"review"}, "the review record is missing"),
     "wrong-phase": (_wrong_phase, {"review"}, "P1"),
     "blocking-finding": (_blocking, {"fsck", "review"}, "1 blocking finding(s)"),
@@ -561,6 +564,20 @@ def test_each_degraded_state_is_unmet_for_its_own_reason(tree, name):
     measures = tree.measures()
     assert _met(measures) == {k: k not in unmet for k in BY_KIND}, measures
     assert any(fragment in measures[k][1] for k in unmet), (fragment, measures)
+
+
+def test_an_edit_of_another_phase_leaves_the_review_current(tree):
+    """R3. The gate's review of P2 was bound to the whole matrix and to a seal over
+    every phase's items, so editing P1's matrix row or P3's register row staled it
+    with 0 P2 rows changed (2026-10-14). The control of `stale` above: same edits, other
+    phases."""
+    tree.review()
+    assert _met(tree.measures())["review"] is True
+    tree.matrix["capabilities"][0]["evidence"] = ["src/p1-edited-after-the-review.py:1"]
+    tree.register["requirements"][-1]["name"] = "P3 requirement, edited after the review"
+    tree.status("P3-01", "PARTIAL")
+    measures = tree.measures()
+    assert _met(measures) == {"items": True, "review": True, "fsck": True}, measures
 
 
 class _Row:

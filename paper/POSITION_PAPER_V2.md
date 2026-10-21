@@ -1033,3 +1033,16 @@ requirement, and readiness is not claimed (`TECHNICALLY_STABLE_READY = no` `[V13
 * **The honest ratio.** The attribution check counts 320 nodes after its anchor `[V06]` **R** (294), of which 1 `[V06a]` **R** ran through the shipped
   control plane end to end (1), 131 `[V06b]` **R** were developed by the product and merged by the orchestrating session after review (126), and
   188 `[V06c]` **R** are the orchestrating session's direct work (167).
+
+## 25. Update ahead of the pre-release v0.4.0a1 (added 2026-10-14)
+
+The preceding sections stay as written. This section is the update for the public documentation, CI and packaging refresh that
+precedes the pre-release `v0.4.0a1`: the figures marked **R** were taken again at the base named in `paper/NUMBERS_V2.md` (the commit `aefef58a`).
+The refresh changes no source file, lifts no requirement and claims no readiness (`TECHNICALLY_STABLE_READY = no` `[V13]` **R**).
+
+* **The register.** The register holds 236 requirements, 88 PROVEN and 11 PARTIAL `[V10]` **R**; of the requirements
+  registered for P3 to P12, 131 of 177 MISSING (11 PARTIAL, 35 PROVEN) `[V11b]` **R**.
+* **The claim of section 24 and what happened to it on the development line.** Section 24 says that every one of P2's requirements reads
+  PROVEN at the release `v0.3.0`; that is a statement about the release commit and stands. The development line has changed source files
+  that the durability evidence is bound to, so the register reads those rows IMPLEMENTED_NOT_PROVEN again; amendment A7 treats that as a
+  regression obligation, not as a re-opened phase.

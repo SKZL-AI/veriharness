@@ -302,6 +302,48 @@ def evidence_status(probe: dict, *, requirement: dict | None = None) -> tuple[st
     return IMPLEMENTED_NOT_PROVEN, note
 
 
+def evidence_watch(probe: dict) -> dict:
+    """Where a durability-evidence row stands against the regression watch (A7), as
+    annotations: `evidence_commit` (the commit the record's evidence was taken at),
+    `stale_since` (the first commit after it that changed a relevant path, or None),
+    `last_watch` (`{stamp, verdict, commit}` of the newest committed watch record, or
+    None). Read from committed state only. The row's **status is not touched**: a row
+    stale since a commit with a PASS watch is still IMPLEMENTED_NOT_PROVEN, never a
+    PROVEN the record does not carry. `{}` for any other probe, and every field None
+    where git or a record cannot say."""
+    if probe.get("deriver") != "durability_e2e.py":
+        return {}
+    out: dict = {"evidence_commit": None, "stale_since": None, "last_watch": None}
+    record = _inside(probe.get("path", ""))
+    try:
+        data = json.loads(record.read_text(encoding="utf-8")) if record else None
+        head = data.get("evidence_head") if isinstance(data, dict) else None
+        if not isinstance(head, str) or not head:
+            return out
+        out["evidence_commit"] = head
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from regression_watch import changed_paths, head_commit  # noqa: PLC0415
+        from regression_watch import NOT_RETAKEN, last_watch, stale_since  # noqa: PLC0415
+
+        commit = head_commit(HOH)
+        if commit is None:
+            return out
+        if changed_paths(HOH, head, commit):
+            out["stale_since"] = stale_since(HOH, head, commit)
+        if str(probe.get("key") or "") in NOT_RETAKEN:
+            # The watch never takes this evidence: a PASS beside it would read as the
+            # reboot evidence re-validated. It is taken at a release checkpoint (D5).
+            out["watch_note"] = ("not re-taken by the regression watch (" + probe["key"]
+                                 + "): the reboot evidence is taken at a release checkpoint")
+            return out
+        last = last_watch(HOH, commit)
+        if last is not None:
+            out["last_watch"] = {k: last[k] for k in ("stamp", "verdict", "commit")}
+    except Exception:  # noqa: BLE001 - an annotation that cannot be read is None
+        return out
+    return out
+
+
 def _key_not_bound(probe: dict, key, requirement: dict, data: dict) -> str:
     """Why `key` does not belong to `requirement`, or "" when it does."""
     rid = requirement.get("id")
@@ -528,6 +570,7 @@ def classify(req: dict, symbols, collection, board,
             row_state = row[0] if row else "ABSENT"
             evidence.append(f"board row `{row_name}`: {row_state}")
 
+    watch_fields: dict = {}
     # --- the decision, in the order the plan's vocabulary implies ----------
     if kind == "none":
         status = PARTIAL if equivalent else MISSING
@@ -554,6 +597,7 @@ def classify(req: dict, symbols, collection, board,
         # condition. Durable evidence, not operational state (O197).
         status, note = evidence_status(probe, requirement=req)
         evidence.append(note)
+        watch_fields = evidence_watch(probe)
         if status == MISSING and equivalent:
             status = PARTIAL
     elif kind == "row":
@@ -677,6 +721,10 @@ def classify(req: dict, symbols, collection, board,
     out.pop("probe", None)
     out["status"] = status
     out["evidence"] = evidence
+    # R2: annotations, never a status: where a durability row stands against the
+    # regression watch. They are not part of what a review is bound to
+    # (`programme_supervisor.PHASE_ROW_KEYS`).
+    out.update(watch_fields)
     if equivalent:
         out["equivalent_here"] = equivalent
     return out

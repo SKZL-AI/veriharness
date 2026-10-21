@@ -7,8 +7,8 @@ message: >-
   that implement the Harness-of-Harness pattern; VeriHarness is the project
   built on that pattern and the name this citation records.
 title: "VeriHarness: an evidence-bound Harness-of-Harness for verifiable long-horizon agent development"
-version: 0.3.0
-date-released: "2026-10-13"
+version: 0.4.0a1
+date-released: "2026-10-21"
 # date-released: the date of the documentation checkpoint at which the pre-release is
 # cut; the operator may move it if the tag is cut on another day.
 # Provenance: this file said `version: 0.1.0` with `date-released: "2026-09-08"`
@@ -30,3 +30,8 @@ license: "MIT"
 # See LICENSE at the repository root: the captain decided MIT for this
 # project, and LICENSE carries the complete, unmodified text. See
 # PROVENANCE.md for the third-party facts this decision was checked against.
+# 2026-10-20: `version` became 0.4.0a1, the pre-release of the v0.4 line that is prepared for publication (operator decision of
+# 2026-10-20; v0.4.0 stays reserved for the closure of phase P3). `date-released` is the date of the v0.3.0 tag until the tag
+# v0.4.0a1 is cut; the cut sets it. This note is by addition.
+# 2026-10-21 (by addition): the cut has run; `date-released` is 2026-10-21, the day planned for the tag v0.4.0a1, and it replaces the
+# statement above that it stays the date of the v0.3.0 tag until the cut. The operator may move it if the tag is cut on another day.

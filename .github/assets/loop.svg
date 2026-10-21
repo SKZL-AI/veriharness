@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="560" viewBox="0 0 1100 560" role="img" aria-labelledby="t d">
+  <title id="t">The evidence-bound loop</title>
+  <desc id="d">A specification goes through a planner, a developer in an isolated worktree, an independent QA role and a deterministic runner that writes receipts; acceptance follows only from the receipts, a rejection goes back to planning with its evidence. Accepted candidates then pass two independent adversarial reviewers, the merge gate and the capability register.</desc>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#7fe3d8"/>
+    </marker>
+    <marker id="r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#ff8a8a"/>
+    </marker>
+  </defs>
+  <rect width="1100" height="560" rx="16" fill="#0f1c2e"/>
+  <g font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" text-anchor="middle">
+    <text x="550" y="40" font-size="22" font-weight="700" fill="#f2f6fa">The evidence-bound loop</text>
+
+    <text x="60" y="84" font-size="14" fill="#8fb3d0" text-anchor="start">INSIDE ONE RUN (the product)</text>
+    <text x="190" y="326" font-size="14" fill="#8fb3d0" text-anchor="start">AROUND THE RUN (orchestration)</text>
+
+    <g font-size="16" fill="#eaf1f7">
+      <rect x="40" y="100" width="150" height="76" rx="12" fill="#1d3552" stroke="#4f9dff" stroke-width="1.5"/>
+      <text x="115" y="132" font-weight="700">Specification</text>
+      <text x="115" y="154" font-size="13" fill="#b9c7d6">criteria written down</text>
+
+      <rect x="230" y="100" width="150" height="76" rx="12" fill="#1d3552" stroke="#2ec4b6" stroke-width="1.5"/>
+      <text x="305" y="132" font-weight="700">Planner</text>
+      <text x="305" y="154" font-size="13" fill="#b9c7d6">plan + checkable criteria</text>
+
+      <rect x="420" y="100" width="170" height="76" rx="12" fill="#1d3552" stroke="#2ec4b6" stroke-width="1.5"/>
+      <text x="505" y="132" font-weight="700">Developer</text>
+      <text x="505" y="154" font-size="13" fill="#b9c7d6">isolated worktree, sole writer</text>
+
+      <rect x="630" y="100" width="170" height="76" rx="12" fill="#1d3552" stroke="#2ec4b6" stroke-width="1.5"/>
+      <text x="715" y="132" font-weight="700">Independent QA</text>
+      <text x="715" y="154" font-size="13" fill="#b9c7d6">frozen, isolated copy</text>
+
+      <rect x="840" y="100" width="220" height="76" rx="12" fill="#3a2f12" stroke="#ffbf47" stroke-width="1.5"/>
+      <text x="950" y="132" font-weight="700">Receipts</text>
+      <text x="950" y="154" font-size="13" fill="#e6d3a0">written by a deterministic runner</text>
+    </g>
+
+    <g stroke="#7fe3d8" stroke-width="2.2" fill="none" marker-end="url(#a)">
+      <path d="M190 138 H222"/>
+      <path d="M380 138 H412"/>
+      <path d="M590 138 H622"/>
+      <path d="M800 138 H832"/>
+    </g>
+
+    <g font-size="16" fill="#eaf1f7">
+      <rect x="640" y="214" width="420" height="70" rx="12" fill="#17402f" stroke="#5ad19a" stroke-width="1.5"/>
+      <text x="850" y="244" font-weight="700">Accept only if every criterion passes</text>
+      <text x="850" y="266" font-size="13" fill="#bfe3d0">and one of them was genuinely red before the change</text>
+    </g>
+    <path d="M950 176 V206" stroke="#7fe3d8" stroke-width="2.2" fill="none" marker-end="url(#a)"/>
+
+    <path d="M640 249 H305 V184" stroke="#ff8a8a" stroke-width="2.2" fill="none" stroke-dasharray="7 5" marker-end="url(#r)"/>
+    <text x="470" y="240" font-size="13" fill="#ffb0b0">rejected: back to planning, evidence attached</text>
+
+    <g font-size="16" fill="#eaf1f7">
+      <rect x="40" y="340" width="230" height="86" rx="12" fill="#1d3552" stroke="#4f9dff" stroke-width="1.5"/>
+      <text x="155" y="372" font-weight="700">Two independent reviewers</text>
+      <text x="155" y="394" font-size="13" fill="#b9c7d6">each tries to refute the change</text>
+      <text x="155" y="412" font-size="13" fill="#b9c7d6">from a different angle</text>
+
+      <rect x="330" y="340" width="230" height="86" rx="12" fill="#1d3552" stroke="#4f9dff" stroke-width="1.5"/>
+      <text x="445" y="372" font-weight="700">Merge gate</text>
+      <text x="445" y="394" font-size="13" fill="#b9c7d6">judges each review's bound footer</text>
+      <text x="445" y="412" font-size="13" fill="#b9c7d6">and writes a receipt; a stale one blocks</text>
+
+      <rect x="620" y="340" width="230" height="86" rx="12" fill="#1d3552" stroke="#4f9dff" stroke-width="1.5"/>
+      <text x="735" y="372" font-weight="700">Merge</text>
+      <text x="735" y="394" font-size="13" fill="#b9c7d6">a candidate pinned to a commit,</text>
+      <text x="735" y="412" font-size="13" fill="#b9c7d6">on an eligible receipt</text>
+
+      <rect x="910" y="340" width="150" height="86" rx="12" fill="#1d3552" stroke="#4f9dff" stroke-width="1.5"/>
+      <text x="985" y="372" font-weight="700">Register</text>
+      <text x="985" y="394" font-size="13" fill="#b9c7d6">status moves only</text>
+      <text x="985" y="412" font-size="13" fill="#b9c7d6">with evidence</text>
+    </g>
+    <g stroke="#7fe3d8" stroke-width="2.2" fill="none" marker-end="url(#a)">
+      <path d="M270 383 H322"/>
+      <path d="M560 383 H612"/>
+      <path d="M850 383 H902"/>
+    </g>
+    <path d="M950 284 V300 H155 V332" stroke="#7fe3d8" stroke-width="2.2" fill="none" marker-end="url(#a)"/>
+    <text x="1060" y="320" font-size="13" fill="#b9c7d6" text-anchor="end">an accepted candidate leaves the run</text>
+
+    <rect x="40" y="466" width="1020" height="64" rx="12" fill="#14243a" stroke="#2b4568" stroke-width="1"/>
+    <text x="550" y="494" font-size="15" fill="#e3ebf3">A review that says no, a missing receipt and a status the register cannot back are all the same thing:</text>
+    <text x="550" y="516" font-size="15" fill="#e3ebf3">the change does not land, and the reason is written down.</text>
+  </g>
+</svg>

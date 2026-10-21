@@ -699,12 +699,15 @@ def _capsule_binding_problems(rec, ps, *, register, matrix, snapshot) -> list[st
     except Exception as exc:  # noqa: BLE001 - an underivable brief is not a pass
         return [*problems, f"the canonical P2 brief could not be derived: "
                 f"{_one_line(exc)}"]
-    canonical_digest = ps.capsule_digest(canonical)
+    # R3: a brief bound to its phase is current while the phase's own state is; one
+    # preserved before that is compared exactly as it was (`comparable_digest`).
+    canonical_digest = ps.comparable_digest(canonical, like=preserved)
+    preserved_compared = ps.comparable_digest(preserved, like=preserved)
     preserved_digest = ps.capsule_digest(preserved)
-    if preserved_digest != canonical_digest:
+    if preserved_compared != canonical_digest:
         problems.append(
             f"{shown} is not the brief this gate would put to a supervisor for P2 on "
-            f"this board (preserved {preserved_digest[:12]}..., canonical "
+            f"this board (preserved {preserved_compared[:12]}..., canonical "
             f"{canonical_digest[:12]}...): either it is about another phase or another "
             "board, or it does not cover the phase")
     if rec.capsule_digest != preserved_digest:
@@ -940,7 +943,8 @@ def row_programme_supervisor() -> Row:
     # agree for any matrix. It now asks the tool that already answers this question.
     try:
         problems += _ps.stale_against(rec, snapshot=snapshot,
-                                      matrix_digest=_ps.matrix_digest(matrix))
+                                      matrix_digest=_ps.matrix_digest(matrix),
+                                      matrix=matrix)
         problems += _capsule_binding_problems(rec, _ps, register=register,
                                               matrix=matrix, snapshot=snapshot)
     except Exception as exc:  # noqa: BLE001 - an unanswerable question is not a pass

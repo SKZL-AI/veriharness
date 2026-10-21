@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from collections import Counter
 from collections.abc import Iterable, Mapping
 from enum import StrEnum
@@ -198,6 +199,40 @@ class Blocker(Strict):
         return _require_text(value, "why")
 
 
+#: Lines of live state a closed phase's verdict carries beside the closure: what the
+#: closure stopped holding shut stays visible, but never as a wall of text.
+MAX_WATCH_LINES = 8
+_COMMIT = re.compile(r"[0-9a-f]{40}")
+
+
+class Closure(Strict):
+    """A phase closed at a commit (amendment A7), as the caller who verified it hands it in.
+
+    This module does not verify a closure -- it has no I/O. `hoh.phases` re-derives one from the
+    blobs at `closed_at` and passes the result here; `phase_gate` then reads the phase as CLOSED
+    whatever the live snapshot says, and keeps what the snapshot says as the watch.
+    """
+
+    phase: str
+    closed_at: str
+    ref: str
+    #: Lines about the closure's own regression watch (stale evidence, the last re-run, an
+    #: open reopen request), already worded by the caller.
+    watch: list[str] = Field(default_factory=list, max_length=MAX_WATCH_LINES)
+
+    @field_validator("phase", "ref")
+    @classmethod
+    def _text(cls, value: str, info) -> str:
+        return _require_text(value, info.field_name)
+
+    @field_validator("closed_at")
+    @classmethod
+    def _full_commit(cls, value: str) -> str:
+        if not _COMMIT.fullmatch(value):
+            raise ValueError("closed_at must be one full lower-case commit id")
+        return value
+
+
 class GateVerdict(Strict):
     phase: str
     closed: bool
@@ -209,6 +244,22 @@ class GateVerdict(Strict):
     #: caller who forgot was back to trusting a reseal, with nothing in the
     #: record saying so.
     derived_from_evidence: bool = False
+    #: Set only when the phase reads closed because a verified `Closure` was handed in: the
+    #: commit it was closed at and the records entry that says so. `blockers` is then empty
+    #: and what the live snapshot would have blocked on is in `watch`.
+    closed_at: str | None = None
+    closure_ref: str | None = None
+    watch: list[str] = Field(default_factory=list)
+
+    def reading(self) -> str:
+        """The one line a person reads: CLOSED at a commit with its watch, closed live, or open."""
+        if self.closed_at is not None:
+            watch = "; ".join(self.watch) if self.watch else "nothing to report"
+            ref = f" ({self.closure_ref})" if self.closure_ref else ""
+            return f"CLOSED at {self.closed_at[:12]}{ref}; watch: {watch}"
+        if self.closed:
+            return "closed (live gate, no closure record)"
+        return f"OPEN: {len(self.blockers)} blocker(s)"
 
 
 # --------------------------------------------------------------------------- #
@@ -400,12 +451,20 @@ def reconcile(
 #: Blocker ids for verdicts that concern no single item.
 SNAPSHOT_BLOCKER = "(snapshot)"
 PHASE_BLOCKER = "(phase)"
+CLOSURE_BLOCKER = "(closure)"
 
 
 def phase_gate(snapshot: Snapshot, phase: str, *,
                evidence: Mapping[str, object] | None = None,
-               waivers: Mapping[str, Waiver] | None = None) -> GateVerdict:
+               waivers: Mapping[str, Waiver] | None = None,
+               closure: Closure | None = None) -> GateVerdict:
     """A phase closes only when each of its blocking items is VERIFIED or WAIVED.
+
+    With a `closure` (a verified closure of this phase, amendment A7) the phase reads CLOSED at
+    the commit it names whatever the snapshot says: the live blockers become `watch` lines and
+    the verdict carries `closed_at` and `closure_ref`. A closure of another phase is not
+    applied -- it is a blocker of its own, because a caller that hands in the wrong closure has
+    not verified the one it needs. This function verifies nothing about the closure itself.
 
     Fail-closed on two things besides the items themselves. The snapshot must
     carry an intact seal from `reconcile`: a hand-built snapshot, or one whose
@@ -466,6 +525,19 @@ def phase_gate(snapshot: Snapshot, phase: str, *,
         for item in sorted(in_phase, key=lambda i: i.item_id)
         if item.status not in (Status.VERIFIED, Status.WAIVED)
     ]
+    if closure is not None and closure.phase != phase:
+        blockers.append(Blocker(
+            item_id=CLOSURE_BLOCKER,
+            why=f"the closure handed in is about phase {closure.phase!r}, not {phase!r}, "
+                "so it closes nothing here"))
+    elif closure is not None:
+        live = [f"live: {b.item_id}: {b.why}" for b in blockers[:MAX_WATCH_LINES]]
+        if len(blockers) > MAX_WATCH_LINES:
+            live.append(f"live: and {len(blockers) - MAX_WATCH_LINES} more")
+        return GateVerdict(phase=phase, closed=True, blockers=[],
+                           derived_from_evidence=False,       # the closure closed it, not evidence
+                           closed_at=closure.closed_at, closure_ref=closure.ref,
+                           watch=[*closure.watch, *live])
     return GateVerdict(phase=phase, closed=not blockers, blockers=blockers,
                        derived_from_evidence=evidence is not None)
 

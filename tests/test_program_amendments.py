@@ -466,10 +466,20 @@ def test_this_repositorys_amendments_are_pinned_and_mapped():
     # and must equal the authoritative pin index, entry for entry.
     # O262: A6 (the agent-session orchestration surface) registered; the set grows by one again.
     # O265: A7 (a phase is closed at a commit) registered; the set grows by one again.
-    assert [x["id"] for x in a["amendments"]] == ["A1", "A2", "A3", "A4", "A5", "A6", "A7"]
+    # O270: A8 (the autonomous double-down on blocked work) registered; the set grows by one again.
+    assert [x["id"] for x in a["amendments"]] == ["A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8"]
     pinned = json.loads((ROOT / "program/v3_3/amendments/AMENDMENTS.json").read_text())
-    assert [x["id"] for x in pinned["amendments"]] == ["A1", "A2", "A3", "A4", "A5", "A6", "A7"]
+    assert [x["id"] for x in pinned["amendments"]] == ["A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8"]
     assert a["pulled_forward"]["A5"] == []
+    # A8 adds one autonomy capability to P3, no exit condition and no pull-forward, and is claimed
+    # by exactly the requirement P3-42 (O270, A8_OVERLAP_RECORD.md section 3).
+    a8 = [i for i in a["items"] if i["amendment"] == "A8"]
+    assert len(a8) == 1 and a8[0]["phase"] == "P3" and a8[0]["kind"] == "autonomy_capability"
+    assert not [i for i in a8 if i["kind"] in bp._GATE_KINDS]
+    assert a["pulled_forward"]["A8"] == []
+    a8_reqs = sorted(r["id"] for r in json.loads((ROOT / "program/v3_3/REQUIREMENTS.json").read_text())["requirements"]
+                     if ".a8." in str(r.get("authoritative_item", "")))
+    assert a8_reqs == ["P3-42"]
     # A7 states a rule about the closure of a phase and adds no capability, no pull-forward and no
     # exit condition: three constraint items under P2, which the build plan counts for no gate and
     # the register for no requirement (O265, A7_OVERLAP_RECORD.md section 2).

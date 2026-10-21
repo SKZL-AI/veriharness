@@ -33,9 +33,11 @@ What this is not (stated, not built):
   by a later `hoh surface reap --close` from another pane; Herdr's behaviour on
   a self-closed pane is NOT_RUN. Inside Herdr with its own tab unknown, nothing
   is closed (`refused`).
-* It has no terminal rule other than "the run is over": a reviewer tab with no
-  run is not covered, there is no report-file rule, no deadline, no
-  `hoh run --detach`, no strand-level registry.
+* It has one terminal rule of its own, "the run is over"; a caller may pass another,
+  asked once per surface (`over_for`, and `workspace_of` for a surface whose close is the
+  close of its Herdr workspace): `surfacebook.Rule` does, for reviewer and drafter
+  surfaces (their strand is merged or released), for run workspaces (every run of their
+  runs root has ended) and for orchestrator sessions (never). There is no deadline.
 * It removes no file and signals no process. A run-host of a run that stops at a
   checkpoint stays open until the run is delivered, failed or cancelled.
 * An agent pane is judged by the agent's state, not by its processes: a command
@@ -584,7 +586,7 @@ def _already_recorded(run_dir, pane_id: str, event: str, why: str) -> bool:
     return latest is not None and latest.get("event") == event and latest.get("why") == why
 
 
-def _closing_unless_closed(run_dir, s, since: str, scope: str) -> str:
+def _closing_unless_closed(run_dir, s, since: str, scope: str, reason: str = "run over") -> str:
     """Under the run's ledger gate: the check for a `closed` line of the pane at or after
     `since` and the `closing` line are one step, so a reaper that overlaps this one
     cannot land its `closed` between them. Returns `closed` (another reaper's line is
@@ -596,7 +598,7 @@ def _closing_unless_closed(run_dir, s, since: str, scope: str) -> str:
         if _closed_since(run_dir, s.pane_id, since):
             return "closed"
         wrote = pane_ledger.append(run_dir, "closing", pane=s.pane_id, tab=s.tab_id,
-                                   role=s.role.key, via="surface", reason="run over",
+                                   role=s.role.key, via="surface", reason=reason,
                                    scope=scope)
         return "written" if wrote else "failed"
 
@@ -629,11 +631,35 @@ def _gone_now(adapter, pane_id: str) -> bool:
 
 
 def reap(run_dir, *, close: bool = False, self_pane: str = "", self_tab: str = "",
-         self_inside: bool = False) -> list[dict]:
+         self_inside: bool = False, over_for=None, workspace_of=None,
+         group_of=None, refuse_for=None) -> list[dict]:
     """For every surface the record owns now, say what happens to it (a dry run)
     or close it (`close`), after the fail-closed proof of the spec. Raises only
     for a Herdr that cannot be reached (`HerdrError` / `DispatchError` from
-    making the control)."""
+    making the control).
+
+    `over_for` is the terminal rule, `(run_dir, surface) -> (over, why)`, asked **once
+    per surface**; by default one answer for the whole directory, `run_over(run_dir)`.
+    A rule that raises or answers something else says "not over". A surface that is
+    not over is `pending` (with the rule's reason; with `close` a `kept` line of the
+    pane ledger, once per reason), and when none is over neither Herdr nor the process
+    table is asked. `workspace_of(run_dir, surface)` names the Herdr workspace whose
+    close is the surface's close ("" for a tab or a pane): the workspace must hold that
+    one pane and no other, and `close_workspace` closes it.
+
+    `group_of(run_dir, surface)` answers `([(pane id, workspace id), ...], problem)`: the other
+    surfaces recorded together with this one by the same creation (a `hoh worktree` call makes a
+    target workspace and a linked one, and Herdr's close of the target ends the linked one with
+    it), and a non-empty `problem` when a member of the group is not in the record at all. A
+    surface with a group closes only if **every** member passes every proof of this reap or is
+    gone already: otherwise it is `kept` (a member that is kept) or `refused` (a member that is
+    refused, or a group with an unrecorded member), with the member named.
+
+    `refuse_for(run_dir, surface)` answers a reason ('' for none) for a surface that is not over
+    and must not read as a surface that merely waits: it is then `refused` (with a `refused` line
+    of the pane ledger under `close`), not `pending`. It is asked only of a surface the rule says
+    is not over. The identity check of the recorded agent name runs only under a rule (`over_for`):
+    the default path is the old reaper, statement for statement."""
     run_dir = Path(run_dir)
     started = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     registry = registry_for(run_dir)
@@ -644,14 +670,24 @@ def reap(run_dir, *, close: bool = False, self_pane: str = "", self_tab: str = "
                  "why": f"the surfaces record cannot be read: {registry.problem}"}]
     if not owned:
         return []
-    over, over_why = run_over(run_dir)
+    if over_for is None:
+        run_verdict = run_over(run_dir)
+        verdicts = {s.pane_id: run_verdict for s in owned}
+    else:
+        verdicts = {}
+        for s in owned:
+            try:
+                verdict = over_for(run_dir, s)
+                if not (isinstance(verdict, tuple) and len(verdict) == 2
+                        and isinstance(verdict[0], bool) and isinstance(verdict[1], str)):
+                    raise TypeError("a terminal rule answers (bool, str)")
+                verdicts[s.pane_id] = verdict
+            except Exception as exc:                  # noqa: BLE001 - a rule that fails proves nothing
+                verdicts[s.pane_id] = (False, f"the terminal rule failed: {type(exc).__name__}")
 
     def entry(s, outcome, why=""):
         return {"run_id": registry.run_id, "pane_id": s.pane_id, "tab_id": s.tab_id,
                 "role": s.role.key, "outcome": outcome, "why": why}
-
-    if not over:
-        return [entry(s, "pending", f"the run is not over: {over_why}") for s in owned]
 
     def record(event, s, **fields):
         return pane_ledger.append(
@@ -665,6 +701,25 @@ def reap(run_dir, *, close: bool = False, self_pane: str = "", self_tab: str = "
                                      and _already_recorded(run_dir, s.pane_id, event, why))):
             record(event, s, why=why)
         return entry(s, event, why)
+
+    def pending(s):
+        why = verdicts[s.pane_id][1]
+        if over_for is None:
+            return entry(s, "pending", f"the run is not over: {why}")
+        odd = ""
+        if refuse_for is not None:
+            try:
+                odd = str(refuse_for(run_dir, s) or "")
+            except Exception:                         # noqa: BLE001 - the ordinary answer stands
+                odd = ""
+        if odd:
+            return note(s, "refused", odd)
+        if close and not _already_recorded(run_dir, s.pane_id, "kept", why):
+            record("kept", s, why=why)
+        return entry(s, "pending", why)
+
+    if not any(v[0] for v in verdicts.values()):
+        return [pending(s) for s in owned]
 
     adapter = OwnedAgentControl(make_control(), registry)
     try:
@@ -687,7 +742,90 @@ def reap(run_dir, *, close: bool = False, self_pane: str = "", self_tab: str = "
     view_box: list = [None]
     mount_box: list = [None]
     results: list[dict] = []
+    deferred: list = []
+
+    def close_one(s, ws):
+        """The close of one surface whose proofs have passed (or its `would_close` line)."""
+        end_why = "the run is over" if over_for is None else verdicts[s.pane_id][1]
+        if not close:
+            results.append(entry(s, "would_close", f"{end_why} and nothing can be running in "
+                                                   "the pane"))
+            return
+        scope = "workspace" if ws else ("tab" if s.tab_id else "pane")
+        if _closed_since(run_dir, s.pane_id, started):
+            # Another reaper finished while this one read the process table (its `closed`
+            # line is written before it releases the record): nothing is asked of the
+            # runtime and no `closing` line is left without its `closed`. Only a real
+            # `closed` line says so -- a record that cannot be read now is not "released".
+            results.append(entry(s, "released", "another reaper closed the pane first"))
+            return
+        registry.owned()                  # the record, read again: it may have become unreadable
+        if registry.problem:
+            results.append(note(s, "refused", f"the surfaces record cannot be read: "
+                                              f"{registry.problem}"))
+            return
+        step = _closing_unless_closed(run_dir, s, started, scope,
+                                      "run over" if over_for is None else end_why)
+        if step == "closed":
+            results.append(entry(s, "released", "another reaper closed the pane first"))
+            return
+        if step == "gate":
+            results.append(note(s, "kept", "another reaper holds the ledger gate: the "
+                                           "close is left to the next reap"))
+            return
+        if step == "failed":
+            results.append(entry(s, "refused", "the pane lifecycle ledger cannot be "
+                                               "appended to: the close is not attempted"))
+            return
+        try:
+            if ws:
+                adapter.close_workspace(ws, purpose=f"close the workspace {ws} of surface "
+                                                    f"{s.pane_id}: {end_why}")
+            elif s.tab_id:
+                adapter.close_tab(s.tab_id, purpose=f"close the tab of surface {s.pane_id}: "
+                                                    f"{end_why}")
+            else:
+                adapter.close_pane(s.pane_id, purpose=f"close surface {s.pane_id}: {end_why}")
+        except Exception as exc:                  # noqa: BLE001 - the close did not happen, or not by us
+            if _gone_now(adapter, s.pane_id):
+                # Another reaper closed it first: its `closed` line stands (one is written
+                # only if none of the pane's `closed` lines is from this reap), and no
+                # `refused` line is appended after it.
+                _closed_once(run_dir, s, started, reason="closed by another reaper",
+                             already_gone=True)
+                try:
+                    registry.release(s.pane_id, reason="gone")
+                except Exception:                 # noqa: BLE001 - the next reap finds it gone again
+                    pass
+                results.append(entry(s, "released", "another reaper closed the pane first"))
+                return
+            results.append(note(s, "refused", f"the close failed: {exc}"))
+            return
+        try:
+            after = adapter.snapshot()
+            after_problem = _snapshot_problem(after, need_pane=False)
+        except Exception as exc:                  # noqa: BLE001
+            after, after_problem = None, f"the snapshot after the close cannot be read: {exc}"
+        if after_problem:
+            results.append(note(s, "refused", f"the close is not proven: {after_problem}"))
+            return
+        listed = {str(p.get("pane_id") or "") for p in after["panes"]}
+        if s.pane_id in listed or not _says_gone(adapter, s.pane_id):
+            results.append(note(s, "refused", "the close did not take: the runtime still "
+                                              "knows the pane"))
+            return
+        _closed_once(run_dir, s, started, reason="run over" if over_for is None else end_why)
+        try:
+            registry.release(s.pane_id, reason="closed")
+        except Exception:                         # noqa: BLE001 - the next reap finds the pane gone
+            pass
+        results.append(entry(s, "closed", f"{end_why}; the pane is gone"))
+
+
     for s in owned:
+        if not verdicts[s.pane_id][0]:
+            results.append(pending(s))
+            continue
         if (self_pane and s.pane_id == self_pane) or (s.tab_id and s.tab_id in protected):
             results.append(note(s, "kept", "reap from another pane: this is the pane or "
                                            "tab of the process that reaps"))
@@ -730,6 +868,12 @@ def reap(run_dir, *, close: bool = False, self_pane: str = "", self_tab: str = "
             results.append(note(s, "refused", problem))
             continue
         mine = [a for a in agent_rows if str(a.get("pane_id") or "") == s.pane_id]
+        named = [str(a.get("name") or "") for a in mine]
+        if over_for is not None and s.name and any(n != s.name for n in named):
+            results.append(note(s, "refused", f"the agent in the pane is named {named[0]!r}, "
+                                              f"not {s.name!r} as recorded: the pane is not "
+                                              "the one that was registered"))
+            continue
         busy = [str(a.get("agent_status") or "") or "empty" for a in mine
                 if str(a.get("agent_status") or "") not in IDLE_STATUSES]
         if busy:
@@ -765,76 +909,71 @@ def reap(run_dir, *, close: bool = False, self_pane: str = "", self_tab: str = "
                                                   "a close of the tab would end panes that "
                                                   "were not examined"))
                 continue
-        if not close:
-            results.append(entry(s, "would_close", "the run is over and nothing can be "
-                                                   "running in the pane"))
-            continue
-        scope = "tab" if s.tab_id else "pane"
-        if _closed_since(run_dir, s.pane_id, started):
-            # Another reaper finished while this one read the process table (its `closed`
-            # line is written before it releases the record): nothing is asked of the
-            # runtime and no `closing` line is left without its `closed`. Only a real
-            # `closed` line says so -- a record that cannot be read now is not "released".
-            results.append(entry(s, "released", "another reaper closed the pane first"))
-            continue
-        registry.owned()                  # the record, read again: it may have become unreadable
-        if registry.problem:
-            results.append(note(s, "refused", f"the surfaces record cannot be read: "
-                                              f"{registry.problem}"))
-            continue
-        step = _closing_unless_closed(run_dir, s, started, scope)
-        if step == "closed":
-            results.append(entry(s, "released", "another reaper closed the pane first"))
-            continue
-        if step == "gate":
-            results.append(note(s, "kept", "another reaper holds the ledger gate: the "
-                                           "close is left to the next reap"))
-            continue
-        if step == "failed":
-            results.append(entry(s, "refused", "the pane lifecycle ledger cannot be "
-                                               "appended to: the close is not attempted"))
-            continue
-        try:
-            if s.tab_id:
-                adapter.close_tab(s.tab_id, purpose=f"close the tab of surface {s.pane_id}: "
-                                                    "the run is over")
-            else:
-                adapter.close_pane(s.pane_id, purpose=f"close surface {s.pane_id}: the run "
-                                                      "is over")
-        except Exception as exc:                  # noqa: BLE001 - the close did not happen, or not by us
-            if _gone_now(adapter, s.pane_id):
-                # Another reaper closed it first: its `closed` line stands (one is written
-                # only if none of the pane's `closed` lines is from this reap), and no
-                # `refused` line is appended after it.
-                _closed_once(run_dir, s, started, reason="closed by another reaper",
-                             already_gone=True)
-                try:
-                    registry.release(s.pane_id, reason="gone")
-                except Exception:                 # noqa: BLE001 - the next reap finds it gone again
-                    pass
-                results.append(entry(s, "released", "another reaper closed the pane first"))
+        ws = ""
+        if workspace_of is not None:
+            try:
+                ws = str(workspace_of(run_dir, s) or "")
+            except Exception as exc:              # noqa: BLE001 - a surface whose scope is unknown stays
+                results.append(note(s, "refused", "the workspace of the surface cannot be "
+                                                  f"determined: {type(exc).__name__}"))
                 continue
-            results.append(note(s, "refused", f"the close failed: {exc}"))
-            continue
-        try:
-            after = adapter.snapshot()
-            after_problem = _snapshot_problem(after, need_pane=False)
-        except Exception as exc:                  # noqa: BLE001
-            after, after_problem = None, f"the snapshot after the close cannot be read: {exc}"
-        if after_problem:
-            results.append(note(s, "refused", f"the close is not proven: {after_problem}"))
-            continue
-        listed = {str(p.get("pane_id") or "") for p in after["panes"]}
-        if s.pane_id in listed or not _says_gone(adapter, s.pane_id):
-            results.append(note(s, "refused", "the close did not take: the runtime still "
-                                              "knows the pane"))
-            continue
-        _closed_once(run_dir, s, started, reason="run over")
-        try:
-            registry.release(s.pane_id, reason="closed")
-        except Exception:                         # noqa: BLE001 - the next reap finds the pane gone
-            pass
-        results.append(entry(s, "closed", "the run is over; the pane is gone"))
+        if ws:
+            in_ws = [str(r.get("pane_id") or "") for r in pane_rows
+                     if str(r.get("workspace_id") or "") == ws]
+            if s.pane_id not in in_ws:
+                results.append(note(s, "refused", f"the pane is not in workspace {ws}, where "
+                                                  "it was recorded"))
+                continue
+            strangers = [p for p in in_ws if p not in owned_panes]
+            if strangers:
+                results.append(note(s, "refused", f"workspace {ws} holds a pane the record "
+                                                  f"does not own: {', '.join(strangers)}"))
+                continue
+            if len(in_ws) != 1:
+                results.append(note(s, "refused", f"workspace {ws} holds {len(in_ws)} panes: "
+                                                  "a close of the workspace would end panes "
+                                                  "that were not examined"))
+                continue
+        if ws and group_of is not None:
+            try:
+                members, group_problem = group_of(run_dir, s)
+            except Exception as exc:              # noqa: BLE001 - a group that is unknown stays
+                results.append(note(s, "refused", "the group of the workspace cannot be "
+                                                  f"determined: {type(exc).__name__}"))
+                continue
+            if group_problem:
+                results.append(note(s, "refused", group_problem))
+                continue
+            if members:                           # judged once every surface has been examined
+                deferred.append((s, ws, members))
+                continue
+        close_one(s, ws)
+    if deferred:
+        resolved = {r["pane_id"]: r for r in results}
+        waiting = {d[0].pane_id for d in deferred}
+        for s, ws, members in deferred:
+            blockers = []
+            for member, member_ws in members:
+                if member in owned_panes:
+                    done = resolved.get(member)
+                    if done is not None and done["outcome"] not in ("would_release", "released"):
+                        blockers.append((member, member_ws, done["outcome"], done["why"]))
+                    elif done is None and member not in waiting:
+                        blockers.append((member, member_ws, "kept", "it was not examined"))
+                elif member in snapshot_panes:    # no longer ours and still there: not examined
+                    blockers.append((member, member_ws, "kept",
+                                     "it is not in the record any more and Herdr still lists it"))
+            if blockers:
+                member, member_ws, outcome, why = blockers[0]
+                results.append(note(s, "refused" if any(b[2] == "refused" for b in blockers)
+                                    else "kept",
+                                    f"workspace {ws} was created together with workspace "
+                                    f"{member_ws} (pane {member}) and a close of one ends both: "
+                                    f"that one is {outcome}: {why}"))
+                continue
+            close_one(s, ws)
+        position = {a.pane_id: i for i, a in enumerate(owned)}      # the order of the record
+        results.sort(key=lambda r: position.get(r["pane_id"], len(position)))
     return results
 
 

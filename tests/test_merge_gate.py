@@ -137,6 +137,14 @@ def _pair(w: World, suffix: str = "", **over_b: str | None) -> list[str]:
     return [f"a={_report(w, 'a' + suffix)}", f"b={_report(w, 'b' + suffix, **over_b)}"]
 
 
+def _move_base_over_a_candidate_path(w: World) -> None:
+    """HEAD moves by a commit that touches a path the candidate also changes (`a.txt`), so a review
+    bound to the old base is not carried forward (tests/test_merge_gate_rebind.py has the carried case)."""
+    (w.repo / "a.txt").write_text("main\n", encoding="utf-8")
+    _git(w.repo, "add", "-A")
+    _git(w.repo, "commit", "-qm", "another merge")
+
+
 def _load(receipt: str) -> dict:
     return json.loads(Path(receipt).read_text(encoding="utf-8"))
 
@@ -574,7 +582,7 @@ def test_candidate_base_and_spec_are_recomputed_from_git_now(world, capsys, monk
 def test_a_base_that_moved_since_the_review_is_stale(world, capsys):
     w = world
     reviews = _pair(w)
-    _git(w.repo, "commit", "--allow-empty", "-qm", "another merge")      # HEAD moves
+    _move_base_over_a_candidate_path(w)                                  # HEAD moves
     rc, _out, err, receipt = _gate(w, capsys, reviews, base="HEAD")
     assert (rc, err) == (1, "")
     body = _load(receipt)
@@ -654,7 +662,7 @@ def test_verify_refuses_a_moved_base_and_a_receipt_that_said_no(world, capsys):
     reviews = _pair(w)
     rc, out, err, receipt = _gate(w, capsys, reviews, base="HEAD")
     assert rc == 0 and _verify(w, capsys, receipt)[0] == 0
-    _git(w.repo, "commit", "--allow-empty", "-qm", "another merge")
+    _move_base_over_a_candidate_path(w)
     rc, out, err = _verify(w, capsys, receipt)
     assert (rc, err) == (1, "")
     assert "  a: STALE_BASE: " in out and "  b: STALE_BASE: " in out

@@ -360,8 +360,14 @@ def _remove_tree(fd: int, path: str, dev: int, mnt: int, snapshot: _Snapshot) ->
     return failed
 
 
+def _tree_entries(snapshot: _Snapshot) -> int:
+    """The entries of a verified tree: every file and directory below its root (P3-39)."""
+    return sum(1 + (_tree_entries(seen[2]) if seen[0] == "d" else 0) for seen in snapshot.values())
+
+
 def _clean_workspace(path: Path, st_dev: int, st_ino: int, *, remove: bool,
-                     root: tuple[int, int] | None = None) -> tuple[bool, str, int]:
+                     root: tuple[int, int] | None = None,
+                     inodes_out: list[int] | None = None) -> tuple[bool, str, int]:
     """The creator's cleanup of the workspace `path` it registered as
     ``(st_dev, st_ino)`` in the root registered as ``root = (st_dev, st_ino)``:
     ``(removed, note, bytes)``. With ``remove`` false only the verification and
@@ -377,7 +383,11 @@ def _clean_workspace(path: Path, st_dev: int, st_ino: int, *, remove: bool,
     registered one); otherwise the bytes the walk counted -- also when the
     removal stopped or an entry stays (they may still be there, an upper bound),
     and for a kept workspace. Nothing outside the verified tree is listed or
-    measured. See the module docstring."""
+    measured. See the module docstring.
+
+    ``inodes_out`` (P3-39): when a list is given, the entries of the verified tree -- the workspace's own inode and
+    everything below it -- are appended to it **if the walk verified the tree** (never otherwise: an unverified
+    tree has no count, which records nothing)."""
     try:
         root_fd = os.open(path.parent, _DIR_FLAGS)
     except OSError as exc:
@@ -419,6 +429,11 @@ def _clean_workspace(path: Path, st_dev: int, st_ino: int, *, remove: bool,
                 return False, f"{exc}; left alone", 0
             except RecursionError:
                 return False, "the tree is nested too deeply to verify; left alone", 0
+            if inodes_out is not None:
+                try:
+                    inodes_out.append(1 + _tree_entries(snapshot))
+                except RecursionError:
+                    pass
             if not remove:
                 return False, "kept", nbytes
             try:
@@ -585,7 +600,8 @@ class EphemeralRoots:
         if ws.released:
             return {"removed": False, "note": "already released"}
         ws.released = True
-        removed, note, measured = _clean_workspace(ws.path, ws.st_dev, ws.st_ino,
+        counted: list[int] = []
+        removed, note, measured = _clean_workspace(ws.path, ws.st_dev, ws.st_ino, inodes_out=counted,
                                                    remove=not keep, root=ws.root_ident)
         ws.note = note
         try:
@@ -600,16 +616,22 @@ class EphemeralRoots:
         except OSError as exc:
             note += f"; the record could not be updated ({exc})"
         ws.note = note
-        self._release_reservation(ws.reservation, measured)
+        self._release_reservation(ws.reservation, measured, counted[0] if counted else None)
         return {"removed": removed, "note": note}
 
-    def _release_reservation(self, reservation: Any, actual: int) -> None:
+    def _release_reservation(self, reservation: Any, actual: int, inodes: int | None = None) -> None:
         if reservation is None or self.admission is None:
             return
         try:
             self.admission.release(reservation, actual)
         except Exception:                       # a ledger problem never hides the real one
             pass
+        record = getattr(self.admission, "record_inodes", None)    # P3-39: the inode history; nothing when unmeasured
+        if callable(record) and inodes is not None:
+            try:
+                record(reservation, inodes)
+            except Exception:                   # noqa: BLE001 - never hides the real one either
+                pass
 
 
 def _dump(record: dict[str, Any]) -> str:

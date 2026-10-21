@@ -431,6 +431,14 @@ def _nonce(repo: Path) -> str:
 
 
 def arm_b(task: str, repo: Path, one_run: int, isolation: str) -> dict:
+    from hoh.preflightgate import PreflightRefused, cli_options, requirement_from_environment
+
+    # P3-11 slice 3: the cell types `hoh start` and `hoh run` itself and spends quota, so it asks
+    # the environment first and hands the requirement to both commands (like arm C's launcher).
+    try:
+        preflight_options = cli_options(requirement_from_environment())
+    except PreflightRefused as exc:
+        raise SystemExit(f"refused: {exc}") from None
     root = repo.parent / "root"
     run_id = f"bmb{task[:6]}{one_run}{_nonce(repo)}".replace("_", "")
     environment_ = dict(os.environ, PYTHONPATH=str(HOH / "src"))
@@ -456,7 +464,7 @@ def arm_b(task: str, repo: Path, one_run: int, isolation: str) -> dict:
          # looked budgeted without being budgeted: a schema repair or a
          # transient retry is a further provider call and nothing stopped one.
          # The protocol says the ceiling is nine, so the ceiling is passed.
-         "--max-dispatches", str(DISPATCH_BUDGET)],
+         "--max-dispatches", str(DISPATCH_BUDGET), *preflight_options],
         capture_output=True, text=True, env=environment_, timeout=300,
     )
     if st.returncode != 0:
@@ -467,7 +475,7 @@ def arm_b(task: str, repo: Path, one_run: int, isolation: str) -> dict:
     r = subprocess.run(
         [sys.executable, "-m", "hoh.cli", "--root", str(root), "run", run_id,
          "--iterations", "3", "--planner", "claude", "--developer", "claude",
-         "--qa", "claude", "--isolation", isolation],
+         "--qa", "claude", "--isolation", isolation, *preflight_options],
         capture_output=True, text=True, env=environment_, timeout=5400,
     )
     duration_ = time.monotonic() - t0
@@ -580,6 +588,7 @@ def arm_c(task: str, repo: Path, one_run: int, isolation: str) -> dict:
     """
     from hoh.launcher import HohRunLauncher
     from hoh.orchestrator import GateRunner, HaltClass, ProjectController
+    from hoh.preflightgate import PreflightRefused, requirement_from_environment
     from hoh.project import (
         ActionClass,
         GateOutcome,
@@ -590,6 +599,12 @@ def arm_c(task: str, repo: Path, one_run: int, isolation: str) -> dict:
     )
     from hoh.projectstore import ProjectStore
 
+    # P3-11 slice 3: a cell spends quota, so it starts only on a report that allows it (the
+    # environment names it: HOH_PREFLIGHT_REPORT); nothing is written before that is known.
+    try:
+        requirement = requirement_from_environment()
+    except PreflightRefused as exc:
+        raise SystemExit(f"refused: {exc}") from None
     os.environ["PYTHONPATH"] = str(HOH / "src")
     root = repo.parent / "root"
     spec = TASKS / task / "SPEC.md"
@@ -640,6 +655,7 @@ def arm_c(task: str, repo: Path, one_run: int, isolation: str) -> dict:
         # existed there was no way to say it, and three of campaign v2's five
         # arm-C cells spent 18 against 9 without being stopped (O140).
         dispatch_budget=DISPATCH_BUDGET,
+        preflight=requirement,
         approvals=_CheckedScope(
             script=_configured(TRUST_HELPER_ENV),
             prefix=_configured(WORKTREE_ROOT_ENV) / repo.name,

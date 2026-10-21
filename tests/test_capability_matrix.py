@@ -165,11 +165,24 @@ def test_this_tree_is_the_baseline_the_plan_was_written_against():
     needs_evidence(PROGRAM_REGISTER)
     body = cm.measure()
     by_id = {r["id"]: r["status"] for r in body["capabilities"]}
-    assert by_id["P3-02"] == cm.MISSING, "ParallelWaveExecutor"
+    assert by_id["P4-07"] == cm.MISSING, "ValidationDomain"
+    # P3-07 slice 1: the controller exists, nothing in the product consults it.
+    # (Read IMPLEMENTED_NOT_PROVEN until slice 2. Replaced by addition: the project loop asks the decision
+    # before it prepares a wave, reached from `hoh project drive`, and the reviewed spec's (d) reads the row PROVEN.)
+    assert by_id["P3-07"] == cm.PROVEN, "BackpressureController gates the wave's admission (P3-07 slice 2)"
+    # P3-02 slice 1: the executor exists, nothing in the product runs it.
+    # (Read IMPLEMENTED_NOT_PROVEN until 2026-10-14. Replaced by addition by the records strand preg2,
+    # ledger O271: P3-02 slice 2 made the project loop launch the READY frontier through the executor,
+    # reached from `hoh project drive`, and the reviewed spec's (d) reads the row PROVEN.)
+    assert by_id["P3-02"] == cm.PROVEN, "ParallelWaveExecutor is run by the project loop (P3-02 slice 2)"
     # ExecutionPreflight measures and reports; nothing refuses to start a run
     # on its verdict yet, so it is PARTIAL -- the board row that said PASS
     # was answering a different question (O197).
-    assert by_id["P3-11"] == cm.PARTIAL, "ExecutionPreflight is not wired in"
+    # (Read PARTIAL until P3-11 slice 4, 2026-10-19: a project that declares nothing is gated by the
+    # default, a report names the place it was measured for, the tools that start runs and a launcher
+    # that cannot be bound no longer bypass it, and the reviewed spec's (d) reads the row PROVEN.
+    # Replaced by addition.)
+    assert by_id["P3-11"] == cm.PROVEN, "ExecutionPreflight gates every start path (P3-11 slice 4)"
     # The capability report was filed as P3-10 until the register was
     # reconciled with the plan (O196); the plan files it under P5.
     assert by_id["P5-17"] == cm.PROVEN, "the truthful isolation report is"

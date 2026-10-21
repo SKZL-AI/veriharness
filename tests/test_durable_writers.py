@@ -1566,6 +1566,8 @@ CLASSIFIED: dict[tuple[str, str, str], tuple[str, int, str]] = {
     ("archive_target.py", "_Flock.__enter__", "os.open(write)"): ("LOCK_FILE", 1, "flock target"),
     ("projectstore.py", "ProjectStore.lock", "open(write)"): (
         "LOCK_FILE", 1, "flock target; holder line informational"),
+    ("reservation.py", "BudgetReservations._locked", "os.open(write)"): (
+        "LOCK_FILE", 1, "flock target"),
     ("resumeloop.py", "_flock", "os.open(write)"): ("LOCK_FILE", 1, "flock target"),
     ("storage_coordinator.py", "StorageCoordinator._locked", "os.open(write)"): (
         "LOCK_FILE", 1, "flock target"),
@@ -1591,12 +1593,20 @@ CLASSIFIED: dict[tuple[str, str, str], tuple[str, int, str]] = {
     ("dispatchers.py", "HerdrDispatcher._dispatch", "Path.rename"): (
         "RENAME_ONLY", 1, "answer versioning rename"),
     ("runner.py", "_fresh_scratch", "Path.rename"): ("RENAME_ONLY", 1, "scratch versioning rename"),
+    ("waverecovery.py", "_quarantine", "os.rename"): (
+        "RENAME_ONLY", 1, "a file that is not an outcome set aside under a versioned name, never removed"),
     ("storage_pressure.py", "StorageAdmission._scan", "os.replace"): (
         "RENAME_ONLY", 1, "stale reservation versioning rename"),
     ("storage_pressure.py", "StorageAdmission.release", "os.replace"): (
         "RENAME_ONLY", 1, "closed reservation versioning rename"),
     ("storage_registry.py", "_rename_versioned", "os.rename"): (
         "RENAME_ONLY", 1, "versioning rename"),
+    ("preflightgate.py", "measure_default", "os.rename"): (
+        "RENAME_ONLY", 1, "an old preflight report put aside under a versioned name before the new one "
+        "is created with `durable_create`; never removed, never overwritten (the name is checked first)"),
+    ("leaseadmin.py", "archive_ended", "os.rename"): (
+        "RENAME_ONLY", 1, "an ended run lease (and its parked copies) moved into the pass directory of "
+        "<lease dir>-archive after the manifest is durable; the target directory is fresh, nothing is replaced"),
     ("store.py", "RunStore.prune", "Path.rename"): ("RENAME_ONLY", 5, "attic moves"),
     ("cli.py", "_park_stale_record", "Path.rename"): (
         "RENAME_ONLY", 1, "a stale integrity record set aside by a versioned rename; "
@@ -1639,6 +1649,19 @@ CLASSIFIED: dict[tuple[str, str, str], tuple[str, int, str]] = {
         "OUTPUT_NOT_STATE", 1, "temp tar for arena materialisation"),
     ("workspace.py", "working_tree", "tempfile.NamedTemporaryFile"): (
         "OUTPUT_NOT_STATE", 1, "temp git index"),
+    # MG-RB2: the merge gate's matrix reading writes a merge tree out to a temporary directory it owns and
+    # removes (a TemporaryDirectory of `_matrix_reading`), reads it, and keeps nothing of it
+    ("mergegate.py", "_matrix_reading", "extractall"): (
+        "OUTPUT_NOT_STATE", 1, "the merge tree's src/hoh, tools, tests written to the reading's own temporary "
+        "directory (tarfile data filter); removed with it"),
+    ("mergegate.py", "_matrix_reading", "write_bytes"): (
+        "OUTPUT_NOT_STATE", 1, "the base's classifier written over the extracted copy, in the same temporary "
+        "directory"),
+    ("mergegate.py", "_matrix_reading", "os.replace"): (
+        "OUTPUT_NOT_STATE", 1, "that classifier put in place by replacing the extracted entry (a link included)"),
+    ("mergegate.py", "_matrix_reading", "write_text"): (
+        "OUTPUT_NOT_STATE", 2, "the driver script and the rows to read, in the reading's own temporary "
+        "directory"),
 }
 
 _CLASSES = {"PRIMITIVE", "PARK_LINK", "LOCK_FILE", "RENAME_ONLY", "OWN_DURABLE",

@@ -28,6 +28,10 @@ Usage:
     python3 tools/preflight.py --profile demo
     python3 tools/preflight.py --profile unattended --deep
     python3 tools/preflight.py --out program/v3_3/VERIHARNESS_ENVIRONMENT_CAPABILITIES.json
+    python3 tools/preflight.py --profile unattended --deep --repo REPO --root RUNS --out FILE
+
+The last form is the one a launcher accepts (P3-11 slice 3): the report says which interpreter,
+repository and runs directory it was measured for, and a launcher refuses one for another.
 """
 from __future__ import annotations
 
@@ -214,27 +218,27 @@ def check_herdr() -> Check:
                  {"which": where, "exit_code": rc, "version": out[:80]})
 
 
-def check_git_repo() -> Check:
+def check_git_repo(repo: Path | None = None) -> Check:
     """A repository, and the mainline branch *detected* rather than assumed.
 
     The live demo hard-coded `master`. This reports which method answered, so
     a wrong mainline is visible as a wrong method rather than as an
     inexplicable failure later.
     """
-    rc, _ = _run("git", "rev-parse", "--git-dir")
+    rc, _ = _run("git", "rev-parse", "--git-dir", cwd=repo)
     if rc != 0:
         return Check("git_repo", "is this a git repository with a known mainline?",
                      FAIL, "not a git repository", {})
     method, mainline = "", ""
-    rc, out = _run("git", "symbolic-ref", "refs/remotes/origin/HEAD")
+    rc, out = _run("git", "symbolic-ref", "refs/remotes/origin/HEAD", cwd=repo)
     if rc == 0 and out:
         method, mainline = "origin/HEAD", out.rsplit("/", 1)[-1]
     if not mainline:
-        rc, out = _run("git", "config", "--get", "init.defaultBranch")
+        rc, out = _run("git", "config", "--get", "init.defaultBranch", cwd=repo)
         if rc == 0 and out:
             method, mainline = "init.defaultBranch", out.strip()
     if not mainline:
-        rc, out = _run("git", "rev-parse", "--abbrev-ref", "HEAD")
+        rc, out = _run("git", "rev-parse", "--abbrev-ref", "HEAD", cwd=repo)
         if rc == 0 and out and out != "HEAD":
             method, mainline = "current branch", out.strip()
     return Check(
@@ -468,7 +472,7 @@ def check_role_permissions() -> Check:
          "digest": policy.digest, "operator_default_mode": operator_mode})
 
 
-def check_worktree_creation(deep: bool) -> Check:
+def check_worktree_creation(deep: bool, repo: Path | None = None) -> Check:
     """Can this repository actually produce a worktree for a parallel node?
 
     Off by default: it writes to `.git/worktrees`. With `--deep` it creates a
@@ -483,12 +487,12 @@ def check_worktree_creation(deep: bool) -> Check:
     with tempfile.TemporaryDirectory() as tmp:
         target = Path(tmp) / "probe"
         rc, out = _run("git", "worktree", "add", "--detach", str(target), "HEAD",
-                       timeout=120)
+                       cwd=repo, timeout=120)
         if rc != 0:
             return Check("worktree_creation", "can a worktree be created here?",
                          FAIL, out[-140:], {"attempted": True, "exit_code": rc})
         rc2, out2 = _run("git", "worktree", "remove", "--force", str(target),
-                         timeout=120)
+                         cwd=repo, timeout=120)
         return Check(
             "worktree_creation", "can a worktree be created here?",
             PASS if rc2 == 0 else FAIL,
@@ -496,15 +500,21 @@ def check_worktree_creation(deep: bool) -> Check:
             {"attempted": True, "created": True, "removed": rc2 == 0})
 
 
-def check_disk_headroom(min_free_mb: int = 512) -> Check:
-    """Free space where the runs and the arenas go, and where TMPDIR points."""
-    spots = {"repo": HOH, "tmpdir": Path(tempfile.gettempdir())}
+def check_disk_headroom(min_free_mb: int = 512, *, repo: Path | None = None,
+                        root: Path | None = None) -> Check:
+    """Free space where the runs and the arenas go, and where TMPDIR points. `repo` and `root`
+    are the repository and the runs directory the report is for (slice 3 of P3-11); a spot that
+    cannot be measured is a FAIL, not a pass."""
+    spots = {"repo": repo or HOH, "tmpdir": Path(tempfile.gettempdir())}
+    if root is not None:
+        spots["root"] = root
     measured, tight = {}, []
     for name, where in spots.items():
         try:
             st = os.statvfs(where)
         except OSError as exc:
             measured[name] = {"error": str(exc)}
+            tight.append(f"{name}: cannot be measured ({exc.strerror})")
             continue
         free_mb = st.f_bavail * st.f_frsize // (1 << 20)
         inodes = st.f_favail
@@ -534,8 +544,8 @@ def check_provider_health() -> Check:
         {"measurable_here": False})
 
 
-def check_repo_clean() -> Check:
-    rc, out = _run("git", "status", "--porcelain")
+def check_repo_clean(repo: Path | None = None) -> Check:
+    rc, out = _run("git", "status", "--porcelain", cwd=repo)
     if rc != 0:
         return Check("repo_clean", "is the working tree clean?", INCONCLUSIVE,
                      "git could not answer", {})
@@ -550,23 +560,24 @@ def check_repo_clean() -> Check:
 # The report
 # --------------------------------------------------------------------------- #
 
-def measure(deep: bool = False) -> list[Check]:
+def measure(deep: bool = False, repo: Path | None = None,
+            root: Path | None = None) -> list[Check]:
     return [
         check_python_version(),
         check_cli_entrypoint(),
         check_dependencies(),
         check_herdr(),
-        check_git_repo(),
+        check_git_repo(repo),
         check_infrastructure_exits(),
         check_isolation(),
         check_sandbox_interpreter(),
         check_resource_controls(),
         check_trust_readiness(),
         check_role_permissions(),
-        check_worktree_creation(deep),
-        check_disk_headroom(),
+        check_worktree_creation(deep, repo),
+        check_disk_headroom(repo=repo, root=root),
         check_provider_health(),
-        check_repo_clean(),
+        check_repo_clean(repo),
     ]
 
 
@@ -591,8 +602,11 @@ def verdict(checks: list[Check], profile: str) -> tuple[str, list[str], list[str
     return "READY", blocking, unknown
 
 
-def report(checks: list[Check], profile: str, deep: bool) -> dict:
+def report(checks: list[Check], profile: str, deep: bool, *,
+           repo: Path | None = None, root: Path | None = None) -> dict:
     state, blocking, unknown = verdict(checks, profile)
+    sys.path.insert(0, str(HOH / "src"))
+    from hoh.preflightgate import environment_identity   # the gate's own definition of a place
     body = {
         "what": (
             "Environment capability report. Every line is measured on this "
@@ -607,6 +621,9 @@ def report(checks: list[Check], profile: str, deep: bool) -> dict:
         "verdict": state,
         "blocking": blocking,
         "inconclusive": unknown,
+        # Where this was measured (P3-11 slice 3): the launcher refuses a report for another
+        # interpreter, repository or runs directory, by name.
+        "environment": environment_identity(repo=repo or HOH, root=root),
         "platform": {
             "system": platform.system(), "release": platform.release(),
             "machine": platform.machine(),
@@ -621,18 +638,34 @@ def report(checks: list[Check], profile: str, deep: bool) -> dict:
     return body
 
 
+def _named_path(text: str) -> Path:
+    """An option that names a place: `Path("")` is `.`, so an empty value would silently mean the
+    current directory -- refused by name instead."""
+    if not text.strip() or "\0" in text:
+        raise argparse.ArgumentTypeError("must name a directory (an empty value would mean the "
+                                         "current directory)")
+    return Path(text)
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--profile", choices=sorted(PROFILES), default="demo")
     ap.add_argument("--deep", action="store_true",
                     help="also create and remove a real worktree")
+    ap.add_argument("--repo", type=_named_path, default=None,
+                    help="the repository the runs will use (default: this checkout); the "
+                         "git, clean-tree, worktree and disk checks measure it, and the report "
+                         "says it was measured for it")
+    ap.add_argument("--root", type=_named_path, default=None,
+                    help="the runs directory the runs will use; its disk headroom is measured "
+                         "and the report says it was measured for it")
     ap.add_argument("--out", type=Path, default=None,
                     help="write the machine-readable report here")
     ap.add_argument("--json", action="store_true", help="print the report")
     args = ap.parse_args(argv)
 
-    checks = measure(args.deep)
-    body = report(checks, args.profile, args.deep)
+    checks = measure(args.deep, args.repo, args.root)
+    body = report(checks, args.profile, args.deep, repo=args.repo, root=args.root)
     if args.out:
         args.out.parent.mkdir(parents=True, exist_ok=True)
         args.out.write_text(json.dumps(body, indent=2) + "\n")

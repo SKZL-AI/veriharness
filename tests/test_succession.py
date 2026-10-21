@@ -440,7 +440,7 @@ def test_a_junk_row_name_stays_red():
         spaced["verdict_excluding_self"] == "yes"), spaced
 
 
-def test_o210_a_capsule_claiming_a_clean_tree_drifts_in_a_dirty_one(tmp_path):
+def test_o210_a_capsule_claiming_a_clean_tree_drifts_in_a_dirty_one(tmp_path, monkeypatch):
     """Recorded since the first capsule and never re-derived. A reviewer
     demonstrated it the expensive way: all seven fields VERIFIED in a tree with
     a modified source file and three untracked modules, because
@@ -448,19 +448,47 @@ def test_o210_a_capsule_claiming_a_clean_tree_drifts_in_a_dirty_one(tmp_path):
 
     Compared, not required: a capsule written mid-closure records a dirty tree
     honestly. What must not verify is a capsule that claims a clean one.
-    """
+
+    Re-stated after the v0.3.0 tag (strand ptests, O267 section 8(a)) because the test's
+    own premise was a state of the tree it ran in: it asked `git status` whether the tree
+    was dirty and skipped when it was clean, and in a tree dirty in record paths alone
+    (`docs/`, `dogfood/`: where a records entry leaves it) a capsule claiming clean
+    verifies, correctly, so the second assertion read `VERIFIED == DRIFTED`. The dirt is
+    now what the test says it is: `git status --porcelain` is answered with the paths
+    given, everything else passes through, and both directions are asserted in every tree
+    -- dirt outside the record paths drifts a clean claim and verifies a dirty one; dirt
+    in record paths alone verifies a clean claim and drifts a dirty one."""
     capsule = _capsule(tmp_path)
     assert "internal_tree_clean" in capsule
     assert _verdict(capsule, "tree")[0] in (su.OK, su.DRIFT)
 
-    claims_clean = dict(capsule, internal_tree_clean=True)
-    dirty_now = su._git("status", "--porcelain") != ""
-    if not dirty_now:
-        import pytest as _pytest
+    real_git_rc = su._git_rc
 
-        _pytest.skip("this tree is clean, so the claim is not a lie here")
-    assert _verdict(claims_clean, "tree")[0] == su.DRIFT
-    assert "recorded a clean tree" in _verdict(claims_clean, "tree")[1]
+    def dirty_with(*paths: str) -> None:
+        def fake(*args, **kw):
+            if args[:2] == ("status", "--porcelain"):
+                return 0, "".join(f" M {p}\0" for p in paths)
+            return real_git_rc(*args, **kw)
+
+        monkeypatch.setattr(su, "_git_rc", fake)
+
+    claims_clean = dict(capsule, internal_tree_clean=True)
+    claims_dirty = dict(capsule, internal_tree_clean=False)
+
+    # Dirt outside the record paths: a clean claim is a lie, a dirty one is honest.
+    dirty_with("src/hoh/cli.py", "docs/READINESS.md")
+    state, detail = _verdict(claims_clean, "tree")
+    assert state == su.DRIFT, (state, detail)
+    assert "recorded a clean tree" in detail, detail
+    assert "src/hoh/cli.py" in detail and "docs/READINESS.md" not in detail, detail
+    assert _verdict(claims_dirty, "tree")[0] == su.OK
+
+    # Dirt in record paths alone is not dirt: the clean claim holds, the dirty one drifts.
+    dirty_with("docs/READINESS.md", "dogfood/p2-gate/NOTE.md")
+    assert _verdict(claims_clean, "tree")[0] == su.OK
+    state, detail = _verdict(claims_dirty, "tree")
+    assert state == su.DRIFT, (state, detail)
+    assert "recorded a dirty tree" in detail, detail
 
     missing = {k: v for k, v in capsule.items() if k != "internal_tree_clean"}
     assert _verdict(missing, "tree")[0] == su.GAP

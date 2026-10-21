@@ -53,6 +53,31 @@ Three rules decide what it may touch, and each is a refusal first:
   after the lift. When the attempts run out the loop appends a
   `RETRIES_EXHAUSTED` escalation (once per park) and reports `given_up`.
 
+* **Runs of one account wake together (P3-08).** Before a run of
+  `QUOTA_CLASSES` is lifted -- by a timer or by the `retry_after` fallback, at
+  the run level and, for a project node, after its run's park has verified --
+  `hoh.health.ProviderHealthSentinel` is asked. When other runs of the same
+  provider, account and model state a limit that is still pending and whose
+  park still verifies (a governed run's only when it is deferred to a live,
+  current master), the run or node is `held_for_provider` until the latest such
+  reset: state, timer, receipts and project untouched -- no master is acquired
+  for it, said in the record, and the decision is taken again on the next pass.
+  The refusals above come first and are not softened; a sentinel that cannot
+  read says so (`provider_health`) and the run is lifted as before.
+
+* **A declared fallback does not wait for the reset (P3-41 slice 3).** A run of
+  `QUOTA_CLASSES` whose park verifies and whose stated reset has not come is looked at once more
+  when its pinned routing policy (`<run>/routing.json`) declares a fallback for the parked role:
+  `routing.record_park_failover` decides from the verified health of the other runs and this
+  park, and records the decision *before* anything is lifted. The run is then lifted exactly as
+  a due one is (one resume attempt, a claim, the unparked state before anything else), its timer
+  is withdrawn, and the next `hoh run` builds its dispatcher on the fallback until the record's
+  `return_at`. Where no declared fallback is healthy, or anything cannot be verified, the park
+  waits for its reset as before (the record says `failover_not_decided` and why): a provider stop
+  is never a halt. A failure that is not a usage limit (a rate limit, an outage, a network failure)
+  fails over only when at least `routing.MIN_FAILOVER_WAIT_SECONDS` of its wait are left: a blip waits
+  and spends no record. At the project level a node whose run was lifted this way is lifted with it.
+
 **The crash invariant**, the same on both sides of a wait:
 
     a parked state is never durable without its wake-up;
@@ -175,8 +200,12 @@ def resume_runs(root: Path | str, *, now: datetime | str | None = None,
     from . import quota, stages
     from .store import LockBusy, RunStore, StoreError, list_runs
 
+    from .health import ProviderHealthSentinel
+
     root = Path(root).expanduser()
     moment = _now_str(now)
+    when = _moment(now)
+    sentinel = ProviderHealthSentinel(root, now=when)
     timers_store = TimerStore(root)
     out: list[dict] = []
     ids = [only] if only else list(list_runs(root))
@@ -209,6 +238,15 @@ def resume_runs(root: Path | str, *, now: datetime | str | None = None,
                         armed, runs={rid: run_view(st, epoch)}, now=moment,
                         program_epoch=epoch if epoch is not None else 0,
                         killed=killed)
+                    def failover(timer_id, store=store, st=st):
+                        try:
+                            return _failover_run(store, st, timer_id=timer_id,
+                                                 timers_store=timers_store, when=when,
+                                                 stages=stages, quota=quota)
+                        except Exception as exc:          # noqa: BLE001 - said, not raised
+                            # a defect in the failover must not stop the pass for the runs
+                            # behind this one (review A4, G4); the park simply waits
+                            return {"failover_not_decided": f"internal error ({type(exc).__name__})"}
                     for d in decisions:
                         rec = {"scope": "run", "target": rid, "timer_id": d.timer_id,
                                "verdict": d.verdict.value, "why": d.why}
@@ -218,9 +256,11 @@ def resume_runs(root: Path | str, *, now: datetime | str | None = None,
                                           f"owns ({sorted(classes)}); the timer stays armed")
                         elif d.resumes:
                             rec.update(_resume_run(store, st, d, timers_store, moment,
-                                                   stages, quota))
+                                                   stages, quota, sentinel))
                         else:
                             rec["action"] = "refused"
+                            if d.verdict is Verdict.NOT_DUE and st.blocked_kind in classes:
+                                rec.update(failover(d.timer_id))
                         out.append(rec)
                     if not armed and st.condition is Condition.BLOCKED \
                             and st.blocked_kind in classes:
@@ -231,7 +271,8 @@ def resume_runs(root: Path | str, *, now: datetime | str | None = None,
                                         "why": f"run {rid} is on the kill list; the "
                                                "retry_after fallback never resumes it"})
                         else:
-                            out.append(_legacy_run(store, st, rid, stages, quota))
+                            out.append(_legacy_run(store, st, rid, stages, quota,
+                                                   sentinel, failover))
             except (LockBusy, StoreError) as exc:
                 out.append({"scope": "run", "target": rid, "action": "skipped",
                             "why": str(exc)[:160]})
@@ -302,6 +343,24 @@ def _exhausted(store, st, check, rec: dict) -> dict:
     return rec
 
 
+def _provider_hold(sentinel, run_id: str) -> tuple[dict | None, dict]:
+    """(the result record of a run the sentinel says to hold, or None; the fields a
+    run that is let through carries).
+
+    A sentinel that could not read says so in the record of the run it lets
+    through (`provider_health`), so a pass that consulted nothing is not
+    mistaken for one that consulted and found nothing."""
+    if sentinel is None:
+        return None, {}
+    verdict = sentinel.consult(run_id)
+    if verdict.action.value == "HOLD":
+        return {"action": "held_for_provider", "why": verdict.reason,
+                "until": verdict.not_before, "evidence": list(verdict.evidence)}, {}
+    if not verdict.available:
+        return None, {"provider_health": f"not consulted: {verdict.reason}"[:200]}
+    return None, {}
+
+
 def _claim(store, st, check) -> dict:
     """The receipt of the resume, written after the park was lifted."""
     if check is None or check.record is None:
@@ -314,7 +373,73 @@ def _claim(store, st, check) -> dict:
     return {"claim": "written"}
 
 
-def _resume_run(store, st, d: Resumption, timers_store, moment, stages, quota) -> dict:
+def _pinned_policy(run_dir: Path):
+    """`(policy, why)`: the routing policy a run is bound to (`<run>/routing.json`), or None and
+    why not -- no pin is the empty string, anything else is a pin that cannot be applied."""
+    from . import routing
+    from .cli import RoutingPinRefused, _routing_decide
+
+    try:
+        policy, _pin = _routing_decide(run_dir, None)
+    except (RoutingPinRefused, routing.RoutingRefused) as exc:
+        return None, f"the routing policy of the run cannot be read: {str(exc)[:160]}"
+    return policy, ""
+
+
+def _failover_run(store, st, *, timer_id, timers_store, when, stages, quota) -> dict:
+    """P3-41 slice 3: a verified, not yet due provider wait of a run whose pinned policy declares
+    a fallback for the parked role is lifted now, on that fallback. Returns the fields of the
+    result record: `{}` for a run this does not apply to (no pinned policy, a policy without
+    fallbacks, a hold), `failover_not_decided` and the reason for a run that waits for its reset,
+    or the resume (`action: resumed_failover`).
+
+    The order is the crash invariant's: the decision is recorded first (create-only, and counted
+    even if the lift never happens), the unparked state is persisted next, the timer is withdrawn
+    last. One lift is one resume attempt (`MAX_RESUME_ATTEMPTS` bounds the unproductive ones)."""
+    from . import routing
+
+    if stages.violation_unresolved(st):
+        return {}
+    policy, why = _pinned_policy(store.dir)
+    if policy is None:
+        return {"failover_not_decided": why} if why else {}
+    if not policy.fallbacks:
+        return {}
+    if st.resume_attempts >= quota.MAX_RESUME_ATTEMPTS:
+        return {"failover_not_decided": f"{st.resume_attempts} resume attempts are used"}
+    check = _check_park(store, st)
+    barred = _barred(check)
+    if barred is not None or check is None or check.record is None:
+        return {"failover_not_decided": (barred or {}).get("why")
+                or "no receipt describes this park"}
+    try:
+        made = routing.record_park_failover(policy, run_dir=store.dir, receipt=check.record,
+                                            now=when)
+    except routing.RoutingRefused as exc:
+        return {"failover_not_decided": str(exc)[:200], **_binding_fields(check)}
+    st.resume_attempts += 1
+    stages.unblock(st, f"resumed by the resume loop on the declared fallback "
+                       f"{made.route.provider}/{made.route.model} (park failover {made.number}; "
+                       f"the declared route again from {made.return_at}), attempt "
+                       f"{st.resume_attempts}{_binding_note(check)}")
+    store.write_state(st)
+    rec = {"action": "resumed_failover", "attempt": st.resume_attempts,
+           "route": {"provider": made.route.provider, "model": made.route.model},
+           "failover_record": routing.PARK_FAILOVER_FILE.format(n=made.number),
+           "return_at": made.return_at,
+           "next_step": f"hoh --root {store.root} run {store.run_id}",
+           **_binding_fields(check), **_claim(store, st, check)}
+    if timer_id is not None:
+        try:
+            timers_store.disarm(timer_id, f"the run was resumed on a declared fallback "
+                                          f"(park failover {made.number})")
+        except (TimerStoreError, OSError) as exc:
+            rec["timer"] = f"left armed: {exc}"
+    return rec
+
+
+def _resume_run(store, st, d: Resumption, timers_store, moment, stages, quota,
+                sentinel=None) -> dict:
     if stages.violation_unresolved(st):
         return _hold_refusal(st, {}, "a timer")
     check = _check_park(store, st)
@@ -323,13 +448,16 @@ def _resume_run(store, st, d: Resumption, timers_store, moment, stages, quota) -
         return barred
     if st.resume_attempts >= quota.MAX_RESUME_ATTEMPTS:
         return _exhausted(store, st, check, {})
+    held, said = _provider_hold(sentinel, store.run_id)
+    if held is not None:
+        return {**held, **_binding_fields(check)}
     st.resume_attempts += 1
     stages.unblock(st, f"resumed by the resume loop: timer {d.timer_id} due "
                        f"{d.due_at}, attempt {st.resume_attempts}{_binding_note(check)}")
     store.write_state(st)
     rec = {"action": "resumed", "attempt": st.resume_attempts,
            "next_step": f"hoh --root {store.root} run {store.run_id}",
-           **_binding_fields(check), **_claim(store, st, check)}
+           **said, **_binding_fields(check), **_claim(store, st, check)}
     try:
         consume(timers_store, d, now=moment)
     except ResumptionError as exc:
@@ -339,7 +467,7 @@ def _resume_run(store, st, d: Resumption, timers_store, moment, stages, quota) -
     return rec
 
 
-def _legacy_run(store, st, rid, stages, quota) -> dict:
+def _legacy_run(store, st, rid, stages, quota, sentinel=None, failover=None) -> dict:
     rec = {"scope": "run", "target": rid, "timer_id": None,
            "verdict": "LEGACY_RETRY_AFTER"}
     if stages.violation_unresolved(st):
@@ -356,6 +484,12 @@ def _legacy_run(store, st, rid, stages, quota) -> dict:
         return _exhausted(store, st, check, rec)
     if not quota.is_due(st.retry_after):
         rec.update(action="waiting", why=f"retry after {st.retry_after}")
+        if failover is not None:
+            rec.update(failover(None))
+        return rec
+    held, said = _provider_hold(sentinel, rid)
+    if held is not None:
+        rec.update(held, **_binding_fields(check))
         return rec
     st.resume_attempts += 1
     stages.unblock(st, f"quota retry {st.resume_attempts} (retry_after, no timer)"
@@ -363,7 +497,7 @@ def _legacy_run(store, st, rid, stages, quota) -> dict:
     store.write_state(st)
     rec.update(action="resumed_without_timer", attempt=st.resume_attempts,
                next_step=f"hoh --root {store.root} run {rid}",
-               **_binding_fields(check), **_claim(store, st, check))
+               **said, **_binding_fields(check), **_claim(store, st, check))
     return rec
 
 
@@ -454,10 +588,12 @@ def resume_projects(root: Path | str, *, now: datetime | str | None = None,
                     killed: frozenset[str] = frozenset(),
                     authority_factory: Callable[..., Any] | None = None) -> list[dict]:
     """One pass over the projects under `root`."""
+    from .health import ProviderHealthSentinel
     from .projectstore import list_projects
 
     root = Path(root).expanduser()
     moment = _now_str(now)
+    sentinel = ProviderHealthSentinel(root, now=_moment(now))
     out: list[dict] = []
     for pid in list_projects(root):
         # One project's damage -- an unreadable lease, a driver that raises --
@@ -466,15 +602,40 @@ def resume_projects(root: Path | str, *, now: datetime | str | None = None,
             out.extend(_resume_one_project(
                 root, pid, moment=moment, classes=classes, drive=drive,
                 session_id=session_id, killed=killed,
-                authority_factory=authority_factory))
+                authority_factory=authority_factory, sentinel=sentinel))
         except Exception as exc:                          # noqa: BLE001 - reported
             out.append({"scope": "project", "target": pid, "action": "skipped",
                         "why": f"{type(exc).__name__}: {exc}"[:200]})
     return out
 
 
+def _failover_lifted(root: Path, node: Any) -> bool:
+    """P3-41 slice 3: is this parked node's run one that the resume loop already lifted onto a
+    declared fallback -- the run is no longer parked, the newest park failover record names the
+    run's newest park, and that park was claimed? The node's own timer is not due yet; the run
+    is on its way, and the node goes with it. Reads only; anything unreadable is False."""
+    from . import routing
+    from .health import _state_of
+    from .store import RunStore
+
+    try:
+        store = RunStore(root, node.run_id or node.id)
+        latest = routing.latest_park_failover(store.dir)
+        if latest is None:
+            return False
+        st = _state_of(store)
+        if st is None or st.condition is Condition.BLOCKED:
+            return False
+        records, _ = dispatchrecovery.read_records(store.dir)
+        parks = [r for r in records if isinstance(r, dispatchrecovery.RoutingDecision)]
+        return (bool(parks) and parks[-1].park_id == latest["park_id"]
+                and os.path.lexists(dispatchrecovery.claim_path(store.dir, latest["park_id"])))
+    except Exception:                                    # noqa: BLE001 - unreadable: not lifted
+        return False
+
+
 def _resume_one_project(root: Path, pid: str, *, moment: str, classes, drive,
-                        session_id, killed, authority_factory) -> list[dict]:
+                        session_id, killed, authority_factory, sentinel=None) -> list[dict]:
     from .orchestrator import disarm_stale_waits, node_timer_key, write_lock
     from .projectstore import ProjectStore
     from .store import LockBusy, StoreError
@@ -505,6 +666,11 @@ def _resume_one_project(root: Path, pid: str, *, moment: str, classes, drive,
                    and node_timer_key(n.id) not in timed and n.id not in killed]
         if not decisions and not orphans:
             return out
+        # a node not due whose run was already lifted onto a declared fallback goes with it
+        lifted = {n.id for n in state.nodes
+                  if n.lifecycle.value == "BLOCKED" and n.blocked_kind in classes
+                  and n.id not in killed and node_timer_key(n.id) in timed
+                  and _failover_lifted(root, n)}
         by_key = {node_timer_key(n.id): n for n in state.nodes}
         todo: list[Resumption] = []
         fallback: list[str] = []
@@ -513,11 +679,15 @@ def _resume_one_project(root: Path, pid: str, *, moment: str, classes, drive,
                    "verdict": "PARKED_WITHOUT_TIMER"}
             if n.retry_after and n.retry_after <= moment:
                 barred = _run_park_gate(root, n)
+                held, said = ((None, {}) if barred is not None
+                              else _provider_hold(sentinel, n.run_id or n.id))
                 if barred is not None:
                     rec.update(barred)
+                elif held is not None:
+                    rec.update(held)
                 else:
                     rec.update(action="pending", why=f"no armed timer; retry_after "
-                               f"{n.retry_after} has passed (fallback)")
+                               f"{n.retry_after} has passed (fallback)", **said)
                     fallback.append(n.id)
             else:
                 rec.update(action="waiting", why=f"no armed timer; retry_after "
@@ -533,11 +703,21 @@ def _resume_one_project(root: Path, pid: str, *, moment: str, classes, drive,
                               f"({sorted(classes)}); the timer stays armed")
             elif d.resumes:
                 barred = _run_park_gate(root, node) if node is not None else None
+                held, said = ((None, {}) if barred is not None or node is None
+                              else _provider_hold(sentinel, node.run_id or node.id))
                 if barred is not None:
                     rec.update(barred)
+                elif held is not None:
+                    rec.update(held)
                 else:
                     rec["action"] = "pending"
+                    rec.update(said)
                     todo.append(d)
+            elif d.verdict is Verdict.NOT_DUE and node is not None and node.id in lifted:
+                rec.update(verdict="LIFTED_BY_FAILOVER", action="pending",
+                           why=f"run {node.run_id or node.id} was resumed on a declared "
+                               "fallback before its reset; the node goes with it")
+                fallback.append(node.id)
             else:
                 rec["action"] = "refused"
             out.append(rec)
@@ -548,9 +728,12 @@ def _resume_one_project(root: Path, pid: str, *, moment: str, classes, drive,
         make = authority_factory or MasterAuthority
         authority = make(store.dir, sid, serialize=lambda: write_lock(store))
         pending = [r for r in out if r.get("target") == pid and r.get("action") == "pending"
-                   and r.get("timer_id") is not None]
+                   and r.get("timer_id") is not None
+                   and r.get("verdict") != "LIFTED_BY_FAILOVER"]
         pending_fb = [r for r in out if r.get("target") == pid
-                      and r.get("action") == "pending" and r.get("timer_id") is None]
+                      and r.get("action") == "pending"
+                      and (r.get("timer_id") is None
+                           or r.get("verdict") == "LIFTED_BY_FAILOVER")]
         try:
             authority.acquire(program_generation=state.program_generation,
                               note="resume loop: a due provider wait")
@@ -575,12 +758,16 @@ def _resume_one_project(root: Path, pid: str, *, moment: str, classes, drive,
                             r.update(action="refused", why="the node changed under the pass")
                             continue
                         node.lifecycle = Lifecycle.READY
+                        failed_over = r.get("verdict") == "LIFTED_BY_FAILOVER"
                         node.note = (f"resumed by {sid} at {moment}: "
                                      + (f"timer {d.timer_id} (due {d.due_at})" if d
+                                        else "its run was resumed on a declared fallback "
+                                             f"(retry_after {node.retry_after})" if failed_over
                                         else f"retry_after {node.retry_after}, no timer"))
                         node.blocked_kind = None
                         node.retry_after = None
-                        r.update(action="resumed" if d else "resumed_without_timer",
+                        r.update(action=("resumed" if d else "resumed_failover" if failed_over
+                                         else "resumed_without_timer"),
                                  master=sid, epoch=authority.epoch)
                         if d is not None:
                             to_consume.append((d, r))
@@ -656,6 +843,33 @@ def drive_governed(store, authority, factory, **controller_kw):
 
     try:
         launcher, gates = factory(store)
+        # P3-20 slice 3: the routing the project declares binds the runs this launcher starts.
+        # A project that declares a policy (or is pinned to one) and whose launcher cannot be
+        # bound to it halts here, by name, before anything is started.
+        from .launcher import ROUTING_PIN_FILE, ROUTING_POLICY_FILE, unbound_preflight_refusal
+
+        project_dir = getattr(store, "dir", None)         # a store without one declares nothing
+        bind_routing = getattr(launcher, "bind_routing", None)
+        if project_dir is None:
+            pass
+        elif callable(bind_routing):
+            bind_routing(project_dir)
+        elif any(os.path.lexists(project_dir / name)
+                 for name in (ROUTING_POLICY_FILE, ROUTING_PIN_FILE)):
+            declares = os.path.lexists(project_dir / ROUTING_POLICY_FILE)
+            raise ValueError(
+                f"routing policy refused: this project "
+                f"{'declares a routing policy' if declares else 'is bound to a routing policy'}"
+                f" ({ROUTING_POLICY_FILE if declares else ROUTING_PIN_FILE}) and its launcher "
+                f"({type(launcher).__name__}) cannot route the runs it starts")
+        # P3-11 slice 4: the same for the execution preflight. A launcher that binds is bound by
+        # `bind_routing` above (the default, the project's requirement or its waiver); one that
+        # cannot bind runs on no report unless the project recorded a waiver -- else it halts
+        # here, by name, before anything is started.
+        if project_dir is not None:
+            refusal = unbound_preflight_refusal(launcher, project_dir)
+            if refusal is not None:
+                raise ValueError(refusal)
         # P2-43b: the runs this master launches are bound to it.
         bind_master = getattr(launcher, "bind_master", None)
         if callable(bind_master) and authority.epoch is not None:

@@ -108,8 +108,14 @@ def test_the_contract_surface_separates_absent_from_renamed():
     rows = {r["contract"]: r for r in pb.contract_surface()}
     assert rows["ExecutionPreflight"]["status"] == pb.PARTIAL
     assert "preflight" in rows["ExecutionPreflight"]["equivalent_here"]
-    assert rows["ParallelWaveExecutor"]["status"] == pb.MISSING
-    assert rows["ParallelWaveExecutor"]["equivalent_here"] is None
+    assert rows["ValidationDomain"]["status"] == pb.MISSING
+    assert rows["ValidationDomain"]["equivalent_here"] is None
+    # `BackpressureController` exists (P3-07, slice 1) and nothing calls it: not MISSING, not PROVEN.
+    assert rows["BackpressureController"]["status"] == pb.IMPLEMENTED_NOT_PROVEN
+    assert rows["BackpressureController"]["symbol"][0].startswith("src/hoh/backpressure.py:")
+    # `ParallelWaveExecutor` exists (P3-02, slice 1) and nothing calls it: not MISSING, not PROVEN.
+    assert rows["ParallelWaveExecutor"]["status"] == pb.IMPLEMENTED_NOT_PROVEN
+    assert rows["ParallelWaveExecutor"]["symbol"][0].startswith("src/hoh/wave.py:")
     # And a contract whose symbol exists is never MISSING.
     for row in rows.values():
         if row["symbol"]:

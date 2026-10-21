@@ -504,6 +504,33 @@ class Handling(StrEnum):
     STOP_PROGRAM = "STOP_PROGRAM"
 
 
+#: The handlings after which work that is independent of the stopped branch may
+#: carry on (V3.3 P3-28). Every handling is decided here on purpose: a
+#: `Handling` added later is in neither this set nor `STOPS_EVERYTHING` until
+#: somebody says which, and a handling in neither does not continue anything
+#: (`continues_past` is a membership test).
+CONTINUES_PAST = frozenset({Handling.RESOLVED_BY_POLICY, Handling.ASK_NOW,
+                            Handling.COLLECT_FOR_DIGEST, Handling.PARK_BRANCH,
+                            Handling.ABORT_BRANCH})
+#: The one handling that is not about a branch: "the whole programme stops".
+STOPS_EVERYTHING = frozenset({Handling.STOP_PROGRAM})
+
+
+def continues_past(handling: Handling) -> bool:
+    """May independent READY work carry on while a decision is handled this way?
+
+    Yes for everything that is about *one branch* -- asked, collected, parked,
+    abandoned -- and no for STOP_PROGRAM, which the plan words as "the whole
+    programme stops". Anything this table does not know is a no, an
+    unhashable value included: a handling nobody classified must not be read
+    as permission.
+    """
+    try:
+        return handling in CONTINUES_PAST
+    except TypeError:
+        return False
+
+
 class Routing(Strict):
     """One decision, routed, with the rule that routed it.
 

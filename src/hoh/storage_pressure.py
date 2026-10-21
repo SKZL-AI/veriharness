@@ -95,6 +95,7 @@ Layout::
     reservations/<id>.json.closed.v1.<UTC>    released (renamed, kept)
     reservations/<id>.json.stale.v1.<UTC>     owner dead (renamed, kept)
     history.jsonl                             one line per release
+    inodes.jsonl                              one line per measured inode count of a closed run (P3-39)
     host_last.json                            last successful host reading
     state.json                                the tracker's last state
     observations.json                         the last observations (slope)
@@ -156,6 +157,9 @@ DEFAULT_ESTIMATES: dict[str, int] = {
 }
 
 #: How many observations are kept for the naive ``seconds_to_reserve`` slope.
+#: The largest inode count one run may record (P3-39): above it a count is not a measurement of a run.
+MAX_RECORDED_INODES = 10 ** 12
+
 _OBSERVATIONS_KEPT = 32
 _SLOPE_POINTS = 8
 
@@ -562,6 +566,15 @@ class StateTracker:
             return PressureState.OPTIMIZE
         return PressureState.NORMAL
 
+    def inode_floor(self, total_inodes: int | None) -> int:
+        """The fewest free inodes that are not CRITICAL on the inode axis: the absolute floor, and with a
+        reported total the share ``inode_critical_ratio`` of it. Rounded up, so the line is never below the one
+        ``inode_axis`` draws: free inodes under it may be CRITICAL, free inodes at or above it never are."""
+        floor = self.policy.min_inodes_free
+        if total_inodes:
+            floor = max(floor, math.ceil(total_inodes * self.policy.inode_critical_ratio))
+        return floor
+
     def classify(
         self,
         free_bytes: int,
@@ -882,6 +895,7 @@ class StorageAdmission:
         self.history_path = self.ledger / "history.jsonl"
         self.host_path = self.ledger / "host_last.json"
         self.observations_path = self.ledger / "observations.json"
+        self.inodes_path = self.ledger / "inodes.jsonl"
         self.namespace_path = self.ledger / _NAMESPACE_RECORD
         self.tracker = StateTracker(policy, self.ledger / "state.json", load=False)
         self._pid_alive = pid_alive
@@ -1394,20 +1408,22 @@ class StorageAdmission:
             )
             return decision is None
 
-    def _append_history(self, entry: dict[str, Any]) -> None:
+    def _append_history(self, entry: dict[str, Any], path: Path | None = None) -> None:
         """One ``os.write`` of a complete line on an ``O_APPEND`` descriptor.
         If the file does not end with a newline (a torn line, e.g. after
         ENOSPC), the newline is put in front of the record in the same write,
-        so the record never glues onto the torn fragment. Call under the lock."""
+        so the record never glues onto the torn fragment. Call under the lock.
+        ``path`` is ``history.jsonl`` unless the inode record (``inodes.jsonl``) is meant."""
+        target = self.history_path if path is None else path
         line = (json.dumps(entry) + "\n").encode("utf-8")
-        fd = os.open(self.history_path, os.O_RDWR | os.O_APPEND | os.O_CREAT, 0o644)
+        fd = os.open(target, os.O_RDWR | os.O_APPEND | os.O_CREAT, 0o644)
         try:
             size = os.fstat(fd).st_size
             if size and os.pread(fd, 1, size - 1) != b"\n":
                 line = b"\n" + line
             written = os.write(fd, line)
             if written != len(line):
-                raise OSError(f"short write to {self.history_path}: {written} of {len(line)}")
+                raise OSError(f"short write to {target}: {written} of {len(line)}")
             os.fsync(fd)
         finally:
             os.close(fd)
@@ -1460,6 +1476,59 @@ class StorageAdmission:
             os.replace(path, target)
             return target
 
+    def record_inodes(self, reservation: Reservation, actual_inodes: object) -> bool:
+        """Record the inodes a closed run really created (P3-39: the measured history behind ``estimate_inodes``).
+
+        ``release`` records bytes; the inodes are a second record, one line of ``inodes.jsonl`` per run, because a
+        host runs short of inodes as well as of bytes (the inode axis is CRITICAL below 3 % free). **Fail closed:**
+        a count that is not a whole number from 1 to ``MAX_RECORDED_INODES`` (a bool, a float, a negative, a missing
+        measurement, **and 0**: a run that exists owns at least its own directory, so a count of 0 measured nothing)
+        or a write that fails records **nothing** and returns False -- the estimate then stays what it was, never a
+        guessed figure -- and this never raises: it is called after the run's own outcome is settled."""
+        if (not isinstance(actual_inodes, int) or isinstance(actual_inodes, bool)
+                or not 1 <= actual_inodes <= MAX_RECORDED_INODES):
+            return False
+        try:
+            with self._locked():
+                self._append_history(
+                    {"op_kind": reservation.op_kind, "id": reservation.id, "actual_inodes": actual_inodes,
+                     "closed_utc": _iso(self._clock())}, self.inodes_path)
+        except Exception:                      # noqa: BLE001 - an inode record never hides the run's outcome
+            return False
+        return True
+
+    def _inode_actuals(self, op_kind: str) -> list[int]:
+        """The recorded inode counts of ``op_kind``, oldest first; a torn or malformed line is skipped."""
+        try:
+            lines = self.inodes_path.read_text(encoding="utf-8", errors="replace").split("\n")
+        except OSError:
+            return []
+        out: list[int] = []
+        for line in lines:
+            try:
+                entry = json.loads(line)
+            except ValueError:
+                continue
+            value = entry.get("actual_inodes") if isinstance(entry, dict) else None
+            if (isinstance(entry, dict) and entry.get("op_kind") == op_kind and isinstance(value, int)
+                    and not isinstance(value, bool) and 1 <= value <= MAX_RECORDED_INODES):
+                out.append(value)
+        return out
+
+    def estimate_inodes(self, op_kind: str) -> int | None:
+        """``ceil(safety_factor x p95)`` of the last ``history_window`` recorded inode counts of that kind, at least 1 --
+        windowed like ``estimate`` -- or **None when none was ever recorded** (a measured figure is never invented). It
+        carries **no floor of its own**, as ``estimate`` does through the policy's defaults: the floor of an inode want
+        is the caller's (``capacitycheck.RUN_INODES``, permanent). Reads the record without the lock; it never raises for a bad record."""
+        if op_kind not in OP_KINDS:
+            raise ValueError(f"unknown operation kind {op_kind!r}; known: {list(OP_KINDS)}")
+        actuals = self._inode_actuals(op_kind)[-self.policy.history_window:]
+        if not actuals:
+            return None
+        ordered = sorted(actuals)
+        p95 = ordered[math.ceil(0.95 * len(ordered)) - 1]
+        return max(1, math.ceil(self.policy.safety_factor * p95))
+
     def stale_reservations(self) -> list[Reservation]:
         """Every stale reservation in the ledger (renaming newly found ones).
         They are not counted by admission; their files are kept."""
@@ -1508,6 +1577,13 @@ class StorageAdmission:
                         obs.guest_free_inodes, obs.guest_total_inodes
                     ).value
                 ),
+                # The inode line below which the axis is CRITICAL: admission has no inode reservations, so a
+                # capacity broker (P3-39) takes `guest_free_inodes - reserve_inodes` as what may still be used.
+                "reserve_inodes": self.tracker.inode_floor(obs.guest_total_inodes),
+                # When the figure above is derived from a persisted host reading (host_unknown True, up to
+                # host_max_age_s old) this is when that reading was recorded; None otherwise. A consumer that
+                # judges age (the capacity broker, P3-39) must use it, not observed_utc.
+                "host_reading_utc": self._host_reading_utc(obs),
                 "host_free_bytes": obs.host_free_bytes,
                 "host_unknown": obs.host_unknown,
                 "host_note": obs.host_note,
@@ -1525,6 +1601,16 @@ class StorageAdmission:
                 "observed_utc": obs.observed_utc,
                 "ledger": str(self.ledger),
             }
+
+    def _host_reading_utc(self, obs: Observation) -> str | None:
+        """The ``recorded_utc`` of the persisted host reading the effective figure was derived from, or None where
+        it is not derived (the host was read now, or no host is configured). Call under the lock, after
+        ``_assess``: the file is the one ``_host_term`` just read."""
+        if not obs.host_unknown or obs.host_free_bytes is None:
+            return None
+        last = _read_json(self.host_path)
+        value = last.get("recorded_utc") if isinstance(last, dict) else None
+        return value if isinstance(value, str) else None
 
     def _seconds_to_reserve(self, effective: int | None) -> float | None:
         """Least-squares slope over the last observations; a forecast only

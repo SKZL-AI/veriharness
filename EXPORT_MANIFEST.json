@@ -12,6 +12,36 @@
       "rule": "operational-integration"
     },
     {
+      "path": ".github/assets/hero.svg",
+      "decision": "INCLUDE",
+      "rule": "repo-meta"
+    },
+    {
+      "path": ".github/assets/loop.svg",
+      "decision": "INCLUDE",
+      "rule": "repo-meta"
+    },
+    {
+      "path": ".github/assets/social-preview.png",
+      "decision": "INCLUDE",
+      "rule": "repo-meta"
+    },
+    {
+      "path": ".github/assets/social-preview.svg",
+      "decision": "INCLUDE",
+      "rule": "repo-meta"
+    },
+    {
+      "path": ".github/assets/steward.svg",
+      "decision": "INCLUDE",
+      "rule": "repo-meta"
+    },
+    {
+      "path": ".github/assets/succession.svg",
+      "decision": "INCLUDE",
+      "rule": "repo-meta"
+    },
+    {
       "path": ".github/releases/v0.1.0.json",
       "decision": "INCLUDE",
       "rule": "repo-meta"
@@ -443,6 +473,11 @@
     },
     {
       "path": "dogfood/VORSCHLAG_UNION_GATE.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/a8dd/spec.md",
       "decision": "EXCLUDE",
       "rule": "internal-working-document"
     },
@@ -6048,6 +6083,86 @@
     },
     {
       "path": "dogfood/attr030/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/bench1ports/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/bench1ports/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/bench1ports/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/bench1ports/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/bench1ports/mutants.py",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/bench1ports/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/bench1tool/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/bench1tool/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/bench1tool/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/bench1tool/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/bench1tool/mutants.py",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/bench1tool/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/bench1toolid/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/bench1toolid/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/bench1toolng/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/bench1toolng/spec.md",
       "decision": "EXCLUDE",
       "rule": "internal-working-document"
     },
@@ -19018,6 +19133,66 @@
     },
     {
       "path": "dogfood/f06f/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/ff2/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/ff2/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/ff2/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/ff2/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/ff2/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/fid1/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/fid1/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/fid1/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/fid1/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/fid1/mutants.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/fid1/mutants.py",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/fid1/spec.md",
       "decision": "EXCLUDE",
       "rule": "internal-working-document"
     },
@@ -38327,6 +38502,31 @@
       "rule": "internal-working-document"
     },
     {
+      "path": "dogfood/lint1/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/lint1/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/lint1/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/lint1/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/lint1/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
       "path": "dogfood/long-prompt/20261002T1519Z/integration-review/lprompt-a-report.md",
       "decision": "EXCLUDE",
       "rule": "internal-working-document"
@@ -39658,6 +39858,96 @@
     },
     {
       "path": "dogfood/long-prompt/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/mgrb1/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/mgrb1/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/mgrb1/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/mgrb1/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/mgrb1/mutants.py",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/mgrb1/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/mgrb2/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/mgrb2/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/mgrb2/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/mgrb2/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/mgrb2/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/mgrb3/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/mgrb3/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/mgrb3/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/mgrb3/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/mgrb3/mutants.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/mgrb3/mutants.py",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/mgrb3/spec.md",
       "decision": "EXCLUDE",
       "rule": "internal-working-document"
     },
@@ -131947,6 +132237,11 @@
       "rule": "internal-working-document"
     },
     {
+      "path": "dogfood/p2-gate/CLOSURE.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
       "path": "dogfood/p2-gate/REVIEW.json",
       "decision": "EXCLUDE",
       "rule": "internal-working-document"
@@ -152902,6 +153197,106 @@
       "rule": "internal-working-document"
     },
     {
+      "path": "dogfood/p2cls1/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p2cls1/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p2cls1/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p2cls1/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p2cls1/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p2cls2/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p2cls2/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p2cls2/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p2cls2/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p2cls2/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p2cls3/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p2cls3/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p2cls3/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p2cls3/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p2cls3/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p2cls4/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p2cls4/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p2cls4/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p2cls4/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p2cls4/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
       "path": "dogfood/p2exit-proof/20261008T1119Z/integration-review/REDACTION_NOTE.txt",
       "decision": "EXCLUDE",
       "rule": "internal-working-document"
@@ -155402,6 +155797,2286 @@
       "rule": "internal-working-document"
     },
     {
+      "path": "dogfood/p301/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p301/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p301/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p301/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p301/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p301t/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p301t/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p301t/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p301t/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p301t/mutants.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p301t/mutants.py",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p301t/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p302/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p302/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p302/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p302/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p302/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p302f/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p302f/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p302f/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p302f/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p302f/mutants.py",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p302f/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p302s2/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p302s2/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p302s2/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p302s2/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p302s2/mutants.py",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p302s2/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p302s2r/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p302s2r/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p302s2r/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p302s2r/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p302s2r/mutants.py",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p302s2r/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p302s2rf2/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p302s2rf2/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p302s2rf2/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p302s2rf2/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p302s2rf2/mutants.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p302s2rf2/mutants.py",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p302s2rf2/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p304/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p304/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p304/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p304/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p304/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p304c4/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p304c4/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p304c4/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p304c4/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p304c4/mutants.py",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p304c4/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p304c5/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p304c5/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p304c5/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p304c5/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p304c5/mutants.py",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p304c5/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p306/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p306/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p306/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p306/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p306/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p306s2/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p306s2/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p306s2/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p306s2/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p306s2/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p306s2f/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p306s2f/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p306s2f/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p306s2f/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p306s2f/mutants.py",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p306s2f/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p307/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p307/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p307/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p307/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p307/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p307s2/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p307s2/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p307s2/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p307s2/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p307s2/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p308/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p308/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p308/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p308/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p308/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p308s2/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p308s2/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p308s2/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p308s2/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p308s2/mutants.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p308s2/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p308s3/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p308s3/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p308s3/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p308s3/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p308s3/mutants.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p308s3/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p308s4/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p308s4/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p308s4/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p308s4/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p308s4/mutants.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p308s4/mutants.py",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p308s4/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p311/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p311/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p311/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p311/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p311/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p311s2/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p311s2/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p311s2/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p311s2/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p311s2/mutants.py",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p311s2/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p311s3/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p311s3/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p311s3/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p311s3/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p311s3/mutants.py",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p311s3/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p311s4/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p311s4/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p311s4/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p311s4/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p311s4/mutants.py",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p311s4/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p316/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p316/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p316/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p316/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p316/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p316s2/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p316s2/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p316s2/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p316s2/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p316s2/mutants.py",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p316s2/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p316s3/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p316s3/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p316s3/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p316s3/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p316s3/mutants.py",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p316s3/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p317/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p317/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p317/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p317/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p317/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p317s2/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p317s2/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p317s2/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p317s2/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p317s2/mutants.py",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p317s2/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p317s3/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p317s3/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p317s3/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p317s3/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p317s3/mutants.py",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p317s3/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p318/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p318/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p318/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p318/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p318/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p318f/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p318f/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p318f/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p318f/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p318f/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p318s2/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p318s2/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p318s2/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p318s2/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p318s2/mutants.py",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p318s2/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p318s3/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p318s3/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p318s3/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p318s3/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p318s3/mutants.py",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p318s3/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p319/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p319/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p319/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p319/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p319/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p319f/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p319f/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p319f/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p319f/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p319f/mutants.py",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p319f/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p319s2/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p319s2/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p319s2/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p319s2/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p319s2/mutants.py",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p319s2/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p320/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p320/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p320/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p320/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p320/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p320s2/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p320s2/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p320s2/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p320s2/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p320s2/mutants.py",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p320s2/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p320s2f/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p320s2f/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p320s2f/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p320s2f/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p320s2f/mutants.py",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p320s2f/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p320s3/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p320s3/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p320s3/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p320s3/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p320s3/mutants.py",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p320s3/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p321/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p321/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p321/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p321/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p321/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p321f/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p321f/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p321f/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p321f/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p321f/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p321s2/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p321s2/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p321s2/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p321s2/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p321s2/mutants.py",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p321s2/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p321s3/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p321s3/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p321s3/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p321s3/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p321s3/mutants.py",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p321s3/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p322r/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p322r/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p322r/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p322r/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p322r/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p322s2/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p322s2/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p322s2/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p322s2/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p322s2/mutants.py",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p322s2/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p322s3/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p322s3/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p322s3/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p322s3/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p322s3/mutants.py",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p322s3/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p322s4/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p322s4/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p322s4/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p322s4/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p322s4/mutants.py",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p322s4/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p325/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p325/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p325/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p325/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p325/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p325w/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p325w/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p325w/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p325w/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p325w/mutants.py",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p325w/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p326/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p326/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p326/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p326/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p326/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p326f/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p326f/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p326f/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p326f/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p326f/mutants.py",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p326f/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p327/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p327/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p327/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p327/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p327/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p328/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p328/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p328/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p328/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p328/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p328f/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p328f/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p328f/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p328f/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p328f/mutants.py",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p328f/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p328s2/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p328s2/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p328s2/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p328s2/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p328s2/mutants.py",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p328s2/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p330s2/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p330s2/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p330s2/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p330s2/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p330s2/mutants.py",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p330s2/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p331/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p331/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p331/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p331/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p331/mutants.py",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p331/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p331s2/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p331s2/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p331s2/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p331s2/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p331s2/mutants.py",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p331s2/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p332/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p332/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p332/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p332/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p332/mutants.py",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p332/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p332s3/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p332s3/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p332s3/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p332s3/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p332s3/mutants.py",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p332s3/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p333/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p333/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p333/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p333/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p333/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p334/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p334/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p334/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p334/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p334/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p339/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p339/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p339/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p339/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p339/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p339c5/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p339c5/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p339c5/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p339c5/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p339c5/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p341/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p341/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p341/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p341/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p341/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p341s2/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p341s2/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p341s2/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p341s2/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p341s2/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p341s3/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p341s3/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p341s3/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p341s3/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p341s3/mutants.py",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p341s3/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p341s4/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p341s4/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p341s4/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p341s4/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p341s4/mutants.py",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p341s4/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p3dd1/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p3dd1/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p3dd1/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p3dd1/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p3dd1/mutants.py",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p3dd1/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p3dd1id/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p3dd1id/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p3dd2/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p3dd2/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p3dd2/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p3dd2/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p3dd2/mutants.py",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p3dd2/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p3dd3m/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p3dd3m/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p3dd3m/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p3ff1/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p3ff1/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p3ff1/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p3ff1/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p3ff1/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p3inv1/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p3inv1/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p3inv1/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p3inv1/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p3inv1/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p3ph1/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p3ph1/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p3ph1/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p3ph1/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p3ph1/mutants.py",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p3ph1/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p3rot5/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p3rot5/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p3rot5/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p3rot5/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p3rot5/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p3rotd/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p3rotd/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p3rotd/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p3rotd/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p3rotd/mutants.py",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p3rotd/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p3ui1/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p3ui1/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p3ui1/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p3ui1/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p3ui1/mutants.py",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p3ui1/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p3wake/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p3wake/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p3wake/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p3wake/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p3wake/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p3wakes2/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p3wakes2/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p3wakes2/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p3wakes2/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p3wakes2/mutants.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p3wakes2/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p3wakes3/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p3wakes3/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p3wakes3/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p3wakes3/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p3wakes3/mutants.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p3wakes3/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
       "path": "dogfood/phase2-pathlen/20261003T0234Z/integration-review/REDACTION_NOTE.txt",
       "decision": "EXCLUDE",
       "rule": "internal-working-document"
@@ -156863,6 +159538,16 @@
     },
     {
       "path": "dogfood/portability/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/preg1/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/preg2/spec.md",
       "decision": "EXCLUDE",
       "rule": "internal-working-document"
     },
@@ -160193,6 +162878,46 @@
     },
     {
       "path": "dogfood/prompt-threshold/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/ptests/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/ptests/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/ptests/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/ptests/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/ptests/mutants.py",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/ptests/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/pub1/MEASUREMENTS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/pub1/spec.md",
       "decision": "EXCLUDE",
       "rule": "internal-working-document"
     },
@@ -184817,6 +187542,106 @@
       "rule": "internal-working-document"
     },
     {
+      "path": "dogfood/tabreap/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/tabreap/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/tabreap/mutants.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/tabreap/reference/fix-tr1.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/tabreap/reference/fix-tr2.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/tabreap/reference/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/tabreap/reference/src__hoh__reviewstart.py.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/tabreap/reference/src__hoh__surfacebook.py.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/tabreap/reference/tests__test_review_start.py.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/tabreap/reference/tests__test_surface_book.py.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/tabreap/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/tabreapf/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/tabreapf/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/tabreapf/mutants.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/tabreapf/reference/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/tabreapf/reference/src__hoh__cli.py.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/tabreapf/reference/src__hoh__surfacebook.py.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/tabreapf/reference/src__hoh__surfaces.py.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/tabreapf/reference/tests__test_surface_book.py.txt",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/tabreapf/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
       "path": "dogfood/timer-ceil/20260925T1801Z/DISCRIMINATION-NOTE.md",
       "decision": "EXCLUDE",
       "rule": "internal-working-document"
@@ -185293,6 +188118,31 @@
     },
     {
       "path": "dogfood/timer-ceil/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/tr1f2/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/tr1f2/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/tr1f2/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/tr1f2/mutants.json",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/tr1f2/spec.md",
       "decision": "EXCLUDE",
       "rule": "internal-working-document"
     },
@@ -190557,6 +193407,21 @@
       "rule": "unclassified"
     },
     {
+      "path": "program/v3_3/amendments/A8_AUTONOMOUS_DOUBLE_DOWN.md",
+      "decision": "EXCLUDE",
+      "rule": "unclassified"
+    },
+    {
+      "path": "program/v3_3/amendments/A8_OPERATOR_DIRECTIVE_2026-10-14.txt",
+      "decision": "EXCLUDE",
+      "rule": "unclassified"
+    },
+    {
+      "path": "program/v3_3/amendments/A8_OVERLAP_RECORD.md",
+      "decision": "EXCLUDE",
+      "rule": "unclassified"
+    },
+    {
       "path": "program/v3_3/amendments/AMENDMENTS.json",
       "decision": "EXCLUDE",
       "rule": "unclassified"
@@ -190565,11 +193430,6 @@
       "path": "pyproject.toml",
       "decision": "INCLUDE",
       "rule": "package"
-    },
-    {
-      "path": "runs/",
-      "decision": "EXCLUDE",
-      "rule": "evidence-not-artifact"
     },
     {
       "path": "src/hoh/__init__.py",
@@ -190662,7 +193522,42 @@
       "rule": "package"
     },
     {
+      "path": "src/hoh/backpressure.py",
+      "decision": "INCLUDE",
+      "rule": "package"
+    },
+    {
+      "path": "src/hoh/broker.py",
+      "decision": "INCLUDE",
+      "rule": "package"
+    },
+    {
+      "path": "src/hoh/budgetconfig.py",
+      "decision": "INCLUDE",
+      "rule": "package"
+    },
+    {
       "path": "src/hoh/capability.py",
+      "decision": "INCLUDE",
+      "rule": "package"
+    },
+    {
+      "path": "src/hoh/capacity.py",
+      "decision": "INCLUDE",
+      "rule": "package"
+    },
+    {
+      "path": "src/hoh/capacitycheck.py",
+      "decision": "INCLUDE",
+      "rule": "package"
+    },
+    {
+      "path": "src/hoh/capacityrecord.py",
+      "decision": "INCLUDE",
+      "rule": "package"
+    },
+    {
+      "path": "src/hoh/capacitysource.py",
       "decision": "INCLUDE",
       "rule": "package"
     },
@@ -190687,6 +193582,11 @@
       "rule": "package"
     },
     {
+      "path": "src/hoh/conflict.py",
+      "decision": "INCLUDE",
+      "rule": "package"
+    },
+    {
       "path": "src/hoh/contracts.py",
       "decision": "INCLUDE",
       "rule": "package"
@@ -190697,7 +193597,22 @@
       "rule": "package"
     },
     {
+      "path": "src/hoh/ddapply.py",
+      "decision": "INCLUDE",
+      "rule": "package"
+    },
+    {
+      "path": "src/hoh/ddverify.py",
+      "decision": "INCLUDE",
+      "rule": "package"
+    },
+    {
       "path": "src/hoh/decisioncheck.py",
+      "decision": "INCLUDE",
+      "rule": "package"
+    },
+    {
+      "path": "src/hoh/decisionfrontier.py",
       "decision": "INCLUDE",
       "rule": "package"
     },
@@ -190708,6 +193623,11 @@
     },
     {
       "path": "src/hoh/delivery.py",
+      "decision": "INCLUDE",
+      "rule": "package"
+    },
+    {
+      "path": "src/hoh/derivedreads.py",
       "decision": "INCLUDE",
       "rule": "package"
     },
@@ -190723,6 +193643,11 @@
     },
     {
       "path": "src/hoh/dispatchrecovery.py",
+      "decision": "INCLUDE",
+      "rule": "package"
+    },
+    {
+      "path": "src/hoh/doubledown.py",
       "decision": "INCLUDE",
       "rule": "package"
     },
@@ -190752,6 +193677,11 @@
       "rule": "package"
     },
     {
+      "path": "src/hoh/frontier.py",
+      "decision": "INCLUDE",
+      "rule": "package"
+    },
+    {
       "path": "src/hoh/gateway.py",
       "decision": "INCLUDE",
       "rule": "package"
@@ -190763,6 +193693,11 @@
     },
     {
       "path": "src/hoh/governance.py",
+      "decision": "INCLUDE",
+      "rule": "package"
+    },
+    {
+      "path": "src/hoh/health.py",
       "decision": "INCLUDE",
       "rule": "package"
     },
@@ -190787,6 +193722,11 @@
       "rule": "package"
     },
     {
+      "path": "src/hoh/leaseadmin.py",
+      "decision": "INCLUDE",
+      "rule": "package"
+    },
+    {
       "path": "src/hoh/legacy_scratch.py",
       "decision": "INCLUDE",
       "rule": "package"
@@ -190802,12 +193742,27 @@
       "rule": "package"
     },
     {
+      "path": "src/hoh/missioncontrol.py",
+      "decision": "INCLUDE",
+      "rule": "package"
+    },
+    {
       "path": "src/hoh/orchestrator.py",
       "decision": "INCLUDE",
       "rule": "package"
     },
     {
       "path": "src/hoh/pane_ledger.py",
+      "decision": "INCLUDE",
+      "rule": "package"
+    },
+    {
+      "path": "src/hoh/parallelmode.py",
+      "decision": "INCLUDE",
+      "rule": "package"
+    },
+    {
+      "path": "src/hoh/phases.py",
       "decision": "INCLUDE",
       "rule": "package"
     },
@@ -190823,6 +193778,11 @@
     },
     {
       "path": "src/hoh/policy/house-rules-patterns.txt",
+      "decision": "INCLUDE",
+      "rule": "package"
+    },
+    {
+      "path": "src/hoh/preflightgate.py",
       "decision": "INCLUDE",
       "rule": "package"
     },
@@ -190872,6 +193832,11 @@
       "rule": "package"
     },
     {
+      "path": "src/hoh/reservation.py",
+      "decision": "INCLUDE",
+      "rule": "package"
+    },
+    {
       "path": "src/hoh/resumeloop.py",
       "decision": "INCLUDE",
       "rule": "package"
@@ -190897,6 +193862,21 @@
       "rule": "package"
     },
     {
+      "path": "src/hoh/routing.py",
+      "decision": "INCLUDE",
+      "rule": "package"
+    },
+    {
+      "path": "src/hoh/rundrive.py",
+      "decision": "INCLUDE",
+      "rule": "package"
+    },
+    {
+      "path": "src/hoh/runlease.py",
+      "decision": "INCLUDE",
+      "rule": "package"
+    },
+    {
       "path": "src/hoh/runner.py",
       "decision": "INCLUDE",
       "rule": "package"
@@ -190908,6 +193888,11 @@
     },
     {
       "path": "src/hoh/sandbox.py",
+      "decision": "INCLUDE",
+      "rule": "package"
+    },
+    {
+      "path": "src/hoh/scheduler.py",
       "decision": "INCLUDE",
       "rule": "package"
     },
@@ -190992,6 +193977,11 @@
       "rule": "package"
     },
     {
+      "path": "src/hoh/surfacebook.py",
+      "decision": "INCLUDE",
+      "rule": "package"
+    },
+    {
       "path": "src/hoh/surfaces.py",
       "decision": "INCLUDE",
       "rule": "package"
@@ -191032,7 +194022,27 @@
       "rule": "package"
     },
     {
+      "path": "src/hoh/wake.py",
+      "decision": "INCLUDE",
+      "rule": "package"
+    },
+    {
+      "path": "src/hoh/wave.py",
+      "decision": "INCLUDE",
+      "rule": "package"
+    },
+    {
+      "path": "src/hoh/waverecovery.py",
+      "decision": "INCLUDE",
+      "rule": "package"
+    },
+    {
       "path": "src/hoh/workspace.py",
+      "decision": "INCLUDE",
+      "rule": "package"
+    },
+    {
+      "path": "src/hoh/wslease.py",
       "decision": "INCLUDE",
       "rule": "package"
     },
@@ -191117,7 +194127,27 @@
       "rule": "tests"
     },
     {
+      "path": "tests/test_backpressure.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_backpressure_wave.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
       "path": "tests/test_baseline_docs.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_bench1.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_bench1_ports.py",
       "decision": "INCLUDE",
       "rule": "tests"
     },
@@ -191127,7 +194157,27 @@
       "rule": "tests"
     },
     {
+      "path": "tests/test_broker.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_broker_storage.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
       "path": "tests/test_budget_evidence.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_budget_invariant.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_budget_reservation.py",
       "decision": "INCLUDE",
       "rule": "tests"
     },
@@ -191138,6 +194188,16 @@
     },
     {
       "path": "tests/test_build_plan_checklist_gate.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_build_plan_closure.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_build_plan_counter.py",
       "decision": "INCLUDE",
       "rule": "tests"
     },
@@ -191167,6 +194227,41 @@
       "rule": "tests"
     },
     {
+      "path": "tests/test_capacity.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_capacity_admission.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_capacity_check.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_capacity_command.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_capacity_reservation.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_capacity_settlement.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_capacity_source.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
       "path": "tests/test_capsule.py",
       "decision": "INCLUDE",
       "rule": "tests"
@@ -191192,6 +194287,21 @@
       "rule": "tests"
     },
     {
+      "path": "tests/test_conflict.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_conflict_closure.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_continuation.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
       "path": "tests/test_contracts.py",
       "decision": "INCLUDE",
       "rule": "tests"
@@ -191202,7 +194312,27 @@
       "rule": "tests"
     },
     {
+      "path": "tests/test_ddapply.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_ddrenew.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_ddverify.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
       "path": "tests/test_decision_cli.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_decision_routing.py",
       "decision": "INCLUDE",
       "rule": "tests"
     },
@@ -191212,7 +194342,17 @@
       "rule": "tests"
     },
     {
+      "path": "tests/test_decisionfrontier.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
       "path": "tests/test_decisions.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_derivedreads.py",
       "decision": "INCLUDE",
       "rule": "tests"
     },
@@ -191223,6 +194363,11 @@
     },
     {
       "path": "tests/test_developer_limit_screen.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_dispatch_budget_knob.py",
       "decision": "INCLUDE",
       "rule": "tests"
     },
@@ -191268,6 +194413,11 @@
     },
     {
       "path": "tests/test_docs_numbers.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_doubledown.py",
       "decision": "INCLUDE",
       "rule": "tests"
     },
@@ -191342,6 +194492,11 @@
       "rule": "tests"
     },
     {
+      "path": "tests/test_export_gap_table.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
       "path": "tests/test_export_manifest.py",
       "decision": "INCLUDE",
       "rule": "tests"
@@ -191352,7 +194507,22 @@
       "rule": "tests"
     },
     {
+      "path": "tests/test_failover_run.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
       "path": "tests/test_failure_classes.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_frontier.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_frontier_drive.py",
       "decision": "INCLUDE",
       "rule": "tests"
     },
@@ -191392,6 +194562,16 @@
       "rule": "tests"
     },
     {
+      "path": "tests/test_launcher_preflight.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_launcher_routing.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
       "path": "tests/test_launcher_verdicts.py",
       "decision": "INCLUDE",
       "rule": "tests"
@@ -191407,6 +194587,16 @@
       "rule": "tests"
     },
     {
+      "path": "tests/test_limit_policies.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_limit_stop_pane.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
       "path": "tests/test_master_authority.py",
       "decision": "INCLUDE",
       "rule": "tests"
@@ -191417,7 +194607,22 @@
       "rule": "tests"
     },
     {
+      "path": "tests/test_merge_gate_floor.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_merge_gate_overlap.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
       "path": "tests/test_merge_gate_read.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_merge_gate_rebind.py",
       "decision": "INCLUDE",
       "rule": "tests"
     },
@@ -191433,6 +194638,26 @@
     },
     {
       "path": "tests/test_migrations.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_missioncontrol.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_missioncontrol_project.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_missioncontrol_views.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_mode_wave.py",
       "decision": "INCLUDE",
       "rule": "tests"
     },
@@ -191457,6 +194682,21 @@
       "rule": "tests"
     },
     {
+      "path": "tests/test_parallelism_modes.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_park_failover.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_parked_continuation.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
       "path": "tests/test_permission_rule_forms.py",
       "decision": "INCLUDE",
       "rule": "tests"
@@ -191467,7 +194707,17 @@
       "rule": "tests"
     },
     {
+      "path": "tests/test_phases.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
       "path": "tests/test_pin_import.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_policy_continuation.py",
       "decision": "INCLUDE",
       "rule": "tests"
     },
@@ -191483,6 +194733,21 @@
     },
     {
       "path": "tests/test_preflight.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_preflight_identity.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_preflight_start_paths.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_preflight_unbound.py",
       "decision": "INCLUDE",
       "rule": "tests"
     },
@@ -191537,6 +194802,11 @@
       "rule": "tests"
     },
     {
+      "path": "tests/test_programme_supervisor_phase_seal.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
       "path": "tests/test_project_activity.py",
       "decision": "INCLUDE",
       "rule": "tests"
@@ -191572,6 +194842,16 @@
       "rule": "tests"
     },
     {
+      "path": "tests/test_provider_health.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_provider_sentinel.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
       "path": "tests/test_qa_arena_readonly.py",
       "decision": "INCLUDE",
       "rule": "tests"
@@ -191603,6 +194883,11 @@
     },
     {
       "path": "tests/test_register_target.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_regression_watch.py",
       "decision": "INCLUDE",
       "rule": "tests"
     },
@@ -191677,7 +194962,52 @@
       "rule": "tests"
     },
     {
+      "path": "tests/test_rotation_compactions.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_rotation_delivery.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
       "path": "tests/test_rotation_policy.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_route_receipts.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_routing.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_routing_failover.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_routing_option.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_run_lease_consult.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_run_lease_drive.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_runlease.py",
       "decision": "INCLUDE",
       "rule": "tests"
     },
@@ -191693,6 +195023,21 @@
     },
     {
       "path": "tests/test_sandbox_toolchain.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_scheduler.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_scheduler_adaptive.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_scheduler_profiles.py",
       "decision": "INCLUDE",
       "rule": "tests"
     },
@@ -191753,6 +195098,11 @@
     },
     {
       "path": "tests/test_storage_host.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_storage_inode_history.py",
       "decision": "INCLUDE",
       "rule": "tests"
     },
@@ -191827,6 +195177,11 @@
       "rule": "tests"
     },
     {
+      "path": "tests/test_surface_book.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
       "path": "tests/test_surfaces.py",
       "decision": "INCLUDE",
       "rule": "tests"
@@ -191858,6 +195213,11 @@
     },
     {
       "path": "tests/test_telemetry_wiring.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_test_pins.py",
       "decision": "INCLUDE",
       "rule": "tests"
     },
@@ -191917,7 +195277,72 @@
       "rule": "tests"
     },
     {
+      "path": "tests/test_wake.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_wake_rearm.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_wake_tokenfence.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_wave.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_wave_capacity.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_wave_controller.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_wave_cuts.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_wave_recovery.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_wave_settlement.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_wave_settlement_wired.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_wave_storage.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
       "path": "tests/test_workspace.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_wslease.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_wslease_controller.py",
       "decision": "INCLUDE",
       "rule": "tests"
     },
@@ -191938,6 +195363,21 @@
     },
     {
       "path": "tools/baseline_docs.py",
+      "decision": "INCLUDE",
+      "rule": "tooling"
+    },
+    {
+      "path": "tools/bench1.py",
+      "decision": "INCLUDE",
+      "rule": "tooling"
+    },
+    {
+      "path": "tools/bench1_ports.py",
+      "decision": "INCLUDE",
+      "rule": "tooling"
+    },
+    {
+      "path": "tools/bench1_wiring_patterns.txt",
       "decision": "INCLUDE",
       "rule": "tooling"
     },
@@ -192047,6 +195487,11 @@
       "rule": "tooling"
     },
     {
+      "path": "tools/merge_gate.py",
+      "decision": "INCLUDE",
+      "rule": "tooling"
+    },
+    {
       "path": "tools/meta_evidence.py",
       "decision": "INCLUDE",
       "rule": "tooling"
@@ -192098,6 +195543,11 @@
     },
     {
       "path": "tools/regenerate.py",
+      "decision": "INCLUDE",
+      "rule": "tooling"
+    },
+    {
+      "path": "tools/regression_watch.py",
       "decision": "INCLUDE",
       "rule": "tooling"
     },

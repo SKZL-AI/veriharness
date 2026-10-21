@@ -41,8 +41,12 @@ import subprocess
 import tarfile
 import tempfile
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from .contracts import Candidate, utcnow
+
+if TYPE_CHECKING:  # pragma: no cover - typing only; `hoh.wslease` imports this module
+    from .wslease import WorkspaceLease
 
 
 #: Branches HoH never commits to. An integration branch is the place where
@@ -121,8 +125,74 @@ def head_commit(repo: Path | str) -> str:
     return _git(Path(repo), "rev-parse", "HEAD")
 
 
+#: The directory, inside a worktree's own git directory, where its
+#: WorkspaceLease (`hoh.wslease`) lives. Inside the git directory because that
+#: is the worktree's identity to git: every spelling of the path reaches the
+#: same one, `git add -A` never sees it, and `git worktree remove` takes it
+#: along with the worktree it governed.
+LEASE_DIRNAME = "hoh-workspace-lease"
+
+
+def lease_directory(repo: Path | str) -> Path:
+    """Where the WorkspaceLease of the worktree rooted at `repo` is kept.
+
+    `repo` must be the **root** of a worktree (`is_git_repo`): the lease of
+    the outer repository is not the lease of a subdirectory. The path is the
+    resolved `git rev-parse --absolute-git-dir` -- `<repo>/.git` for a main
+    checkout, `<common>/worktrees/<name>` for a linked worktree -- so two
+    spellings of one worktree (a symbolic link, `..`, a trailing slash) name
+    one directory and two worktrees of one repository name two.
+    """
+    path = Path(repo).expanduser()
+    if not is_git_repo(path):
+        raise WorkspaceError(f"{path} is not a git worktree")
+    git_dir = _git(path, "rev-parse", "--absolute-git-dir")
+    if not git_dir:
+        raise WorkspaceError(f"{path} reports no git directory")
+    return Path(git_dir).resolve() / LEASE_DIRNAME
+
+
 def is_clean(repo: Path | str) -> bool:
     return _git(Path(repo), "status", "--porcelain") == ""
+
+
+def has_uncommitted_work(repo: Path | str) -> bool:
+    """The commit's own question: is there anything in this worktree that `commit_candidate`
+    (`git add -A`, then `git commit`) would take?
+
+    Not `is_clean`. `git status --porcelain` answers what *status* shows, and that follows
+    configuration the commit does not: `status.showUntrackedFiles=no` -- in the repository, in the
+    worktree's own config or in the user's -- hides every untracked file from it, while `git add
+    -A` takes them. A tree that is "clean" to status and dirty to the commit is how one run's
+    leftover reached another run's commit (`controller._admit_worktree`, review of P3-06s2).
+    So it is asked of the two commands that do the work, neither of which reads that setting:
+
+    * `git add -A --dry-run` names every path `add -A` would stage -- modified, deleted and
+      untracked-and-not-ignored, by the same exclude rules (`.gitignore`, `.git/info/exclude`,
+      `core.excludesFile`) the commit applies, so a path the commit would not take is not a
+      leftover;
+    * `git diff-index --cached --name-only HEAD` names what the index already holds beyond HEAD,
+      which `git commit` takes without `add`. `--ignore-submodules=none` overrides
+      `diff.ignoreSubmodules` and the `.gitmodules` `ignore` setting, so a changed submodule
+      pointer is not hidden either.
+
+    Either listing non-empty is "yes". It changes nothing: no object, no reference and no byte
+    of the index (`--dry-run`; `--no-optional-locks` only forgoes git's optional index refresh).
+    It is **not** lock-free: `git add` takes `index.lock` for the duration of the command, so a
+    foreign git command that holds it makes this one fail -- by design a refusal, not a race.
+    A git that cannot answer (an unborn HEAD, a damaged index, a held `index.lock`) is a
+    `WorkspaceError`, never "no": the caller refuses on it.
+
+    Conservative where status-like precision would cost the rule: a *staged deletion* of a
+    tracked file whose working copy still exists (`git rm --cached`) is listed by the index
+    half although `add -A` would re-stage the file and the commit would be empty. Over-reporting
+    is the safe direction: the caller refuses another run and a person looks.
+    """
+    path = Path(repo)
+    would_stage = _git(path, "--no-optional-locks", "add", "-A", "--dry-run")
+    held = _git(path, "--no-optional-locks", "diff-index", "--cached", "--name-only",
+                "--ignore-submodules=none", "HEAD", "--")
+    return bool(would_stage or held)
 
 
 def working_tree(repo: Path | str) -> str:
@@ -269,7 +339,8 @@ def materialize(candidate: Candidate, dest: Path | str) -> Path:
 
 
 def commit_candidate(
-    repo: Path | str, candidate: Candidate, *, run_id: str, iteration: int
+    repo: Path | str, candidate: Candidate, *, run_id: str, iteration: int,
+    lease: "WorkspaceLease | None" = None,
 ) -> str:
     """Turns an accepted candidate into a durable commit.
 
@@ -284,6 +355,15 @@ def commit_candidate(
     it is created on the working branch in the isolated worktree that HoH
     created itself. No push, no merge, no protected branch -- that stays
     reserved for `deliver` with explicit approval (handoff §6).
+
+    **One writer per worktree (P3-06).** With a `lease`, the commit is made
+    only if that lease is held *now* by its handle and governs *this* worktree
+    (`WorkspaceLease.check`): a handle that never acquired, one that was
+    superseded, released or has run out, and a lease taken for another
+    worktree are each refused with a `WorkspaceLeaseError` (a
+    `WorkspaceError`), and a value that is not a lease with a plain
+    `WorkspaceError`, before the first `git add -A`. Without a lease nothing
+    changes: the existing callers pass none.
 
     Returns the commit SHA. If there is nothing to commit, the existing HEAD.
     """
@@ -314,7 +394,23 @@ def commit_candidate(
             "this run -- otherwise `git add -A` sweeps up other people's work."
         )
 
-    if is_clean(path):
+    # After the ownership tests, before anything is read or written: a handle
+    # that does not hold the worktree has no business asking whether it is
+    # clean either.
+    if lease is not None:
+        check = getattr(lease, "check", None)
+        if not callable(check):
+            raise WorkspaceError(
+                f"lease must be a WorkspaceLease or None, not {type(lease).__name__}: "
+                "a value that is not a lease is never taken for 'no lease'"
+            )
+        check(path)
+
+    # The commit's own question (`has_uncommitted_work`), not `git status`'s: under
+    # `status.showUntrackedFiles=no` a tree whose only change is an untracked file is "clean"
+    # to status and was accepted here without a commit -- the history said "committed as <the
+    # old head>" and the file stayed in the tree for the next run.
+    if not has_uncommitted_work(path):
         return head_commit(path)
 
     before = working_tree(path)

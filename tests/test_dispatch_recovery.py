@@ -102,7 +102,9 @@ def _master(project: ProjectStore, session: str) -> MasterAuthority:
 def _resume_via_the_cli(root, monkeypatch, capsys) -> dict:
     later = _later().strftime("%Y-%m-%dT%H:%M:%SZ")
     monkeypatch.setattr(resumeloop, "_now_str", lambda now: later)
-    assert cli.main(["--root", str(root), "resume-quota"]) == 0
+    # the double-down is on by default and keeps a dossier under dd/ of a blocked run: these tests
+    # are about what the resume loop itself writes, so they opt out of it
+    assert cli.main(["--root", str(root), "resume-quota", "--no-double-down"]) == 0
     return json.loads(capsys.readouterr().out)
 
 

@@ -262,22 +262,71 @@ def _tell_steward(steward: Any, state: Any, store: Any, *, arm_failed: bool) -> 
 
 
 def _walk_bytes(directory: str) -> int:
+    """The apparent bytes of the regular files below `directory`. Iterative (an explicit stack, P3-39): a tree
+    nested deeper than the interpreter's recursion limit -- a persisted pytest basetemp inside an arena can be --
+    is measured, not aborted with a ``RecursionError`` that blocks the run that sized it."""
+    total = 0
+    pending = [directory]
+    while pending:
+        current = pending.pop()
+        try:
+            entries = list(os.scandir(current))
+        except OSError:
+            continue                         # an unreadable directory counts 0, as before
+        for entry in entries:
+            try:
+                st = entry.stat(follow_symlinks=False)
+            except OSError:
+                continue
+            if stat_mod.S_ISLNK(st.st_mode):
+                continue                     # a link is never followed or counted
+            if stat_mod.S_ISDIR(st.st_mode):
+                pending.append(entry.path)
+            elif stat_mod.S_ISREG(st.st_mode):
+                total += st.st_size
+    return total
+
+
+#: The most entries ``measure_owned_inodes`` walks before it says the count is unmeasurable (P3-39): a walk without an end is not a measurement.
+MAX_INODE_WALK = 5_000_000
+
+
+def measure_owned_inodes(paths: Iterable[Path | str]) -> int | None:
+    """The number of directory entries (files, directories, links) below ``paths`` -- the inodes a run's owned trees hold (P3-39).
+
+    The same discipline as ``measure_owned_bytes``: only the given directories are walked, with ``os.scandir`` and
+    ``DirEntry.is_dir(follow_symlinks=False)``; a link is counted as the entry it is (it takes an inode) and never
+    followed; a given path that is itself a link, or not a directory, or that is missing counts 0. **Fail closed:** more
+    than ``MAX_INODE_WALK`` entries, a directory that cannot be listed (a permission error, a race) and a walk that
+    raises are all ``None`` -- unmeasurable, which records nothing -- never a partial count mistaken for the whole.
+    The walk is iterative, so a deep tree cannot exhaust the stack."""
     total = 0
     try:
-        entries = list(os.scandir(directory))
-    except OSError:
-        return 0
-    for entry in entries:
-        try:
-            st = entry.stat(follow_symlinks=False)
-        except OSError:
-            continue
-        if stat_mod.S_ISLNK(st.st_mode):
-            continue                         # a link is never followed or counted
-        if stat_mod.S_ISDIR(st.st_mode):
-            total += _walk_bytes(entry.path)
-        elif stat_mod.S_ISREG(st.st_mode):
-            total += st.st_size
+        for path in paths:
+            try:
+                st = os.lstat(path)
+            except OSError:
+                continue
+            if not stat_mod.S_ISDIR(st.st_mode):
+                continue
+            pending = [os.fspath(path)]
+            while pending:
+                directory = pending.pop()
+                try:
+                    entries = list(os.scandir(directory))
+                except OSError:
+                    return None                      # an unlistable directory is a count nobody has: unmeasurable
+                total += len(entries)
+                if total > MAX_INODE_WALK:
+                    return None
+                for entry in entries:
+                    try:
+                        if entry.is_dir(follow_symlinks=False):
+                            pending.append(entry.path)
+                    except OSError:
+                        return None
+    except Exception:                        # noqa: BLE001 - a walk that cannot be completed is unmeasurable
+        return None
     return total
 
 

@@ -28,6 +28,7 @@ import json
 import os
 import re
 import stat
+from collections.abc import Mapping
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -93,6 +94,19 @@ class ProjectStore:
 
     def exists(self) -> bool:
         return self.state_path.exists()
+
+    def run_leases(self, **environment):
+        """The run leases of this project (`hoh.runlease`), kept in `<project dir>/run-leases`.
+
+        Pure: nothing is created until a lease is taken. `environment` is `RunLeases`' injectable facts
+        (clock, boot, host, pid, ...); the directory is not a parameter -- it is this project's, built from
+        the id this store already checked.
+        """
+        # Imported here, not at module level: `hoh.runlease` builds on `hoh.succession`, which builds on
+        # this module's store primitives.
+        from .runlease import DIRNAME, RunLeases
+
+        return RunLeases(self.dir / DIRNAME, **environment)
 
     @contextmanager
     def lock(self, *, blocking: bool = False) -> Iterator[None]:
@@ -254,10 +268,21 @@ EVALUATE = "evaluate"
 BLOCK = "block"
 REPAIR = "repair"
 CLOSED = "closed"
+#: P3-18 slice 3: every RUNNING node holds a live run lease -- the work is alive, so there is nothing to evaluate,
+#: reclaim or relaunch; a session waits.
+WAIT = "wait"
 
 
-def resume_decision(state: ProjectState) -> tuple[str, str]:
+def resume_decision(state: ProjectState,
+                    leases: Mapping[str, tuple[str, str]] | None = None) -> tuple[str, str]:
     """What a fresh session should do, derived from persisted state alone.
+
+    `leases` (P3-18 slice 3) is what the RUNNING nodes' run leases say, `{node id: (state, why)}` with `state` one of
+    `NONE`, `LIVE`, `LOST`, `RELEASED`, `UNREADABLE` (`rundrive.consult_nodes`); a node missing from it, or a call
+    without it, is `NONE`. It changes the answer for RUNNING nodes only: a lease that cannot be read is BLOCK (a
+    record that cannot be read is not a free run), every RUNNING node LIVE is WAIT (the work is alive), and any other
+    case stays EVALUATE with the leases it found in the reason. A lease whose holder is gone is **reclaimable**: the
+    next `hoh run` takes it over; this function reads it and writes nothing.
 
     Returns `(verdict, reason)`. The reason is not decoration: a verdict a
     human cannot check is a verdict they have to trust.
@@ -299,16 +324,35 @@ def resume_decision(state: ProjectState) -> tuple[str, str]:
 
     laufend = [n for n in state.nodes if n.lifecycle is Lifecycle.RUNNING]
     if laufend:
+        seen_ = {n.id: (leases or {}).get(n.id, ("NONE", "")) for n in laufend}
+        unreadable_ = [n.id for n in laufend if seen_[n.id][0] == "UNREADABLE"]
+        if unreadable_:
+            return BLOCK, (
+                "the run lease of "
+                + "; ".join(f"{k} cannot be read ({seen_[k][1]})" for k in unreadable_)
+                + ". A record that cannot be read is not a free run, so the node is neither evaluated as "
+                "dead nor relaunched."
+            )
+        if all(seen_[n.id][0] == "LIVE" for n in laufend):
+            return WAIT, (
+                "nodes recorded as RUNNING hold a live run lease: "
+                + "; ".join(f"{k}: {seen_[k][1]}" for k in seen_)
+                + ". The work is alive, so it is not evaluated, reclaimed or relaunched."
+            )
         # RUNNING with no live controller is precisely the ambiguous case: the
         # work may have finished, may have crashed mid-merge, or may still be
         # going in a process this session cannot see. It is evaluated, never
         # assumed either way.
+        noted_ = [f"{k} lease {v[0]} ({v[1]})" + (" -- reclaimable by the next 'hoh run'"
+                                                  if v[0] in ("LOST", "RELEASED") else "")
+                  for k, v in seen_.items() if v[0] != "NONE"]
         return EVALUATE, (
             "nodes recorded as RUNNING: "
             + ", ".join(n.id for n in laufend)
             + ". Whether that work finished, crashed, or is still live cannot be "
             "read from this state -- it has to be established against the run "
             "record before anything else is decided."
+            + (" Run leases: " + "; ".join(noted_) + "." if noted_ else "")
         )
 
     if state.rc_closed():

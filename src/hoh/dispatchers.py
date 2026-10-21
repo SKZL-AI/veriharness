@@ -40,11 +40,19 @@ from pathlib import Path
 from time import monotonic as _real_monotonic
 from typing import NamedTuple
 
-from . import durable_io, failures, herdr, pane_ledger, procs
+from . import durable_io, failures, herdr, pane_ledger, procs, routing as routing_mod
 from .agentcontrol import (OWNED_FILE, AgentControlAdapter, AgentInfo, HerdrAgentControl,
                            OwnedAgentControl, OwnedAgentRegistry, ProgramAgentRole)
 from .contracts import Role, RunState, utcnow
 from .controller import AnswerMissing, DispatchError, PaneNotClean, WaitingForApproval
+
+
+class _LimitStop(DispatchError):
+    """A pane Herdr reports as blocked whose dialog is the provider's limit menu
+    (`failures.blocked_screen_banners`), not an approval: a wait for the provider,
+    classified by the banner it carries. Its own type so that `_await_ready`, which
+    counts every other failure of a read, lets it through like a dialog."""
+
 
 class PaneRelease(NamedTuple):
     """What `HerdrDispatcher.release_role` answers: `closed` is True only when
@@ -616,6 +624,9 @@ class _Base:
         #: behaviour: the role inherits the operator's interactive defaults and
         #: a prompt stops the run for a human (O198).
         self.approval_policy = None
+        #: P3-20. What a declared routing policy resolved to (`routing.resolve`: the policy's
+        #: digest and, per role, each value with where it came from); None without a policy.
+        self.routing_evidence: dict | None = None
         self.answers_dir = Path(answers_dir)
         self.answers_dir.mkdir(parents=True, exist_ok=True)
         #: The run directory. Boundary for reusing an agent that Herdr
@@ -1357,12 +1368,14 @@ class HerdrDispatcher(_Base):
                 )
             status = str(row.get("agent_status", "unknown"))
             if status in ("working", "blocked"):
-                error = DispatchError if status == "working" else WaitingForApproval
-                raise error(
+                message = (
                     f"{name} {'is still working' if status == 'working' else 'waits for an approval'} "
                     f"(pane {row.get('pane_id')}). A running worker is reattached, "
                     "not overwritten -- wait first or check the pane."
                 )
+                if status == "working":
+                    raise DispatchError(message)
+                raise self._blocked(name, name, message, view=False)
             if status not in ("idle", "done"):
                 # `unknown` proves no completion -- and here no liveness
                 # either. After the hard reset Herdr had restored the pane and
@@ -2245,6 +2258,30 @@ class HerdrDispatcher(_Base):
         tail = "\n".join(ln for ln in view.splitlines() if ln.strip())[-1200:]
         return f"--- Visible in pane ---\n{tail or '(empty)'}\n-----------------------"
 
+    def _blocked(self, who: str, target: str, approval: str, *,
+                 view: bool = True) -> DispatchError:
+        """The error for an agent Herdr reports as `blocked`: `WaitingForApproval`
+        with `approval` and the pane (as always), unless the pane shows the
+        provider's limit menu, which is a wait for the provider and not a dialog
+        (P3-08 slice 4, T-UL1; the planner and QA panes of run mgrb2 sat behind it
+        for three days as an "approval" nobody could give).
+
+        The pane is read once, as `_pane_view` reads it for the message. Fail
+        closed: a pane that cannot be read, shows no banner, or shows anything but
+        the limit's menu below it is the dialog it always was. The limit error
+        carries the banner line and nothing else of the screen (`failures.
+        classify` and `quota.next_attempt_at` read it), never the words
+        "approval" or "waits": those are this project's own sentence for a dialog.
+        """
+        shown = self._pane_view(target)
+        banners = failures.blocked_screen_banners(shown)
+        if not banners:
+            return WaitingForApproval(f"{approval}\n{shown}" if view else approval)
+        return _LimitStop(
+            f"{who} is stopped by a provider's limit screen in pane {target}, "
+            "not by a dialog; it is a wait for the provider and not a verdict\n"
+            "--- Visible in pane ---\n" + "\n".join(banners) + "\n-----------------------")
+
     # -- Is the pane free to take a prompt? ---------------------------------- #
 
     def _unsettled(self) -> dict:
@@ -2319,11 +2356,11 @@ class HerdrDispatcher(_Base):
                 "A pane whose state is unknown is never prompted.\n"
                 f"{self._pane_view(target)}") from exc
         if status == "blocked":
-            raise WaitingForApproval(
+            raise self._blocked(
+                role.value, target,
                 f"{role.value} waits for an approval in pane {target}; the "
                 "earlier prompt did not return, and nothing is sent into a "
-                "dialog. A blocked dialog is not answered automatically.\n"
-                f"{self._pane_view(target)}")
+                "dialog. A blocked dialog is not answered automatically.")
         if status == "working":
             if digest == full_sha:
                 state.note(
@@ -2448,11 +2485,11 @@ class HerdrDispatcher(_Base):
         except Exception:                 # noqa: BLE001 - fail closed
             raise refusal from None
         if status == "blocked":
-            raise WaitingForApproval(
+            raise self._blocked(
+                role.value, target,
                 f"{role.value} waits for an approval in pane {pane or target}; its "
                 "stalled prompt is still typed in the box, and Enter is not "
-                "pressed: a blocked dialog is not answered automatically.\n"
-                f"{self._pane_view(target)}")
+                "pressed: a blocked dialog is not answered automatically.")
         own = set(getattr(self, "own_panes", []) or []) | {
             p for _t, p in self._adopted().values() if p}
         if status not in ("idle", "done") or not pane or pane not in own:
@@ -2541,11 +2578,12 @@ class HerdrDispatcher(_Base):
             try:
                 status = self._agent_state(role, target)
                 if status == "blocked":
-                    raise WaitingForApproval(
+                    raise self._blocked(
+                        role.value, target,
                         f"{role.value}: the new agent {target} waits for an "
                         "approval before its first prompt; nothing is sent into "
                         "a dialog. A blocked dialog is not answered "
-                        f"automatically.\n{self._pane_view(target)}")
+                        "automatically.")
                 if status not in ("idle", "done"):
                     why = f"its status is {status!r}"
                 elif boxless:
@@ -2559,7 +2597,7 @@ class HerdrDispatcher(_Base):
                         why = f"its input box already holds text: {pending[:80]!r}"
                     else:
                         signature = (status, pending, _box_width(view))
-            except WaitingForApproval:
+            except (WaitingForApproval, _LimitStop):
                 raise
             except Exception as exc:      # noqa: BLE001 - counted, then fail closed
                 why = f"a read failed ({exc})"
@@ -2597,10 +2635,11 @@ class HerdrDispatcher(_Base):
                 f"{role.value}: the restored agent {target} is not prompted, its "
                 f"status cannot be read ({exc}).\n{self._pane_view(target)}") from exc
         if status == "blocked":
-            raise WaitingForApproval(
+            raise self._blocked(
+                role.value, target,
                 f"{role.value}: the restored agent {target} waits for an "
                 "approval; nothing is sent into a dialog. A blocked dialog is "
-                f"not answered automatically.\n{self._pane_view(target)}")
+                "not answered automatically.")
         if status not in ("idle", "done"):
             raise PaneNotClean(
                 f"{role.value}: the restored agent {target} is not prompted, its "
@@ -3005,11 +3044,10 @@ class HerdrDispatcher(_Base):
             # without a cause is not a finding but a dead end. `agent read`
             # exists for exactly that; as run state the text is still no good,
             # as a diagnosis very much so.
-            raise WaitingForApproval(
+            raise self._blocked(
+                role.value, target,
                 f"{role.value} waits for an approval in pane {data.pane_id}. "
-                "A blocked dialog is not answered automatically.\n"
-                f"{self._pane_view(target)}"
-            )
+                "A blocked dialog is not answered automatically.")
         if status == "blocked":
             # The pane is blocked and the role has **already answered**. A
             # planner that wrote its plan and then left its pane at an input
@@ -3235,11 +3273,12 @@ class HerdrDispatcher(_Base):
 
             if status == "blocked":
                 # Never a follow-up into a dialog.
-                raise WaitingForApproval(
+                raise self._blocked(
+                    role.value, target,
                     f"{role.value} waits for an approval in pane {target}; its "
                     "turn ended without the answer file, and no follow-up is "
                     "sent into a dialog. A blocked dialog is not answered "
-                    f"automatically.\n{self._pane_view(target)}")
+                    "automatically.")
             if status not in ("idle", "done"):
                 # Only idle and done prove that a turn ended
                 # (`herdr.liveness`). A follow-up could land in a live turn.
@@ -3288,11 +3327,11 @@ sentence saying that the file is written.
             self.endpoints[role] = data.evidence()
             if (data.status == "blocked"
                     and not self._answered(answer_path, role)):
-                raise WaitingForApproval(
+                raise self._blocked(
+                    role.value, target,
                     f"{role.value} waits for an approval in pane "
                     f"{data.pane_id} after the follow-up. A blocked "
-                    "dialog is not answered automatically.\n"
-                    f"{self._pane_view(target)}")
+                    "dialog is not answered automatically.")
 
             grace()
             answer = collect("after the follow-up turn", "collected after the follow-up")
@@ -3323,12 +3362,22 @@ def build_dispatcher(
     efforts: dict[Role, str] | None = None,
     approval_policy=None,
     defer_role_scratch: bool = False,
+    routing: "routing_mod.RoutingPolicy | None" = None,
 ) -> _Base:
     """Picks the adapter -- and says honestly when it is not the evidencing one.
+
+    `routing` (P3-20): a declared routing policy, resolved before any adapter, directory or
+    Herdr check. An explicit per-role `models`/`efforts` value still wins and the policy fills
+    the rest; a policy that disagrees with `profiles` raises `routing.RoutingRefused` with
+    nothing built. The resolved evidence is left on `dispatcher.routing_evidence`.
 
     `defer_role_scratch` (P2-42): make no role scratch directory in the arena root; the
     controller binds them into the iteration's registered temporary workspace
     (`bind_role_scratch`) and the dispatcher refuses to dispatch a role without one."""
+    routed = None
+    if routing is not None:
+        routed = routing_mod.resolve(routing, profiles=profiles, models=models, efforts=efforts)
+        models, efforts = routed.models, routed.efforts
     if prefer_herdr:
         if not herdr.available():
             raise DispatchError(
@@ -3343,6 +3392,7 @@ def build_dispatcher(
                             timeout_ms=timeout_ms, models=models, efforts=efforts,
                             registry=registry)
         d.approval_policy = approval_policy
+        d.routing_evidence = routed.evidence if routed is not None else None
         _scratch_of(d, defer_role_scratch)
         return d
     # The subprocess adapter counts in seconds, not in milliseconds.
@@ -3350,6 +3400,7 @@ def build_dispatcher(
                           timeout=max(1, timeout_ms // 1000),
                           models=models, efforts=efforts)
     d.approval_policy = approval_policy
+    d.routing_evidence = routed.evidence if routed is not None else None
     _scratch_of(d, defer_role_scratch)
     return d
 

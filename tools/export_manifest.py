@@ -844,6 +844,12 @@ SYNTHETIC_SESSION_UUIDS = frozenset({
     "ffffffff-ffff-ffff-ffff-ffffffffffff",
     "3f2b8a1c-9d4e-4b7a-8c1d-5e6f7a8b9c0d",
     "0b8f3a52-9c41-4d27-a6e0-5f1d7c2e9a38",
+    # 2026-10-14, after review: made-up fixtures of two test files of the P3 slices
+    # (counter-shaped pair in tests/test_rotation_compactions.py; the example UUID of
+    # the UUID literature in tests/test_wake.py). Neither was ever a session id.
+    "0000000a-0000-4000-8000-00000000000b",
+    "0000000b-0000-4000-8000-00000000000c",
+    "123e4567-e89b-42d3-a456-426614174000",
 })
 
 #: A whole token of eight hex characters (a bare id, `scratch/<id>/x`, the

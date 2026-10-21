@@ -1,0 +1,23 @@
+# BENCH1 wiring patterns (PREREG 5.4; frozen at F1 by digest).
+#
+# A product stop whose stated reason matches ANY line here is the instrument's fault (INSTRUMENT_FAILURE: the
+# cell is re-run once and is never a verdict about the product). Every other product-stated stop reason is a
+# product outcome and counts against the arm. One case-insensitive regular expression per line; '#' starts a
+# comment; an empty list is refused by the loader.
+#
+# Approval and trust dialogs the declared approval policy and --trust-worktree should have covered
+needs a one-time trust approval
+trust could not be granted
+trust dialog
+permission dialog
+unapproved action
+# Herdr / harness availability
+Herdr is not available
+HERDR_ENV
+# Storage refusals of the dedicated bench1 root
+storage state root is not initialised
+storage admission unavailable
+temporary root of the run's project cannot be opened
+# The runner's own read-back
+wiring read-back
+read-back .* missing

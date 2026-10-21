@@ -156,9 +156,16 @@ def _foreign_process(root: Path, repo: Path, budget: int) -> dict:
 def one_run(task: str, budget: int) -> dict:
     from hoh.launcher import HohRunLauncher
     from hoh.orchestrator import GateOutcome, GateResult, GateRunner, HaltClass, ProjectController
+    from hoh.preflightgate import PreflightRefused, requirement_from_environment
     from hoh.project import ActionClass, Lifecycle, ProjectState, TaskNode
     from hoh.projectstore import ProjectStore
 
+    # P3-11 slice 3: the run spends quota, so it starts only on a report that allows it (the
+    # environment names it: HOH_PREFLIGHT_REPORT); the fixture is not even built before that.
+    try:
+        requirement = requirement_from_environment()
+    except PreflightRefused as exc:
+        raise SystemExit(f"refused: {exc}") from None
     os.environ["PYTHONPATH"] = str(HOH / "src")
     repo = _fixture(task)
     root = repo.parent / "root"
@@ -205,6 +212,7 @@ def one_run(task: str, budget: int) -> dict:
         root, repo, mainline="main", iterations=3,
         planner="claude", developer="claude", qa="claude",
         dispatch_budget=budget,
+        preflight=requirement,
         approvals=PrefixScopedProvider(
             script=_configured(TRUST_HELPER_ENV),
             prefix=_configured(WORKTREE_ROOT_ENV) / repo.name))

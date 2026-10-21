@@ -11,6 +11,11 @@ other imports. This module is that sequence as one command with one receipt:
    no ref is written by the fetch, and `FETCH_HEAD` is not either;
 3. **its tree must be the accepted candidate's tree** (the arithmetic of `self_hosted_topology.verify_import`: the tree
    of the commit equals `tree_digest`). A commit that is not that tree is refused and **no ref is created**;
+3a. **the test files the specification pins are those bytes** (FID1, `spec_criteria.pin_findings`): the run state names
+   the specification (`spec_path`, `spec_digest`; `--spec` names a copy whose digest is that one), and the candidate's
+   tree is compared with its `test-pins` block exactly as the run compared it at verification and at the acceptance.
+   A finding refuses the import and **no ref is created**; a specification that pins nothing is reported in
+   the receipt (`NO_TEST_PINS`), never "verified";
 4. the commit is published as **`refs/imports/<id>`**, created only if absent (an import ref never moves);
 5. a **merge preview** (`git merge-tree --write-tree`, which writes tree objects and no ref, index or working tree) is made
    against the base (the full id typed with `--base`, or the repository's `HEAD` resolved here) and against each other
@@ -26,6 +31,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import stat
 import time
 from collections.abc import Sequence
 from pathlib import Path
@@ -39,6 +45,8 @@ SCHEMA = "hoh-import/1"
 IMPORT_PREFIX = "refs/imports/"
 MAX_AGAINST = 32
 MAX_CONFLICTS = 50
+#: A specification larger than this is not read for its pins (they are kilobytes).
+MAX_SPEC_BYTES = 4 * 1024 * 1024
 
 _ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,31}")
 
@@ -67,6 +75,59 @@ def accepted_candidate(state_path: str) -> dict[str, str]:
                             "(nothing is fetched from a URL)")
     return {"candidate_id": str(candidate.get("candidate_id", "")), "tree_digest": digest,
             "repo_path": source, "run_id": str(state.get("run_id", ""))}
+
+
+def verify_test_pins(run_state: str, candidate: dict[str, str], spec: str | None = None) -> dict[str, Any]:
+    """The candidate's test files against the pins of the specification it was accepted under (FID1).
+
+    `{"status": "VERIFIED", "pins": n, "spec_digest": ...}` when the specification pins files and every rule holds;
+    `{"status": "NO_TEST_PINS", "reason": ...}` when it pins none; `{"status": "NOT_RUN", "reason": ...}` when the run
+    state names no specification at all (neither `spec_path` nor `spec_digest`: nothing can be read); `ImportRefused`
+    for everything else (a specification that cannot be read or is not the run's, a finding, an unreadable tree)."""
+    from . import spec_criteria
+    from .contracts import digest
+
+    try:
+        state = json.loads(Path(run_state).read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise ImportRefused(f"--run-state {run_state!r} is unreadable: {exc}") from exc
+    if not isinstance(state, dict):
+        raise ImportRefused(f"--run-state {run_state!r} is not a run state (a JSON object)")
+    if "spec_path" not in state and "spec_digest" not in state:
+        return {"status": "NOT_RUN", "reason": "the run state names no specification, so no pins can be read"}
+    wanted = state.get("spec_digest")
+    if not isinstance(wanted, str) or not wanted:
+        raise ImportRefused("the run state names a specification but no usable spec_digest: the pins of an unbound text "
+                            "are not the run's")
+    named = spec if spec is not None else state.get("spec_path")
+    if not isinstance(named, str) or not named or "\0" in named:
+        raise ImportRefused("the run state names no readable specification (spec_path); --spec names a copy")
+    try:
+        # a regular file of bounded size: a FIFO, a device or a directory is never opened for reading
+        info = os.stat(named)
+        if not stat.S_ISREG(info.st_mode) or info.st_size > MAX_SPEC_BYTES:
+            raise OSError("not a regular file, or larger than %d bytes" % MAX_SPEC_BYTES)
+        text = Path(named).read_bytes().decode("utf-8")
+    except (OSError, ValueError) as exc:
+        raise ImportRefused(f"the specification {named!r} cannot be read ({exc}); --spec names a copy whose digest "
+                            f"is {wanted}") from exc
+    if digest(text) != wanted:
+        raise ImportRefused(f"the specification {named!r} has digest {digest(text)}, the run was accepted under "
+                            f"{wanted}: the pins of another text are not the run's")
+    try:
+        pins = spec_criteria.declared_pins(text)
+    except spec_criteria.CriteriaBlockError as exc:
+        raise ImportRefused(str(exc)) from exc
+    if not pins:
+        return {"status": "NO_TEST_PINS", "reason": spec_criteria.NO_TEST_PINS, "spec_digest": wanted}
+    base = state.get("base_candidate")
+    base_tree = base.get("tree_digest") if isinstance(base, dict) else None
+    findings = spec_criteria.pin_findings(
+        text, repo=candidate["repo_path"], tree=candidate["tree_digest"],
+        base_tree=base_tree if isinstance(base_tree, str) else None)
+    if findings:
+        raise ImportRefused(spec_criteria.refusal(findings))
+    return {"status": "VERIFIED", "pins": len(pins), "spec_digest": wanted}
 
 
 def verify_tree(repo: str, commit: str, candidate: dict[str, str]) -> str:
@@ -115,7 +176,8 @@ def _imports(repo: str) -> dict[str, str]:
 
 
 def make_import(*, repo: str, run_state: str, commit: str, name: str, base: str | None = None,
-                against: Sequence[str] = (), against_unmerged: bool = False) -> dict[str, Any]:
+                against: Sequence[str] = (), against_unmerged: bool = False,
+                spec: str | None = None) -> dict[str, Any]:
     """Fetch, verify, publish the import ref and preview; the receipt body. Raises `ImportRefused` before any ref
     is created."""
     if _ID.fullmatch(name or "") is None or name.endswith(".lock") or ".." in name:
@@ -145,6 +207,7 @@ def make_import(*, repo: str, run_state: str, commit: str, name: str, base: str 
                 "--no-write-fetch-head", "--quiet", candidate["repo_path"], commit)
         resolve_commit(repo, "--commit", commit)
         tree = verify_tree(repo, commit, candidate)
+        test_pins = verify_test_pins(run_state, candidate, spec)
         parents = git(repo, "rev-list", "--parents", "-n", "1", commit).stdout.decode().split()[1:]
         git(repo, "update-ref", ref, commit, "")
         previews = [{"against": "base", **preview(repo, base, commit)}]
@@ -153,13 +216,14 @@ def make_import(*, repo: str, run_state: str, commit: str, name: str, base: str 
         raise ImportRefused(str(exc)) from exc
     return {"schema": SCHEMA, "ref": ref, "commit": commit, "tree": tree, "parents": parents, "base": base,
             "fetched": not present, "run_id": candidate["run_id"], "candidate_id": candidate["candidate_id"],
-            "tree_digest": candidate["tree_digest"], "source": candidate["repo_path"], "previews": previews,
+            "tree_digest": candidate["tree_digest"], "source": candidate["repo_path"], "test_pins": test_pins,
+            "previews": previews,
             "all_clean": all(p["status"] == "clean" for p in previews),
             "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
 
 
 def run_import(*, repo: str, run_state: str, commit: str, name: str, receipt: str, base: str | None = None,
-               against: Sequence[str] = (), against_unmerged: bool = False) -> Outcome:
+               against: Sequence[str] = (), against_unmerged: bool = False, spec: str | None = None) -> Outcome:
     """Exit 0: imported, every preview clean. Exit 1: imported, at least one preview is a conflict or an error (the
     receipt says which). Exit 2: refused, no ref, no receipt. Exit 3: the ref exists but the receipt could not be
     written."""
@@ -168,12 +232,14 @@ def run_import(*, repo: str, run_state: str, commit: str, name: str, receipt: st
         if os.path.lexists(target) or not target.parent.is_dir():
             raise ImportRefused(f"--receipt {receipt}: exists already, or its directory does not")
         result = make_import(repo=repo, run_state=run_state, commit=commit, name=name, base=base, against=against,
-                             against_unmerged=against_unmerged)
+                             against_unmerged=against_unmerged, spec=spec)
     except ImportRefused as exc:
         return Outcome(2, "", f"import refused: {exc}\n")
     except Exception as exc:                      # noqa: BLE001 - a crash must not read as an import
         return Outcome(2, "", f"import refused: the command itself failed: {type(exc).__name__}: {exc}\n")
-    lines = [f"IMPORT: {result['ref']} {result['commit']}", f"TREE: {result['tree']}", f"BASE: {result['base']}"]
+    lines = [f"IMPORT: {result['ref']} {result['commit']}", f"TREE: {result['tree']}", f"BASE: {result['base']}",
+             f"TEST-PINS: {result['test_pins']['status']}"
+             + (f" {result['test_pins']['reason']}" if result["test_pins"]["status"] != "VERIFIED" else "")]
     for item in result["previews"]:
         extra = f" ({item['conflict_count']} path(s))" if item["status"] == "conflict" else ""
         lines.append(f"PREVIEW {item['against']}: {item['status'].upper()} {item['relation']}{extra}")

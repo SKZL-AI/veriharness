@@ -11,7 +11,10 @@ from __future__ import annotations
 
 import ast
 import hashlib
+import importlib
+import os
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -711,3 +714,41 @@ def test_the_hygiene_gate_reads_the_exports_denylist():
     the published-code gate above and the export scan both read it, so a digest
     added once is refused in both places."""
     assert _PRIVATE_ID_DIGESTS is em.PRIVATE_ID_DIGESTS
+
+
+# --------------------------------------------------------------------------- #
+# 4 - the development line stays clean under `ruff check --select F,E9` (lint1)
+# --------------------------------------------------------------------------- #
+
+
+def test_the_wave_gate_of_the_parallelism_mode_is_named_for_the_type_checker_only():
+    """`ModeGate.gate` is annotated `"WaveGate | None"` (a string, under `from __future__ import annotations`)
+    and ruff (F821) wants the name bound. The module does not import the gate it is handed (it is a
+    parameter of `admit_wave`), so the name is bound under `if TYPE_CHECKING:` and `import hoh.parallelmode`
+    must not load `hoh.backpressure`. Catches: a runtime import of the gate, a seam the module's contract
+    excludes and one edit from an import cycle. Mutant: the import moved out of the `if`."""
+    tree = ast.parse((PACKAGE / "parallelmode.py").read_text(encoding="utf-8"))
+    bound = [(parent, node) for parent in ast.walk(tree) for node in ast.iter_child_nodes(parent)
+             if isinstance(node, ast.ImportFrom) and any(alias.name == "WaveGate" for alias in node.names)]
+    assert len(bound) == 1, "WaveGate must be bound exactly once in src/hoh/parallelmode.py"
+    parent, node = bound[0]
+    assert (node.module, node.level) == ("backpressure", 1)
+    assert isinstance(parent, ast.If) and isinstance(parent.test, ast.Name) and parent.test.id == "TYPE_CHECKING"
+    probe = subprocess.run(
+        [sys.executable, "-B", "-c", "import sys, hoh.parallelmode; print('hoh.backpressure' in sys.modules)"],
+        env={**os.environ, "PYTHONPATH": str(PACKAGE.parent)}, capture_output=True, text=True, timeout=120)
+    assert probe.returncode == 0, probe.stderr
+    assert probe.stdout.strip() == "False", "importing hoh.parallelmode loaded hoh.backpressure"
+
+
+def test_a_fixture_taken_by_name_from_another_test_module_is_that_very_fixture():
+    """Three test modules use a fixture that another test module defines, and say so with an alias
+    (`world = _rebind_world`) instead of a shadowed import (ruff F811 reads every test parameter named like
+    an imported name as a redefinition). The alias must stay the object it names: a stand-in under the
+    same name would silently replace the shared fixture. Mutant: an alias to another object."""
+    for holder, name, owner in (("test_merge_gate_floor", "world", "test_merge_gate_rebind"),
+                                ("test_route_receipts", "spec", "test_controller"),
+                                ("test_surface_book", "fake", "test_storage_registry")):
+        taken = getattr(importlib.import_module(holder), name)
+        defined = getattr(importlib.import_module(owner), name)
+        assert taken is defined, f"{holder}.{name} is not {owner}.{name}"

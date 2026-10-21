@@ -132,6 +132,19 @@ def test_this_programmes_own_gates_agree_with_the_independently_built_plan():
     the supervisor review, ChecklistFsck and, once bound, the succession capsule). A
     verdict that reads P2 met before the closure sequence is a false green; a reconciler
     that holds P2 open on a capability item contradicts the matrix.
+
+    Re-stated after the v0.3.0 tag (strand ptests, O267 section 8(a)) because P2's exit is
+    a live measurement: it moves with every `src/hoh` commit (the supervisor review's
+    canonical brief, the durability probe, the succession capsule), so "P2 closed, exit
+    unmet by exactly the instruments" is a state of one commit and not a property of the
+    tree. What stays pinned is the agreement, on whatever the tree says: each reconciler
+    gate is derived from evidence and is closed exactly when it has no blocker, no blocker
+    is a PROVEN row, a phase whose rows are all PROVEN is closed; and `build_plan`'s P2
+    line carries the bound, unmeasured, checklist and succession clauses exactly when the
+    register, the inventory, the matrix and the instruments say so, and is met exactly
+    when none of them does. The state expectations live on injected answers, where they
+    discriminate (`test_the_p2_exit_is_held_by_the_instruments_and_each_unmet_one_is_named`,
+    `tests/test_build_plan.py`).
     """
     if not pc.REGISTER.is_file() or not pc.MATRIX.is_file():
         pytest.skip("the register and matrix are internal")
@@ -139,40 +152,60 @@ def test_this_programmes_own_gates_agree_with_the_independently_built_plan():
     matrix_body = json.loads(pc.MATRIX.read_text(encoding="utf-8"))
     items, evidence = pc.build(register_body, matrix_body)
     snapshot = reconcile(items, evidence=evidence, generation=1)
-    p1 = phase_gate(snapshot, "P1", evidence=evidence)
-    p2 = phase_gate(snapshot, "P2", evidence=evidence)
-    assert p1.closed, [b.item_id for b in p1.blockers]
-    assert p2.closed and p2.blockers == [], [b.item_id for b in p2.blockers]
-    assert p2.derived_from_evidence
-
-    # The matrix behind both views: every P1 and every P2 requirement measured PROVEN.
     measured = {c["id"]: c["status"] for c in matrix_body["capabilities"]}
     register = register_body["requirements"]
-    p1_ids = [r["id"] for r in register if r["target_phase"] == "P1"]
-    assert all(measured.get(i) == "PROVEN" for i in p1_ids)
-    p2_ids = [r["id"] for r in register if r["target_phase"] == "P2"]
-    assert all(measured.get(i) == "PROVEN" for i in p2_ids), \
-        [i for i in p2_ids if measured.get(i) != "PROVEN"]
 
-    # The other view, from the same matrix and the programme inventory: P2's exit is
-    # not met, and only its instrument-measured conditions hold it.
+    # The reconciler's view: a gate is re-derived, closed exactly when it has no blocker,
+    # never blocked by a row that is PROVEN, and closed when all its rows are PROVEN.
+    gates_by_phase = {}
+    for phase in ("P1", "P2"):
+        gate = phase_gate(snapshot, phase, evidence=evidence)
+        gates_by_phase[phase] = gate
+        assert gate.derived_from_evidence, phase
+        rows = [r["id"] for r in register if r["target_phase"] == phase]
+        assert rows, phase
+        if all(measured.get(i) == "PROVEN" for i in rows):
+            assert gate.closed and gate.blockers == [], (
+                phase, [b.item_id for b in gate.blockers])
+        for blocker in gate.blockers:
+            row = blocker.item_id.split("+")[0]
+            assert measured.get(row) != "PROVEN", (phase, blocker.item_id)
+        assert gate.closed is (gate.blockers == []), phase
+    p2 = gates_by_phase["P2"]
+
+    # The other view, from the same matrix and the programme inventory: the gate line is
+    # what the register, the inventory, the matrix and the instruments say.
     bp = pc._build_plan()
     _order, gates = bp.phase_gates(matrix_body["capabilities"], register)
     assert "P2" in gates, sorted(gates)
     met, why = gates["P2"]
-    assert met is False, why
-    assert "bound to requirement(s) not PROVEN" not in why, why
-    assert "nothing here measures yet" not in why, why
-    assert "measured by the checklist instruments and unmet" in why, why
+    scope = bp._scope()
+    conditions = [i for i in scope["items"]
+                  if i["phase"] == "P2" and i["kind"] in bp._GATE_KINDS]
+    assert conditions
+    bindings = bp.gate_bindings(scope["items"], register)
+    bound_short = any(measured.get(rid) != "PROVEN"
+                      for i in conditions for rid in bindings[i["id"]])
+    unmeasured = any(not bindings[i["id"]] and i["id"] not in bp.CHECKLIST_GATE_ITEMS
+                     for i in conditions)
+    answers = bp.checklist_gate_measures()
+    checklist_unmet = any(a[0] is not True for a in answers.values())
+    succession = bp.succession_measure()
+    assert ("bound to requirement(s) not PROVEN" in why) is bound_short, why
+    assert ("nothing here measures yet" in why) is unmeasured, why
+    assert answers["items"][0] is p2.closed, (answers["items"], p2.closed)
+    assert met is (not bound_short and not unmeasured and not checklist_unmet
+                   and succession[0] is True), (met, why)
+    assert ("measured by the checklist instruments and unmet" in why) is checklist_unmet, why
+    assert ("measured by the succession instrument and unmet" in why) \
+        is (succession[0] is not True), why
 
     # And this binding says the same about itself: its verdict does not evaluate those
-    # conditions, every P2 condition it leaves unbound is one the instruments measure,
-    # and none is held only through a non-blocking requirement.
+    # conditions, and every P2 condition it leaves unbound is one the instruments measure.
     scope, why_not = pc._programme_scope()
     assert scope is not None, why_not
     exits = pc.phase_exit(scope, register_body, matrix_body)["P2"]
     assert exits["unbound"] and set(exits["unbound"]) <= set(bp.CHECKLIST_GATE_ITEMS)
-    assert exits["not_held"] == []
     assert "measured by the checklist instruments of tools/build_plan.py" in \
         pc._exit_note({"P2": exits}, "P2", "")
 
@@ -186,33 +219,52 @@ def test_the_p2_exit_is_held_by_the_instruments_and_each_unmet_one_is_named():
     merged) is unmet as well. The gate line names each unmet instrument by its label and
     does not name a met one, so a closure that meets one condition cannot pass as meeting
     all. Reasons are not pinned: the review's and the capsule's reasons depend on the
-    tree (a git-less copy has no committed capsule), the verdicts do not."""
+    tree (a git-less copy has no committed capsule), the verdicts do not.
+
+    Re-stated after the v0.3.0 tag (strand ptests, O267 section 8(a)) because P2's exit is a
+    live measurement: the review's brief, the durability evidence and the succession
+    capsule all move with a `src/hoh` commit, so no instrument's answer on the real tree is
+    a property of the tree. On the real tree this pins consistency: the gate is met exactly
+    when no instrument answers unmet, names exactly the unmet ones (and the bound or
+    unmeasured clauses when it is held by those), and `fsck` is never met while a preserved
+    review leaves a release-blocking finding open. Every state expectation (all met -> met;
+    each kind alone unmet -> unmet and the only one named) is asserted on injected answers
+    over an all-PROVEN matrix, where it discriminates."""
     if not pc.REGISTER.is_file() or not pc.MATRIX.is_file():
         pytest.skip("the register and matrix are internal")
     bp = pc._build_plan()
     kinds = set(bp.CHECKLIST_GATE_ITEMS.values())
     assert {"items", "review", "fsck"} <= kinds
-    answers = bp.checklist_gate_measures()
-    assert answers["items"][0] is True, answers["items"]
-    assert answers["review"][0] is False, answers["review"]
-    assert answers["fsck"][0] is False, answers["fsck"]
     register_body = json.loads(pc.REGISTER.read_text(encoding="utf-8"))
     matrix_body = json.loads(pc.MATRIX.read_text(encoding="utf-8"))
+    labels = bp._GATE_LABELS
+
+    # The real tree: the gate is the conjunction of its instruments' answers, and names
+    # exactly the unmet ones. Which ones those are is the tree's state and is not pinned.
+    answers = bp.checklist_gate_measures()
+    if pc._preserved_release_blocking_findings():
+        assert answers["fsck"][0] is False, answers["fsck"]
+    answers = {**answers, "succession": bp.succession_measure()}
+    assert set(answers) == kinds, (sorted(answers), sorted(kinds))
+    unmet = {k for k in kinds if answers[k][0] is not True}
     _order, gates = bp.phase_gates(matrix_body["capabilities"], register_body["requirements"])
     met, why = gates["P2"]
-    assert met is False, why
-    labels = bp._GATE_LABELS
-    for kind in sorted(kinds - {"items"}):
-        assert f"{labels[kind]}: " in why, (kind, why)
-    assert f"{labels['items']}: " not in why, why
+    if met:
+        assert not unmet, (unmet, why)
+    else:
+        assert (unmet or "bound to requirement(s) not PROVEN" in why
+                or "nothing here measures yet" in why), why
+    for kind in sorted(kinds):
+        assert (f"{labels[kind]}: " in why) is (kind in unmet), (kind, unmet, why)
 
     # Each unmet instrument alone holds the gate, and with every instrument answering met
-    # nothing else does -- P2's exit then reads met. Capability coverage is closed; the
-    # instruments are all that stands between this tree and the closure sequence.
+    # nothing else does -- over a matrix with every row PROVEN, handed in, so that the
+    # answer is the instruments' and not the tree's.
     import inspect
     takes_succession = ("succession_measures"
                         in inspect.signature(bp.phase_gates).parameters)
     assert takes_succession == ("succession" in kinds), sorted(kinds)
+    proven = [{"id": r["id"], "status": "PROVEN"} for r in register_body["requirements"]]
 
     def gate_with(unmet):
         answers = {k: (k not in unmet, f"answered for the test: {k}")
@@ -221,7 +273,7 @@ def test_the_p2_exit_is_held_by_the_instruments_and_each_unmet_one_is_named():
         if takes_succession:
             extra["succession_measures"] = lambda: ("succession" not in unmet,
                                                     "answered for the test: succession")
-        _o, g = bp.phase_gates(matrix_body["capabilities"], register_body["requirements"],
+        _o, g = bp.phase_gates(proven, register_body["requirements"],
                                checklist_measures=lambda: answers, **extra)
         return g["P2"]
 
@@ -251,21 +303,36 @@ def test_the_written_snapshot_carries_its_seal_and_the_gate_mode(tmp_path):
     assert len(written["items"]) > 100
 
 
-def test_open_release_blocking_findings_move_the_exit_code(tmp_path, monkeypatch):
+def test_open_release_blocking_findings_move_the_exit_code(tmp_path, monkeypatch, capsys):
     """O229/L3. `fsck`'s ninth check fired only to stderr with the code left at 0, so the
     board read `programme_checklist | PASS | 186 item(s) reconciled` while fourteen
     unresolved release-blocking findings sat in the preserved review. That is O228/K5's
     "dead code that looks like a safety check" with one extra step, and it was mine.
 
     The control is the same tree with nothing preserved: the code returns to 0, so this
-    pins the *cause* rather than just the number."""
+    pins the *cause* rather than just the number.
+
+    Re-stated after the v0.3.0 tag (strand ptests, O267 section 8(a)) because whether the
+    preserved reviews leave a finding open is the review record's state, and the closure
+    review answered them: this tree no longer has them, so asserting that it does asserts
+    a state. The cause is pinned where it discriminates: on the real tree the code is 1
+    whenever the helper reports a finding; with the helper stubbed to one finding the code
+    is 1 and the output names it; and a fixture programme with nothing open exits 0."""
     if not pc.REGISTER.is_file():
         pytest.skip("the register is internal")
-    assert pc._preserved_release_blocking_findings()          # this tree has them
-    assert pc.main(["--out", str(tmp_path / "a.json")]) == 1
+    real = pc._preserved_release_blocking_findings()
+    if real:
+        assert pc.main(["--out", str(tmp_path / "a.json")]) == 1
+        capsys.readouterr()
 
-    monkeypatch.setattr(pc, "_preserved_release_blocking_findings", lambda: [])
-    assert pc.main(["--out", str(tmp_path / "b.json")]) == 0
+    monkeypatch.setattr(pc, "_preserved_release_blocking_findings", lambda: ["F-open"])
+    assert pc.main(["--out", str(tmp_path / "b.json")]) == 1
+    assert "release-blocking finding F-open is unresolved" in capsys.readouterr().out
+
+    rc, _out, _snap = _run_over(tmp_path, monkeypatch, capsys, _register(),
+                                _matrix("PROVEN", "PROVEN"),
+                                _gate_scope(("PX.gate", "PX")), name="control")
+    assert rc == 0
 
 
 def test_an_unstamped_or_symlinked_directory_cannot_erase_the_findings(tmp_path,

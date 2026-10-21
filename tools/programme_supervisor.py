@@ -703,6 +703,49 @@ def matrix_digest(matrix: Mapping) -> str:
                     if k not in MEASUREMENT_TIME_KEYS})
 
 
+#: The fields of a matrix row a review is bound to (`phase_matrix_digest`).
+PHASE_ROW_KEYS: tuple[str, ...] = ("id", "target_phase", "status", "evidence")
+
+
+def _item_requirement(item_id: str) -> str:
+    """The requirement id of a checklist item (`P2-33+probe` -> `P2-33`)."""
+    return str(item_id).split("+")[0]
+
+
+def phase_seal(snapshot: Snapshot, phase: str) -> str:
+    """sha256 over the canonical JSON of the snapshot's items **of `phase`** (and its
+    generation) -- what a review of that phase is bound to.
+
+    The whole-snapshot seal moves when any item of any phase moves: two P3 register
+    rows were edited on 2026-10-14 and the supervisor review of P2 went stale with 0
+    P2 rows changed. This digest moves when an item of `phase` is added, removed or
+    changed in any field (status, evidence, requirement binding, source digest) and
+    in no other case. A phase with no item digests to a value of its own, so a phase
+    that disappears is a change, not a match.
+    """
+    items = sorted((i for i in snapshot.items if i.phase == phase),
+                   key=lambda i: i.item_id)
+    return _sha256({"phase": phase, "generation": snapshot.generation,
+                    "items": [i.model_dump(mode="json", by_alias=True) for i in items]})
+
+
+def phase_matrix_digest(matrix: Mapping, snapshot: Snapshot, phase: str) -> str:
+    """sha256 over the matrix rows of the phase, projected to what a review judges:
+    id, target phase, status and evidence. A row belongs to the phase when it is
+    the row of a requirement the snapshot's items of `phase` come from, **or** when it
+    says `target_phase == phase` itself (a row no item answers for is still a row the
+    closure verifier counts). The rows of other phases do not enter, and neither does
+    any other field a row may carry (a watch annotation, a note about when it was
+    measured): a row that gains a field has not become another claim."""
+    rows_all = [c for c in matrix.get("capabilities") or [] if isinstance(c, Mapping)]
+    ids = {_item_requirement(i.item_id) for i in snapshot.items if i.phase == phase}
+    ids |= {c.get("id") for c in rows_all if c.get("target_phase") == phase}
+    rows = sorted(({k: c.get(k) for k in PHASE_ROW_KEYS}
+                   for c in rows_all if c.get("id") in ids),
+                  key=lambda c: str(c.get("id")))
+    return _sha256({"phase": phase, "rows": rows})
+
+
 # --------------------------------------------------------------------------- #
 # source drift: what the files an item's evidence names hash to now
 # --------------------------------------------------------------------------- #
@@ -1134,6 +1177,22 @@ class Selection(Strict):
     #: Why drift is NOT_RUN (`drift_baseline_for`'s reason); None exactly when MEASURED.
     #: A capsule preserved before these fields existed has none and still loads.
     drift_reason: str | None = None
+    #: R3: the phase-scoped bindings (`phase_seal`, `phase_matrix_digest`). None in a
+    #: capsule preserved before they existed, which still loads, dumps and digests
+    #: exactly as it did; a capsule `capsule_for` builds always carries both.
+    phase_seal: str | None = None
+    phase_matrix_digest: str | None = None
+
+    @model_serializer(mode="wrap")
+    def _omit_unset_phase_scope(self, handler):
+        body = handler(self)
+        if self.phase_seal is None and self.phase_matrix_digest is None:
+            body.pop("phase_seal", None)
+            body.pop("phase_matrix_digest", None)
+        return body
+
+    def is_phase_scoped(self) -> bool:
+        return self.phase_seal is not None and self.phase_matrix_digest is not None
 
     #: The four drift fields at their defaults -- the shape of a capsule preserved
     #: before they existed, which `capsule_digest` digests without them.
@@ -1391,6 +1450,8 @@ def capsule_for(phase: str, *, register: Mapping, matrix: Mapping,
         source_seal=snapshot.seal, source_generation=snapshot.generation,
         matrix_digest=matrix_digest(matrix),
         source_digests=source_digests,
+        phase_seal=phase_seal(snapshot, phase),
+        phase_matrix_digest=phase_matrix_digest(matrix, snapshot, phase),
         drift="NOT_RUN" if previous_source_digests is None else "MEASURED",
         drift_baseline=None if previous_source_digests is None else previous_review_id,
         drift_reason=reason,
@@ -1465,6 +1526,32 @@ def capsule_digest(capsule: ReviewCapsule) -> str:
     return _sha256(body)
 
 
+def comparable_digest(capsule: ReviewCapsule, *, like: ReviewCapsule) -> str:
+    """The digest of `capsule` in the shape of `like`, for the question "is `like` still
+    the brief this gate would put to a supervisor?" (readiness' canonical-brief check).
+
+    `capsule_digest` is a statement about what a supervisor was given and stays the
+    digest of the whole dump. A brief bound to its phase (R3) is *current* when the
+    phase's own state is unchanged, so the two whole-programme fields (`source_seal`,
+    `matrix_digest`) -- which move with any item of any phase -- are left out of the
+    comparison, and the phase seal and phase matrix digest stay. Against a brief
+    preserved before R3 the comparison is the old one: the capsule is put into the
+    legacy shape (no phase fields) and digested whole, so such a review is judged
+    exactly as it was.
+    """
+    like_sel = getattr(like, "selection", None)
+    if isinstance(like_sel, Selection) and like_sel.is_phase_scoped():
+        body = capsule.model_dump(mode="json", by_alias=True)
+        for key in ("source_seal", "matrix_digest"):
+            body.get("selection", {}).pop(key, None)
+        return _sha256(body)
+    selection = getattr(capsule, "selection", None)
+    if isinstance(selection, Selection) and selection.is_phase_scoped():
+        capsule = capsule.model_copy(update={"selection": selection.model_copy(
+            update={"phase_seal": None, "phase_matrix_digest": None})})
+    return capsule_digest(capsule)
+
+
 # --------------------------------------------------------------------------- #
 # the review record
 # --------------------------------------------------------------------------- #
@@ -1528,6 +1615,12 @@ class ReviewRecord(BaseModel):
     findings_source: str | None = None
     snapshot_seal: str
     matrix_digest: str | None
+    #: R3: what the review is bound to *of its phase*: `phase_seal(snapshot, phase)`
+    #: and `phase_matrix_digest(matrix, snapshot, phase)` as the capsule carried them.
+    #: None in a record written before they existed; such a record is judged against
+    #: the whole seal and the whole matrix digest, exactly as before.
+    phase_seal: str | None = None
+    phase_matrix_digest: str | None = None
     findings: tuple[SupervisorFinding, ...] = ()
     applied: tuple[str, ...] = ()
     #: For each applied finding, a reference to the evidence that the repair exists:
@@ -1539,6 +1632,15 @@ class ReviewRecord(BaseModel):
     repair_evidence: dict[str, str] = Field(default_factory=dict)
     rejected: tuple[SupervisorFinding, ...] = ()
     validation_failures: tuple[ValidationFailure, ...] = ()
+
+    @model_serializer(mode="wrap")
+    def _omit_unset_phase_scope(self, handler):
+        """A record written before R3 dumps byte for byte as it did."""
+        body = handler(self)
+        if self.phase_seal is None and self.phase_matrix_digest is None:
+            body.pop("phase_seal", None)
+            body.pop("phase_matrix_digest", None)
+        return body
 
     @model_validator(mode="after")
     def _consistent(self) -> ReviewRecord:
@@ -1877,6 +1979,11 @@ def record_review(phase: str, *, capsule: ReviewCapsule, findings: Iterable,
             matrix_digest = selection.matrix_digest
         elif matrix_digest != selection.matrix_digest:
             raise ValueError("the capsule was built from a different matrix")
+        if getattr(selection, "phase_seal", None) is not None and (
+                selection.phase_seal != phase_seal(snapshot, phase)):
+            raise ValueError(f"the capsule's phase seal for {phase!r} is not this "
+                             "snapshot's: the findings are about another state of "
+                             "the phase")
 
     accepted: list[SupervisorFinding] = []
     failures: list[ValidationFailure] = []
@@ -1967,6 +2074,8 @@ def record_review(phase: str, *, capsule: ReviewCapsule, findings: Iterable,
         capsule_max_summary_chars=getattr(capsule, "max_summary_chars", None),
         snapshot_seal=snapshot.seal,
         matrix_digest=matrix_digest,
+        phase_seal=getattr(selection, "phase_seal", None),
+        phase_matrix_digest=getattr(selection, "phase_matrix_digest", None),
         findings=tuple(accepted),
         applied=tuple(applied),
         repair_evidence=repair_evidence,
@@ -1976,17 +2085,35 @@ def record_review(phase: str, *, capsule: ReviewCapsule, findings: Iterable,
 
 
 def stale_against(record: ReviewRecord, *, snapshot: Snapshot,
-                  matrix_digest: str) -> list[str]:
+                  matrix_digest: str, matrix: Mapping | None = None) -> list[str]:
     """Why `record` may no longer be relied on as a *current* review; `[]` when
-    it still may. One reason per binding that moved."""
+    it still may. One reason per binding that moved.
+
+    A record that carries the phase-scoped pair (R3) is judged against the items and
+    matrix rows **of its own phase**: another phase's edit does not move it, any edit
+    of its phase does. The matrix rows need `matrix`; without it the whole-matrix
+    digest is compared instead, which is the stricter reading (fail closed). A record
+    without the pair is judged against the whole seal and the whole digest, as before.
+    """
     out: list[str] = []
     if not snapshot.is_sealed():
         out.append("the current snapshot carries no intact seal, so nothing can be "
                    "current against it")
-    if record.snapshot_seal != snapshot.seal:
+    scoped = record.phase_seal is not None and record.phase_matrix_digest is not None
+    if scoped:
+        now = phase_seal(snapshot, record.phase)
+        if record.phase_seal != now:
+            out.append(f"phase seal of {record.phase} changed: reviewed "
+                       f"{record.phase_seal[:12]}..., now {now[:12]}...")
+    elif record.snapshot_seal != snapshot.seal:
         out.append(f"snapshot seal changed: reviewed {record.snapshot_seal[:12]}..., "
                    f"now {(snapshot.seal or 'none')[:12]}...")
-    if record.matrix_digest is None:
+    if scoped and matrix is not None:
+        now_rows = phase_matrix_digest(matrix, snapshot, record.phase)
+        if record.phase_matrix_digest != now_rows:
+            out.append(f"the matrix rows of {record.phase} changed: reviewed "
+                       f"{record.phase_matrix_digest[:12]}..., now {now_rows[:12]}...")
+    elif record.matrix_digest is None:
         out.append("the review was not bound to a matrix digest")
     elif record.matrix_digest != matrix_digest:
         out.append(f"matrix digest changed: reviewed {record.matrix_digest[:12]}..., "

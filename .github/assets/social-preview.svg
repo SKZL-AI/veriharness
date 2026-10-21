@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640" role="img" aria-labelledby="t d">
+  <title id="t">VeriHarness</title>
+  <desc id="d">VeriHarness: an evidence-bound Harness-of-Harness. Agent-written work is accepted on receipts, independent checks and adversarial review, and the project that builds it runs itself across session handovers.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#08121f"/>
+      <stop offset="1" stop-color="#13304d"/>
+    </linearGradient>
+    <linearGradient id="bar" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#2ec4b6"/>
+      <stop offset="1" stop-color="#4f9dff"/>
+    </linearGradient>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#7fe3d8"/>
+    </marker>
+  </defs>
+  <rect width="1280" height="640" fill="url(#bg)"/>
+  <rect x="80" y="110" width="10" height="150" rx="5" fill="url(#bar)"/>
+  <g font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif">
+    <text x="112" y="196" font-size="104" font-weight="700" fill="#f4f8fb">VeriHarness</text>
+    <text x="114" y="256" font-size="37" fill="#9fd8d1">Evidence-bound Harness-of-Harness</text>
+    <text x="114" y="338" font-size="30" fill="#d3dde7">Agent-written work is accepted on receipts,</text>
+    <text x="114" y="382" font-size="30" fill="#d3dde7">independent checks and adversarial review —</text>
+    <text x="114" y="426" font-size="30" fill="#d3dde7">not on a model's report that it is done.</text>
+    <text x="114" y="548" font-size="26" fill="#8fb3d0">Built by its own orchestration, session after session.</text>
+    <g font-size="23" fill="#eef4f9" text-anchor="middle">
+      <rect x="880" y="120" width="300" height="64" rx="14" fill="#1d3552" stroke="#2ec4b6" stroke-width="2"/>
+      <text x="1030" y="161">plan · develop</text>
+      <rect x="880" y="232" width="300" height="64" rx="14" fill="#1d3552" stroke="#2ec4b6" stroke-width="2"/>
+      <text x="1030" y="273">independent QA</text>
+      <rect x="880" y="344" width="300" height="64" rx="14" fill="#3a2f12" stroke="#ffbf47" stroke-width="2"/>
+      <text x="1030" y="385">receipts</text>
+      <rect x="880" y="456" width="300" height="64" rx="14" fill="#17402f" stroke="#5ad19a" stroke-width="2"/>
+      <text x="1030" y="497">review · merge gate</text>
+    </g>
+    <g stroke="#7fe3d8" stroke-width="3" fill="none" marker-end="url(#a)">
+      <path d="M1030 184 V224"/>
+      <path d="M1030 296 V336"/>
+      <path d="M1030 408 V448"/>
+    </g>
+  </g>
+</svg>
