@@ -740,7 +740,11 @@ class ProjectController:
         the contract has pre-authorised (it executes nothing; a failure is a step and does not hold the
         independent work back); (3) `governance.continue_by_policy` -- what the contract allows to
         continue, written down (create-only, one record per state version and contract) **before**
-        anything is dispatched; (3b) when that record is a hold for a reached limit whose policy is DEGRADE or
+        anything is dispatched; (3a) when that record says CONTINUE, `extexec.execute_answered_decisions` -- an
+        answered action whose target the contract names as pre-authorised, within the number it pre-authorises, is
+        carried out by a verb registered for it (P3-32 slice 4; the product registers none; the attempt is recorded
+        before the verb is called, the outcome after, a decision is attempted once; a held wave carries out
+        nothing); (3b) when that record is a hold for a reached limit whose policy is DEGRADE or
         REPLAN, `governance.act_on_limit` -- the wave at width one (recorded in `limit-acts/`), or the
         replanning step added to the graph and dispatched in the next pass (P3-32 slice 3); (4) when it says
         CONTINUE, `_drive()` restricted to them: the loop's own rounds, sequential or wave, over the nodes the
@@ -755,7 +759,7 @@ class ProjectController:
         decision that holds, a refusal and a record that cannot be written end the passes with the halt
         in hand and a step that says why; nothing is dispatched on any of them.
         """
-        from . import governance
+        from . import extexec, governance
 
         steps_: list[Step] = list(result.steps)
         runs_root = getattr(self.launcher, "root", None) or self.store.root
@@ -808,6 +812,17 @@ class ProjectController:
                         # decided again without a record to stand on: nothing is dispatched from it
                         raise governance.ContinuationError(
                             "the limit of the recorded hold is not reached any more; nothing is acted on")
+                    # P3-32 slice 4: while the contract lets the programme continue (the wave is not held: no limit
+                    # reached, no review due, no branch without a way out), the pre-authorised, answered actions are
+                    # carried out -- a registered verb, the contract's own target, the attempt recorded first -- and
+                    # said at once, like the answers; a held wave carries out nothing
+                    if plan.outcome == "CONTINUE":
+                        for d in extexec.execute_answered_decisions(
+                                self.store, self.autonomy, runs_root, actors=extexec.production_actors()).decisions:
+                            if d.outcome in (extexec.EXECUTED, extexec.FAILED):
+                                steps_.append(Step(pass_, "EXTERNAL_" + d.outcome, d.node_id, d.describe()))
+                            elif d.reason in extexec.VISIBLE_REASONS:
+                                steps_.append(Step(pass_, "EXTERNAL_WITH_PERSON", d.node_id, d.describe()))
                     act = None
                     if (plan.outcome == "HOLD" and plan.reason == governance.LIMIT_REACHED
                             and self.autonomy.horizon.on_limit in governance.ACTING_POLICIES):
@@ -1651,14 +1666,15 @@ class ProjectController:
 
         def capacity(outcome, reason: str) -> int:
             """The gone controller's open capacity rows (its pid and process identity; in this very process, this
-            thread's only -- another thread of it may be a live controller of another project)."""
+            thread's only -- another thread of it may be a live controller of another project). A run whose lease is
+            live (or cannot be read) outlives the controller that is gone: its rows are kept (`keep_live`)."""
             if capacity_root is None:
                 return 0
             if outcome.pid != os.getpid() and outcome.pid_start is None:
                 return 0            # a foreign pid whose identity was not recorded cannot be told from a reused one: left
             return CapacityReservations(capacity_root).settle_owned(
                 reason, pid=outcome.pid, thread=threading.get_ident() if outcome.pid == os.getpid() else None,
-                identity=outcome.pid_start)
+                identity=outcome.pid_start, keep_live=True)
 
         report = waverecovery.recover_open(
             directory,
@@ -1707,6 +1723,9 @@ class ProjectController:
         (`capacitycheck.storage_reader`, over the launcher's own admission factory when it has one), and the admitted
         nodes hold them in the capacity ledger with their sessions.
 
+        P3-04 C6: `runs` names each node's run (`node.run_id or node.id`, the launcher's rule), so the rows a node holds name
+        the lease its run takes and are kept while that lease is live; a run's session is counted once, through its lease.
+
         P3-17 slice 3 / P3-19 slice 3 / P3-16 slice 4: the admission is **recorded** (`<project>/capacity/capacity-<id>.json`,
         create-only, bound by its own digest, written before the nodes are held; a record that cannot be written admits
         nobody, so the round is a `CAPACITY_WAIT`); the nodes that may take the operator's reserve are the **critical** ones
@@ -1737,7 +1756,7 @@ class ProjectController:
             providers=backpressure.providers_of(launcher),
             record_dir=self.store.dir / capacityrecord.DIRNAME,
             decision_id=f"c{state.write_seq}-{round_}-{secrets.token_hex(3)}",
-            width=self.width, ready=ready)
+            width=self.width, ready=ready, runs={n.id: n.run_id or n.id for n in asked})
         if not gate.configured:
             if not self._capacity_opt_out_said:
                 self._capacity_opt_out_said = True

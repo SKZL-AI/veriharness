@@ -3064,7 +3064,7 @@ def put(name, text):
     os.replace(tmp, os.path.join(out, name))
 
 
-for name, argv in (("first", [sleep, "60"]), ("second", [odd, "60"]), ("third", [sleep, "60"])):
+for name, argv in (("first", [sleep, "60"]), ("second", [odd, "-I", "-c", "import time; time.sleep(60)"]), ("third", [sleep, "60"])):
     if name == "second":
         time.sleep(1.1)
     kid = subprocess.Popen(argv, process_group=0)
@@ -3095,7 +3095,10 @@ def test_the_real_stat_fields_agree_with_an_independent_parse(tmp_path, real):
     link = tmp_path / "bin"
     link.mkdir()
     odd = link / "x) S 9 9"
-    odd.symlink_to(SLEEP)
+    # Not a link to `sleep`: a runner whose `sleep` is the multi-call `coreutils` (Ubuntu's Rust build) refuses to run under a name
+    # that is not one of its utilities ("Requested utility `x) S 9 9` does not match executable name") and the child is dead before
+    # it has a state to read. The interpreter runs under any name; the kernel takes `comm` from the name it was started by.
+    odd.symlink_to(os.path.realpath(sys.executable))
     middle, middle_rec = real.popen([sys.executable, "-c", _STARTER, str(real.tmp), SLEEP, str(odd)])
     session = os.getsid(0)
     assert os.getsid(middle.pid) == session and session != middle.pid, \
@@ -3124,6 +3127,33 @@ def test_the_real_stat_fields_agree_with_an_independent_parse(tmp_path, real):
     gap_wall = wall_third - wall_first
     assert abs(gap_ticks / CLK_TCK - gap_wall) <= 1.0
     assert gap_ticks / CLK_TCK >= 0.9, "a start read from the wrong field is the same for all"
+
+
+#: A `sleep` that behaves like the multi-call `coreutils` of a runner whose `sleep` is Ubuntu's Rust build: it runs under its own
+#: name and refuses any other. A script, so the kernel takes `comm` from its name, as it does for the real thing.
+_MULTICALL_SLEEP = """\
+#!{python}
+import os, sys, time
+name = os.path.basename(sys.argv[0])
+if name != "sleep":
+    sys.stderr.write("Security violation: Requested utility `%s` does not match executable name\\n" % name)
+    sys.exit(1)
+time.sleep(float(sys.argv[1]))
+"""
+
+
+def test_the_stat_fields_test_holds_where_sleep_refuses_a_name_that_is_not_its_own(tmp_path, real, monkeypatch):
+    """Catches a child whose name is made by linking it to `sleep` (the public CI's runner, where `sleep` is a multi-call binary that
+    refuses to run as `x) S 9 9` and the child is dead before it has a state to read -- "did not settle within 10.0 s ... state=Z" on
+    all three Pythons, while a machine with GNU `sleep` could not show it): the same test, whole, with a `sleep` that refuses other
+    names. The three children are still one `sleep`, one named `x) S 9 9` and one `sleep`."""
+    multicall = tmp_path / "multicall"
+    multicall.mkdir()
+    sleep = multicall / "sleep"
+    sleep.write_text(_MULTICALL_SLEEP.format(python=sys.executable), encoding="utf-8")
+    sleep.chmod(0o755)
+    monkeypatch.setitem(globals(), "SLEEP", str(sleep))
+    test_the_real_stat_fields_agree_with_an_independent_parse(tmp_path, real)
 
 
 def test_a_real_zombie_is_read_as_a_zombie(real):

@@ -12,8 +12,11 @@ rbtint-b, MINOR 1 and 2). What is shown here, each by running the code:
   nothing is charged and no role is called;
 * the length of `TMPDIR`: a role directory below the run's arena root is 117-130 characters
   on the real layout, and a Unix socket path (`multiprocessing.Manager()`, the `forkserver`
-  start method) may not exceed 107 bytes. The residual is stated in the role prompt, and the
-  claim the prompt makes is measured here against a real child process (Linux only);
+  start method) may not exceed 107 bytes. The residual is stated in the role prompt -- as a
+  possibility, because it depends on the interpreter: the CPython of the public CI (3.13.16)
+  starts the `forkserver` with a 117- and a 130-character `TMPDIR`, the others measured (3.11,
+  3.12, 3.13.5) do not -- and what the prompt says is held against a real child process on the
+  interpreter running the tests (Linux only);
 * the house-rules bullet of the three role prompts is the one the spec shows, word for word.
 
 Nothing here starts Herdr or an agent: the autouse fixture of `test_role_basetemp` puts a
@@ -24,6 +27,7 @@ from __future__ import annotations
 
 import contextlib
 import os
+import re
 import stat
 import subprocess
 import sys
@@ -65,10 +69,17 @@ BULLET = """\
   it first; give it a fresh path that does not exist yet, below `$TMPDIR`. That
   `TMPDIR` is long (over 100 characters) and a Unix socket path may not exceed
   107 bytes: `multiprocessing.Manager()` or the `forkserver` start method, which
-  make theirs below `$TMPDIR`, fail here with `AF_UNIX path too long`. That is
-  the layout, not the code under test, and the acceptance checks run under a
-  `TMPDIR` just as long: report it, and do not unset `TMPDIR` to get around it.
+  make theirs below `$TMPDIR`, may fail here with `AF_UNIX path too long`,
+  depending on the interpreter and the platform. If they do, that is the layout,
+  not the code under test, and the acceptance checks run under a `TMPDIR` just
+  as long: report it, and do not unset `TMPDIR` to get around it.
 """
+
+#: The sentence the bullet carried until the CI of CPython 3.13.16 showed it false there: a
+#: failure stated as certain. Kept only so that the detector below is itself tested.
+CERTAIN_FAILURE_SENTENCE = (
+    "`multiprocessing.Manager()` or the `forkserver` start method, which make theirs below "
+    "`$TMPDIR`, fail here with `AF_UNIX path too long`.")
 
 
 @contextlib.contextmanager
@@ -321,12 +332,101 @@ def test_a_role_directory_that_fits_hosts_multiprocessing_sockets(tmp_path, how)
     assert done.returncode == 0 and "SOCKET_OK" in done.stdout, done.stdout + done.stderr
 
 
+def _states_failure_as_certain(text: str) -> bool:
+    """Whether `text` says the socket users *fail* here, without a modal ("may", "can",
+    "might"): the one claim that is true on some interpreters and false on others. Case and
+    line wrapping do not matter."""
+    flat = " ".join(text.split())
+    return re.search(r"(?<!may )(?<!can )(?<!might )fails? here with", flat, re.IGNORECASE) is not None
+
+
+def _prompt_overclaims(text: str, outcomes: "dict[str, str]") -> bool:
+    """The prompt states a failure as certain, and a child on this interpreter started anyway."""
+    return _states_failure_as_certain(text) and any(o == "starts" for o in outcomes.values())
+
+
+def _outcome(done: "subprocess.CompletedProcess[str]") -> str:
+    """What one run of `_CHILD` came to. Exactly two ends are known: it starts the socket user,
+    or it fails with the words the prompt quotes. Any other end is a different story than the
+    one the prompt tells and fails the test."""
+    output = done.stdout + done.stderr
+    if done.returncode == 0:
+        assert "SOCKET_OK" in done.stdout, output
+        return "starts"
+    assert "AF_UNIX path too long" in done.stderr and "SOCKET_OK" not in done.stdout, output
+    return "fails with AF_UNIX path too long"
+
+
+def _done(returncode: int, stdout: str = "", stderr: str = "") -> "subprocess.CompletedProcess[str]":
+    return subprocess.CompletedProcess(["child"], returncode, stdout, stderr)
+
+
+def test_the_outcome_of_a_child_is_one_of_the_two_the_prompt_allows():
+    """The classifier itself, on made-up results: it does not wave through a child that died of
+    something else, or one that exited 0 without reaching the end of the script."""
+    assert _outcome(_done(0, "TMPDIR_LEN 20\nSOCKET_OK\n")) == "starts"
+    assert _outcome(_done(1, "TMPDIR_LEN 117\n", "OSError: AF_UNIX path too long\n")) == (
+        "fails with AF_UNIX path too long")
+    for odd in (_done(0, "TMPDIR_LEN 20\n"), _done(1, "", "ModuleNotFoundError: x\n"),
+                _done(1, "SOCKET_OK\n", "AF_UNIX path too long\n"), _done(-9)):
+        with pytest.raises(AssertionError):
+            _outcome(odd)
+
+
+def test_a_failure_stated_as_certain_is_told_from_one_stated_as_possible():
+    """The detector, on the sentence the prompt had and the one it has."""
+    assert _states_failure_as_certain(CERTAIN_FAILURE_SENTENCE)
+    assert _states_failure_as_certain("they\nfail   here with `AF_UNIX path too long`")
+    assert not _states_failure_as_certain(BULLET)
+    assert not _states_failure_as_certain("they may\nfail here with `AF_UNIX path too long`")
+    assert _states_failure_as_certain("Both fail   here\nwith `AF_UNIX path too long`")
+    assert _states_failure_as_certain("The forkserver fails here with `AF_UNIX path too long`")
+    assert not _states_failure_as_certain("they can fail here with `AF_UNIX path too long`")
+    assert _states_failure_as_certain("BOTH FAILS HERE WITH `AF_UNIX path too long`")
+    assert not _states_failure_as_certain("they might fail here with `AF_UNIX path too long`")
+    assert not _states_failure_as_certain("nothing about sockets")
+    starts, fails = "starts", "fails with AF_UNIX path too long"
+    # the prompt of the base on the public CI's interpreter (the forkserver starts) is caught;
+    # the same prompt where both fail, and the possibility-prompt anywhere, are not
+    assert _prompt_overclaims(CERTAIN_FAILURE_SENTENCE, {"forkserver": starts, "manager": fails})
+    assert not _prompt_overclaims(CERTAIN_FAILURE_SENTENCE, {"forkserver": fails, "manager": fails})
+    assert not _prompt_overclaims(BULLET, {"forkserver": starts, "manager": starts})
+
+
+def test_the_prompt_states_the_socket_failure_as_a_possibility_it_names_the_reason_for():
+    """What the prompt tells a role is true on every supported interpreter: the failure is
+    stated as possible and as depending on the interpreter and the platform, and a role is told to report it
+    only if it happens. (Whether it happens is measured on the running interpreter below.)"""
+    for role, text in _prompts().items():
+        flat = " ".join(text.split())
+        assert not _states_failure_as_certain(text), f"{role}: a failure stated as certain"
+        assert "may fail here with `AF_UNIX path too long`, depending on the interpreter and the platform" in flat, role
+        assert "If they do, that is the layout, not the code under test" in flat, role
+
+
+def test_the_controller_hands_each_role_the_possibility_sentence_and_no_certainty(tmp_path, repo, spec):   # noqa: F811
+    """The path production takes (`cmd_run` -> `run_iteration` -> `roles.<role>_prompt`): the
+    three prompts a real controller dispatches carry the bullet once, as possible, never as
+    certain -- not only the prompt functions called by hand."""
+    d = Dispatcher(repo=repo)
+    ctrl, state, _ = build(tmp_path, repo, spec, d)
+    ctrl.run_iteration(state)
+    assert set(d.prompts) == set(Role), "all three roles were dispatched"
+    for role, prompt in d.prompts.items():
+        assert prompt.count(BULLET) == 1, role
+        assert not _states_failure_as_certain(prompt), role
+
+
 @pytest.mark.parametrize("length", [REAL_LAYOUT_SHORTEST_TMPDIR, 130], ids=["shortest", "longest"])
 def test_the_residual_the_prompt_states_is_what_a_child_process_meets(tmp_path, length):
     """The claim of the role prompt, run: on a role directory as long as the real layout's
-    (117 and 130 measured), the `forkserver` fails with the very words the prompt quotes and a
-    `Manager` cannot start. If CPython ever stops doing this, this test goes red -- and then the
-    sentence is to be taken out of `roles.py`, not this test silenced."""
+    (117 and 130 measured), each of the `forkserver` and a `Manager` either starts or fails with
+    the very words the prompt quotes -- nothing else -- and the prompt claims neither more nor
+    less than that. Which one it is depends on the interpreter: 3.11, 3.12 and 3.13.5 fail
+    (measured), the `forkserver` of 3.13.16 (the public CI) starts. The prompt therefore says
+    "may fail"; if the prompt ever states the failure as certain again, this test goes red on
+    an interpreter that starts, and the sentence is to be changed in `roles.py`, not this test
+    silenced."""
     prompt_claims = ("AF_UNIX path too long", "107 bytes", "over 100 characters")
     flat = " ".join(roles._HOUSE_RULES_POINTER.split())      # the bullet wraps lines
     assert all(claim in " ".join(BULLET.split()) for claim in prompt_claims)
@@ -336,12 +436,11 @@ def test_the_residual_the_prompt_states_is_what_a_child_process_meets(tmp_path, 
     assert REAL_LAYOUT_SHORTEST_TMPDIR + SOCKET_SUFFIX > SUN_PATH_USABLE
     with _short_root() as root_:
         tmpdir = _role_tmpdir_of_length(Path(root_), length)
-        forkserver = _socket_child(tmpdir, tmp_path, "forkserver")
-        manager = _socket_child(tmpdir, tmp_path, "manager")
-    assert forkserver.returncode != 0 and "AF_UNIX path too long" in forkserver.stderr, (
-        forkserver.stdout + forkserver.stderr)
-    assert manager.returncode != 0 and "SOCKET_OK" not in manager.stdout, (
-        manager.stdout + manager.stderr)
+        outcomes = {how: _outcome(_socket_child(tmpdir, tmp_path, how))
+                    for how in ("forkserver", "manager")}
+    assert not _prompt_overclaims(roles._HOUSE_RULES_POINTER, outcomes), (
+        f"the prompt states a failure as certain, and this interpreter ({sys.version.split()[0]}) "
+        f"met: {outcomes}")
 
 
 # --- the prompt ---------------------------------------------------------------------

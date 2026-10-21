@@ -59,6 +59,16 @@ RELEASES = {
         "main_has_no_package_diff": True,
         "prerelease": True,
     },
+    # 0.4.0a2: the next PRE-release of the v0.4 line (operator decision of 2026-10-21: PyPI starts with it; 0.4.0a1 was never uploaded).
+    # Declared and NOT pinned: the two identity values are added by a records commit after the tag exists; until then every command
+    # refuses it.
+    "v0.4.0a2": {
+        "version": "0.4.0a2",
+        "commit": None,
+        "tag_object": None,
+        "main_has_no_package_diff": True,
+        "prerelease": True,
+    },
 }
 
 

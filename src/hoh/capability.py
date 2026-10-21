@@ -275,6 +275,84 @@ def _entry(file_path: Path, rel: str, h) -> None:
             h.update(b"?")
 
 
+#: The deepest directory nesting `tree_digest` and `inode_digest` walk, and the most entries either folds in. Past
+#: either the walk is `TreeWalkRefused`: a digest of a part of a tree is not a digest of the tree. The walk is
+#: iterative, so these are limits of the *measurement*, not of the interpreter's stack (a path-based walk meets
+#: ENAMETOOLONG near 2000 levels long before the depth limit).
+MAX_DIGEST_DEPTH = 4096
+MAX_DIGEST_ENTRIES = 5_000_000
+
+
+class TreeWalkRefused(OSError):
+    """A tree could not be walked completely: a limit was passed, or a directory could not be listed.
+
+    An `OSError`, so a caller that already handles one keeps working. Loud on purpose: the walks that raise it
+    feed digests and a budget, and a part of a tree taken for the whole is the failure they exist to prevent."""
+
+
+def walk_tree(root: Path | str, *, skip_denied: bool = True, prune: str | None = None,
+              max_depth: int | None = None, max_entries: int | None = None):
+    """Every entry below `root` as `(relative path, full path)`, in the order of `sorted(Path(root).rglob("*"))`.
+
+    That order is a pre-order walk with the names of each directory sorted as strings -- a directory is followed by
+    its contents and then by its next sibling -- which is what comparing paths component by component gives.
+    **No link is followed and none is skipped:** a symlink (dangling or not) is an entry like any other, a
+    directory is entered only if it is a real one. `Path.rglob` is not used because its answer differs between the
+    interpreters the package supports (3.11 omits a dangling link when the pattern is a literal name and recurses
+    once per level, so a deep tree raises `RecursionError`); this walk keeps an explicit stack and sees the same
+    entries on all of them.
+
+    A directory that cannot be listed: one that has vanished is skipped (it is gone); `PermissionError` is skipped
+    when `skip_denied` (what every pathlib did, and what the digests keep) and `TreeWalkRefused` otherwise; any
+    other error (a path too long, an I/O error) is `TreeWalkRefused` -- never a silent partial walk.
+    `prune`: an entry with this name is neither yielded nor entered. `max_depth` / `max_entries`: more than that
+    many directory levels / entries is `TreeWalkRefused`.
+    """
+    top = os.fspath(root)
+    count = 0
+    stack = []                                   # (full path, relative path, iterator over its sorted entries)
+
+    def listing(full: str, depth: int):
+        if max_depth is not None and depth > max_depth:
+            raise TreeWalkRefused(errno.ELOOP, f"nested deeper than {max_depth} levels", full)
+        try:
+            with os.scandir(full) as scan:
+                rows = [(e.name, e.is_dir(follow_symlinks=False)) for e in scan]
+        except (FileNotFoundError, NotADirectoryError):
+            return None
+        except PermissionError as exc:
+            if skip_denied:
+                return None
+            raise TreeWalkRefused(exc.errno, "cannot be listed", full) from exc
+        except OSError as exc:
+            raise TreeWalkRefused(exc.errno, f"cannot be listed ({exc.strerror})", full) from exc
+        rows.sort(key=lambda row: row[0])
+        return iter(rows)
+
+    rows_ = listing(top, 1)
+    if rows_ is not None:
+        stack.append((top, "", rows_))
+    while stack:
+        full, rel, rows_ = stack[-1]
+        row = next(rows_, None)
+        if row is None:
+            stack.pop()
+            continue
+        name, is_dir = row
+        if name == prune:
+            continue
+        count += 1
+        if max_entries is not None and count > max_entries:
+            raise TreeWalkRefused(errno.EFBIG, f"holds more than {max_entries} entries", top)
+        child = os.path.join(full, name)
+        child_rel = f"{rel}/{name}" if rel else name
+        yield child_rel, child
+        if is_dir:
+            below = listing(child, len(stack) + 1)
+            if below is not None:
+                stack.append((child, child_rel, below))
+
+
 def tree_digest(root: Path | str) -> str:
     """A digest over a path's contents: a directory tree, or a single file.
 
@@ -298,10 +376,11 @@ def tree_digest(root: Path | str) -> str:
         return h.hexdigest()[:16]
     if not p.is_dir():
         return ""
-    for entry in sorted(p.rglob("*")):
-        if VCS_METADATA in entry.parts:
-            continue
-        _entry(entry, str(entry.relative_to(p)), h)
+    if VCS_METADATA in p.parts:
+        return h.hexdigest()[:16]
+    for rel, full in walk_tree(p, prune=VCS_METADATA, max_depth=MAX_DIGEST_DEPTH,
+                               max_entries=MAX_DIGEST_ENTRIES):
+        _entry(Path(full), rel, h)
     return h.hexdigest()[:16]
 
 
@@ -373,11 +452,8 @@ def inode_digest(root: Path | str) -> str:
 
     fold(".", st)
     if stat.S_ISDIR(st.st_mode):
-        entries = []
-        for dirpath, dirnames, filenames in os.walk(p, followlinks=False):
-            for name in dirnames + filenames:
-                full = os.path.join(dirpath, name)
-                entries.append(os.path.relpath(full, p))
+        entries = [rel for rel, _full in walk_tree(p, max_depth=MAX_DIGEST_DEPTH,
+                                                   max_entries=MAX_DIGEST_ENTRIES)]
         for rel in sorted(entries):
             try:
                 fold(rel, os.lstat(p / rel))
@@ -578,19 +654,17 @@ def seal_plan(root: Path | str) -> dict[str, SealEntry]:
         raise OSError(errno.ENOTDIR, f"not a directory: {p}")
     found: list[tuple[int, str, SealEntry]] = [
         (0, ".", SealEntry(st.st_mode, st.st_dev, st.st_ino))]
-    for dirpath, dirnames, filenames in os.walk(p, followlinks=False):
-        for name in dirnames + filenames:
-            rel = os.path.relpath(os.path.join(dirpath, name), p)
-            st_ = os.lstat(p / rel)
-            if stat.S_ISLNK(st_.st_mode):
-                continue
-            if not stat.S_ISDIR(st_.st_mode) and st_.st_nlink > 1:
-                raise SealFailed(
-                    f"{rel} has {st_.st_nlink} hard links: a file with more than "
-                    "one name is not sealed, because one name may lie outside the "
-                    "arena and the count cannot tell; nothing changed")
-            found.append((rel.count(os.sep) + 1, rel,
-                          SealEntry(st_.st_mode, st_.st_dev, st_.st_ino)))
+    for rel, full in walk_tree(p):
+        st_ = os.lstat(full)
+        if stat.S_ISLNK(st_.st_mode):
+            continue
+        if not stat.S_ISDIR(st_.st_mode) and st_.st_nlink > 1:
+            raise SealFailed(
+                f"{rel} has {st_.st_nlink} hard links: a file with more than "
+                "one name is not sealed, because one name may lie outside the "
+                "arena and the count cannot tell; nothing changed")
+        found.append((rel.count(os.sep) + 1, rel,
+                      SealEntry(st_.st_mode, st_.st_dev, st_.st_ino)))
     found.sort(key=lambda t: (t[0], t[1]))
     return {rel: entry for _, rel, entry in found}
 

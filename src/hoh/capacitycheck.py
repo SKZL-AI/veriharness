@@ -62,10 +62,16 @@ controllers could each be told "one session is free". `admit_wave` therefore tak
 locked step (`reservation.CapacityReservations.reserve_atomically`): what is over is ended first (an owner that is gone,
 a hold past its ttl, this owner's own earlier wave), the holds are read, the scheduler decides, and one
 `machine/host.sessions` session per admitted node is written to `<runs root>/_capacity-reservations.json` before the lock
-is let go. `live_holds` counts the open holds of live owners as sessions, one per row and one per lease (run names and node ids are
-project-local, so they are never merged: a run that has a lease **and** a hold counts twice -- over-counted, never
-under-counted; not the caller's own rows, whose earlier wave is over when it asks), so `hoh capacity check`, another process,
-sees what a running wave holds. A ledger or lock that cannot be used admits nobody.
+is let go. `live_holds` counts the open holds of live owners as sessions, one per row and one per lease, **but one run, one session**
+(P3-04, capacity chain step C6): the admission names the lease of each node's run in the row it holds (`runs=`, from the
+controller's `node.run_id or node.id`, kept under `rundrive.lease_name`), and a session row whose lease is a live lease of the
+`hoh run` namespace (`rundrive.LEASE_PROJECT`) is not counted again -- a lease absorbs **at most one** row (so two owners
+holding a node of the same name stay two), only the session row (the provider's sessions, the bytes and the inodes of the row are
+counted in full), and only the lease of that namespace. Run names and node ids are otherwise project-local, so a row that names
+no lease, or a lease of another project, is never merged: a run that has a lease **and** a row that names none counts twice --
+over-counted, never under-counted (not the caller's own rows, whose earlier wave is over when it asks). So `hoh capacity check`,
+another process, sees what a running wave holds. A ledger or lock that cannot be used admits nobody. The same link keeps the row
+while the lease is live (`reservation.CapacityReservations.judge`).
 `live_holds` and `check` remain read-only; `admit_wave` is the one writer here.
 
 **Storage is one more capacity of the same admission (plan row P3-39, the remaining two thirds).** Slice 1 gave the broker
@@ -124,11 +130,11 @@ from __future__ import annotations
 import os
 import stat
 import threading
-from collections.abc import Callable, Collection, Iterable, Sequence
+from collections.abc import Callable, Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-from . import capacityrecord
+from . import capacityrecord, rundrive
 from .broker import (STORAGE_BYTES, STORAGE_INODES, STORAGE_KIND, Amount, BrokerError, Decision, Policy, decide,
                      storage_facts)
 from .capacity import KINDS, CapacityError, Registry, parse, render
@@ -213,7 +219,12 @@ class CheckError(ValueError):
 class Holds:
     """What is held, as read: the runs root, how many project directories and lease files were looked at, the live
     sessions, the reserved dispatches, the sums of the `machine/storage.bytes` and `machine/storage.inodes` rows that
-    other owners' waves hold (`storage_bytes`, `storage_inodes`, P3-39), and the `Amount`s `decide` is given."""
+    other owners' waves hold (`storage_bytes`, `storage_inodes`, P3-39), and the `Amount`s `decide` is given.
+
+    `reserved` is the session rows of other owners **counted beyond their lease** (a row whose run holds a live `hoh run`
+    lease is counted once, through the lease: C6); before C6 it was every session row of another owner. `absorbed` is the
+    difference -- the rows a live lease absorbed -- so `sessions - reserved` is still the live leases and `reserved +
+    absorbed` is what the session rows of other owners held."""
 
     runs_root: str
     projects: int
@@ -224,10 +235,12 @@ class Holds:
     reserved: int = 0
     storage_bytes: int = 0
     storage_inodes: int = 0
+    absorbed: int = 0
 
     def as_dict(self) -> dict:
         return {"runs_root": self.runs_root, "projects": self.projects, "lease_files": self.lease_files,
                 "sessions": self.sessions, "dispatches": self.dispatches, "reserved": self.reserved,
+                "absorbed": self.absorbed,
                 "storage_bytes": self.storage_bytes, "storage_inodes": self.storage_inodes,
                 "amounts": [{"kind": a.kind, "name": a.name, "amount": a.amount, "unit": a.unit}
                             for a in self.amounts]}
@@ -282,6 +295,7 @@ def live_holds(runs_root: str | os.PathLike, **environment) -> Holds:
         raise CheckError("holds", f"the runs root {root.name!r} does not exist (pass --root)")
     projects = 0
     leased = 0                                            # live run leases: one session each, per lease file
+    live_runs: set[str] = set()                           # the names of the live leases of the `hoh run` namespace
     found: list[tuple[str, Path, list[str]]] = []
     projects_dir = root / "projects"
     if _directory(projects_dir, "projects") is not None:
@@ -310,6 +324,8 @@ def live_holds(runs_root: str | os.PathLike, **environment) -> Holds:
                                           f"read ({exc.reason}): not a free run") from exc
             if state == LIVE:
                 leased += 1
+                if name == rundrive.LEASE_PROJECT:
+                    live_runs.add(file_name[:-len(_SUFFIX)])
                 if leased > MAX_LEASES:
                     raise CheckError("invalid", f"live run leases: more than {MAX_LEASES}")
     try:
@@ -326,9 +342,13 @@ def live_holds(runs_root: str | os.PathLike, **environment) -> Holds:
         raise CheckError("holds", f"the capacity reservations cannot be read: {str(exc)[:160]}") from exc
     others: dict[tuple[str, str, str], int] = {}
     reserved_sessions = 0
+    absorbed: set[str] = set()                            # the leases that already stand for a row: at most one each
     for row in reserved:
         if (row.kind, row.name, row.unit) == SESSIONS:
-            reserved_sessions += 1                        # one session per row: run names are project-local
+            if row.lease in live_runs and row.lease not in absorbed:
+                absorbed.add(row.lease)                   # one run, one session: the lease counted it
+            else:
+                reserved_sessions += 1                    # one session per row: run names are project-local
         else:
             key = (row.kind, row.name, row.unit)
             others[key] = others.get(key, 0) + row.amount
@@ -340,7 +360,7 @@ def live_holds(runs_root: str | os.PathLike, **environment) -> Holds:
               or key[:2] == (STORAGE_KIND, STORAGE_INODES)}
     return Holds(str(root), projects, scanned, sessions, dispatches, amounts, reserved_sessions,
                  sum(a for key, a in stored.items() if key[1] == STORAGE_BYTES),
-                 sum(a for key, a in stored.items() if key[1] == STORAGE_INODES))
+                 sum(a for key, a in stored.items() if key[1] == STORAGE_INODES), len(absorbed))
 
 
 _LEASE_KEYS = ("clock", "boot", "host", "pid", "alive", "pidns", "start", "lock_wait_seconds")
@@ -625,7 +645,7 @@ def admit_wave(node_ids: Iterable[str], *, runs_root: str | os.PathLike, state_r
                storage: Callable[[], StorageReading | None] | None = None, critical: Iterable[str] = (),
                providers: Sequence[str] | None = None, record_dir: str | os.PathLike | None = None,
                decision_id: str | None = None, width: int | None = None, ready: int | None = None,
-               **environment) -> Gate:
+               runs: Mapping[str, str] | None = None, **environment) -> Gate:
     """Which of the nodes `node_ids` (the wave's candidates, in priority order) may start at `now`? See the module
     text. **Does not raise**: every failure of its own work -- a `state_root` or `runs_root` that is not a path, a
     record that cannot be examined, anything the readers raise -- is `Gate(configured=True, admitted=())` with every
@@ -638,6 +658,11 @@ def admit_wave(node_ids: Iterable[str], *, runs_root: str | os.PathLike, state_r
     `runs_root` (the nodes it admits are held there in the same locked step), the admission record when it is asked for
     and, when it judges storage, what the admission ledger records when it is read (`StorageAdmission.status()`: the
     observation, the pressure state, the stale reservations it renames); nothing at all when no registry is declared.
+
+    `runs` (C6) is a mapping of node id to the id of the node's run (`node.run_id or node.id`): the rows held for a node name the
+    lease of that run (`rundrive.lease_name`), which keeps them while the lease is live and lets `live_holds` count the run's
+    session once. A node it does not name holds rows that name no lease; `runs` that is not such a mapping is a bad request
+    (`CheckError(invalid)`): nobody is admitted.
 
     `critical` are the ids among `node_ids` that may take the reserve (see the module text; ids that are not offered are
     ignored), `providers` the providers the runs use (`None`: every declared provider session capacity counts).
@@ -678,6 +703,10 @@ def admit_wave(node_ids: Iterable[str], *, runs_root: str | os.PathLike, state_r
         if isinstance(critical, (str, bytes)) or not all(type(c) is str for c in named):
             raise CheckError("invalid", "the critical nodes of a wave are a list of node ids")
         flagged = frozenset(named) & set(nodes)
+        if runs is not None and (not isinstance(runs, Mapping) or not all(
+                type(k) is str and type(v) is str for k, v in runs.items())):
+            raise CheckError("invalid", "the runs of a wave are a map of node ids to run ids")
+        links = {} if runs is None else {node: rundrive.lease_name(run) for node, run in runs.items()}
         if (record_dir is None) != (decision_id is None):
             raise CheckError("invalid", "a record needs both its directory and its decision id")
         for what, figure in (("width", width), ("ready", ready)):
@@ -686,7 +715,7 @@ def admit_wave(node_ids: Iterable[str], *, runs_root: str | os.PathLike, state_r
         reading = None if storage is None else storage()      # before the lock: it may wait (STORAGE_TIMEOUT)
         judged: dict = {}
 
-        def decide_now() -> list[tuple[str, str, str, int, str]]:
+        def decide_now() -> list[tuple[str, str, str, int, str, str | None]]:
             """Runs under the reservation lock, after what is over was ended: the registry, the holds (the ledger as
             just written), the capacity source's snapshot of them and one admission over them and the storage read
             before; what it admits is held by the caller in the same locked write, and the admission is recorded first."""
@@ -730,7 +759,7 @@ def admit_wave(node_ids: Iterable[str], *, runs_root: str | os.PathLike, state_r
                     "outcome": {"admitted": list(plan.admitted),
                                 "waiting": [[p.node, p.verdict, p.reason] for p in plan.placements if p.verdict != "admit"]},
                     "held": [list(row) for row in rows]})
-            return rows
+            return [(*row, links.get(row[0])) for row in rows]
 
         created, ended = CapacityReservations(runs_root, **_owner_facts(environment)).reserve_atomically(decide_now)
         plan = judged["plan"]

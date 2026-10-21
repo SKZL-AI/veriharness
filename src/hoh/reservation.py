@@ -57,6 +57,8 @@ from pydantic import Field, ValidationError
 
 from . import durable_io
 from .contracts import Strict, utcnow
+from .leaseadmin import UNREADABLE
+from .runlease import LIVE
 from .store import RESERVED_PREFIXES, RESERVED_RUN_IDS
 
 SCHEMA = "hoh-budget-reservations/1"
@@ -433,10 +435,21 @@ class BudgetReservations:
 #   controller's (its pid and process identity). `settle(run_id, reason)` is the primitive for a caller that knows the
 #   project. A round that ends before its executor starts leaves its rows to the next ask, the owner's death or the ttl.
 #
-# The limit, exactly: a hold is released when its *owner* is gone or past its ttl, not when its *run* is over. A run
-# that outlives its controller (the controller dies, the run goes on; or the wave runs past the ttl) has its capacity
-# released while it still runs, and nothing but a run lease (P3-18 slice 2) can say it is still there. Until runs take
-# leases in production that window can admit a wave against capacity a surviving run still uses.
+# Lease-aware (capacity chain step C6): a row may name the **run lease** of the run it was taken for (`CapacityHold.lease`,
+# written by `capacitycheck.admit_wave` from the controller's run ids). While that lease is `LIVE` -- `rundrive.consult`,
+# read-only, in this object's own view of the machine -- the row is `HELD` whatever its owner's death and its ttl say, so a
+# run that outlives its controller, or a wave that runs past the ttl, keeps what it was admitted against until its lease
+# ends. A lease that cannot be read exactly is not a free run: it suspends the owner-gone rule (the ttl still ends the row)
+# and the ask that would have ended the row for its owner's death is refused, naming the file. A lease that is absent,
+# released or lost says nothing and the rules above apply. `settle_owned(keep_live=True)`, which the recovery of a
+# crash-left wave uses, leaves such rows open.
+#
+# The limit, exactly: a hold is released when its *owner* is gone or past its ttl, **unless its run's lease is live**.
+# The windows that stay (the register's `equivalent` names them): L1 the owner's own next ask supersedes its earlier
+# rows although a run of that wave is alive; L2 a row is settled by the wave's end or the recovery before its run has
+# taken its lease (the launch is between the dispatch and `hoh run` taking it); L3 a run that takes no run lease (only
+# `hoh run` takes one) is held by its row alone; the link is by the lease's name, not its generation. The retention is
+# bounded by the run's life: a retained row ends, by the rules it always had, at the first ask after its lease does.
 #
 # Each transition is made once, under the lock, and persisted in the same write that decided; a terminal row is
 # never looked at again (a further ask over a ledger with nothing to end writes nothing). The lock is taken
@@ -485,6 +498,25 @@ class CapacityHold(Strict):
     expires_at: str
     ended_at: str | None = None
     reason: str = ""
+    lease: str | None = None
+    """The name of the run lease (`rundrive.lease_name`) of the run this hold was taken for, or None. The ledger spells
+    the key only when it is set (`_row_json`), so a ledger nothing links to a run is what it was."""
+
+
+def check_lease_name(name: object) -> str:
+    """The lease name as given, or `ReservationError`: the run lease's own name grammar (at most 64 characters, not a
+    name the runs root keeps for itself). Not stripped or folded."""
+    from . import runlease
+
+    try:
+        return runlease._run_id(name)
+    except runlease.RunLeaseError as exc:
+        raise ReservationError(f"not a run lease name: {name!r}") from exc
+
+
+def _row_json(row: CapacityHold) -> dict:
+    """A row as the ledger spells it: without `lease` when it names none."""
+    return json.loads(row.model_dump_json(exclude={"lease"}) if row.lease is None else row.model_dump_json())
 
 
 class CapacityReservations:
@@ -539,28 +571,62 @@ class CapacityReservations:
             raise ReservationError(f"{self.path} does not hold a capacity ledger")
         for raw_row in data["holds"]:
             check_run_id(raw_row.get("run_id") if isinstance(raw_row, dict) else None)
+            if isinstance(raw_row, dict) and raw_row.get("lease") is not None:
+                check_lease_name(raw_row["lease"])
         try:
             return [CapacityHold.model_validate(r) for r in data["holds"]]
         except ValidationError as exc:
             raise ReservationError(f"{self.path} holds an invalid row: {exc}") from exc
 
-    def judge(self, row: CapacityHold, now: str) -> tuple[CapacityStatus, str]:
-        """`(status, why)` of a row at `now`: its own terminal status, or `LOST` / `EXPIRED` / `HELD` (live). The
-        order is the run lease's: another boot; this host and pid namespace and the pid gone or another process
-        (or, for this process, the owning thread gone); the ttl."""
-        if row.status is not CapacityStatus.HELD:
-            return row.status, row.reason or "ended"
+    def _run_lease_state(self, name: str, seen: dict | None):
+        """What the run lease `name` says now (`rundrive.consult`: read-only, nothing is created), judged in this
+        object's own view of the machine (its clock, boot id, host, process facts). Asked once per name for the
+        operation that shares `seen`."""
+        if seen is not None and name in seen:
+            return seen[name]
+        from . import rundrive
+
+        fact = rundrive.consult(self.root, name, clock=self.clock, boot=self.boot, host=self.host, pid=self.pid,
+                                alive=self.alive, pidns=self.pidns, start=self.start)
+        if seen is not None:
+            seen[name] = fact
+        return fact
+
+    def _owner_lost(self, row: CapacityHold) -> str | None:
+        """Why the owner of the row is gone, or None: another boot; this host and pid namespace and the pid gone or
+        another process (or, for this process, the owning thread gone). The run lease's order."""
         here = str(self.boot() or "")
         if row.owner_boot and here and row.owner_boot != here:
-            return CapacityStatus.LOST, "the machine restarted since the hold was taken"
+            return "the machine restarted since the hold was taken"
         if (row.owner_host == self.host and row.owner_pidns and row.owner_pidns == str(self.pidns() or "")):
             if not self.alive(row.owner_pid):
-                return CapacityStatus.LOST, f"the owner (pid {row.owner_pid}) no longer exists"
+                return f"the owner (pid {row.owner_pid}) no longer exists"
             started = str(self.start(row.owner_pid) or "")
             if row.owner_start and started and started != row.owner_start:
-                return CapacityStatus.LOST, f"pid {row.owner_pid} now belongs to another process"
+                return f"pid {row.owner_pid} now belongs to another process"
             if row.owner_pid == self.pid and row.owner_thread not in self.live_threads():
-                return CapacityStatus.LOST, "the owning thread has ended"
+                return "the owning thread has ended"
+        return None
+
+    def _lease_says(self, row: CapacityHold, seen: dict | None) -> str | None:
+        """The state of the run lease of a row that names one (`LIVE`, `UNREADABLE`, ...), else None."""
+        return None if row.lease is None else self._run_lease_state(row.lease, seen).state
+
+    def judge(self, row: CapacityHold, now: str, *, seen: dict | None = None) -> tuple[CapacityStatus, str]:
+        """`(status, why)` of a row at `now`: its own terminal status, or `LOST` / `EXPIRED` / `HELD` (live). A row
+        that names a run lease asks it, after the terminal-status check: **`LIVE` keeps the row `HELD` whatever the
+        owner and the ttl say**; a lease that cannot be read suspends the owner-gone rule (the ttl still ends the
+        row); an absent, released or lost lease says nothing. Then the run lease's order: the owner (`_owner_lost`),
+        the ttl. `seen` is the lease facts of one operation (a name is asked once); judging writes nothing."""
+        if row.status is not CapacityStatus.HELD:
+            return row.status, row.reason or "ended"
+        state = self._lease_says(row, seen)
+        if state == LIVE:
+            return CapacityStatus.HELD, f"the run lease {row.lease} is live"
+        if state != UNREADABLE:
+            lost = self._owner_lost(row)
+            if lost is not None:
+                return CapacityStatus.LOST, lost
         if row.expires_at <= now:
             return CapacityStatus.EXPIRED, f"the hold ran past {row.expires_at}"
         return CapacityStatus.HELD, "held"
@@ -568,16 +634,16 @@ class CapacityReservations:
     def live(self) -> list[CapacityHold]:
         """The holds that count now: open and judged live. Read without the lock and **without writing**: a row whose
         owner is gone is not counted even before somebody ends it."""
-        now = self.clock()
+        now, seen = self.clock(), {}
         return [r for r in self.read() if r.status is CapacityStatus.HELD
-                and self.judge(r, now)[0] is CapacityStatus.HELD]
+                and self.judge(r, now, seen=seen)[0] is CapacityStatus.HELD]
 
     # -- writing ------------------------------------------------------------ #
 
     def _write(self, rows: list[CapacityHold]) -> None:
         payload = json.dumps(
             {"schema_version": CAPACITY_SCHEMA, "written_at": self.clock(),
-             "holds": [json.loads(r.model_dump_json()) for r in rows]}, indent=2) + "\n"
+             "holds": [_row_json(r) for r in rows]}, indent=2) + "\n"
         try:
             durable_io.durable_write(self.path, payload, mode=0o600)
         except OSError as exc:
@@ -588,7 +654,7 @@ class CapacityReservations:
         stamp = self.clock().replace(":", "").replace("-", "")
         payload = json.dumps(
             {"schema_version": CAPACITY_SCHEMA, "archived_at": self.clock(),
-             "holds": [json.loads(r.model_dump_json()) for r in terminal]}, indent=2) + "\n"
+             "holds": [_row_json(r) for r in terminal]}, indent=2) + "\n"
         for _ in range(5):                                   # a name that exists is another archive: a new token
             target = self.root / f"_capacity-reservations.{stamp}-{secrets.token_hex(3)}.json"
             try:
@@ -615,11 +681,15 @@ class CapacityReservations:
 
     # -- the operations ----------------------------------------------------- #
 
-    def reserve_atomically(self, decide: Callable[[], Sequence[tuple[str, str, str, int, str]]]
+    def reserve_atomically(self, decide: Callable[[], Sequence[tuple]]
                            ) -> tuple[list[CapacityHold], list[CapacityHold]]:
         """`(created, ended)`: under the lock, end what is over (a lost or expired owner's rows; this owner's earlier
         rows, which its asking again supersedes), persist that, call `decide()` -- which reads the holds and the
-        registry and returns `(run_id, kind, name, amount, unit)` for each capacity to hold -- and write those rows.
+        registry and returns `(run_id, kind, name, amount, unit)` -- or a six-tuple whose last element is the name of
+        the run lease of the run, or None -- for each capacity to hold -- and write those rows.
+
+        A row whose run lease cannot be read, and which only the owner's death would have ended, is not a free
+        run: the ask is a `ReservationError` naming the lease, before anything is written.
 
         `decide` runs with the lock held and sees the ledger as just written, so two callers are one after the
         other: the second counts what the first held. Whatever `decide` raises is raised after the ended rows were
@@ -628,18 +698,29 @@ class CapacityReservations:
             rows = self.read()
             now = self.clock()
             ended: list[CapacityHold] = []
+            seen: dict = {}
+            unreadable: list[CapacityHold] = []
             for index, row in enumerate(rows):
                 if row.status is not CapacityStatus.HELD:
                     continue
-                status, why = self.judge(row, now)
+                status, why = self.judge(row, now, seen=seen)
                 if status is CapacityStatus.HELD and row.owner_pid == self.pid and row.owner_thread == self.thread:
                     status, why = CapacityStatus.SUPERSEDED, "the owner asked again: its earlier wave is over"
+                if status is CapacityStatus.HELD and self._lease_says(row, seen) == UNREADABLE \
+                        and self._owner_lost(row) is not None:
+                    unreadable.append(row)
                 if status is not CapacityStatus.HELD:
                     rows[index] = row.model_copy(update={"status": status, "ended_at": now, "reason": why})
                     ended.append(rows[index])
+            if unreadable:
+                first = unreadable[0]
+                raise ReservationError(
+                    f"capacity cannot be judged: the run lease {first.lease!r} of the hold {first.reservation_id} "
+                    f"cannot be read ({seen[first.lease].why}); move the lease file aside (a versioned rename) "
+                    f"after looking at it")
             if ended:
                 self._write(rows)
-            wanted = list(decide())
+            wanted = [self._wanted(item) for item in decide()]
             if not wanted:
                 return [], ended
             identity = dict(owner_pid=self.pid, owner_thread=self.thread, owner_boot=str(self.boot() or ""),
@@ -650,14 +731,23 @@ class CapacityReservations:
             expires = (moment + timedelta(seconds=self.ttl)).strftime(_TIME_FORMAT)
             created = [CapacityHold(reservation_id=f"{secrets.token_hex(4)}-{check_run_id(run_id)}", run_id=run_id,
                                     kind=kind, name=name, amount=amount, unit=unit, reserved_at=now,
-                                    expires_at=expires, **identity)
-                       for run_id, kind, name, amount, unit in wanted]
+                                    expires_at=expires, lease=lease, **identity)
+                       for run_id, kind, name, amount, unit, lease in wanted]
             terminal = [r for r in rows if r.status is not CapacityStatus.HELD]
             if len(terminal) > CAPACITY_ARCHIVE_ROWS:
                 self._archive(terminal)
                 rows = [r for r in rows if r.status is CapacityStatus.HELD]
             self._write(rows + created)
             return created, ended
+
+    @staticmethod
+    def _wanted(item: object) -> tuple:
+        """One thing `decide` wants held, as `(run_id, kind, name, amount, unit, lease)`: the five-tuple of before (no
+        lease) or a six-tuple whose last element is a lease name or None. Anything else is `ReservationError`."""
+        if not isinstance(item, (tuple, list)) or len(item) not in (5, 6):
+            raise ReservationError(f"a capacity to hold is (run id, kind, name, amount, unit[, lease]): {item!r}")
+        lease = item[5] if len(item) == 6 else None
+        return (*item[:5], None if lease is None else check_lease_name(lease))
 
     def settle(self, run_id: str, reason: str) -> int:
         """Ends the open holds of `run_id` (`SETTLED`): the settle path of a wave calls it when the run is over.
@@ -679,7 +769,8 @@ class CapacityReservations:
             return count
 
     def settle_owned(self, reason: str, *, run_ids: Sequence[str] | None = None, keep: Sequence[str] = (),
-                     pid: int | None = None, thread: int | None = None, identity: str | None = None) -> int:
+                     pid: int | None = None, thread: int | None = None, identity: str | None = None,
+                     keep_live: bool = False) -> int:
         """Ends (`SETTLED`) the open holds of **one owner** -- by default this object's own `(pid, thread)`, the
         controller whose wave is over. Returns how many it ended; 0 -- and no write, no lock, no file -- when there
         was none or no ledger exists, so a second call over the same rows is a no-op.
@@ -688,8 +779,10 @@ class CapacityReservations:
         `settle` is not what a wave's end calls); `keep` leaves those runs' rows open (a run that may still be alive:
         its launch came back IN_FLIGHT or raised). A recovery names a *gone* controller: `pid`, `thread` (None = any
         thread of that process) and `identity`, the `<boot id>:<start time>` token of the process as its outcome
-        recorded it -- a row whose owner has another identity is a reused pid's and is left. An unreadable ledger
-        is `ReservationError`: nothing is ended and the caller says so."""
+        recorded it -- a row whose owner has another identity is a reused pid's and is left. `keep_live` leaves the rows
+        whose run lease is `LIVE` -- or cannot be read, which is not a free run -- open (a run that outlives its
+        controller keeps what it was admitted against); the rows of every other lease, and of none, are ended. An
+        unreadable ledger is `ReservationError`: nothing is ended and the caller says so."""
         who = self.pid if pid is None else pid
         if pid is None and thread is None:
             thread = self.thread
@@ -697,13 +790,15 @@ class CapacityReservations:
         kept = {check_run_id(r) for r in keep}
         if not os.path.lexists(self.path):
             return 0
+        seen: dict = {}
 
         def mine(row: CapacityHold) -> bool:
             return (row.status is CapacityStatus.HELD and row.owner_pid == who
                     and (thread is None or row.owner_thread == thread)
                     and (wanted is None or row.run_id in wanted) and row.run_id not in kept
                     and (identity is None or not (row.owner_boot or row.owner_start)
-                         or f"{row.owner_boot}:{row.owner_start}" == identity))
+                         or f"{row.owner_boot}:{row.owner_start}" == identity)
+                    and not (keep_live and self._lease_says(row, seen) in (LIVE, UNREADABLE)))
         with self._locked():
             rows = self.read()
             if not any(mine(r) for r in rows):

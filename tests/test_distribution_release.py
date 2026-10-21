@@ -67,12 +67,32 @@ import os
 import urllib.error as _urlerror
 
 
+#: A synthetic release that is declared and not pinned. The real table is never changed for it: it is added to the table of the
+#: process under test (`monkeypatch.setitem`), or to a copy of the tool (`_tool_declaring_an_unpinned_release`).
+UNPINNED = "v0.0.2"
+UNPINNED_RECORD = {"version": "0.0.2", "commit": None, "tag_object": None, "main_has_no_package_diff": True, "prerelease": True}
+
+
 def test_unknown_and_unpinned_releases_are_refused(monkeypatch):
     with pytest.raises(AssertionError, match="Only the audited"):
         release.release_for("v9.9.9")
-    # v0.4.0a1 is declared and not pinned yet: refused until its two identity values are added
+    # a release that is declared and not pinned is refused until its two identity values are added. The example is a synthetic
+    # one: v0.4.0a1 was the example until its identity was pinned (130fbb4e), and a test that names a real release as "the
+    # unpinned one" goes red the day that release is pinned
+    monkeypatch.setitem(release.RELEASES, UNPINNED, dict(UNPINNED_RECORD))
     with pytest.raises(AssertionError, match="not pinned"):
-        release.release_for("v0.4.0a1")
+        release.release_for(UNPINNED)
+    # one value is not a pin: each of the two identity values missing alone is refused as well
+    for half in ({"commit": "c" * 40}, {"tag_object": "d" * 40}):
+        monkeypatch.setitem(release.RELEASES, UNPINNED, {**UNPINNED_RECORD, **half})
+        with pytest.raises(AssertionError, match="not pinned"):
+            release.release_for(UNPINNED)
+    # the other direction: the same record with both identity values is accepted, so the refusal is the missing pin and nothing else
+    monkeypatch.setitem(release.RELEASES, UNPINNED, {**UNPINNED_RECORD, "commit": "c" * 40, "tag_object": "d" * 40})
+    assert release.release_for(UNPINNED)["version"] == "0.0.2"
+    # the real pre-release is pinned: it is accepted, with both identity values
+    pinned = release.release_for("v0.4.0a1")
+    assert re.fullmatch(r"[0-9a-f]{40}", pinned["commit"]) and re.fullmatch(r"[0-9a-f]{40}", pinned["tag_object"])
     # v0.4.0 is reserved for the closure of P3 and is not declared at all
     with pytest.raises(AssertionError, match="Only the audited"):
         release.release_for("v0.4.0")
@@ -102,14 +122,33 @@ def test_v040a1_is_a_declared_pre_release_with_a_pep440_version(monkeypatch):
     assert release.release_for("v0.4.0a1")["prerelease"] is True
 
 
-def test_the_prerelease_command_prints_what_the_github_release_must_say():
+def _tool_declaring_an_unpinned_release(tmp_path):
+    """A copy of `tools/distribution_release.py` whose `RELEASES` also holds `UNPINNED`: the program is run as a program, so a
+    table changed in this process does not reach it. The table line is replaced exactly once, or this fails loudly."""
+    source = Path(release.__file__).read_text(encoding="utf-8")
+    assert source.count("RELEASES = {\n") == 1
+    copy = tmp_path / "distribution_release_copy.py"
+    copy.write_text(source.replace("RELEASES = {\n", f"RELEASES = {{\n    {UNPINNED!r}: {UNPINNED_RECORD!r},\n"), encoding="utf-8")
+    return copy
+
+
+def test_the_prerelease_command_prints_what_the_github_release_must_say(tmp_path):
     """`prerelease --release-ref` is what the workflow asks before it compares the GitHub release: false for v0.1.0, and a refusal (not a
     guess) for a release whose identity is not pinned yet."""
     tool = release.__file__
     ok = subprocess.run([sys.executable, tool, "prerelease", "--release-ref", "v0.1.0"], capture_output=True, text=True)
     assert ok.returncode == 0 and ok.stdout.strip() == "false"
-    unpinned = subprocess.run([sys.executable, tool, "prerelease", "--release-ref", "v0.4.0a1"], capture_output=True, text=True)
-    assert unpinned.returncode != 0 and "not pinned" in unpinned.stderr
+    # the pinned pre-release answers true: what the workflow compares the GitHub release with
+    pre = subprocess.run([sys.executable, tool, "prerelease", "--release-ref", "v0.4.0a1"], capture_output=True, text=True)
+    assert pre.returncode == 0 and pre.stdout.strip() == "true", pre.stderr
+    # a release that is declared and not pinned is a refusal, not a guess: the tool itself, run as a program, with a synthetic
+    # unpinned release added to a copy of its table
+    copy = _tool_declaring_an_unpinned_release(tmp_path)
+    unpinned = subprocess.run([sys.executable, str(copy), "prerelease", "--release-ref", UNPINNED], capture_output=True, text=True)
+    assert unpinned.returncode != 0 and "not pinned" in unpinned.stderr and unpinned.stdout == ""
+    # and the copy is a faithful one: it answers a pinned release as the original does
+    same = subprocess.run([sys.executable, str(copy), "prerelease", "--release-ref", "v0.1.0"], capture_output=True, text=True)
+    assert same.returncode == 0 and same.stdout.strip() == "false"
 
 
 def test_the_file_set_and_the_index_url_follow_the_version(bundle, monkeypatch):

@@ -185,6 +185,10 @@ def _records(store: ProjectStore) -> list[Path]:
 
 
 def _tree(root: Path) -> dict:
+    """Every entry under `root`: its mode, its size and its digest. The size of a **directory** is not content: a filesystem
+    reports it by its own rule (4096 on ext4; on tmpfs, which a runner's `/tmp` can be, 20 bytes per entry), so a directory that
+    gained an entry the comparison filters out by name (`policy-continuations`) differs by it. A directory is recorded with no
+    size; its entries are the keys, and a regular file keeps its size and digest."""
     import hashlib
     seen = {}
     for base, dirs, files in os.walk(root):
@@ -192,10 +196,48 @@ def _tree(root: Path) -> dict:
             path = os.path.join(base, name) if name else base
             info = os.lstat(path)
             digest = None
+            size = None if stat.S_ISDIR(info.st_mode) else info.st_size
             if stat.S_ISREG(info.st_mode):
                 digest = hashlib.sha256(Path(path).read_bytes()).hexdigest()
-            seen[os.path.relpath(path, root)] = (info.st_mode, info.st_size, digest)
+            seen[os.path.relpath(path, root)] = (info.st_mode, size, digest)
     return seen
+
+
+def test_the_tree_snapshot_does_not_read_a_directory_size_as_content(tmp_path, monkeypatch):
+    """Catches `_tree` comparing the size a filesystem reports for a directory (on a tmpfs `/tmp` a directory that gained an entry
+    the comparison filters out by name grows by 20, and the public CI's runner read it as a changed project): every directory is made
+    to report 20 bytes more, and the snapshot is the same. Negative controls, each a change the snapshot must see: a file with other
+    bytes of the same size, a file that grew, a new entry, a mode."""
+    (tmp_path / "d").mkdir()
+    (tmp_path / "d" / "f").write_text("x")
+    before = _tree(tmp_path)
+    assert before["d"][1] is None and before["d/f"][1] == 1
+    real_lstat = os.lstat
+
+    def lstat(path, *args, **kwargs):
+        info = real_lstat(path, *args, **kwargs)
+        if not stat.S_ISDIR(info.st_mode):
+            return info
+        fields = list(info)
+        fields[stat.ST_SIZE] += 20
+        return os.stat_result(fields)
+
+    monkeypatch.setattr(os, "lstat", lstat)
+    assert _tree(tmp_path) == before
+    monkeypatch.undo()
+    (tmp_path / "d" / "f").write_text("y")
+    assert _tree(tmp_path) != before
+    (tmp_path / "d" / "f").write_text("x")
+    assert _tree(tmp_path) == before
+    (tmp_path / "d" / "f").write_text("xx")
+    assert _tree(tmp_path) != before
+    (tmp_path / "d" / "f").write_text("x")
+    (tmp_path / "d" / "new").write_text("")
+    assert _tree(tmp_path) != before
+    (tmp_path / "d" / "new").unlink()
+    assert _tree(tmp_path) == before
+    (tmp_path / "d").chmod(0o700)
+    assert _tree(tmp_path) != before
 
 
 def _ready_project(tmp_path, capsys, *, contract=None, nodes=None, pin=True, route=True,

@@ -8372,6 +8372,31 @@
       "rule": "internal-working-document"
     },
     {
+      "path": "dogfood/ci2/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/ci2/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/ci2/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/ci2/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/ci2/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
       "path": "dogfood/closure-e2e/CLOSURE_E2E.json",
       "decision": "EXCLUDE",
       "rule": "internal-working-document"
@@ -156092,6 +156117,36 @@
       "rule": "internal-working-document"
     },
     {
+      "path": "dogfood/p304c6/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p304c6/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p304c6/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p304c6/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p304c6/mutants.py",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p304c6/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
       "path": "dogfood/p306/DECISIONS.md",
       "decision": "EXCLUDE",
       "rule": "internal-working-document"
@@ -157532,6 +157587,36 @@
       "rule": "internal-working-document"
     },
     {
+      "path": "dogfood/p332s4/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p332s4/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p332s4/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p332s4/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p332s4/mutants.py",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/p332s4/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
       "path": "dogfood/p333/DECISIONS.md",
       "decision": "EXCLUDE",
       "rule": "internal-working-document"
@@ -158073,6 +158158,56 @@
     },
     {
       "path": "dogfood/p3wakes3/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/pfix311/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/pfix311/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/pfix311/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/pfix311/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/pfix311/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/pfixroles/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/pfixroles/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/pfixroles/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/pfixroles/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/pfixroles/spec.md",
       "decision": "EXCLUDE",
       "rule": "internal-working-document"
     },
@@ -162918,6 +163053,16 @@
     },
     {
       "path": "dogfood/pub1/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/pub2/MEASUREMENTS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/pub2/spec.md",
       "decision": "EXCLUDE",
       "rule": "internal-working-document"
     },
@@ -193672,6 +193817,11 @@
       "rule": "package"
     },
     {
+      "path": "src/hoh/extexec.py",
+      "decision": "INCLUDE",
+      "rule": "package"
+    },
+    {
       "path": "src/hoh/failures.py",
       "decision": "INCLUDE",
       "rule": "package"
@@ -194247,6 +194397,11 @@
       "rule": "tests"
     },
     {
+      "path": "tests/test_capacity_lease.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
       "path": "tests/test_capacity_reservation.py",
       "decision": "INCLUDE",
       "rule": "tests"
@@ -194507,6 +194662,11 @@
       "rule": "tests"
     },
     {
+      "path": "tests/test_external_executor.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
       "path": "tests/test_failover_run.py",
       "decision": "INCLUDE",
       "rule": "tests"
@@ -194728,6 +194888,11 @@
     },
     {
       "path": "tests/test_portability.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_portable_walks.py",
       "decision": "INCLUDE",
       "rule": "tests"
     },

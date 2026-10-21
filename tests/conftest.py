@@ -220,6 +220,7 @@ NEEDS_WITHHELD: dict[str, tuple[Withheld, ...]] = {
     "tests/test_dispatch_budget_knob.py::test_the_register_reads_p3_22_p3_23_and_p3_24_proven_on_this_tree": (PROGRAM_REGISTER,),
     "tests/test_docs_numbers.py::test_the_committed_table_carries_the_v10d_sentence_the_tool_derives": (PROGRAM_MATRIX,),
     "tests/test_durability_reboot.py::CrashAndRebootRequirementTest::test_p2_11_is_a_requirement_of_the_record_bound_to_its_plan_item": (PROGRAM_REGISTER,),
+    "tests/test_external_executor.py::test_the_register_row_names_the_probe_the_matrix_reads": (PROGRAM_REGISTER,),
     "tests/test_limit_policies.py::test_the_register_row_of_this_slice_names_the_probe_the_matrix_reads": (PROGRAM_REGISTER,),
     "tests/test_missioncontrol_views.py::test_the_register_names_the_three_probes_the_views_earn": (PROGRAM_REGISTER,),
     "tests/test_parallelism_modes.py::test_the_register_reads_p3_25_and_p3_26_proven_on_this_tree": (PROGRAM_REGISTER,),

@@ -13,6 +13,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parent.parent
 _spec = importlib.util.spec_from_file_location(
     "preflight_probe", ROOT / "tools" / "preflight.py")
@@ -103,12 +105,63 @@ def test_unattended_requires_more_than_demo():
     assert {"trust_readiness", "worktree_creation"} <= unattended - demo
 
 
-def test_the_mainline_is_detected_and_never_assumed():
+@pytest.fixture
+def plain_git(tmp_path, monkeypatch):
+    """Git with no configuration of anyone's (an empty global file, no system file) and an identity to commit with: what a
+    fresh runner has, whatever the machine under the test has in its own `~/.gitconfig`."""
+    empty = tmp_path / "empty-gitconfig"
+    empty.write_text("", encoding="utf-8")
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(empty))
+    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
+    # git looks for a repository in the parents of a directory too: a `tmp_path` that lies inside some work tree (a `--basetemp` or
+    # `TMPDIR` under a checkout) would make "a directory that is no repository" a repository
+    monkeypatch.setenv("GIT_CEILING_DIRECTORIES", str(tmp_path))
+    for name in ("AUTHOR", "COMMITTER"):
+        monkeypatch.setenv(f"GIT_{name}_NAME", "t")
+        monkeypatch.setenv(f"GIT_{name}_EMAIL", "t@example.invalid")
+
+
+def _git(repo: Path, *args: str) -> None:
+    subprocess.run(["git", "-C", str(repo), *args], check=True, capture_output=True, text=True)
+
+
+def _repo_on(tmp_path: Path, name: str, branch: str) -> Path:
+    repo = tmp_path / name
+    repo.mkdir()
+    _git(repo, "init", "-q", "-b", branch)
+    _git(repo, "commit", "-q", "--allow-empty", "-m", "first")
+    return repo
+
+
+def test_the_mainline_is_detected_and_never_assumed(tmp_path, plain_git):
     """The live demo hard-coded `master`. The check reports the method that
-    answered, so a wrong mainline is visible as a wrong method."""
-    c = pf.check_git_repo()
-    assert c.evidence.get("hardcoded") is False
-    assert c.evidence.get("method"), "no method named"
+    answered, so a wrong mainline is visible as a wrong method.
+
+    Measured in repositories the test makes, not in the checkout the suite runs
+    in: a runner checks a tag out detached, with no branch, no `origin/HEAD` and
+    no `init.defaultBranch`, and there the mainline is rightly undetermined --
+    the check then reads INCONCLUSIVE (never an assumed name), and a source tree
+    without a `.git` (an arena) is not a repository at all."""
+    repo = _repo_on(tmp_path, "repo", "trunk")
+    c = pf.check_git_repo(repo)
+    assert c.state == pf.PASS and c.evidence.get("hardcoded") is False
+    assert c.evidence.get("method") == "current branch" and c.evidence.get("mainline") == "trunk"
+    _git(repo, "update-ref", "refs/remotes/origin/develop", "HEAD")
+    _git(repo, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/develop")
+    c = pf.check_git_repo(repo)
+    assert (c.evidence.get("method"), c.evidence.get("mainline")) == ("origin/HEAD", "develop")
+    detached = _repo_on(tmp_path, "detached", "trunk")
+    _git(detached, "switch", "-q", "--detach")
+    c = pf.check_git_repo(detached)
+    assert c.state == pf.INCONCLUSIVE and c.evidence == {"mainline": None, "method": None, "hardcoded": False}
+    _git(detached, "config", "init.defaultBranch", "configured")
+    c = pf.check_git_repo(detached)
+    assert (c.state, c.evidence.get("method"), c.evidence.get("mainline")) == (pf.PASS, "init.defaultBranch", "configured")
+    no_repo = tmp_path / "no-repo"
+    no_repo.mkdir()
+    assert pf.check_git_repo(no_repo).state == pf.FAIL
+    # with no argument the check measures the tool's own checkout (whatever shape it has here: a branch, a detached tag, no `.git`)
+    assert pf.check_git_repo() == pf.check_git_repo(pf.HOH)
     source = (ROOT / "tools" / "preflight.py").read_text()
     assert '"master"' not in source and "'master'" not in source
 

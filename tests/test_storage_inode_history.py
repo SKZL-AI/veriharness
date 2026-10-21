@@ -74,15 +74,45 @@ def build_deep(top: Path, levels: int = DEEP_LEVELS, *, top_bytes: int = 3, bott
 
 
 def remove_deep(top: Path) -> None:
-    """Takes a tree built by `build_deep` away, bottom up, **iteratively** (`os.walk(topdown=False)` keeps its own stack): a deep
-    tree must not outlive its test inside a pytest basetemp -- the harness that sizes the arena a run's check wrote into walks it
-    too. Test cleanup of the test's own synthetic tree, nothing else."""
-    for dirpath, dirnames, filenames in os.walk(top, topdown=False):
-        for name in filenames:
-            os.unlink(os.path.join(dirpath, name))
-        for name in dirnames:
-            os.rmdir(os.path.join(dirpath, name))
-    os.rmdir(top)
+    """Takes a tree built by `build_deep` away, bottom up, **iteratively**: a deep tree must not outlive its test inside a pytest
+    basetemp -- the harness that sizes the arena a run's check wrote into walks it too. Test cleanup of the test's own synthetic
+    tree, nothing else. An explicit list of the directories met, not `os.walk`: before Python 3.12 `os.walk` calls itself once per
+    level and raises `RecursionError` on the very tree this helper exists to take away (the public CI's 3.11 job)."""
+    pending, met = [str(top)], []
+    while pending:
+        here = pending.pop()
+        met.append(here)
+        with os.scandir(here) as entries:
+            for entry in entries:
+                if entry.is_dir(follow_symlinks=False):
+                    pending.append(entry.path)
+                else:
+                    os.unlink(entry.path)
+    for here in reversed(met):                                  # every directory is met before its children, so this is bottom up
+        os.rmdir(here)
+
+
+def test_a_deep_tree_is_taken_away_without_a_recursive_walk(tmp_path, monkeypatch):
+    """Catches `remove_deep` going back to `os.walk`: before Python 3.12 that calls itself once per level and raises `RecursionError`
+    on the tree this helper exists to take away (the public CI's 3.11 job failed three nodes on it, while 3.12 and 3.13 -- whose walk
+    is iterative -- could not show it). A tree 1200 directories deep with a link to a directory beside its files; `os.walk` is made to
+    refuse, so this fails on any interpreter that would have gone through it; the tree is gone, the link was removed and not followed,
+    and what it pointed at is untouched."""
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "keep").write_bytes(b"k")
+    deep = tmp_path / "deep"
+    build_deep(deep)
+    (deep / "link-dir").symlink_to(outside, target_is_directory=True)
+
+    def refuse(*args, **kwargs):
+        raise AssertionError("os.walk is recursive before Python 3.12")
+
+    monkeypatch.setattr(os, "walk", refuse)
+    remove_deep(deep)
+    monkeypatch.undo()
+    assert not os.path.lexists(deep)
+    assert (outside / "keep").read_bytes() == b"k"
 
 
 # --- R1 the ledger: record, window, estimate, fail closed -------------------------------------------------------------------

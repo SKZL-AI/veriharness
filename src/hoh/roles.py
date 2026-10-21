@@ -127,9 +127,10 @@ context bringing them along:
   it first; give it a fresh path that does not exist yet, below `$TMPDIR`. That
   `TMPDIR` is long (over 100 characters) and a Unix socket path may not exceed
   107 bytes: `multiprocessing.Manager()` or the `forkserver` start method, which
-  make theirs below `$TMPDIR`, fail here with `AF_UNIX path too long`. That is
-  the layout, not the code under test, and the acceptance checks run under a
-  `TMPDIR` just as long: report it, and do not unset `TMPDIR` to get around it.
+  make theirs below `$TMPDIR`, may fail here with `AF_UNIX path too long`,
+  depending on the interpreter and the platform. If they do, that is the layout,
+  not the code under test, and the acceptance checks run under a `TMPDIR` just
+  as long: report it, and do not unset `TMPDIR` to get around it.
 - **A helper file goes inside `$TMPDIR`, and nothing beside or above it.** A one-off
   script, a generated list, a copy, a note to yourself -- anything that is not your answer
   file and, for the developer, not part of the candidate itself: give it a path below

@@ -1451,7 +1451,7 @@ def _spent_dispatches(runs_root: Path) -> int:
     from .launcher import HohRunLauncher
 
     total = 0
-    for path in sorted(runs_root.rglob("state.json")):
+    for path in HohRunLauncher._state_files(runs_root):
         total += HohRunLauncher._dispatches_in(path)
     return total
 
@@ -2538,6 +2538,66 @@ def resolve_routed_decisions(store, contract: AutonomyContract, runs_dir: Path |
                             contract_digest=contract.digest(), mode=contract.mode.value,
                             program_epoch=contract.program_epoch, dry_run=dry_run,
                             decisions=tuple(done))
+
+
+@dataclass(frozen=True)
+class AnsweredDecision:
+    """An EXTERNAL decision the resolver answered, as the executor needs it (P3-32 slice 4)."""
+
+    node_id: str
+    #: The node's note: what the decision is about, and where a node declares its action.
+    note: str
+    decision_digest: str
+    #: The resolution record that answers it, and the digest of its bytes.
+    record_name: str
+    record_sha256: str
+
+
+def answered_external_decisions(store, contract: AutonomyContract, runs_dir: Path | str
+                                ) -> tuple[AnsweredDecision, ...]:
+    """The open EXTERNAL decisions whose answer is on disk and is exactly what `resolve_routed_decisions`
+    would write for them now: the contract still holds together, still hands the decision to a resolver,
+    the routing record is still the one the contract would write, and the resolution record is there, one
+    file, as written. Read-only -- the resolver runs as a dry run, so nothing is created, and a decision
+    it would only answer in a dry run (no record yet) is not here. Raises what the resolver raises
+    (`RoutingRefused`: nothing was read of a log)."""
+    report = resolve_routed_decisions(store, contract, runs_dir, dry_run=True)
+    state = store.read_state()
+    found: list[AnsweredDecision] = []
+    for d in report.decisions:
+        node = state.node(d.node_id)
+        # the note is read from a second read of the state: the digest the resolver answered must still be the node's
+        if (d.outcome != ANSWERED or node is None
+                or _decision_digest(store.project_id, node) != d.decision_digest):
+            continue
+        name = f"{d.decision_digest}-{contract.digest()}.json"
+        path = store.dir / RESOLUTIONS_DIR / name
+        try:
+            if os.lstat(path).st_size > MAX_RESOLUTION_RECORD_BYTES:
+                continue
+            data = durable_io.read_single_link(path)
+        except OSError:
+            continue
+        if data is None:
+            continue
+        found.append(AnsweredDecision(node.id, node.note, d.decision_digest, name,
+                                      hashlib.sha256(data).hexdigest()))
+    return tuple(found)
+
+
+def programme_stoppers(store, runs_dir: Path | str) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """`(stoppers, unreadable)`: the nodes whose branch stops the whole programme -- a node blocked
+    `contract_stop`, or one whose run routed a handling that does not continue past it -- and the nodes whose
+    routing log cannot be read. The reading `plan_continuation` makes for `PROGRAMME_STOPPED` and
+    `ROUTING_LOG_UNREADABLE`, read-only: the one durable stop this product has (the contract's `kill_switch` is a
+    declaration of channels; nothing in the running programme sets it). Raises what the state read raises."""
+    state = store.read_state()
+    stops, unreadable = _collect_logs(state, Path(runs_dir))
+    stoppers = tuple(
+        n.id for n in state.nodes
+        if (n.lifecycle is Lifecycle.BLOCKED and n.blocked_kind == "contract_stop")
+        or any(not continues_past(r.handling) for r in stops.get(n.id, ())))
+    return stoppers, tuple(n.id for n in state.nodes if n.id in unreadable)
 
 
 def due_reviews(contract: AutonomyContract, runs_dir: Path | str, project_id: str,

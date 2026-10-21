@@ -103,6 +103,7 @@ import errno
 import os
 import secrets
 import stat
+import time
 from pathlib import Path
 
 #: Errors that mean "there is no room for these bytes". EFBIG is what a write
@@ -175,26 +176,86 @@ def _require_single_link(fd: int, path: Path | str) -> None:
         raise
 
 
+#: How many times `read_single_link` opens a name that was replaced between its open and its `fstat`, and how long
+#: it waits for the second name of a record that `durable_create` has just linked. Both are properties of the writers
+#: in this module, not guesses: `durable_write` replaces the name by `os.replace`, which leaves the inode a reader
+#: already opened with no name at all (`st_nlink == 0`) -- the record is whole, only the name moved on -- and
+#: `durable_create` publishes by `os.link` and drops its temp name afterwards, so for a moment the whole record has
+#: two names (measured on this disk: median 60 us, worst 30 ms). A reader that refused either was refusing a
+#: well-formed record (0.1 % to 0.4 % of the reads against a replacing writer). Each is bounded; past its bound the read
+#: is refused as before, so a record that really has two names (a hard link made on purpose) costs the grace and
+#: is then `UnsafeRecordFile`, and nothing is retried across calls. The pause between reopens is not decoration:
+#: the retries are correlated, not independent -- a writer thread that is mid-cycle meets the reader's next open too
+#: (reads that needed three or more opens were thousands of times more frequent than independent attempts allow,
+#: and one run met eight replacements in a row with immediate reopens). One pause of a millisecond lets the cycle
+#: finish; sixteen attempts are the bound.
+RECORD_REOPEN_ATTEMPTS = 16
+_REOPEN_PAUSE_S = 0.001
+SECOND_NAME_GRACE_S = 0.25
+_SECOND_NAME_POLL_S = 0.001
+
+
+def _settled_stat(fd: int) -> os.stat_result:
+    """`os.fstat(fd)`, re-taken for up to `SECOND_NAME_GRACE_S` while the file has exactly two names.
+
+    Two names are what a record has while `durable_create` has linked it and not yet dropped its temp name; a
+    third, or a count that stays at two, is not that and is returned as it is."""
+    st = os.fstat(fd)
+    if st.st_nlink != 2 or not stat.S_ISREG(st.st_mode):
+        return st
+    deadline = time.monotonic() + SECOND_NAME_GRACE_S
+    while st.st_nlink == 2 and time.monotonic() < deadline:
+        time.sleep(_SECOND_NAME_POLL_S)
+        st = os.fstat(fd)
+    return st
+
+
 def read_single_link(path: Path | str) -> bytes | None:
     """The bytes of one of HoH's own record files; None when it does not exist.
 
     For a ledger a same-user process may try to redirect. The last component is
     opened with `O_NOFOLLOW` (a symbolic link, dangling or not, is refused),
     `O_NONBLOCK` (a FIFO cannot hang the open) and `O_CLOEXEC`; then the file
-    must be regular with exactly one name (`_require_single_link`). A symbolic
+    must be regular with exactly one name, on the descriptor. A symbolic
     link, a non-regular file or a second name is `UnsafeRecordFile`; any other
     error is raised as it is. Directories above the file are not checked: the
     run directory's own identity is the store's concern.
+
+    **A read that races a writer of this module returns a whole record or refuses a
+    real inconsistency; it is not refused spuriously within the stated bounds** (a name
+    replaced `RECORD_REOPEN_ATTEMPTS` times in a row is refused, and a record that stays at
+    two names costs `SECOND_NAME_GRACE_S` per read before it is refused). A name replaced by `durable_write`
+    after the open leaves the descriptor on an inode with no name (`st_nlink == 0`):
+    that inode still holds a complete earlier record, but the name now holds a newer
+    one, so the name is opened again (at most `RECORD_REOPEN_ATTEMPTS` opens, a millisecond
+    apart; the last one that still finds no name is refused). A record `durable_create` has just
+    linked has two names for an instant: the descriptor is looked at again for up to
+    `SECOND_NAME_GRACE_S`, and two names after that are refused. The counters are
+    local to the call; nothing is persisted and nothing outlives it.
     """
-    try:
-        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC)
-    except FileNotFoundError:
-        return None
-    except OSError as exc:
-        if exc.errno == errno.ELOOP:
-            raise UnsafeRecordFile(path, "is a symbolic link", errno.ELOOP) from exc
-        raise
-    _require_single_link(fd, path)
+    for attempt in range(RECORD_REOPEN_ATTEMPTS):
+        try:
+            fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC)
+        except FileNotFoundError:
+            return None
+        except OSError as exc:
+            if exc.errno == errno.ELOOP:
+                raise UnsafeRecordFile(path, "is a symbolic link", errno.ELOOP) from exc
+            raise
+        try:
+            st = _settled_stat(fd)
+            if not stat.S_ISREG(st.st_mode):
+                raise UnsafeRecordFile(path, "is not a regular file", errno.EINVAL)
+            replaced = st.st_nlink == 0 and attempt + 1 < RECORD_REOPEN_ATTEMPTS
+            if not replaced and st.st_nlink != 1:
+                raise UnsafeRecordFile(path, f"has {st.st_nlink} names, not one")
+        except BaseException:
+            os.close(fd)
+            raise
+        if not replaced:
+            break
+        os.close(fd)                              # replaced under us: the name holds a newer record
+        time.sleep(_REOPEN_PAUSE_S)               # let the writer finish its cycle
     try:
         chunks = []
         while True:

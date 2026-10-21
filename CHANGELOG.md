@@ -2,6 +2,95 @@
 
 All notable changes to this project are documented here. Formatting loosely follows Keep a Changelog conventions; versioning follows SemVer once a public release process exists.
 
+<!-- BEGIN GENERATED: tools/changelog_from_release_notes.py 0.4.0a2 -->
+## [0.4.0a2] - 2026-10-21 (pre-release)
+
+**This is a pre-release.** `v0.4.0a2` is the second public release of the `v0.4` line: an alpha and a research preview, published as a GitHub
+pre-release; it is uploaded to PyPI as a pre-release version (`pip install --pre hoh`) in a separate step after the tag, and until that upload PyPI holds
+`v0.1.0` only. It replaces `v0.4.0a1`, whose public CI was red and whose package
+carries three defects; the section of `v0.4.0a1` below carries the dated corrections. `v0.4.0a1` was not uploaded to PyPI: the operator decided
+on 2026-10-21 that PyPI starts with this release. `v0.4.0` is reserved for the closure of phase P3 (*v0.4 Capacity-Aware Autonomous
+Parallelism*) and is unreleased; P3 is in progress and nothing in this section says it is closed. The facts about P3 are written from the
+register at the cut and not before.
+
+Readiness is not claimed here either: the board, `docs/READINESS.md`, still reads `TECHNICALLY_STABLE_READY = no` `[V13]`, as at `v0.3.0`.
+Below this section stand the sections of the earlier releases, each the text of its tag with its dated corrections and with the figures of its
+own cut. The `[Vnn]` figures of the present section are the rows of `paper/NUMBERS_V2.md`, taken at the commit 82bdc60c (committed on
+2026-10-21 at 15:30 +0300). This line has no benchmark result: the matched-budget campaigns of `v0.1.0` stand as they were measured, nobody has repeated
+them on this code, and the pre-registered agentic benchmark has a protocol and no result.
+
+### Added
+
+* **The bounded executor of pre-authorised external acts (P3-32, fourth slice).** `src/hoh/extexec.py` carries out an external act that a
+  contract pre-authorised, and only narrowly: a target the contract names, within the pre-authorised number counted durably before the act,
+  with create-only, digest-bound records; every release and publish class is refused whatever the contract says, the programme stop is
+  honoured, and everything else stays with a person. No production actor is registered, so it carries nothing out for real, and the register
+  keeps P3-32 at PARTIAL; which actor class comes first is an operator decision.
+* **Lease-aware capacity holds (P3-04, step C6).** A capacity reservation row now names the run lease of the run it was admitted for and is kept while that
+  lease is live, also through the recovery of a crash-left wave: a run that outlived its controller, or a wave that ran past the ttl, no longer loses the
+  rows (the provider's session, bytes and inodes) it was admitted against, and a running run's session is counted once, through its lease. A lease that cannot
+  be read is never a free run. The slice states its own windows (the owner's next ask still supersedes the rows of its earlier wave, and a run that takes no run
+  lease holds through its row alone), and the register keeps P3-04 at PARTIAL.
+* **The measured autonomy facts, taken again.** At the base of this section the build's lease records hold 22 epochs, 17 of them
+  verified successions that all ended COMPLETE, each requested by the rotation policy; 254 run
+  directories since 2026-10-01; 1189 review reports with the machine-bound footer, 233 of them RELEASE_NO; and 106 of
+  2,155 entries of the orchestrator's running notes marked as the operator's. The history is 1,601 commits, 297 of them
+  merges `[V48]`, over 44 days 15 hours `[V46]`, and 33 of the 45 calendar days carry a commit `[V47]`; the ledger runs to O271 with 243 numbered entries `[V49]`.
+* **A release table entry.** `tools/distribution_release.py` declares `v0.4.0a2` as a pre-release and unpinned: the two identity values are
+  added after the tag exists, and every command refuses it until then. The entry of `v0.4.0a1` stays, pinned.
+
+### Changed
+
+* **The role prompts state the socket-path failure as possible, not certain.** The sentence that the three role prompts carried about an
+  `AF_UNIX` socket below a long `$TMPDIR` said that such a socket fails; on the runner's CPython 3.13.16 it was bound where CPython 3.13.5
+  refuses it, so the sentence was false there. The prompts now say that it may fail, depending on the interpreter and the platform, and keep
+  the instruction to report it and not to unset `TMPDIR`.
+
+### Fixed
+
+* **The dispatch budget no longer counts an unreadable run as a spend of zero.** `HohRunLauncher._spent_by_run` (`src/hoh/launcher.py`) and
+  `_spent_dispatches` (`src/hoh/governance.py`, the autonomy record's dispatch limit) collected the `state.json` of every run with
+  `Path.rglob`. On Python 3.11 that call does not yield a dangling symbolic link, so a run whose `state.json` was one was not seen; on
+  Python 3.12 and 3.13 the same run was refused, as intended. On every interpreter `rglob` skips a directory it cannot read, so a run in one
+  was not seen either. Both now read the files through one function (`HohRunLauncher._state_files`): a walk with an explicit stack that
+  follows no link and skips no entry. A directory that cannot be listed refuses the budget, and whether an entry is a usable state stays the
+  question of the code that reads it.
+* **`tree_digest`, `inode_digest` and `seal_plan` no longer raise `RecursionError` on Python 3.11.** (`src/hoh/capability.py`: the digest
+  that every QA dispatch records, and the seal of the QA arena.) On 3.11 `Path.rglob` and `os.walk` recurse once per directory level, so a
+  tree nested deeper than the interpreter's recursion limit stopped the dispatch; 3.12 and 3.13 return. The three walk with an explicit stack
+  now and the digest bytes are the bytes they always were; the two digests (`tree_digest`, `inode_digest`) also refuse a tree past stated limits of
+  depth and entries loudly instead of digesting it in part, while `seal_plan` walks without those limits.
+* **A record read no longer refuses a whole, well-formed record that a writer is publishing at that instant.** `read_single_link`
+  (`src/hoh/durable_io.py`) opens a record and requires that the file it opened has exactly one name. A writer that replaces the record
+  leaves a reader that opened the old file with a file that has no name, and a writer that publishes a new record leaves it two names for an
+  instant; the reader refused both. A refusal is fail-closed: no wrong value was ever returned, but a refusal that was not real stopped runs
+  and tests intermittently. The read now opens the name again when the file it opened has lost its name, and looks at a second name again
+  for a short bounded time; a name that keeps being replaced, and two names that stay, are still refused.
+* **The other failures of the public CI of `v0.4.0a1` were in tests, not in the package.** The release-table tests used `v0.4.0a1` as their
+  example of an unpinned release and went red the day it was pinned; a helper removed a deep tree with the recursive `os.walk` of Python 3.11;
+  the mainline test depended on the runner's git setup (a detached checkout of a tag); the role-pane state test waited on a stand-in that the
+  runner's `sleep` refused; and a tree comparison compared directory sizes that tmpfs reports differently. The tests were corrected. The
+  public CI of this release is the evidence that all of it holds, and these notes do not state its result.
+
+### Known limitations
+
+* **Everything the `v0.3.0` and `v0.4.0a1` sections below say about their limits stands**, with the dated corrections of the `v0.4.0a1` section.
+* **The bounded executor has no production actor.** P3-32 reads PARTIAL and not PROVEN `[V10]`: nothing is carried out for real until an
+  actor class is registered, and releasing, publishing and pushing are refused by the executor in any case.
+* **PyPI.** Until `v0.4.0a2` is uploaded PyPI holds `v0.1.0` only (read on 2026-10-21); `v0.4.0a1` was never uploaded, and a pre-release is
+  installed only with `--pre`.
+* **Rotation delivery into a live master is still unobserved.** The rotation log of the project that built this product holds
+  0 `rotation_delivered` rows (taken on 2026-10-21); the delivery described in the `v0.4.0a1` section is tested with fakes.
+* **Product-run merges are counted by merge title** `[V01]`, in the window 2026-09-25 to 2026-10-11, and the counting tool still does not list
+  the titles of the slices merged since the third alpha.
+* **What the development line reads against `v0.3.0`.** Its register reads the durability rows of P2 as IMPLEMENTED_NOT_PROVEN
+  again: the P3 slices changed source files that the evidence is bound to (a regression obligation under amendment A7, not a
+  re-opened phase), and `v0.3.0` is the code on which the closure evidence was taken. The register now holds 236
+  requirements, of which 88 read PROVEN and 11 PARTIAL `[V10]`; the P2 gate reads 0 blocking open; 0 exit conditions bound to requirements not PROVEN; 0 exit conditions nothing measures yet; 148 open requirements, 125 behind a phase gate `[V12]`; and, of the requirements registered
+  for P3 to P12 the register counts 131 of 177 MISSING (11 PARTIAL, 35 PROVEN) `[V11b]`.
+
+<!-- END GENERATED: tools/changelog_from_release_notes.py -->
+
 <!-- BEGIN GENERATED: tools/changelog_from_release_notes.py 0.4.0a1 -->
 ## [0.4.0a1] - 2026-10-21 (pre-release)
 
@@ -79,6 +168,29 @@ a protocol and no result.
   requirements, 88 PROVEN and 11 PARTIAL `[V10]`, and the P2 gate reads 0 blocking open; 0 exit conditions bound to requirements not PROVEN; 0 exit conditions nothing measures yet; 148 open requirements, 125 behind a phase gate `[V12]`; of the requirements
   registered for P3 to P12, 131 of 177 MISSING (11 PARTIAL, 35 PROVEN) `[V11b]`.
 
+### Corrections (added 2026-10-21 with `v0.4.0a2`; every sentence of this section above stays as it was published)
+
+* **The public CI of this release's commit did not pass.** The run of the push of the tag (commit `332e1db`) failed in all three `tests and linter`
+  jobs: 7 tests failed and 12,911 passed on Python 3.11, 3 tests failed and 12,915 passed on Python 3.12, 5 tests failed and 12,913 passed on Python 3.13; the other four jobs passed (the clean install from a built wheel,
+  the sandbox tests, the artifact transfer integrity, the recorded rejection). The correction appended to the GitHub release on the day of the tag
+  gave the Python 3.13 count as the Python 3.12 count; the log reads 3 failures on 3.12 and 5 on 3.13, the two more being the
+  tests of the role prompts' socket-path sentence, which the runner's CPython 3.13.16 contradicted. The local replica of the public checkout, run before the tag,
+  had not shown any of them.
+* **Three defects in the package of this release**, found while the causes were traced; the correction appended to the GitHub release on the day of
+  the tag names them, and all three are fixed in `v0.4.0a2`:
+  1. *The dispatch budget fails open on Python 3.11.* At the tag, `src/hoh/launcher.py:1405` (`HohRunLauncher._spent_by_run`) and
+     `src/hoh/governance.py:1454` (`_spent_dispatches`, the autonomy record's dispatch limit) collect each run's `state.json` with `Path.rglob`, which on
+     Python 3.11 does not yield a dangling symbolic link: a run whose `state.json` is one is not counted against the budget. On Python 3.12 and 3.13 the check
+     refuses that run, as intended. A directory that cannot be read is skipped by `rglob` on every interpreter, so a run in one is not counted either.
+  2. *Deep trees raise `RecursionError` on Python 3.11.* `src/hoh/capability.py:301` (`tree_digest`), `:345` (`inode_digest`, its walk at `:377`) and
+     `:581` (`seal_plan`) walk a tree with the recursive `Path.rglob` or `os.walk` of that version and raise on a tree deeper than the recursion limit; they return on
+     3.12 and 3.13. The sentence of the first correction that this error is "raised in the test helper, not in the package" was wrong for one of the tests, as the
+     second correction says.
+  3. *A read race in `durable_io`.* `read_single_link` refuses a whole record that a writer is replacing or publishing at that instant (about 0.4 % of the reads in a
+     stress reproduction); it fails closed, a refusal and never a wrong value, but it is a source of intermittent failures.
+* **`v0.4.0a1` was not uploaded to PyPI.** The sentences of this section that say it is published "to PyPI as a pre-release version", and that "until `v0.4.0a1` is
+  uploaded PyPI holds `v0.1.0` only", state an intention that was not carried out: the operator decided on 2026-10-21 that PyPI starts with `v0.4.0a2`. PyPI held
+  `v0.1.0` only on 2026-10-21. The package of this tag carries the three defects above; until `v0.4.0a2` is out, run it on Python 3.12 or 3.13.
 <!-- END GENERATED: tools/changelog_from_release_notes.py -->
 
 <!-- BEGIN GENERATED: tools/changelog_from_release_notes.py 0.3.0 -->

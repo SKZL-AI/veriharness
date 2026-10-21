@@ -1016,11 +1016,12 @@ def test_the_real_launcher_prepares_the_replanning_node_as_written(tmp_path):
 
 
 def test_the_register_row_of_this_slice_names_the_probe_the_matrix_reads():
-    """P3-32 as this slice leaves it (R-1): the symbol and the node exist, the row stays PARTIAL with the one thing
-    that is left -- the executor of slice 4 -- as its exact equivalent, the earlier probes are kept by addition."""
+    """P3-32 as slice 3 left it (R-1), read where slice 4 kept it by addition: the symbol and the node exist, the
+    probe carried the one thing that was left -- the executor of slice 4 -- as its exact equivalent, and the
+    earlier probe is kept under it. (tests/test_external_executor.py reads the row as it stands.)"""
     register = json.loads((HERE.parent / "program" / "v3_3" / "REQUIREMENTS.json").read_text(encoding="utf-8"))
     row = {r["id"]: r for r in register["requirements"]}["P3-32"]
-    probe = row["probe"]
+    probe = row["previous_probe"]
     assert (probe["kind"], probe["symbol"], probe["module"]) == ("symbol", "act_on_limit", "governance.py")
     path, node = probe["test"].split("::")
     assert path == "tests/test_limit_policies.py" and hasattr(sys.modules[__name__], node) and callable(governance.act_on_limit)
@@ -1029,6 +1030,7 @@ def test_the_register_row_of_this_slice_names_the_probe_the_matrix_reads():
     assert "REPLAN and DEGRADE" not in equivalent, "the policies are acted on: the equivalent no longer says they are not"
     assert "approves and executes nothing" in probe["note"] and "plain rounds" in probe["note"]
     assert "dispatch-budget.json" in probe["note"], "bounded counts nodes and runs, not dispatches: said"
-    previous = row["previous_probe"]
+    assert probe["replaced_on"] == "2026-10-20"
+    previous = probe["previous_probe"]
     assert (previous["symbol"], previous["replaced_on"]) == ("continue_by_policy", "2026-10-19")
     assert "REPLAN" in previous["equivalent"], "the equivalent of slice two is kept, by addition"

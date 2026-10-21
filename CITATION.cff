@@ -7,7 +7,7 @@ message: >-
   that implement the Harness-of-Harness pattern; VeriHarness is the project
   built on that pattern and the name this citation records.
 title: "VeriHarness: an evidence-bound Harness-of-Harness for verifiable long-horizon agent development"
-version: 0.4.0a1
+version: 0.4.0a2
 date-released: "2026-10-21"
 # date-released: the date of the documentation checkpoint at which the pre-release is
 # cut; the operator may move it if the tag is cut on another day.
@@ -35,3 +35,6 @@ license: "MIT"
 # v0.4.0a1 is cut; the cut sets it. This note is by addition.
 # 2026-10-21 (by addition): the cut has run; `date-released` is 2026-10-21, the day planned for the tag v0.4.0a1, and it replaces the
 # statement above that it stays the date of the v0.3.0 tag until the cut. The operator may move it if the tag is cut on another day.
+# 2026-10-21 (by addition): `version` became 0.4.0a2, the next pre-release of the v0.4 line (operator decision of 2026-10-21: PyPI starts with
+# 0.4.0a2; 0.4.0a1 is a GitHub pre-release only). The tag v0.4.0a1 was cut on 2026-10-21 (see RELEASE_NOTES.md). `date-released` is the day of the
+# cut of 0.4.0a2 (the cut sets it); the operator may move it if the tag is cut on another day.

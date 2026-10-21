@@ -13040,9 +13040,9 @@
     },
     {
       "id": "C-1073",
-      "text": "| Span | 2026-09-07 to the base commit: 43 days 20 hours, and 32 of the 44 calendar days carry a commit `[V46]` `[V47]` |",
+      "text": "| Span | 2026-09-07 to the base commit: 44 days 15 hours, and 33 of the 45 calendar days carry a commit `[V46]` `[V47]` |",
       "where": "README.md:26",
-      "anchor_digest": "3be5e9f3a06fda9532366608044d3efb28941ab5dc8bb795194a5fcf9111f02a",
+      "anchor_digest": "30667d7f2e07925659aba4d5ad18cd5327cceb01009daf1552d602564b36872d",
       "status": "SUPPORTED",
       "evidence": [
         "file:paper/NUMBERS_V2.md:69",
@@ -13052,9 +13052,9 @@
     },
     {
       "id": "C-1074",
-      "text": "| History | 1,571 commits, 291 of them merges `[V48]`; 243 numbered ledger entries, O23 to O271 `[V49]` |",
+      "text": "| History | 1,601 commits, 297 of them merges `[V48]`; 243 numbered ledger entries, O23 to O271 `[V49]` |",
       "where": "README.md:27",
-      "anchor_digest": "084afe97e19338d6a89e9d0dc4f0aac7c2a66b223f017b5bad3c7f0f22fbcf97",
+      "anchor_digest": "f61050c0aae8ff0ef27a3b52385c9ab105f28cf3376df71d3a623d46cda1052b",
       "status": "SUPPORTED",
       "evidence": [
         "file:paper/NUMBERS_V2.md:71",
@@ -13076,47 +13076,6 @@
       ],
       "note": "dogfood/pub1/MEASUREMENTS.md of the PUB1 strand: the figure was counted read-only from the build's own records on 2026-10-14, with the source named by kind, the method and the limit of the figure (the records themselves are the orchestrator's working records and are not exported). It is a count, not an estimate; where a figure could not be counted honestly it is not written.",
       "local_only_resolution": "resolved by the PUB1 drafter on 2026-10-14 against file:dogfood/pub1/MEASUREMENTS.md:14, file:dogfood/pub1/MEASUREMENTS.md:15, file:dogfood/pub1/MEASUREMENTS.md:17, file:dogfood/pub1/MEASUREMENTS.md:19 for the line README.md:28"
-    },
-    {
-      "id": "C-1076",
-      "text": "| Product runs | 250 run directories from 2026-10-01 on; in 223 of them an independent QA result had every check PASS; 97 product-run merges from 2026-09-25 to 2026-10-11 counted by merge title (the window of that count; later titles are not listed by the counting tool) `[V01]` |",
-      "where": "README.md:29",
-      "anchor_digest": "51485d3dd8123f4d28818bcf323ba658f9e913c28eea6f2a42790c1ff24f16ac",
-      "status": "SUPPORTED",
-      "evidence": [
-        "file:dogfood/pub1/MEASUREMENTS.md:34",
-        "file:dogfood/pub1/MEASUREMENTS.md:35",
-        "file:paper/NUMBERS_V2.md:17"
-      ],
-      "note": "dogfood/pub1/MEASUREMENTS.md of the PUB1 strand: the figure was counted read-only from the build's own records on 2026-10-14, with the source named by kind, the method and the limit of the figure (the records themselves are the orchestrator's working records and are not exported). It is a count, not an estimate; where a figure could not be counted honestly it is not written.",
-      "local_only_resolution": "resolved by the PUB1 drafter on 2026-10-14 against file:dogfood/pub1/MEASUREMENTS.md:34, file:dogfood/pub1/MEASUREMENTS.md:35 for the line README.md:29"
-    },
-    {
-      "id": "C-1077",
-      "text": "| Independent review | 1161 review reports carry the machine-bound verdict footer since 2026-10-07; 229 of them (19.7 %) say RELEASE_NO |",
-      "where": "README.md:30",
-      "anchor_digest": "1be36a82f7ea7eb93ea8887fa21b69c876ba14808ca59b39f68458ec4f3ad721",
-      "status": "SUPPORTED",
-      "evidence": [
-        "file:dogfood/pub1/MEASUREMENTS.md:46",
-        "file:dogfood/pub1/MEASUREMENTS.md:47"
-      ],
-      "note": "dogfood/pub1/MEASUREMENTS.md of the PUB1 strand: the figure was counted read-only from the build's own records on 2026-10-14, with the source named by kind, the method and the limit of the figure (the records themselves are the orchestrator's working records and are not exported). It is a count, not an estimate; where a figure could not be counted honestly it is not written.",
-      "local_only_resolution": "resolved by the PUB1 drafter on 2026-10-14 against file:dogfood/pub1/MEASUREMENTS.md:46, file:dogfood/pub1/MEASUREMENTS.md:47 for the line README.md:30"
-    },
-    {
-      "id": "C-1078",
-      "text": "| Who decided | 103 of 2,087 entries (about 5 %) of the orchestrator's running notes are marked as the operator's; 8 operator directives are stored verbatim, one file each; none of 369 attribution entries is booked to a human `[V52]` |",
-      "where": "README.md:31",
-      "anchor_digest": "aee45f48b5d1e43ae515b79a4a675b4cdf27d0db3d5dcbff73ce96dedd30ee0b",
-      "status": "SUPPORTED",
-      "evidence": [
-        "file:dogfood/pub1/MEASUREMENTS.md:56",
-        "file:dogfood/pub1/MEASUREMENTS.md:104",
-        "file:paper/NUMBERS_V2.md:75"
-      ],
-      "note": "dogfood/pub1/MEASUREMENTS.md of the PUB1 strand: the figure was counted read-only from the build's own records on 2026-10-14, with the source named by kind, the method and the limit of the figure (the records themselves are the orchestrator's working records and are not exported). It is a count, not an estimate; where a figure could not be counted honestly it is not written.",
-      "local_only_resolution": "resolved by the PUB1 drafter on 2026-10-14 against file:dogfood/pub1/MEASUREMENTS.md:56, file:dogfood/pub1/MEASUREMENTS.md:104 for the line README.md:31"
     },
     {
       "id": "C-1079",
@@ -13161,32 +13120,6 @@
       "local_only_resolution": "resolved by the PUB1 drafter on 2026-10-14 against file:dogfood/pub1/MEASUREMENTS.md:14, file:dogfood/pub1/MEASUREMENTS.md:15, file:dogfood/pub1/MEASUREMENTS.md:19, file:dogfood/pub1/MEASUREMENTS.md:24 for the line README.md:42"
     },
     {
-      "id": "C-1082",
-      "text": "- **Product runs and QA** are counted from the run directories of the project's runs tree, which holds the runs of 2026-10-01 and later; earlier runs were kept elsewhere. 260 QA result files exist, 223 with every check PASS and 37 with at least one check not PASS; a QA result with every check PASS is not by itself an accepted merge, which is why the merge count above is the one from git.",
-      "where": "README.md:43",
-      "anchor_digest": "a210f504aa80e5a58eec71186b461aee49d8bcd6ec05a365e01c94f9d8dc1d1d",
-      "status": "SUPPORTED",
-      "evidence": [
-        "file:dogfood/pub1/MEASUREMENTS.md:34",
-        "file:dogfood/pub1/MEASUREMENTS.md:35"
-      ],
-      "note": "dogfood/pub1/MEASUREMENTS.md of the PUB1 strand: the figure was counted read-only from the build's own records on 2026-10-14, with the source named by kind, the method and the limit of the figure (the records themselves are the orchestrator's working records and are not exported). It is a count, not an estimate; where a figure could not be counted honestly it is not written.",
-      "local_only_resolution": "resolved by the PUB1 drafter on 2026-10-14 against file:dogfood/pub1/MEASUREMENTS.md:34, file:dogfood/pub1/MEASUREMENTS.md:35 for the line README.md:43"
-    },
-    {
-      "id": "C-1083",
-      "text": "- **Review** counts report files that carry the six-line machine-bound footer (verdict, candidate, base, specification digest, open blockers, completeness) that the merge gate reads; it counts every round, so a candidate that was reviewed three times appears three times. RELEASE_NO is the reviewers' refusal: 225 of all footers declare at least one open blocking finding. A review that says no is the process working, not a defect.",
-      "where": "README.md:44",
-      "anchor_digest": "762f6f57e2411f099ce98e5c6f328325de1477f9eac5dd6dad7556a5315aae05",
-      "status": "SUPPORTED",
-      "evidence": [
-        "file:dogfood/pub1/MEASUREMENTS.md:46",
-        "file:dogfood/pub1/MEASUREMENTS.md:48"
-      ],
-      "note": "dogfood/pub1/MEASUREMENTS.md of the PUB1 strand: the figure was counted read-only from the build's own records on 2026-10-14, with the source named by kind, the method and the limit of the figure (the records themselves are the orchestrator's working records and are not exported). It is a count, not an estimate; where a figure could not be counted honestly it is not written.",
-      "local_only_resolution": "resolved by the PUB1 drafter on 2026-10-14 against file:dogfood/pub1/MEASUREMENTS.md:46, file:dogfood/pub1/MEASUREMENTS.md:48 for the line README.md:44"
-    },
-    {
       "id": "C-1084",
       "text": "- **The operator's share** is the share of entries of the orchestrator's running notes (they begin on 2026-10-02 at the ledger entry O252) that carry the word OPERATOR. It is a lower bound on the operator's messages, because not every message is written down as its own entry, and an entry may bundle several. It is not a measure of effort. The attribution file is written by the orchestrating session and is checked for tiling and for the run states it cites, not for authorship, so its count of human-booked entries is the session's own statement and not an independent measurement.",
       "where": "README.md:45",
@@ -13211,26 +13144,15 @@
       "note": "Figure(s) V36, V37 of paper/NUMBERS_V2.md: each is re-derived by a tool at the recorded base (R rows) or found in the ledger entry the row names (the others) by `python3 tools/docs_numbers.py check`, which also checks that the figure stands in the paragraph that carries the tag."
     },
     {
-      "id": "C-1086",
-      "text": "- **The double-down method.** A blocked stage, phase or work package that does not clear with time is today listed for a person. Amendment A8 registers the method of the house rules (no negative without a proven root cause; a double-down that leaves the measured verdict alone) as a capability of the autonomous loop, as P3-42. P3-42 reads PARTIAL on the development line at the commit aefef58a (the register's word, set by the slices P3-DD1 to P3-DD3; it is not PROVEN). Built and merged, in the register's words: the double-down, the measurement of proposals and the recording of what becomes of a verified fix are on in `hoh resume-quota` without a flag (the opt-outs are recorded); a proposal that carries a fix is, on a person's command, proven on a scratch copy of the run's candidate (red before and green after, the keep-green rows green before and after, the files written those the fix was read to write) and applied as a new iteration of the blocked run, with the approval recorded; a person can revert it. Still missing, in the register's words: no path applies a proven fix without a person, every verified fix is withheld; a later slice (DD4) lets only an unattended long-horizon contract apply a proven correction itself; the analysts stay opt-in, so by default only the derived proposals of trivial blocks exist and none carries a fix; only the block of a run is applied, not a node's or a project's, and a run whose budget is spent cannot continue; the halt class is not yet persisted on the node; and no capacity broker or budget reservation admits the analysts' dispatches or the runner executions. Until then the method is also applied by hand by the orchestrating session.",
-      "where": "README.md:55",
-      "anchor_digest": "0b770d5c81799df29ef62a421dd1cbe582b5cb9e5b44ce1a838fd32f7664e7f0",
-      "status": "SUPPORTED",
-      "evidence": [
-        "file:dogfood/pub1/MEASUREMENTS.md:71"
-      ],
-      "note": "dogfood/pub1/MEASUREMENTS.md M5: `python3 tools/capability_matrix.py --json` on the development tip, counts by target phase and status; the register's word PROVEN is not a claim of a live run (docs/LIMITATIONS.md states the limits row by row).",
-      "local_only_resolution": "resolved by the PUB1 drafter on 2026-10-14 against file:dogfood/pub1/MEASUREMENTS.md:71 for the line README.md:55"
-    },
-    {
       "id": "C-1087",
-      "text": "`v0.3.0` closed phase P2 (*v0.3 Durable Program Runtime + Autonomy Contract Base*): at the commit of its closure record all 43 requirements of P2 read PROVEN, with the limits that `docs/LIMITATIONS.md` states. Phase P3 (*v0.4 Capacity-Aware Autonomous Parallelism*) is in progress on the development line. Read the next table as a measurement of the development tip at the base commit named in `paper/NUMBERS_V2.md`, the commit aefef58a (2026-10-20 at 20:24 +0300), which is what `tools/capability_matrix.py` and `tools/build_plan.py` print there.",
-      "where": "README.md:61",
-      "anchor_digest": "cd667f14424fc3e3cc0e9c0f4fb64cf6d89d4e1dfc44682dff36ac2718636419",
+      "text": "`v0.3.0` closed phase P2 (*v0.3 Durable Program Runtime + Autonomy Contract Base*): at the commit of its closure record all 43 requirements of P2 read PROVEN, with the limits that `docs/LIMITATIONS.md` states. Phase P3 (*v0.4 Capacity-Aware Autonomous Parallelism*) is in progress on the development line. Read the next table as a measurement of the development tip at the base commit named in `paper/NUMBERS_V2.md`, the commit 82bdc60c (2026-10-21 at 15:30 +0300), which is what `tools/capability_matrix.py` and `tools/build_plan.py` print there.",
+      "where": "README.md:62",
+      "anchor_digest": "81c194d9e4975dfaf26eb91d80ee6509ffe46699737b7ba8965aa1e208555caf",
       "status": "SUPPORTED",
       "evidence": [
         "file:RELEASE_NOTES.md:107",
-        "file:paper/NUMBERS_V2.md:31"
+        "file:paper/NUMBERS_V2.md:31",
+        "file:RELEASE_NOTES.md:221"
       ],
       "note": "The release notes of v0.3.0 (the closure paragraph) state that every one of P2's registered requirements read PROVEN at the commit of the closure record; the count of P2 requirements in the register is row V10b of paper/NUMBERS_V2.md."
     },
@@ -13321,13 +13243,17 @@
     {
       "id": "C-1095",
       "text": "**Readiness is not claimed.** The readiness board, `docs/READINESS.md`, reads `TECHNICALLY_STABLE_READY = no` `[V13]`. A closed phase is not a stable release. At its last committed measurement (2026-10-13) the board named these open conditions, each blocking: tests, union_invariants, benchmark_v3_preregistration, benchmark_v3, export_manifest, export_sync, docs_consistency and external_ci. Separately, the public CI was red from the push of `v0.3.0a1` on 2026-10-08 on every push; the cause was an optional dependency that two test files import and the workflow did not install, and the workflow now installs it and gives the tests a git identity (`.github/workflows/ci.yml`). Behind that collection error the suite had further failures in a published clone, tests written in the development repository that read records the export withholds or need a live Herdr session; they now skip there with the reason named, only when the export manifest declares the record withheld (`tests/conftest.py`), and run in full in the development tree.",
-      "where": "README.md:75",
-      "anchor_digest": "a7e9c5bd50ae4c1e2ba20ec43cf5cc76f821c6465f582d77e2371999b73a7981",
+      "where": "README.md:76",
+      "anchor_digest": "01ad2e36e72ade9c3cc637a2ef51560b539de56cb8f9276259e653156ca0121d",
       "status": "SUPPORTED",
       "evidence": [
-        "file:paper/NUMBERS_V2.md:37"
+        "file:paper/NUMBERS_V2.md:37",
+        "file:dogfood/pub2/MEASUREMENTS.md:104",
+        "file:dogfood/pub2/MEASUREMENTS.md:103",
+        "cite:https://github.com/SKZL-AI/veriharness/actions/runs/39561366436@2026-10-21"
       ],
-      "note": "Figure(s) V13 of paper/NUMBERS_V2.md: each is re-derived by a tool at the recorded base (R rows) or found in the ledger entry the row names (the others) by `python3 tools/docs_numbers.py check`, which also checks that the figure stands in the paragraph that carries the tag."
+      "note": "Figure(s) V13 of paper/NUMBERS_V2.md: each is re-derived by a tool at the recorded base (R rows) or found in the ledger entry the row names (the others) by `python3 tools/docs_numbers.py check`, which also checks that the figure stands in the paragraph that carries the tag.",
+      "local_only_resolution": "resolved by the PUB2 drafter on 2026-10-21 against file:dogfood/pub2/MEASUREMENTS.md:104, file:dogfood/pub2/MEASUREMENTS.md:103 for the line README.md:76"
     },
     {
       "id": "C-1096",
@@ -13722,6 +13648,651 @@
         "file:paper/NUMBERS_V2.md:35"
       ],
       "note": "A figure stated on a line of a paragraph whose tags (V10, V11b) name the rows of paper/NUMBERS_V2.md that carry it; each row is re-derived by a tool or found in its ledger entry by `python3 tools/docs_numbers.py check`, and the tool checks that the figure stands in the paragraph. Bound at the paragraph's tags because the tag sits on a neighbouring line of the same sentence or list item."
+    },
+    {
+      "id": "C-1076",
+      "text": "Readiness is not claimed here either: the board, `docs/READINESS.md`, still reads `TECHNICALLY_STABLE_READY = no` `[V13]`, as at `v0.3.0`.",
+      "where": "CHANGELOG.md:16",
+      "anchor_digest": "dd863ab8e27987cc3ca73dd0381675e1174be8d5c3d8194f3370588552fb5d80",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:37"
+      ],
+      "note": "Figure(s) V13 of paper/NUMBERS_V2.md: each is re-derived by a tool at the recorded base (R rows) or found in the ledger entry the row names (the others) by `python3 tools/docs_numbers.py check`, which also checks that the figure stands in the paragraph that carries the tag."
+    },
+    {
+      "id": "C-1077",
+      "text": "2026-10-21 at 15:30 +0300). This line has no benchmark result: the matched-budget campaigns of `v0.1.0` stand as they were measured, nobody has repeated",
+      "where": "CHANGELOG.md:19",
+      "anchor_digest": "5a7410d4b48ae5029461bea52632a80b2a08dceed8e174526f4daa94b477b2cd",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:37"
+      ],
+      "note": "A figure stated on a line of a paragraph whose tags (V13) name the rows of paper/NUMBERS_V2.md that carry it; each row is re-derived by a tool or found in its ledger entry by `python3 tools/docs_numbers.py check`, and the tool checks that the figure stands in the paragraph. Bound at the paragraph's tags because the tag sits on a neighbouring line of the same sentence or list item."
+    },
+    {
+      "id": "C-1078",
+      "text": "* **The bounded executor of pre-authorised external acts (P3-32, fourth slice).** `src/hoh/extexec.py` carries out an external act that a",
+      "where": "CHANGELOG.md:24",
+      "anchor_digest": "d50900eeb0f74e2b02acf9680b6ca7ec2313fb904fa2545e806f619039619511",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:dogfood/pub2/MEASUREMENTS.md:72",
+        "file:src/hoh/extexec.py:9"
+      ],
+      "note": "dogfood/pub2/MEASUREMENTS.md M5: `python3 tools/capability_matrix.py --json` on the development tip, counts by target phase and status; the register's word PROVEN is not a claim of a live run (docs/LIMITATIONS.md states the limits row by row).",
+      "local_only_resolution": "resolved by the PUB2 drafter on 2026-10-21 against file:dogfood/pub2/MEASUREMENTS.md:72 for the line CHANGELOG.md:24"
+    },
+    {
+      "id": "C-1082",
+      "text": "* **Lease-aware capacity holds (P3-04, step C6).** A capacity reservation row now names the run lease of the run it was admitted for and is kept while that",
+      "where": "CHANGELOG.md:29",
+      "anchor_digest": "1691d4f2568a156f03b4f2ce10c01bd28414d254727d547aeb02c969716565bf",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:dogfood/pub2/MEASUREMENTS.md:73",
+        "file:src/hoh/reservation.py:2"
+      ],
+      "note": "dogfood/pub2/MEASUREMENTS.md M5: `python3 tools/capability_matrix.py --json` on the development tip, counts by target phase and status; the register's word PROVEN is not a claim of a live run (docs/LIMITATIONS.md states the limits row by row).",
+      "local_only_resolution": "resolved by the PUB2 drafter on 2026-10-21 against file:dogfood/pub2/MEASUREMENTS.md:73 for the line CHANGELOG.md:29"
+    },
+    {
+      "id": "C-1083",
+      "text": "* **The measured autonomy facts, taken again.** At the base of this section the build's lease records hold 22 epochs, 17 of them",
+      "where": "CHANGELOG.md:34",
+      "anchor_digest": "7e216705be5c18910947494d3d2bb619f8972cbbb4925c9fb0b9246ecb9cc82f",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:dogfood/pub2/MEASUREMENTS.md:14",
+        "file:dogfood/pub2/MEASUREMENTS.md:17",
+        "file:dogfood/pub2/MEASUREMENTS.md:19",
+        "file:dogfood/pub2/MEASUREMENTS.md:34",
+        "file:dogfood/pub2/MEASUREMENTS.md:46",
+        "file:dogfood/pub2/MEASUREMENTS.md:47",
+        "file:dogfood/pub2/MEASUREMENTS.md:56"
+      ],
+      "note": "dogfood/pub2/MEASUREMENTS.md of the PUB2 strand: the figure was counted read-only from the build's own records and from the public GitHub and PyPI records on 2026-10-21, with the source named by kind, the method and the limit of the figure (the records themselves are the orchestrator's working records and are not exported). It is a count, not an estimate; where a figure could not be counted honestly it is not written.",
+      "local_only_resolution": "resolved by the PUB2 drafter on 2026-10-21 against file:dogfood/pub2/MEASUREMENTS.md:14, file:dogfood/pub2/MEASUREMENTS.md:17, file:dogfood/pub2/MEASUREMENTS.md:19, file:dogfood/pub2/MEASUREMENTS.md:34, file:dogfood/pub2/MEASUREMENTS.md:46, file:dogfood/pub2/MEASUREMENTS.md:47, file:dogfood/pub2/MEASUREMENTS.md:56 for the line CHANGELOG.md:34"
+    },
+    {
+      "id": "C-1086",
+      "text": "verified successions that all ended COMPLETE, each requested by the rotation policy; 254 run",
+      "where": "CHANGELOG.md:35",
+      "anchor_digest": "f298a2cb37fa0c5629f1d0179588008b4f7c44f4479b4027b3a04a8d098b4686",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:dogfood/pub2/MEASUREMENTS.md:17",
+        "file:dogfood/pub2/MEASUREMENTS.md:19",
+        "file:dogfood/pub2/MEASUREMENTS.md:34"
+      ],
+      "note": "dogfood/pub2/MEASUREMENTS.md of the PUB2 strand: the figure was counted read-only from the build's own records and from the public GitHub and PyPI records on 2026-10-21, with the source named by kind, the method and the limit of the figure (the records themselves are the orchestrator's working records and are not exported). It is a count, not an estimate; where a figure could not be counted honestly it is not written.",
+      "local_only_resolution": "resolved by the PUB2 drafter on 2026-10-21 against file:dogfood/pub2/MEASUREMENTS.md:17, file:dogfood/pub2/MEASUREMENTS.md:19, file:dogfood/pub2/MEASUREMENTS.md:34 for the line CHANGELOG.md:35"
+    },
+    {
+      "id": "C-1128",
+      "text": "directories since 2026-10-01; 1189 review reports with the machine-bound footer, 233 of them RELEASE_NO; and 106 of",
+      "where": "CHANGELOG.md:36",
+      "anchor_digest": "58c8151452fd43439d1a56ea321131b933140e870214f68d81a9b9fa5c08954c",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:dogfood/pub2/MEASUREMENTS.md:34",
+        "file:dogfood/pub2/MEASUREMENTS.md:46",
+        "file:dogfood/pub2/MEASUREMENTS.md:47"
+      ],
+      "note": "dogfood/pub2/MEASUREMENTS.md of the PUB2 strand: the figure was counted read-only from the build's own records and from the public GitHub and PyPI records on 2026-10-21, with the source named by kind, the method and the limit of the figure (the records themselves are the orchestrator's working records and are not exported). It is a count, not an estimate; where a figure could not be counted honestly it is not written.",
+      "local_only_resolution": "resolved by the PUB2 drafter on 2026-10-21 against file:dogfood/pub2/MEASUREMENTS.md:34, file:dogfood/pub2/MEASUREMENTS.md:46, file:dogfood/pub2/MEASUREMENTS.md:47 for the line CHANGELOG.md:36"
+    },
+    {
+      "id": "C-1129",
+      "text": "2,155 entries of the orchestrator's running notes marked as the operator's. The history is 1,601 commits, 297 of them",
+      "where": "CHANGELOG.md:37",
+      "anchor_digest": "1409e50c5f52758b423985f03d3446fbda22d48e7571e8ef607164e08385d1ff",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:dogfood/pub2/MEASUREMENTS.md:56"
+      ],
+      "note": "dogfood/pub2/MEASUREMENTS.md of the PUB2 strand: the figure was counted read-only from the build's own records and from the public GitHub and PyPI records on 2026-10-21, with the source named by kind, the method and the limit of the figure (the records themselves are the orchestrator's working records and are not exported). It is a count, not an estimate; where a figure could not be counted honestly it is not written.",
+      "local_only_resolution": "resolved by the PUB2 drafter on 2026-10-21 against file:dogfood/pub2/MEASUREMENTS.md:56 for the line CHANGELOG.md:37"
+    },
+    {
+      "id": "C-1130",
+      "text": "merges `[V48]`, over 44 days 15 hours `[V46]`, and 33 of the 45 calendar days carry a commit `[V47]`; the ledger runs to O271 with 243 numbered entries `[V49]`.",
+      "where": "CHANGELOG.md:38",
+      "anchor_digest": "7c638bb66ab2f8af0408c97af81d23bf64ed4b35fab1d44d5ee8643410cbc8dd",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:71",
+        "file:paper/NUMBERS_V2.md:69",
+        "file:paper/NUMBERS_V2.md:70",
+        "file:paper/NUMBERS_V2.md:72"
+      ],
+      "note": "Figure(s) V48, V46, V47, V49 of paper/NUMBERS_V2.md: each is re-derived by a tool at the recorded base (R rows) or found in the ledger entry the row names (the others) by `python3 tools/docs_numbers.py check`, which also checks that the figure stands in the paragraph that carries the tag."
+    },
+    {
+      "id": "C-1131",
+      "text": "* **The bounded executor has no production actor.** P3-32 reads PARTIAL and not PROVEN `[V10]`: nothing is carried out for real until an",
+      "where": "CHANGELOG.md:78",
+      "anchor_digest": "f0f2832e549f808b7ce829b3cb694cce20b56b3e47bc02ed1a0f5a39d050c281",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:30"
+      ],
+      "note": "Figure(s) V10 of paper/NUMBERS_V2.md: each is re-derived by a tool at the recorded base (R rows) or found in the ledger entry the row names (the others) by `python3 tools/docs_numbers.py check`, which also checks that the figure stands in the paragraph that carries the tag."
+    },
+    {
+      "id": "C-1132",
+      "text": "0 `rotation_delivered` rows (taken on 2026-10-21); the delivery described in the `v0.4.0a1` section is tested with fakes.",
+      "where": "CHANGELOG.md:83",
+      "anchor_digest": "cf18dbbec97e1bf1c827e51892bbdc79cb69c9ff2026928b3e6438b934d7182e",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:30",
+        "file:paper/NUMBERS_V2.md:17",
+        "file:paper/NUMBERS_V2.md:36",
+        "file:paper/NUMBERS_V2.md:35"
+      ],
+      "note": "A figure stated on a line of a paragraph whose tags (V10, V01, V12, V11b) name the rows of paper/NUMBERS_V2.md that carry it; each row is re-derived by a tool or found in its ledger entry by `python3 tools/docs_numbers.py check`, and the tool checks that the figure stands in the paragraph. Bound at the paragraph's tags because the tag sits on a neighbouring line of the same sentence or list item."
+    },
+    {
+      "id": "C-1133",
+      "text": "* **Product-run merges are counted by merge title** `[V01]`, in the window 2026-09-25 to 2026-10-11, and the counting tool still does not list",
+      "where": "CHANGELOG.md:84",
+      "anchor_digest": "b73df9d06cc13a70048f0929949f5536c0ae8d8689bc5d9139390de53d7bc03a",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:17"
+      ],
+      "note": "Figure(s) V01 of paper/NUMBERS_V2.md: each is re-derived by a tool at the recorded base (R rows) or found in the ledger entry the row names (the others) by `python3 tools/docs_numbers.py check`, which also checks that the figure stands in the paragraph that carries the tag."
+    },
+    {
+      "id": "C-1134",
+      "text": "re-opened phase), and `v0.3.0` is the code on which the closure evidence was taken. The register now holds 236",
+      "where": "CHANGELOG.md:88",
+      "anchor_digest": "b7156b2816a4472fc0806ba69fcdec3b8dfd04c237fe0f073ae8d09f8f125214",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:30",
+        "file:paper/NUMBERS_V2.md:17",
+        "file:paper/NUMBERS_V2.md:36",
+        "file:paper/NUMBERS_V2.md:35"
+      ],
+      "note": "A figure stated on a line of a paragraph whose tags (V10, V01, V12, V11b) name the rows of paper/NUMBERS_V2.md that carry it; each row is re-derived by a tool or found in its ledger entry by `python3 tools/docs_numbers.py check`, and the tool checks that the figure stands in the paragraph. Bound at the paragraph's tags because the tag sits on a neighbouring line of the same sentence or list item."
+    },
+    {
+      "id": "C-1135",
+      "text": "requirements, of which 88 read PROVEN and 11 PARTIAL `[V10]`; the P2 gate reads 0 blocking open; 0 exit conditions bound to requirements not PROVEN; 0 exit conditions nothing measures yet; 148 open requirements, 125 behind a phase gate `[V12]`; and, of the requirements registered",
+      "where": "CHANGELOG.md:89",
+      "anchor_digest": "dc67fe7abade9a79319d1e1813964b0dfac7273682903be662329fa673ee8072",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:30",
+        "file:paper/NUMBERS_V2.md:36"
+      ],
+      "note": "Figure(s) V10, V12 of paper/NUMBERS_V2.md: each is re-derived by a tool at the recorded base (R rows) or found in the ledger entry the row names (the others) by `python3 tools/docs_numbers.py check`, which also checks that the figure stands in the paragraph that carries the tag."
+    },
+    {
+      "id": "C-1136",
+      "text": "for P3 to P12 the register counts 131 of 177 MISSING (11 PARTIAL, 35 PROVEN) `[V11b]`.",
+      "where": "CHANGELOG.md:90",
+      "anchor_digest": "1273b140121c4d2ef8492020758ce1d987a32e79673ea0166ee765ea79dfcc1e",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:35"
+      ],
+      "note": "Figure(s) V11b of paper/NUMBERS_V2.md: each is re-derived by a tool at the recorded base (R rows) or found in the ledger entry the row names (the others) by `python3 tools/docs_numbers.py check`, which also checks that the figure stands in the paragraph that carries the tag."
+    },
+    {
+      "id": "C-1137",
+      "text": "jobs: 7 tests failed and 12,911 passed on Python 3.11, 3 tests failed and 12,915 passed on Python 3.12, 5 tests failed and 12,913 passed on Python 3.13; the other four jobs passed (the clean install from a built wheel,",
+      "where": "CHANGELOG.md:174",
+      "anchor_digest": "f77f7ae26445611dc28dfead3f2c85edf89e5282532b12817d6589768a5d7559",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:dogfood/pub2/MEASUREMENTS.md:104",
+        "file:dogfood/pub2/MEASUREMENTS.md:103",
+        "cite:https://github.com/SKZL-AI/veriharness/actions/runs/39561366436@2026-10-21"
+      ],
+      "note": "dogfood/pub2/MEASUREMENTS.md M12: the pytest summary line of each test job of the CI run of the push of the tag v0.4.0a1 (https://github.com/SKZL-AI/veriharness/actions/runs/39561366436), read with gh run view --log-failed and the jobs API, read-only, on the day the block names; the run page is public.",
+      "local_only_resolution": "resolved by the PUB2 drafter on 2026-10-21 against file:dogfood/pub2/MEASUREMENTS.md:104, file:dogfood/pub2/MEASUREMENTS.md:103 for the line CHANGELOG.md:174"
+    },
+    {
+      "id": "C-1138",
+      "text": "gave the Python 3.13 count as the Python 3.12 count; the log reads 3 failures on 3.12 and 5 on 3.13, the two more being the",
+      "where": "CHANGELOG.md:176",
+      "anchor_digest": "6892b7e3a82811a4c99ce495c34d535b5483f9a93452a5668cdc486eba167b27",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:dogfood/pub2/MEASUREMENTS.md:104",
+        "file:dogfood/pub2/MEASUREMENTS.md:103",
+        "cite:https://github.com/SKZL-AI/veriharness/actions/runs/39561366436@2026-10-21"
+      ],
+      "note": "dogfood/pub2/MEASUREMENTS.md M12: the pytest summary line of each test job of the CI run of the push of the tag v0.4.0a1 (https://github.com/SKZL-AI/veriharness/actions/runs/39561366436), read with gh run view --log-failed and the jobs API, read-only, on the day the block names; the run page is public.",
+      "local_only_resolution": "resolved by the PUB2 drafter on 2026-10-21 against file:dogfood/pub2/MEASUREMENTS.md:104, file:dogfood/pub2/MEASUREMENTS.md:103 for the line CHANGELOG.md:176"
+    },
+    {
+      "id": "C-1139",
+      "text": "2. *Deep trees raise `RecursionError` on Python 3.11.* `src/hoh/capability.py:301` (`tree_digest`), `:345` (`inode_digest`, its walk at `:377`) and",
+      "where": "CHANGELOG.md:185",
+      "anchor_digest": "be6c24d03f91956863dabedfcaf25211a3c662f256b3837cbd53b05845da0f6c",
+      "status": "SUPPORTED",
+      "evidence": [
+        "cite:https://github.com/SKZL-AI/veriharness/blob/v0.4.0a1/src/hoh/capability.py#L301@2026-10-21",
+        "cite:https://github.com/SKZL-AI/veriharness/blob/v0.4.0a1/src/hoh/capability.py#L345@2026-10-21",
+        "cite:https://github.com/SKZL-AI/veriharness/blob/v0.4.0a1/src/hoh/capability.py#L581@2026-10-21"
+      ],
+      "note": "Line numbers of the source file at the tag v0.4.0a1 (the public tag is the evidence; this tree has changed the file since)."
+    },
+    {
+      "id": "C-1140",
+      "text": "`:581` (`seal_plan`) walk a tree with the recursive `Path.rglob` or `os.walk` of that version and raise on a tree deeper than the recursion limit; they return on",
+      "where": "CHANGELOG.md:186",
+      "anchor_digest": "4cb189ef718568e520c98cfa829756b9c4ca2e8c79b2fe454d546b5114509437",
+      "status": "SUPPORTED",
+      "evidence": [
+        "cite:https://github.com/SKZL-AI/veriharness/blob/v0.4.0a1/src/hoh/capability.py#L581@2026-10-21"
+      ],
+      "note": "Line number of the source file at the tag v0.4.0a1 (the public tag is the evidence; this tree has changed the file since)."
+    },
+    {
+      "id": "C-1141",
+      "text": "| Product runs | 254 run directories from 2026-10-01 on; in 226 of them an independent QA result had every check PASS; 97 product-run merges from 2026-09-25 to 2026-10-11 counted by merge title (the window of that count; later titles are not listed by the counting tool) `[V01]` |",
+      "where": "README.md:29",
+      "anchor_digest": "aae1fe1587058cdc00e5cee0ad3d79222145481becf187fb3be36b128e2f9dab",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:dogfood/pub2/MEASUREMENTS.md:34",
+        "file:dogfood/pub2/MEASUREMENTS.md:35",
+        "file:paper/NUMBERS_V2.md:17"
+      ],
+      "note": "dogfood/pub2/MEASUREMENTS.md of the PUB2 strand: the figure was counted read-only from the build's own records and from the public GitHub and PyPI records on 2026-10-21, with the source named by kind, the method and the limit of the figure (the records themselves are the orchestrator's working records and are not exported). It is a count, not an estimate; where a figure could not be counted honestly it is not written.",
+      "local_only_resolution": "resolved by the PUB2 drafter on 2026-10-21 against file:dogfood/pub2/MEASUREMENTS.md:34, file:dogfood/pub2/MEASUREMENTS.md:35 for the line README.md:29"
+    },
+    {
+      "id": "C-1142",
+      "text": "| Independent review | 1189 review reports carry the machine-bound verdict footer since 2026-10-07; 233 of them (19.6 %) say RELEASE_NO |",
+      "where": "README.md:30",
+      "anchor_digest": "8ee096b3ea35b2c5d3e74353bc65135c079abcb554ffb869238774120d2a3788",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:dogfood/pub2/MEASUREMENTS.md:46",
+        "file:dogfood/pub2/MEASUREMENTS.md:47"
+      ],
+      "note": "dogfood/pub2/MEASUREMENTS.md of the PUB2 strand: the figure was counted read-only from the build's own records and from the public GitHub and PyPI records on 2026-10-21, with the source named by kind, the method and the limit of the figure (the records themselves are the orchestrator's working records and are not exported). It is a count, not an estimate; where a figure could not be counted honestly it is not written.",
+      "local_only_resolution": "resolved by the PUB2 drafter on 2026-10-21 against file:dogfood/pub2/MEASUREMENTS.md:46, file:dogfood/pub2/MEASUREMENTS.md:47 for the line README.md:30"
+    },
+    {
+      "id": "C-1143",
+      "text": "| Who decided | 106 of 2,155 entries (about 5 %) of the orchestrator's running notes are marked as the operator's; 8 operator directives are stored verbatim, one file each; none of 369 attribution entries is booked to a human `[V52]` |",
+      "where": "README.md:31",
+      "anchor_digest": "4c0c56953d14643684ab82a983c6f33a661b14b567b467f2c4e0783d85df6fbc",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:dogfood/pub2/MEASUREMENTS.md:56",
+        "file:dogfood/pub2/MEASUREMENTS.md:120",
+        "file:paper/NUMBERS_V2.md:75"
+      ],
+      "note": "dogfood/pub2/MEASUREMENTS.md of the PUB2 strand: the figure was counted read-only from the build's own records and from the public GitHub and PyPI records on 2026-10-21, with the source named by kind, the method and the limit of the figure (the records themselves are the orchestrator's working records and are not exported). It is a count, not an estimate; where a figure could not be counted honestly it is not written.",
+      "local_only_resolution": "resolved by the PUB2 drafter on 2026-10-21 against file:dogfood/pub2/MEASUREMENTS.md:56, file:dogfood/pub2/MEASUREMENTS.md:120 for the line README.md:31"
+    },
+    {
+      "id": "C-1144",
+      "text": "- **Product runs and QA** are counted from the run directories of the project's runs tree, which holds the runs of 2026-10-01 and later; earlier runs were kept elsewhere. 263 QA result files exist, 226 with every check PASS and 37 with at least one check not PASS; a QA result with every check PASS is not by itself an accepted merge, which is why the merge count above is the one from git.",
+      "where": "README.md:43",
+      "anchor_digest": "1daff0fa28ad50926c8d9ba16bd5354d04060a42c7ca6e4f5462ae8f8b8cc55a",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:dogfood/pub2/MEASUREMENTS.md:34",
+        "file:dogfood/pub2/MEASUREMENTS.md:35"
+      ],
+      "note": "dogfood/pub2/MEASUREMENTS.md of the PUB2 strand: the figure was counted read-only from the build's own records and from the public GitHub and PyPI records on 2026-10-21, with the source named by kind, the method and the limit of the figure (the records themselves are the orchestrator's working records and are not exported). It is a count, not an estimate; where a figure could not be counted honestly it is not written.",
+      "local_only_resolution": "resolved by the PUB2 drafter on 2026-10-21 against file:dogfood/pub2/MEASUREMENTS.md:34, file:dogfood/pub2/MEASUREMENTS.md:35 for the line README.md:43"
+    },
+    {
+      "id": "C-1145",
+      "text": "- **Review** counts report files that carry the six-line machine-bound footer (verdict, candidate, base, specification digest, open blockers, completeness) that the merge gate reads; it counts every round, so a candidate that was reviewed three times appears three times. RELEASE_NO is the reviewers' refusal: 229 of all footers declare at least one open blocking finding. A review that says no is the process working, not a defect.",
+      "where": "README.md:44",
+      "anchor_digest": "2c40510a9be8a7f5d242749e65624e919b9738d2949ac0a03096c2cdf4fc50ae",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:dogfood/pub2/MEASUREMENTS.md:46",
+        "file:dogfood/pub2/MEASUREMENTS.md:48"
+      ],
+      "note": "dogfood/pub2/MEASUREMENTS.md of the PUB2 strand: the figure was counted read-only from the build's own records and from the public GitHub and PyPI records on 2026-10-21, with the source named by kind, the method and the limit of the figure (the records themselves are the orchestrator's working records and are not exported). It is a count, not an estimate; where a figure could not be counted honestly it is not written.",
+      "local_only_resolution": "resolved by the PUB2 drafter on 2026-10-21 against file:dogfood/pub2/MEASUREMENTS.md:46, file:dogfood/pub2/MEASUREMENTS.md:48 for the line README.md:44"
+    },
+    {
+      "id": "C-1146",
+      "text": "- **The double-down method.** A blocked stage, phase or work package that does not clear with time is today listed for a person. Amendment A8 registers the method of the house rules (no negative without a proven root cause; a double-down that leaves the measured verdict alone) as a capability of the autonomous loop, as P3-42. P3-42 reads PARTIAL on the development line at the commit 82bdc60c (the register's word, set by the slices P3-DD1 to P3-DD3; it is not PROVEN). Built and merged, in the register's words: the double-down, the measurement of proposals and the recording of what becomes of a verified fix are on in `hoh resume-quota` without a flag (the opt-outs are recorded); a proposal that carries a fix is, on a person's command, proven on a scratch copy of the run's candidate (red before and green after, the keep-green rows green before and after, the files written those the fix was read to write) and applied as a new iteration of the blocked run, with the approval recorded; a person can revert it. Still missing, in the register's words: no path applies a proven fix without a person, every verified fix is withheld; a later slice (DD4) lets only an unattended long-horizon contract apply a proven correction itself; the analysts stay opt-in, so by default only the derived proposals of trivial blocks exist and none carries a fix; only the block of a run is applied, not a node's or a project's, and a run whose budget is spent cannot continue; the halt class is not yet persisted on the node; and no capacity broker or budget reservation admits the analysts' dispatches or the runner executions. Until then the method is also applied by hand by the orchestrating session.",
+      "where": "README.md:55",
+      "anchor_digest": "eb8a37b4945ce929caf40df89b2364f79f15e85b3bba1e7627ea4b6968d69e99",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:dogfood/pub2/MEASUREMENTS.md:71"
+      ],
+      "note": "dogfood/pub2/MEASUREMENTS.md M5: `python3 tools/capability_matrix.py --json` on the development tip, counts by target phase and status; the register's word PROVEN is not a claim of a live run (docs/LIMITATIONS.md states the limits row by row).",
+      "local_only_resolution": "resolved by the PUB2 drafter on 2026-10-21 against file:dogfood/pub2/MEASUREMENTS.md:71 for the line README.md:55"
+    },
+    {
+      "id": "C-1147",
+      "text": "- **Pre-authorised external acts.** The bounded executor (`src/hoh/extexec.py`) carries out an external act that a contract pre-authorised, and only narrowly: a target the contract names, within the pre-authorised number counted durably before the act, with create-only, digest-bound records; every release and publish class is refused whatever the contract says, the programme stop is honoured, and everything else stays with a person. No production actor is registered, so it carries nothing out for real yet. P3-32 reads PARTIAL in the register, in whose words: the bounded executor is built and gated (pre-authorised target, the pre-authorised number counted durably before the act, create-only digest-bound records, NEVER_AUTO_PUBLISH and every release/publish class refused, the programme stop honoured, everything else with a person); no production actor is registered yet -- which first actor class is an operator decision.",
+      "where": "README.md:57",
+      "anchor_digest": "461fcbfaf4d422ae11cc06622cb43113b99b4537783c884a9d7237918f3bd044",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:dogfood/pub2/MEASUREMENTS.md:72",
+        "file:src/hoh/extexec.py:9"
+      ],
+      "note": "dogfood/pub2/MEASUREMENTS.md M5: `python3 tools/capability_matrix.py --json` on the development tip, counts by target phase and status; the register's word PROVEN is not a claim of a live run (docs/LIMITATIONS.md states the limits row by row).",
+      "local_only_resolution": "resolved by the PUB2 drafter on 2026-10-21 against file:dogfood/pub2/MEASUREMENTS.md:72 for the line README.md:57"
+    },
+    {
+      "id": "C-1148",
+      "text": "Readiness is not claimed here either: the board, `docs/READINESS.md`, still reads `TECHNICALLY_STABLE_READY = no` `[V13]`, as at `v0.3.0`.",
+      "where": "RELEASE_NOTES.md:11",
+      "anchor_digest": "dd863ab8e27987cc3ca73dd0381675e1174be8d5c3d8194f3370588552fb5d80",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:37"
+      ],
+      "note": "Figure(s) V13 of paper/NUMBERS_V2.md: each is re-derived by a tool at the recorded base (R rows) or found in the ledger entry the row names (the others) by `python3 tools/docs_numbers.py check`, which also checks that the figure stands in the paragraph that carries the tag."
+    },
+    {
+      "id": "C-1149",
+      "text": "2026-10-21 at 15:30 +0300). This line has no benchmark result: the matched-budget campaigns of `v0.1.0` stand as they were measured, nobody has repeated",
+      "where": "RELEASE_NOTES.md:14",
+      "anchor_digest": "5a7410d4b48ae5029461bea52632a80b2a08dceed8e174526f4daa94b477b2cd",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:37"
+      ],
+      "note": "A figure stated on a line of a paragraph whose tags (V13) name the rows of paper/NUMBERS_V2.md that carry it; each row is re-derived by a tool or found in its ledger entry by `python3 tools/docs_numbers.py check`, and the tool checks that the figure stands in the paragraph. Bound at the paragraph's tags because the tag sits on a neighbouring line of the same sentence or list item."
+    },
+    {
+      "id": "C-1150",
+      "text": "* **The bounded executor of pre-authorised external acts (P3-32, fourth slice).** `src/hoh/extexec.py` carries out an external act that a",
+      "where": "RELEASE_NOTES.md:19",
+      "anchor_digest": "d50900eeb0f74e2b02acf9680b6ca7ec2313fb904fa2545e806f619039619511",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:dogfood/pub2/MEASUREMENTS.md:72",
+        "file:src/hoh/extexec.py:9"
+      ],
+      "note": "dogfood/pub2/MEASUREMENTS.md M5: `python3 tools/capability_matrix.py --json` on the development tip, counts by target phase and status; the register's word PROVEN is not a claim of a live run (docs/LIMITATIONS.md states the limits row by row).",
+      "local_only_resolution": "resolved by the PUB2 drafter on 2026-10-21 against file:dogfood/pub2/MEASUREMENTS.md:72 for the line RELEASE_NOTES.md:19"
+    },
+    {
+      "id": "C-1151",
+      "text": "* **Lease-aware capacity holds (P3-04, step C6).** A capacity reservation row now names the run lease of the run it was admitted for and is kept while that",
+      "where": "RELEASE_NOTES.md:24",
+      "anchor_digest": "1691d4f2568a156f03b4f2ce10c01bd28414d254727d547aeb02c969716565bf",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:dogfood/pub2/MEASUREMENTS.md:73",
+        "file:src/hoh/reservation.py:2"
+      ],
+      "note": "dogfood/pub2/MEASUREMENTS.md M5: `python3 tools/capability_matrix.py --json` on the development tip, counts by target phase and status; the register's word PROVEN is not a claim of a live run (docs/LIMITATIONS.md states the limits row by row).",
+      "local_only_resolution": "resolved by the PUB2 drafter on 2026-10-21 against file:dogfood/pub2/MEASUREMENTS.md:73 for the line RELEASE_NOTES.md:24"
+    },
+    {
+      "id": "C-1152",
+      "text": "* **The measured autonomy facts, taken again.** At the base of this section the build's lease records hold 22 epochs, 17 of them",
+      "where": "RELEASE_NOTES.md:29",
+      "anchor_digest": "7e216705be5c18910947494d3d2bb619f8972cbbb4925c9fb0b9246ecb9cc82f",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:dogfood/pub2/MEASUREMENTS.md:14",
+        "file:dogfood/pub2/MEASUREMENTS.md:17",
+        "file:dogfood/pub2/MEASUREMENTS.md:19",
+        "file:dogfood/pub2/MEASUREMENTS.md:34",
+        "file:dogfood/pub2/MEASUREMENTS.md:46",
+        "file:dogfood/pub2/MEASUREMENTS.md:47",
+        "file:dogfood/pub2/MEASUREMENTS.md:56"
+      ],
+      "note": "dogfood/pub2/MEASUREMENTS.md of the PUB2 strand: the figure was counted read-only from the build's own records and from the public GitHub and PyPI records on 2026-10-21, with the source named by kind, the method and the limit of the figure (the records themselves are the orchestrator's working records and are not exported). It is a count, not an estimate; where a figure could not be counted honestly it is not written.",
+      "local_only_resolution": "resolved by the PUB2 drafter on 2026-10-21 against file:dogfood/pub2/MEASUREMENTS.md:14, file:dogfood/pub2/MEASUREMENTS.md:17, file:dogfood/pub2/MEASUREMENTS.md:19, file:dogfood/pub2/MEASUREMENTS.md:34, file:dogfood/pub2/MEASUREMENTS.md:46, file:dogfood/pub2/MEASUREMENTS.md:47, file:dogfood/pub2/MEASUREMENTS.md:56 for the line RELEASE_NOTES.md:29"
+    },
+    {
+      "id": "C-1153",
+      "text": "verified successions that all ended COMPLETE, each requested by the rotation policy; 254 run",
+      "where": "RELEASE_NOTES.md:30",
+      "anchor_digest": "f298a2cb37fa0c5629f1d0179588008b4f7c44f4479b4027b3a04a8d098b4686",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:dogfood/pub2/MEASUREMENTS.md:17",
+        "file:dogfood/pub2/MEASUREMENTS.md:19",
+        "file:dogfood/pub2/MEASUREMENTS.md:34"
+      ],
+      "note": "dogfood/pub2/MEASUREMENTS.md of the PUB2 strand: the figure was counted read-only from the build's own records and from the public GitHub and PyPI records on 2026-10-21, with the source named by kind, the method and the limit of the figure (the records themselves are the orchestrator's working records and are not exported). It is a count, not an estimate; where a figure could not be counted honestly it is not written.",
+      "local_only_resolution": "resolved by the PUB2 drafter on 2026-10-21 against file:dogfood/pub2/MEASUREMENTS.md:17, file:dogfood/pub2/MEASUREMENTS.md:19, file:dogfood/pub2/MEASUREMENTS.md:34 for the line RELEASE_NOTES.md:30"
+    },
+    {
+      "id": "C-1154",
+      "text": "directories since 2026-10-01; 1189 review reports with the machine-bound footer, 233 of them RELEASE_NO; and 106 of",
+      "where": "RELEASE_NOTES.md:31",
+      "anchor_digest": "58c8151452fd43439d1a56ea321131b933140e870214f68d81a9b9fa5c08954c",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:dogfood/pub2/MEASUREMENTS.md:34",
+        "file:dogfood/pub2/MEASUREMENTS.md:46",
+        "file:dogfood/pub2/MEASUREMENTS.md:47"
+      ],
+      "note": "dogfood/pub2/MEASUREMENTS.md of the PUB2 strand: the figure was counted read-only from the build's own records and from the public GitHub and PyPI records on 2026-10-21, with the source named by kind, the method and the limit of the figure (the records themselves are the orchestrator's working records and are not exported). It is a count, not an estimate; where a figure could not be counted honestly it is not written.",
+      "local_only_resolution": "resolved by the PUB2 drafter on 2026-10-21 against file:dogfood/pub2/MEASUREMENTS.md:34, file:dogfood/pub2/MEASUREMENTS.md:46, file:dogfood/pub2/MEASUREMENTS.md:47 for the line RELEASE_NOTES.md:31"
+    },
+    {
+      "id": "C-1155",
+      "text": "2,155 entries of the orchestrator's running notes marked as the operator's. The history is 1,601 commits, 297 of them",
+      "where": "RELEASE_NOTES.md:32",
+      "anchor_digest": "1409e50c5f52758b423985f03d3446fbda22d48e7571e8ef607164e08385d1ff",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:dogfood/pub2/MEASUREMENTS.md:56"
+      ],
+      "note": "dogfood/pub2/MEASUREMENTS.md of the PUB2 strand: the figure was counted read-only from the build's own records and from the public GitHub and PyPI records on 2026-10-21, with the source named by kind, the method and the limit of the figure (the records themselves are the orchestrator's working records and are not exported). It is a count, not an estimate; where a figure could not be counted honestly it is not written.",
+      "local_only_resolution": "resolved by the PUB2 drafter on 2026-10-21 against file:dogfood/pub2/MEASUREMENTS.md:56 for the line RELEASE_NOTES.md:32"
+    },
+    {
+      "id": "C-1156",
+      "text": "merges `[V48]`, over 44 days 15 hours `[V46]`, and 33 of the 45 calendar days carry a commit `[V47]`; the ledger runs to O271 with 243 numbered entries `[V49]`.",
+      "where": "RELEASE_NOTES.md:33",
+      "anchor_digest": "7c638bb66ab2f8af0408c97af81d23bf64ed4b35fab1d44d5ee8643410cbc8dd",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:71",
+        "file:paper/NUMBERS_V2.md:69",
+        "file:paper/NUMBERS_V2.md:70",
+        "file:paper/NUMBERS_V2.md:72"
+      ],
+      "note": "Figure(s) V48, V46, V47, V49 of paper/NUMBERS_V2.md: each is re-derived by a tool at the recorded base (R rows) or found in the ledger entry the row names (the others) by `python3 tools/docs_numbers.py check`, which also checks that the figure stands in the paragraph that carries the tag."
+    },
+    {
+      "id": "C-1157",
+      "text": "* **The bounded executor has no production actor.** P3-32 reads PARTIAL and not PROVEN `[V10]`: nothing is carried out for real until an",
+      "where": "RELEASE_NOTES.md:73",
+      "anchor_digest": "f0f2832e549f808b7ce829b3cb694cce20b56b3e47bc02ed1a0f5a39d050c281",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:30"
+      ],
+      "note": "Figure(s) V10 of paper/NUMBERS_V2.md: each is re-derived by a tool at the recorded base (R rows) or found in the ledger entry the row names (the others) by `python3 tools/docs_numbers.py check`, which also checks that the figure stands in the paragraph that carries the tag."
+    },
+    {
+      "id": "C-1158",
+      "text": "0 `rotation_delivered` rows (taken on 2026-10-21); the delivery described in the `v0.4.0a1` section is tested with fakes.",
+      "where": "RELEASE_NOTES.md:78",
+      "anchor_digest": "cf18dbbec97e1bf1c827e51892bbdc79cb69c9ff2026928b3e6438b934d7182e",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:30",
+        "file:paper/NUMBERS_V2.md:17",
+        "file:paper/NUMBERS_V2.md:36",
+        "file:paper/NUMBERS_V2.md:35"
+      ],
+      "note": "A figure stated on a line of a paragraph whose tags (V10, V01, V12, V11b) name the rows of paper/NUMBERS_V2.md that carry it; each row is re-derived by a tool or found in its ledger entry by `python3 tools/docs_numbers.py check`, and the tool checks that the figure stands in the paragraph. Bound at the paragraph's tags because the tag sits on a neighbouring line of the same sentence or list item."
+    },
+    {
+      "id": "C-1159",
+      "text": "* **Product-run merges are counted by merge title** `[V01]`, in the window 2026-09-25 to 2026-10-11, and the counting tool still does not list",
+      "where": "RELEASE_NOTES.md:79",
+      "anchor_digest": "b73df9d06cc13a70048f0929949f5536c0ae8d8689bc5d9139390de53d7bc03a",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:17"
+      ],
+      "note": "Figure(s) V01 of paper/NUMBERS_V2.md: each is re-derived by a tool at the recorded base (R rows) or found in the ledger entry the row names (the others) by `python3 tools/docs_numbers.py check`, which also checks that the figure stands in the paragraph that carries the tag."
+    },
+    {
+      "id": "C-1160",
+      "text": "re-opened phase), and `v0.3.0` is the code on which the closure evidence was taken. The register now holds 236",
+      "where": "RELEASE_NOTES.md:83",
+      "anchor_digest": "b7156b2816a4472fc0806ba69fcdec3b8dfd04c237fe0f073ae8d09f8f125214",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:30",
+        "file:paper/NUMBERS_V2.md:17",
+        "file:paper/NUMBERS_V2.md:36",
+        "file:paper/NUMBERS_V2.md:35"
+      ],
+      "note": "A figure stated on a line of a paragraph whose tags (V10, V01, V12, V11b) name the rows of paper/NUMBERS_V2.md that carry it; each row is re-derived by a tool or found in its ledger entry by `python3 tools/docs_numbers.py check`, and the tool checks that the figure stands in the paragraph. Bound at the paragraph's tags because the tag sits on a neighbouring line of the same sentence or list item."
+    },
+    {
+      "id": "C-1161",
+      "text": "requirements, of which 88 read PROVEN and 11 PARTIAL `[V10]`; the P2 gate reads 0 blocking open; 0 exit conditions bound to requirements not PROVEN; 0 exit conditions nothing measures yet; 148 open requirements, 125 behind a phase gate `[V12]`; and, of the requirements registered",
+      "where": "RELEASE_NOTES.md:84",
+      "anchor_digest": "dc67fe7abade9a79319d1e1813964b0dfac7273682903be662329fa673ee8072",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:30",
+        "file:paper/NUMBERS_V2.md:36"
+      ],
+      "note": "Figure(s) V10, V12 of paper/NUMBERS_V2.md: each is re-derived by a tool at the recorded base (R rows) or found in the ledger entry the row names (the others) by `python3 tools/docs_numbers.py check`, which also checks that the figure stands in the paragraph that carries the tag."
+    },
+    {
+      "id": "C-1162",
+      "text": "for P3 to P12 the register counts 131 of 177 MISSING (11 PARTIAL, 35 PROVEN) `[V11b]`.",
+      "where": "RELEASE_NOTES.md:85",
+      "anchor_digest": "1273b140121c4d2ef8492020758ce1d987a32e79673ea0166ee765ea79dfcc1e",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:35"
+      ],
+      "note": "Figure(s) V11b of paper/NUMBERS_V2.md: each is re-derived by a tool at the recorded base (R rows) or found in the ledger entry the row names (the others) by `python3 tools/docs_numbers.py check`, which also checks that the figure stands in the paragraph that carries the tag."
+    },
+    {
+      "id": "C-1163",
+      "text": "jobs: 7 tests failed and 12,911 passed on Python 3.11, 3 tests failed and 12,915 passed on Python 3.12, 5 tests failed and 12,913 passed on Python 3.13; the other four jobs passed (the clean install from a built wheel,",
+      "where": "RELEASE_NOTES.md:170",
+      "anchor_digest": "f77f7ae26445611dc28dfead3f2c85edf89e5282532b12817d6589768a5d7559",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:dogfood/pub2/MEASUREMENTS.md:104",
+        "file:dogfood/pub2/MEASUREMENTS.md:103",
+        "cite:https://github.com/SKZL-AI/veriharness/actions/runs/39561366436@2026-10-21"
+      ],
+      "note": "dogfood/pub2/MEASUREMENTS.md M12: the pytest summary line of each test job of the CI run of the push of the tag v0.4.0a1 (https://github.com/SKZL-AI/veriharness/actions/runs/39561366436), read with gh run view --log-failed and the jobs API, read-only, on the day the block names; the run page is public.",
+      "local_only_resolution": "resolved by the PUB2 drafter on 2026-10-21 against file:dogfood/pub2/MEASUREMENTS.md:104, file:dogfood/pub2/MEASUREMENTS.md:103 for the line RELEASE_NOTES.md:170"
+    },
+    {
+      "id": "C-1164",
+      "text": "gave the Python 3.13 count as the Python 3.12 count; the log reads 3 failures on 3.12 and 5 on 3.13, the two more being the",
+      "where": "RELEASE_NOTES.md:172",
+      "anchor_digest": "6892b7e3a82811a4c99ce495c34d535b5483f9a93452a5668cdc486eba167b27",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:dogfood/pub2/MEASUREMENTS.md:104",
+        "file:dogfood/pub2/MEASUREMENTS.md:103",
+        "cite:https://github.com/SKZL-AI/veriharness/actions/runs/39561366436@2026-10-21"
+      ],
+      "note": "dogfood/pub2/MEASUREMENTS.md M12: the pytest summary line of each test job of the CI run of the push of the tag v0.4.0a1 (https://github.com/SKZL-AI/veriharness/actions/runs/39561366436), read with gh run view --log-failed and the jobs API, read-only, on the day the block names; the run page is public.",
+      "local_only_resolution": "resolved by the PUB2 drafter on 2026-10-21 against file:dogfood/pub2/MEASUREMENTS.md:104, file:dogfood/pub2/MEASUREMENTS.md:103 for the line RELEASE_NOTES.md:172"
+    },
+    {
+      "id": "C-1165",
+      "text": "2. *Deep trees raise `RecursionError` on Python 3.11.* `src/hoh/capability.py:301` (`tree_digest`), `:345` (`inode_digest`, its walk at `:377`) and",
+      "where": "RELEASE_NOTES.md:181",
+      "anchor_digest": "be6c24d03f91956863dabedfcaf25211a3c662f256b3837cbd53b05845da0f6c",
+      "status": "SUPPORTED",
+      "evidence": [
+        "cite:https://github.com/SKZL-AI/veriharness/blob/v0.4.0a1/src/hoh/capability.py#L301@2026-10-21",
+        "cite:https://github.com/SKZL-AI/veriharness/blob/v0.4.0a1/src/hoh/capability.py#L345@2026-10-21",
+        "cite:https://github.com/SKZL-AI/veriharness/blob/v0.4.0a1/src/hoh/capability.py#L581@2026-10-21"
+      ],
+      "note": "Line numbers of the source file at the tag v0.4.0a1 (the public tag is the evidence; this tree has changed the file since)."
+    },
+    {
+      "id": "C-1166",
+      "text": "`:581` (`seal_plan`) walk a tree with the recursive `Path.rglob` or `os.walk` of that version and raise on a tree deeper than the recursion limit; they return on",
+      "where": "RELEASE_NOTES.md:182",
+      "anchor_digest": "4cb189ef718568e520c98cfa829756b9c4ca2e8c79b2fe454d546b5114509437",
+      "status": "SUPPORTED",
+      "evidence": [
+        "cite:https://github.com/SKZL-AI/veriharness/blob/v0.4.0a1/src/hoh/capability.py#L581@2026-10-21"
+      ],
+      "note": "Line number of the source file at the tag v0.4.0a1 (the public tag is the evidence; this tree has changed the file since)."
+    },
+    {
+      "id": "C-1167",
+      "text": "* *The figures of the development line, taken again.* At the commit `82bdc60c` (committed on 2026-10-21 at 15:30 +0300; the figures quoted above for the",
+      "where": "docs/LIMITATIONS.md:2222",
+      "anchor_digest": "db7dc90db560da08b87f68f05427350bdfd2227f45d513f2370b9fadecd57c35",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:71",
+        "file:paper/NUMBERS_V2.md:69",
+        "file:paper/NUMBERS_V2.md:70",
+        "file:paper/NUMBERS_V2.md:72",
+        "file:paper/NUMBERS_V2.md:30"
+      ],
+      "note": "A figure stated on a line of a paragraph whose tags (V48, V46, V47, V49, V10) name the rows of paper/NUMBERS_V2.md that carry it; each row is re-derived by a tool or found in its ledger entry by `python3 tools/docs_numbers.py check`, and the tool checks that the figure stands in the paragraph. Bound at the paragraph's tags because the tag sits on a neighbouring line of the same sentence or list item."
+    },
+    {
+      "id": "C-1168",
+      "text": "earlier commits stay as written) the history is 1,601 commits, 297 of them merges `[V48]`; the first and the latest commit of the",
+      "where": "docs/LIMITATIONS.md:2223",
+      "anchor_digest": "8a665f6846c70011c188a18c4b58bc0302d7eba7b2b6f49ae4ffa3590ad69531",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:71"
+      ],
+      "note": "Figure(s) V48 of paper/NUMBERS_V2.md: each is re-derived by a tool at the recorded base (R rows) or found in the ledger entry the row names (the others) by `python3 tools/docs_numbers.py check`, which also checks that the figure stands in the paragraph that carries the tag."
+    },
+    {
+      "id": "C-1169",
+      "text": "mainline are 44 days 15 hours apart `[V46]`, 33 of the 45 calendar days carry a commit `[V47]`, and the ledger runs to O271 with 243 numbered entries",
+      "where": "docs/LIMITATIONS.md:2224",
+      "anchor_digest": "094741b3de61277a7dea35924923884063c09d2af493a6a736c2b005171b53a5",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:69",
+        "file:paper/NUMBERS_V2.md:70"
+      ],
+      "note": "Figure(s) V46, V47 of paper/NUMBERS_V2.md: each is re-derived by a tool at the recorded base (R rows) or found in the ledger entry the row names (the others) by `python3 tools/docs_numbers.py check`, which also checks that the figure stands in the paragraph that carries the tag."
+    },
+    {
+      "id": "C-1170",
+      "text": "`[V49]`; the register now holds 236 requirements, 88 PROVEN and 11 PARTIAL `[V10]`.",
+      "where": "docs/LIMITATIONS.md:2225",
+      "anchor_digest": "2243e38fcab09ac696eb52ddb15829d4290c4179102d086f3316672d3525b5f3",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:72",
+        "file:paper/NUMBERS_V2.md:30"
+      ],
+      "note": "Figure(s) V49, V10 of paper/NUMBERS_V2.md: each is re-derived by a tool at the recorded base (R rows) or found in the ledger entry the row names (the others) by `python3 tools/docs_numbers.py check`, which also checks that the figure stands in the paragraph that carries the tag."
+    },
+    {
+      "id": "C-1171",
+      "text": "* **E18 -- the figures of E5 and E9 to E17, taken again (added 2026-10-21, ahead of v0.4.0a2).** The ledger runs to O271, with 243 numbered entries `[V49]`; the first and the latest commit of the mainline are 44 days 15 hours apart `[V46]` and 33 of the 45 calendar days carry a commit `[V47]`; E5 and E9 to E17 stay as written.",
+      "where": "paper/POSITION_PAPER.md:1114",
+      "anchor_digest": "0048c4a284c4b02ed58d6ed041ea87028e66234c5cc5ee2c2754fa7f87c3dd91",
+      "status": "SUPPORTED",
+      "evidence": [
+        "file:paper/NUMBERS_V2.md:72",
+        "file:paper/NUMBERS_V2.md:69",
+        "file:paper/NUMBERS_V2.md:70"
+      ],
+      "note": "Figure(s) V49, V46, V47 of paper/NUMBERS_V2.md: each is re-derived by a tool at the recorded base (R rows) or found in the ledger entry the row names (the others) by `python3 tools/docs_numbers.py check`, which also checks that the figure stands in the paragraph that carries the tag."
     }
   ],
   "not_claims": [
@@ -22413,10 +22984,10 @@
     },
     {
       "id": "N-1188",
-      "text": "The base is the commit named above (Merge P3-DD3 (landing unit P3-DD3m): a verified correction is applied as a new iteration through the continuation path -- by a person only in this slice (proven_correction for UNATTENDED is DD4); with the two reviewed test repairs it needed to land (Class A code built by a product run, landed mechanically with the repairs); committed 2026-10-20 20:24:46 +0300). Dates are the commits' own (`+0300`); give `git log` explicit times with that offset, because a bare date is read with the current time of day. A figure derived by a tool is derived from the working tree except where the row says it reads the base: the tool refuses to check a table whose base differs from the working tree in the files those derivations read.",
+      "text": "The base is the commit named above (Merge P3-04 C6: lease-aware capacity holds -- a reservation row names the run lease of the run it was admitted for, is kept HELD while that lease is live (also through the recovery of a crash-left wave: settle_owned(keep_live=True)), and a run's session is counted once, through its lease; an unreadable lease is never a free run (Class A); committed 2026-10-21 15:30:18 +0300). Dates are the commits' own (`+0300`); give `git log` explicit times with that offset, because a bare date is read with the current time of day. A figure derived by a tool is derived from the working tree except where the row says it reads the base: the tool refuses to check a table whose base differs from the working tree in the files those derivations read.",
       "where": "paper/NUMBERS_V2.md:9",
       "reason": "names the base commit's own subject and commit time as git records them; no measurement of its own, and `tools/docs_numbers.py check` re-renders the line",
-      "anchor_digest": "d63346a49e581b906ba018aeaf92067a14e82e990f5c452173194baadb035e04"
+      "anchor_digest": "522d40efc17abbd87eabdbccc5ca6f637072e07bdf957f760f321693dc2f45fd"
     },
     {
       "id": "N-1189",
@@ -24878,24 +25449,24 @@
     },
     {
       "id": "N-1546",
-      "text": "| V46 | 2026-09-07 00:19 to 2026-10-20 20:24 (+0300): 43 days 20 h (6 weeks 1 day) | first and latest commit of the development mainline, and the time between them | git history | `git log <base> --format=%cI` (earliest and latest commit date, read at +0300); the difference in days and whole hours | R |",
+      "text": "| V46 | 2026-09-07 00:19 to 2026-10-21 15:30 (+0300): 44 days 15 h (6 weeks 2 days) | first and latest commit of the development mainline, and the time between them | git history | `git log <base> --format=%cI` (earliest and latest commit date, read at +0300); the difference in days and whole hours | R |",
       "where": "paper/NUMBERS_V2.md:69",
       "reason": "a row of the generated numbers table: it names the source and the regeneration command of a figure; the figure is bound as a claim where the prose states it, not at this row, and `tools/docs_numbers.py check` compares the whole table with a fresh derivation",
-      "anchor_digest": "06b450b32e51fc0a0f5cdead68b3bfca23a3321953eda21a5ec02bb8b07d4eca"
+      "anchor_digest": "4218c677b0b831aaaf9cf117c65b79c49e7bb054ca6cc2faeb4ceb7e60e165e2"
     },
     {
       "id": "N-1547",
-      "text": "| V47 | 32 of 44 calendar days carry a commit; none on 2026-09-15 to 2026-09-20 (6 days) or 2026-09-26 to 2026-09-29 (4 days) or 2026-10-16 to 2026-10-17 (2 days); longest run of days with a commit: 16 (2026-09-30 to 2026-10-15) | calendar days (commit date at +0300, first to latest day inclusive) with at least one commit, the commit-free runs and the longest run of consecutive days with a commit | git history | `git log <base> --format=%cI`; the distinct calendar days, the gaps between them and the longest run of consecutive days | R |",
+      "text": "| V47 | 33 of 45 calendar days carry a commit; none on 2026-09-15 to 2026-09-20 (6 days) or 2026-09-26 to 2026-09-29 (4 days) or 2026-10-16 to 2026-10-17 (2 days); longest run of days with a commit: 16 (2026-09-30 to 2026-10-15) | calendar days (commit date at +0300, first to latest day inclusive) with at least one commit, the commit-free runs and the longest run of consecutive days with a commit | git history | `git log <base> --format=%cI`; the distinct calendar days, the gaps between them and the longest run of consecutive days | R |",
       "where": "paper/NUMBERS_V2.md:70",
       "reason": "a row of the generated numbers table: it names the source and the regeneration command of a figure; the figure is bound as a claim where the prose states it, not at this row, and `tools/docs_numbers.py check` compares the whole table with a fresh derivation",
-      "anchor_digest": "90451dbe003aa85152d6b895536bd5b799903ced46ba9f2a919a615dc6e4d6fb"
+      "anchor_digest": "2eb99534f439de6b5631e79fad6570bd13d32c23f235df5ab1d90e6de5b3486b"
     },
     {
       "id": "N-1548",
-      "text": "| V48 | 1,571 commits = 1280 non-merge + 291 merges | commits reachable from the base | git history | `git rev-list --count <base>`; with `--merges` for the merges | R |",
+      "text": "| V48 | 1,601 commits = 1304 non-merge + 297 merges | commits reachable from the base | git history | `git rev-list --count <base>`; with `--merges` for the merges | R |",
       "where": "paper/NUMBERS_V2.md:71",
       "reason": "a row of the generated numbers table: it names the source and the regeneration command of a figure; the figure is bound as a claim where the prose states it, not at this row, and `tools/docs_numbers.py check` compares the whole table with a fresh derivation",
-      "anchor_digest": "9ca70528e1abd4240eb59418c83278e913187991f0f9b5b2040a2c6e752c62e2"
+      "anchor_digest": "f0389c877e79b0567adf84cb72dde2544aedca2661b9b68580ec1d42d60f4d7f"
     },
     {
       "id": "N-1549",
@@ -27987,10 +28558,10 @@
     },
     {
       "id": "N-1990",
-      "text": "| `v0.4.0a1` | **Pre-release**, the first public release of the `v0.4` line (phase P3, *Capacity-Aware Autonomous Parallelism*, in progress). From its tag on it is a GitHub pre-release and a PyPI pre-release version, which `pip` installs only with `--pre`; until its tag exists this row states an intention. Alpha, research preview; it carries this README. Nothing here claims it exists before its tag does. |",
-      "where": "README.md:82",
+      "text": "| `v0.4.0a2` | **Pre-release**, the second public release of the `v0.4` line (phase P3, *Capacity-Aware Autonomous Parallelism*, in progress). From its tag on it is a GitHub pre-release; its upload to PyPI as a pre-release version, which `pip` installs only with `--pre`, is a separate step after the tag, so until PyPI lists it it cannot be installed from there; until its tag exists this row states an intention. Alpha, research preview; it carries this README, and it replaces `v0.4.0a1`. Nothing here claims it exists before its tag does. |",
+      "where": "README.md:83",
       "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
-      "anchor_digest": "d0c22916d12f570f3d035a99f2d00a1bea2c92fffa6179f31e603aa60c42a489"
+      "anchor_digest": "51f8c3a575b98f64f05366191b8be79cbb9415f0e0ef71970b25193aa55d126a"
     },
     {
       "id": "N-1991",
@@ -28008,10 +28579,10 @@
     },
     {
       "id": "N-1993",
-      "text": "`pip install hoh` installs the newest *stable* release on PyPI, which is `v0.1.0` as of 2026-10-21 (its history is at <https://pypi.org/project/hoh/#history>). The pre-release `v0.4.0a1` is installed only with `pip install --pre hoh` once it has been uploaded; until then PyPI holds `v0.1.0` only. To run a tagged release from source:",
-      "where": "README.md:94",
+      "text": "`pip install hoh` installs the newest *stable* release on PyPI, which is `v0.1.0` as of 2026-10-21 (its history is at <https://pypi.org/project/hoh/#history>). The pre-release `v0.4.0a2` is installed only with `pip install --pre hoh` once it has been uploaded; until then PyPI holds `v0.1.0` only. `v0.4.0a1` was never uploaded. To run a tagged release from source:",
+      "where": "README.md:96",
       "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
-      "anchor_digest": "1e87a2d81118ab58460bbe9e2caf4815087ca48d4781704b1df67925d7bbed25"
+      "anchor_digest": "2ed5fed6765863c251db6b81e1baf97ab1b343fdf9d5851504b4bd3af7197136"
     },
     {
       "id": "N-1994",
@@ -28166,6 +28737,363 @@
       "where": "paper/POSITION_PAPER_V2.md:1047",
       "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
       "anchor_digest": "8957d0465d0083a036458891d428a12fbc34827c5095e908b7760bb963cea566"
+    },
+    {
+      "id": "N-2016",
+      "text": "<!-- BEGIN GENERATED: tools/changelog_from_release_notes.py 0.4.0a2 -->",
+      "where": "CHANGELOG.md:5",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "dbb0e57141be39c5562e04ffa545dca15ec0ad7c5c47c2dc1778c7de2a625410"
+    },
+    {
+      "id": "N-2017",
+      "text": "## [0.4.0a2] - 2026-10-21 (pre-release)",
+      "where": "CHANGELOG.md:6",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "818f22da6404925078efa76b6ad4f9f3793f7e14c30e816867dfdcf56f7e709b"
+    },
+    {
+      "id": "N-2018",
+      "text": "**This is a pre-release.** `v0.4.0a2` is the second public release of the `v0.4` line: an alpha and a research preview, published as a GitHub",
+      "where": "CHANGELOG.md:8",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "83ef6fbb3c876791cf25c401a2957270ffc53c5a9b341dd5871931f699746b1e"
+    },
+    {
+      "id": "N-2019",
+      "text": "`v0.1.0` only. It replaces `v0.4.0a1`, whose public CI was red and whose package",
+      "where": "CHANGELOG.md:10",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "6c76abc71be8662b67650e38d8de9205e5966c4eb07ee53586db59f3128b9279"
+    },
+    {
+      "id": "N-2020",
+      "text": "carries three defects; the section of `v0.4.0a1` below carries the dated corrections. `v0.4.0a1` was not uploaded to PyPI: the operator decided",
+      "where": "CHANGELOG.md:11",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "2921fa69cb66f5b8ce2e38e265e898224a2dc8ddc9cca653ea2c66b9fb76e0a7"
+    },
+    {
+      "id": "N-2021",
+      "text": "on 2026-10-21 that PyPI starts with this release. `v0.4.0` is reserved for the closure of phase P3 (*v0.4 Capacity-Aware Autonomous",
+      "where": "CHANGELOG.md:12",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "29b1d9037b08fdab11b92c1d0963d7efc7167af3d15d9629a6eb0657de03c92b"
+    },
+    {
+      "id": "N-2022",
+      "text": "Parallelism*) and is unreleased; P3 is in progress and nothing in this section says it is closed. The facts about P3 are written from the",
+      "where": "CHANGELOG.md:13",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "d7576b12338b9378e3588d9ea099cc25cecb9345e41396f17a2516e6e651b5c2"
+    },
+    {
+      "id": "N-2023",
+      "text": "keeps P3-32 at PARTIAL; which actor class comes first is an operator decision.",
+      "where": "CHANGELOG.md:28",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "e9d0914e63ae41ee12b11e9bb20aaa9c6d655db8fc075534b31652759bab940b"
+    },
+    {
+      "id": "N-2024",
+      "text": "lease holds through its row alone), and the register keeps P3-04 at PARTIAL.",
+      "where": "CHANGELOG.md:33",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "7a0f50102f10483ca22ae92c872802004c737974bfa880d7ec0105dcb3180571"
+    },
+    {
+      "id": "N-2025",
+      "text": "* **A release table entry.** `tools/distribution_release.py` declares `v0.4.0a2` as a pre-release and unpinned: the two identity values are",
+      "where": "CHANGELOG.md:39",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "5cb46fb65a1403e89aca16068e4df0b696d705bed4ee1b0798f18a42225dccc1"
+    },
+    {
+      "id": "N-2026",
+      "text": "added after the tag exists, and every command refuses it until then. The entry of `v0.4.0a1` stays, pinned.",
+      "where": "CHANGELOG.md:40",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "21860bbe23f6daebbe785d1e7ab565fb9164da4b3fca863c731013636d14c1f4"
+    },
+    {
+      "id": "N-2027",
+      "text": "* **The other failures of the public CI of `v0.4.0a1` were in tests, not in the package.** The release-table tests used `v0.4.0a1` as their",
+      "where": "CHANGELOG.md:69",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "6551e0cf798ff674bdd77c23e83a3fbe43506fc997a5e261623ba56068413dbb"
+    },
+    {
+      "id": "N-2028",
+      "text": "* **Everything the `v0.3.0` and `v0.4.0a1` sections below say about their limits stands**, with the dated corrections of the `v0.4.0a1` section.",
+      "where": "CHANGELOG.md:77",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "d61e8d664c167bcd713a8c7eebc87947bd0b4d488d95c667609a57667de7c670"
+    },
+    {
+      "id": "N-2029",
+      "text": "* **PyPI.** Until `v0.4.0a2` is uploaded PyPI holds `v0.1.0` only (read on 2026-10-21); `v0.4.0a1` was never uploaded, and a pre-release is",
+      "where": "CHANGELOG.md:80",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "8f99954838c6f8b94ddbe82e347254181ec40564a19b86df63200191adea4e59"
+    },
+    {
+      "id": "N-2030",
+      "text": "* **What the development line reads against `v0.3.0`.** Its register reads the durability rows of P2 as IMPLEMENTED_NOT_PROVEN",
+      "where": "CHANGELOG.md:86",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "d44605f6bea479de4bf5ee9e3450a56c98cf276cf7d33c87bae4cd320785db1b"
+    },
+    {
+      "id": "N-2031",
+      "text": "again: the P3 slices changed source files that the evidence is bound to (a regression obligation under amendment A7, not a",
+      "where": "CHANGELOG.md:87",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "c8b563eb0605e62150d9a77f62c5376675ba306d001758c53987b68df8633ba1"
+    },
+    {
+      "id": "N-2032",
+      "text": "### Corrections (added 2026-10-21 with `v0.4.0a2`; every sentence of this section above stays as it was published)",
+      "where": "CHANGELOG.md:171",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "d27fe14e09f350b09a66f373e87e9fd6700f8a7c6e7e4e83eb9bc14d60197dee"
+    },
+    {
+      "id": "N-2033",
+      "text": "the tag names them, and all three are fixed in `v0.4.0a2`:",
+      "where": "CHANGELOG.md:180",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "592cf5da9fe97a7dbbfa5d0f1563546fef2bb1c0a2fc188583cfe5ebf0036981"
+    },
+    {
+      "id": "N-2034",
+      "text": "* **`v0.4.0a1` was not uploaded to PyPI.** The sentences of this section that say it is published \"to PyPI as a pre-release version\", and that \"until `v0.4.0a1` is",
+      "where": "CHANGELOG.md:191",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "edad3b9d4f6607089216de09f5def767e3bf7ae117a1c915b8ae8145fb7148fc"
+    },
+    {
+      "id": "N-2035",
+      "text": "uploaded PyPI holds `v0.1.0` only\", state an intention that was not carried out: the operator decided on 2026-10-21 that PyPI starts with `v0.4.0a2`. PyPI held",
+      "where": "CHANGELOG.md:192",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "e24ed7fd7c4e28a855d28f08d5a21e02ef95e9de2fe5da99b52a3a0019a5f2b4"
+    },
+    {
+      "id": "N-2036",
+      "text": "`v0.1.0` only on 2026-10-21. The package of this tag carries the three defects above; until `v0.4.0a2` is out, run it on Python 3.12 or 3.13.",
+      "where": "CHANGELOG.md:193",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "8ac0d68fc9d2afcd5444f1e32f5207bc781e4a7e1a1e6593c5ef084bd55790e3"
+    },
+    {
+      "id": "N-2037",
+      "text": "| `v0.4.0a1` | Pre-release, published on GitHub on 2026-10-21. **Superseded by `v0.4.0a2`**: its public CI was red, its package carries three defects (a budget check that fails open on Python 3.11, a recursion error in two digests on Python 3.11, and a read race in a record reader; its release notes state them with the fix), and it was **not uploaded to PyPI**. Kept for the record. |",
+      "where": "README.md:84",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "59ded55007f70d1d5b550013f17be5e53b7a412456c50dddf51ad6cec4205904"
+    },
+    {
+      "id": "N-2038",
+      "text": "# Release notes -- v0.4.0a2 (pre-release)",
+      "where": "RELEASE_NOTES.md:1",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "88c014c6dba0baf0471e0a642e4aa2dea3c596962468d3feb6d57c5df4fb1b96"
+    },
+    {
+      "id": "N-2039",
+      "text": "**This is a pre-release.** `v0.4.0a2` is the second public release of the `v0.4` line: an alpha and a research preview, published as a GitHub",
+      "where": "RELEASE_NOTES.md:3",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "83ef6fbb3c876791cf25c401a2957270ffc53c5a9b341dd5871931f699746b1e"
+    },
+    {
+      "id": "N-2040",
+      "text": "`v0.1.0` only. It replaces `v0.4.0a1`, whose public CI was red and whose package",
+      "where": "RELEASE_NOTES.md:5",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "6c76abc71be8662b67650e38d8de9205e5966c4eb07ee53586db59f3128b9279"
+    },
+    {
+      "id": "N-2041",
+      "text": "carries three defects; the section of `v0.4.0a1` below carries the dated corrections. `v0.4.0a1` was not uploaded to PyPI: the operator decided",
+      "where": "RELEASE_NOTES.md:6",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "2921fa69cb66f5b8ce2e38e265e898224a2dc8ddc9cca653ea2c66b9fb76e0a7"
+    },
+    {
+      "id": "N-2042",
+      "text": "on 2026-10-21 that PyPI starts with this release. `v0.4.0` is reserved for the closure of phase P3 (*v0.4 Capacity-Aware Autonomous",
+      "where": "RELEASE_NOTES.md:7",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "29b1d9037b08fdab11b92c1d0963d7efc7167af3d15d9629a6eb0657de03c92b"
+    },
+    {
+      "id": "N-2043",
+      "text": "Parallelism*) and is unreleased; P3 is in progress and nothing in this section says it is closed. The facts about P3 are written from the",
+      "where": "RELEASE_NOTES.md:8",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "d7576b12338b9378e3588d9ea099cc25cecb9345e41396f17a2516e6e651b5c2"
+    },
+    {
+      "id": "N-2044",
+      "text": "keeps P3-32 at PARTIAL; which actor class comes first is an operator decision.",
+      "where": "RELEASE_NOTES.md:23",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "e9d0914e63ae41ee12b11e9bb20aaa9c6d655db8fc075534b31652759bab940b"
+    },
+    {
+      "id": "N-2045",
+      "text": "lease holds through its row alone), and the register keeps P3-04 at PARTIAL.",
+      "where": "RELEASE_NOTES.md:28",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "7a0f50102f10483ca22ae92c872802004c737974bfa880d7ec0105dcb3180571"
+    },
+    {
+      "id": "N-2046",
+      "text": "* **A release table entry.** `tools/distribution_release.py` declares `v0.4.0a2` as a pre-release and unpinned: the two identity values are",
+      "where": "RELEASE_NOTES.md:34",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "5cb46fb65a1403e89aca16068e4df0b696d705bed4ee1b0798f18a42225dccc1"
+    },
+    {
+      "id": "N-2047",
+      "text": "added after the tag exists, and every command refuses it until then. The entry of `v0.4.0a1` stays, pinned.",
+      "where": "RELEASE_NOTES.md:35",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "21860bbe23f6daebbe785d1e7ab565fb9164da4b3fca863c731013636d14c1f4"
+    },
+    {
+      "id": "N-2048",
+      "text": "* **The other failures of the public CI of `v0.4.0a1` were in tests, not in the package.** The release-table tests used `v0.4.0a1` as their",
+      "where": "RELEASE_NOTES.md:64",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "6551e0cf798ff674bdd77c23e83a3fbe43506fc997a5e261623ba56068413dbb"
+    },
+    {
+      "id": "N-2049",
+      "text": "* **Everything the `v0.3.0` and `v0.4.0a1` sections below say about their limits stands**, with the dated corrections of the `v0.4.0a1` section.",
+      "where": "RELEASE_NOTES.md:72",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "d61e8d664c167bcd713a8c7eebc87947bd0b4d488d95c667609a57667de7c670"
+    },
+    {
+      "id": "N-2050",
+      "text": "* **PyPI.** Until `v0.4.0a2` is uploaded PyPI holds `v0.1.0` only (read on 2026-10-21); `v0.4.0a1` was never uploaded, and a pre-release is",
+      "where": "RELEASE_NOTES.md:75",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "8f99954838c6f8b94ddbe82e347254181ec40564a19b86df63200191adea4e59"
+    },
+    {
+      "id": "N-2051",
+      "text": "* **What the development line reads against `v0.3.0`.** Its register reads the durability rows of P2 as IMPLEMENTED_NOT_PROVEN",
+      "where": "RELEASE_NOTES.md:81",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "d44605f6bea479de4bf5ee9e3450a56c98cf276cf7d33c87bae4cd320785db1b"
+    },
+    {
+      "id": "N-2052",
+      "text": "again: the P3 slices changed source files that the evidence is bound to (a regression obligation under amendment A7, not a",
+      "where": "RELEASE_NOTES.md:82",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "c8b563eb0605e62150d9a77f62c5376675ba306d001758c53987b68df8633ba1"
+    },
+    {
+      "id": "N-2053",
+      "text": "## Corrections (added 2026-10-21 with `v0.4.0a2`; every sentence of this section above stays as it was published)",
+      "where": "RELEASE_NOTES.md:167",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "870fd038e0066ced8f375800ae7967cc185e94ba6c68ece2477e0b8052c692ae"
+    },
+    {
+      "id": "N-2054",
+      "text": "the tag names them, and all three are fixed in `v0.4.0a2`:",
+      "where": "RELEASE_NOTES.md:176",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "592cf5da9fe97a7dbbfa5d0f1563546fef2bb1c0a2fc188583cfe5ebf0036981"
+    },
+    {
+      "id": "N-2055",
+      "text": "* **`v0.4.0a1` was not uploaded to PyPI.** The sentences of this section that say it is published \"to PyPI as a pre-release version\", and that \"until `v0.4.0a1` is",
+      "where": "RELEASE_NOTES.md:187",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "edad3b9d4f6607089216de09f5def767e3bf7ae117a1c915b8ae8145fb7148fc"
+    },
+    {
+      "id": "N-2056",
+      "text": "uploaded PyPI holds `v0.1.0` only\", state an intention that was not carried out: the operator decided on 2026-10-21 that PyPI starts with `v0.4.0a2`. PyPI held",
+      "where": "RELEASE_NOTES.md:188",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "e24ed7fd7c4e28a855d28f08d5a21e02ef95e9de2fe5da99b52a3a0019a5f2b4"
+    },
+    {
+      "id": "N-2057",
+      "text": "`v0.1.0` only on 2026-10-21. The package of this tag carries the three defects above; until `v0.4.0a2` is out, run it on Python 3.12 or 3.13.",
+      "where": "RELEASE_NOTES.md:189",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "8ac0d68fc9d2afcd5444f1e32f5207bc781e4a7e1a1e6593c5ef084bd55790e3"
+    },
+    {
+      "id": "N-2058",
+      "text": "## Update, 2026-10-21, the pre-release v0.4.0a2",
+      "where": "docs/LIMITATIONS.md:2209",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "f7b91d1744137fc99a509a0d36c02a2c5aa77028055f5088d22457bc13b988ba"
+    },
+    {
+      "id": "N-2059",
+      "text": "Nothing above is edited. This update records what changed in the limits between `v0.4.0a1` and `v0.4.0a2`.",
+      "where": "docs/LIMITATIONS.md:2211",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "cfeda7bf39a350ecf52d1ac2cc894e5475cbc9b089f9aaae337ecb102e439b6d"
+    },
+    {
+      "id": "N-2060",
+      "text": "* *Three defects of the package of `v0.4.0a1` are fixed.* The dispatch budget (`HohRunLauncher._spent_by_run` and the autonomy record's dispatch",
+      "where": "docs/LIMITATIONS.md:2213",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "748fce2995060829b53e503615c3d3b61fd86e30b5eed51c0bef2ecd0d35d9a1"
+    },
+    {
+      "id": "N-2061",
+      "text": "covers the tree\" is to be read with those three defects for the package of `v0.4.0a1`; the release notes of `v0.4.0a1` carry the dated corrections. They",
+      "where": "docs/LIMITATIONS.md:2217",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "8df703157d58b789c6ab70970d229fd4a09b00672afeba95b6914e3b37b385d3"
+    },
+    {
+      "id": "N-2062",
+      "text": "are fixed in `v0.4.0a2`; that is a statement about the code and its tests, not a claim that no other interpreter-dependent answer remains.",
+      "where": "docs/LIMITATIONS.md:2218",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "45d4c2d4f5cf4a0ce305e37551a7f0fd36beee46528377c55eefb50f06157171"
+    },
+    {
+      "id": "N-2063",
+      "text": "* *The bounded executor of pre-authorised acts exists and executes nothing for real.* No production actor is registered; P3-32 reads",
+      "where": "docs/LIMITATIONS.md:2219",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "171105542e6ff0ed796a1a7e5fcef8ed5a5fa75549857172db095aae9f98e606"
+    },
+    {
+      "id": "N-2064",
+      "text": "* *`v0.4.0a1` was not uploaded to PyPI.* PyPI held `v0.1.0` only on 2026-10-21; the first upload of the `v0.4` line is planned to be `v0.4.0a2`, in a separate step after its tag.",
+      "where": "docs/LIMITATIONS.md:2221",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "cc60f61915f986a8bbd22b64e41084d49de7c251f1a550f92cbfff1725ad7238"
+    },
+    {
+      "id": "N-2065",
+      "text": "* *The public CI is evidence only for the commit it ran on.* The CI of `v0.4.0a1` was red, with causes in tests and in the package (see the notes);",
+      "where": "docs/LIMITATIONS.md:2226",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "c3644abb8e0ef8c6efb0ee5f5e2d45478693dde21efb6f23ae369220a84d9d03"
+    },
+    {
+      "id": "N-2066",
+      "text": "a green run of `v0.4.0a2` would say that the suite passed on three interpreters on GitHub's runners on that day, nothing about other platforms.",
+      "where": "docs/LIMITATIONS.md:2227",
+      "reason": "carries only identifiers -- phase, requirement, ledger-entry, amendment, stressor or erratum labels, a version, a section sign, a limit number or a figure tag; the figures themselves are bound on their own lines",
+      "anchor_digest": "fc57f7d6e6f9519063548f67315e2e144b55c99edc705539bdc00b6acf110faa"
     }
   ],
   "claim_surfaces": [
@@ -30822,6 +31750,26 @@
     },
     {
       "path": "tools/regression_watch.py",
+      "reason": "source-code",
+      "why": "source or test code under src/hoh/, tests/, or tools/; claims about its behaviour live in docs/** and are covered there, not by re-declaring the source itself as a claim surface"
+    },
+    {
+      "path": "src/hoh/extexec.py",
+      "reason": "source-code",
+      "why": "source or test code under src/hoh/, tests/, or tools/; claims about its behaviour live in docs/** and are covered there, not by re-declaring the source itself as a claim surface"
+    },
+    {
+      "path": "tests/test_capacity_lease.py",
+      "reason": "source-code",
+      "why": "source or test code under src/hoh/, tests/, or tools/; claims about its behaviour live in docs/** and are covered there, not by re-declaring the source itself as a claim surface"
+    },
+    {
+      "path": "tests/test_external_executor.py",
+      "reason": "source-code",
+      "why": "source or test code under src/hoh/, tests/, or tools/; claims about its behaviour live in docs/** and are covered there, not by re-declaring the source itself as a claim surface"
+    },
+    {
+      "path": "tests/test_portable_walks.py",
       "reason": "source-code",
       "why": "source or test code under src/hoh/, tests/, or tools/; claims about its behaviour live in docs/** and are covered there, not by re-declaring the source itself as a claim surface"
     }

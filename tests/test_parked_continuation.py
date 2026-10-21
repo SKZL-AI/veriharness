@@ -1173,8 +1173,9 @@ def test_the_register_rows_of_the_resolver_slice_name_the_probes_the_matrix_read
         assert path == "tests/test_parked_continuation.py" and hasattr(sys.modules[__name__], node), row_id
         assert "equivalent" not in probe, row_id
         assert rows[row_id]["previous_probe"]["replaced_on"] == "2026-10-19", row_id
-    # P3-32 moved on in slice 3 (tests/test_limit_policies.py reads its row); what slice 2 left is kept by addition
-    assert "REPLAN" in rows["P3-32"]["previous_probe"]["equivalent"]
+    # P3-32 moved on in slices 3 and 4 (tests/test_limit_policies.py and tests/test_external_executor.py read its
+    # row); what slice 2 left is kept by addition, two probes down
+    assert "REPLAN" in rows["P3-32"]["previous_probe"]["previous_probe"]["equivalent"]
     assert callable(governance.resolve_routed_decisions)
     note31, note29 = rows["P3-31"]["probe"]["note"], rows["P3-29"]["probe"]["note"]
     assert "per programme epoch" in note31 and "no independent READY work" in note31 and "release_policy" in note31

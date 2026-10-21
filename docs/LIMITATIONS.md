@@ -2205,3 +2205,23 @@ and no source file; the limits of `v0.3.0` are the limits the sections above sta
   earlier commits stay as written) the history is 1,571 commits, 291 of them merges `[V48]`; the first and the latest commit of the
   mainline are 43 days 20 hours apart `[V46]`, 32 of the 44 calendar days carry a commit `[V47]`, and the ledger runs to O271 with 243 numbered entries
   `[V49]`. The register holds 236 requirements, 88 PROVEN and 11 PARTIAL `[V10]`.
+
+## Update, 2026-10-21, the pre-release v0.4.0a2
+
+Nothing above is edited. This update records what changed in the limits between `v0.4.0a1` and `v0.4.0a2`.
+
+* *Three defects of the package of `v0.4.0a1` are fixed.* The dispatch budget (`HohRunLauncher._spent_by_run` and the autonomy record's dispatch
+  limit) did not see a run whose `state.json` is a dangling link on Python 3.11, nor a run in a directory it cannot read on any interpreter, and counted
+  it as a spend of zero; `tree_digest`, `inode_digest` and `seal_plan` raised `RecursionError` on a deep tree on Python 3.11; and `read_single_link`
+  refused a whole record that a writer was replacing or publishing at that instant. Every limit that states "the budget is enforced" or "a digest
+  covers the tree" is to be read with those three defects for the package of `v0.4.0a1`; the release notes of `v0.4.0a1` carry the dated corrections. They
+  are fixed in `v0.4.0a2`; that is a statement about the code and its tests, not a claim that no other interpreter-dependent answer remains.
+* *The bounded executor of pre-authorised acts exists and executes nothing for real.* No production actor is registered; P3-32 reads
+  PARTIAL in the register. The limit that the system does not itself release, publish or push stands: the executor refuses those classes.
+* *`v0.4.0a1` was not uploaded to PyPI.* PyPI held `v0.1.0` only on 2026-10-21; the first upload of the `v0.4` line is planned to be `v0.4.0a2`, in a separate step after its tag.
+* *The figures of the development line, taken again.* At the commit `82bdc60c` (committed on 2026-10-21 at 15:30 +0300; the figures quoted above for the
+  earlier commits stay as written) the history is 1,601 commits, 297 of them merges `[V48]`; the first and the latest commit of the
+  mainline are 44 days 15 hours apart `[V46]`, 33 of the 45 calendar days carry a commit `[V47]`, and the ledger runs to O271 with 243 numbered entries
+  `[V49]`; the register now holds 236 requirements, 88 PROVEN and 11 PARTIAL `[V10]`.
+* *The public CI is evidence only for the commit it ran on.* The CI of `v0.4.0a1` was red, with causes in tests and in the package (see the notes);
+  a green run of `v0.4.0a2` would say that the suite passed on three interpreters on GitHub's runners on that day, nothing about other platforms.

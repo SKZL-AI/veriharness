@@ -46,6 +46,7 @@ from .orchestrator import (
     RunVerdict,
 )
 from .failures import AUTOMATIC_KINDS
+from .capability import walk_tree
 from .controller import open_seal_arenas
 from .durable_io import DurableWriteNotSynced, UnsafeRecordFile, durable_create, read_single_link
 from .preflightgate import (MENDABLE, PreflightRefused, PreflightRequirement, check_preflight,
@@ -1398,11 +1399,16 @@ class HohRunLauncher(RunLauncher):
         spent: dict[str, int] = {}
         if not self.root.is_dir():
             return spent
-        # `rglob`, not `glob`. A one-level glob sees only runs sitting
-        # directly under the root, and a run one directory deeper -- which
-        # nothing in this file forbids -- would have spent dispatches that
-        # the next run was then handed again.
-        for verdict_state in sorted(self.root.rglob("state.json")):
+        try:
+            states = self._state_files(self.root)
+        except OSError as exc:
+            # A directory that cannot be listed may hold the state of the one run
+            # that spent the budget: not a spend of zero (`TreeWalkRefused`).
+            raise BudgetExhausted(
+                f"the shared dispatch budget cannot be computed: {exc}. Nothing "
+                f"further is started, because a spend that cannot be read is not "
+                f"a spend of zero") from exc
+        for verdict_state in states:
             try:
                 n = self._dispatches_in(verdict_state)
             except (OSError, ValueError, RecursionError) as exc:
@@ -1419,6 +1425,25 @@ class HohRunLauncher(RunLauncher):
             key = verdict_state.parent.name
             spent[key] = spent.get(key, 0) + n
         return spent
+
+    @staticmethod
+    def _state_files(root: Path) -> list[Path]:
+        """Every entry named `state.json` below `root`, at any depth, in path order.
+
+        Not `Path.rglob`, and not a one-level glob. A one-level glob sees only
+        runs sitting directly under the root, and a run one directory deeper --
+        which nothing in this file forbids -- would have spent dispatches that
+        the next run was then handed again. `rglob` sees every depth but its
+        answer depends on the interpreter: 3.11 omits a *dangling* `state.json`
+        link (so a run whose state is a link counted as zero: the budget failed
+        open on the oldest supported Python) and raises `RecursionError` on a
+        deep tree. `walk_tree` lists every entry by name on all of them and
+        follows no link; whether an entry is a usable state is
+        `_dispatches_in`'s question, which refuses a link, a FIFO, a directory.
+        A directory that cannot be listed is `TreeWalkRefused` (an `OSError`).
+        """
+        return [Path(full) for _rel, full in walk_tree(root, skip_denied=False)
+                if os.path.basename(full) == "state.json"]
 
     @staticmethod
     def _dispatches_in(path: Path) -> int:
