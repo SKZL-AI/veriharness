@@ -109,7 +109,7 @@ from .dispatchrecovery import (
     CAPABILITY_REQUIREMENTS, MasterBinding, RecoveryError, check_account_handle,
     stale_master_reason,
 )
-from .durable_io import DurableWriteNotSynced, durable_create
+from .durable_io import DurableWriteNotSynced, durable_create, settled_stat
 from .telemetry import NOT_AVAILABLE
 
 SCHEMA = "hoh-routing-policy/1"
@@ -742,7 +742,7 @@ def _read_failover(dir_fd: int, name: str = FAILOVER_FILE) -> dict | None:
         raise RoutingRefused("the failover record cannot be opened (a link or unreadable)") \
             from None
     try:
-        st = os.fstat(fd)
+        st = settled_stat(fd)           # a creator may be between its link and its drop
         if not stat.S_ISREG(st.st_mode) or st.st_nlink != 1:
             raise RoutingRefused("the failover record is not one regular file with one name")
         raw = b""

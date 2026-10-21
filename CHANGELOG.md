@@ -8,15 +8,15 @@ All notable changes to this project are documented here. Formatting loosely foll
 **This is a pre-release.** `v0.4.0a2` is the second public release of the `v0.4` line: an alpha and a research preview, published as a GitHub
 pre-release; it is uploaded to PyPI as a pre-release version (`pip install --pre hoh`) in a separate step after the tag, and until that upload PyPI holds
 `v0.1.0` only. It replaces `v0.4.0a1`, whose public CI was red and whose package
-carries three defects; the section of `v0.4.0a1` below carries the dated corrections. `v0.4.0a1` was not uploaded to PyPI: the operator decided
+carries four defects; the section of `v0.4.0a1` below carries the dated corrections. `v0.4.0a1` was not uploaded to PyPI: the operator decided
 on 2026-10-21 that PyPI starts with this release. `v0.4.0` is reserved for the closure of phase P3 (*v0.4 Capacity-Aware Autonomous
 Parallelism*) and is unreleased; P3 is in progress and nothing in this section says it is closed. The facts about P3 are written from the
 register at the cut and not before.
 
 Readiness is not claimed here either: the board, `docs/READINESS.md`, still reads `TECHNICALLY_STABLE_READY = no` `[V13]`, as at `v0.3.0`.
 Below this section stand the sections of the earlier releases, each the text of its tag with its dated corrections and with the figures of its
-own cut. The `[Vnn]` figures of the present section are the rows of `paper/NUMBERS_V2.md`, taken at the commit 82bdc60c (committed on
-2026-10-21 at 15:30 +0300). This line has no benchmark result: the matched-budget campaigns of `v0.1.0` stand as they were measured, nobody has repeated
+own cut. The `[Vnn]` figures of the present section are the rows of `paper/NUMBERS_V2.md`, taken at the commit 3439fb9f (committed on
+2026-10-21 at 21:23 +0300). This line has no benchmark result: the matched-budget campaigns of `v0.1.0` stand as they were measured, nobody has repeated
 them on this code, and the pre-registered agentic benchmark has a protocol and no result.
 
 ### Added
@@ -32,10 +32,10 @@ them on this code, and the pre-registered agentic benchmark has a protocol and n
   be read is never a free run. The slice states its own windows (the owner's next ask still supersedes the rows of its earlier wave, and a run that takes no run
   lease holds through its row alone), and the register keeps P3-04 at PARTIAL.
 * **The measured autonomy facts, taken again.** At the base of this section the build's lease records hold 22 epochs, 17 of them
-  verified successions that all ended COMPLETE, each requested by the rotation policy; 254 run
-  directories since 2026-10-01; 1189 review reports with the machine-bound footer, 233 of them RELEASE_NO; and 106 of
-  2,155 entries of the orchestrator's running notes marked as the operator's. The history is 1,601 commits, 297 of them
-  merges `[V48]`, over 44 days 15 hours `[V46]`, and 33 of the 45 calendar days carry a commit `[V47]`; the ledger runs to O271 with 243 numbered entries `[V49]`.
+  verified successions that all ended COMPLETE, each requested by the rotation policy; 257 run
+  directories since 2026-10-01; 1209 review reports with the machine-bound footer, 235 of them RELEASE_NO; and 107 of
+  2,213 entries of the orchestrator's running notes marked as the operator's. The history is 1,612 commits, 299 of them
+  merges `[V48]`, over 44 days 21 hours `[V46]`, and 33 of the 45 calendar days carry a commit `[V47]`; the ledger runs to O271 with 243 numbered entries `[V49]`.
 * **A release table entry.** `tools/distribution_release.py` declares `v0.4.0a2` as a pre-release and unpinned: the two identity values are
   added after the tag exists, and every command refuses it until then. The entry of `v0.4.0a1` stays, pinned.
 
@@ -66,6 +66,16 @@ them on this code, and the pre-registered agentic benchmark has a protocol and n
   instant; the reader refused both. A refusal is fail-closed: no wrong value was ever returned, but a refusal that was not real stopped runs
   and tests intermittently. The read now opens the name again when the file it opened has lost its name, and looks at a second name again
   for a short bounded time; a name that keeps being replaced, and two names that stay, are still refused.
+* **A published file seen with two names for an instant is no longer refused by the readers that count the names themselves.** `durable_create`
+  publishes a file with `os.link` and drops its temporary name afterwards, so for about 60 to 66 microseconds the file has two names. The record read
+  above waits that out; three other readers of files that `durable_create` publishes counted the names themselves and refused the whole file: the run-lease
+  lock (`src/hoh/runlease.py`), the preflight report (`src/hoh/preflightgate.py`) and the routing failover record (`src/hoh/routing.py`). A drive whose second
+  opener met the lock inside that window halted with "not a regular file with one name". All three now ask `settled_stat` of `src/hoh/durable_io.py`, the
+  bounded second look of the record read; a file that keeps two names past the bound, has three, or is not a regular file is still refused. The defect was
+  fail-closed (a halt, never a wrong value or an unseen spend) and was in the package of `v0.4.0a1` as well. In an unseamed stress probe of the run-lease lock
+  on Python 3.12.3, 7 of 8,000 acquisitions made in pairs were refused before the fix and 0 of 8,000 after it, and 0 of 8,000 on each of Python 3.11, 3.12 and 3.13
+  with the fix. That the failure of the public CI of the first export of this release (the Python 3.13 job: 1 test failed and 13,103 passed, one test, "run lease refused ... not a
+  regular file with one name"; the run passed when it was run again) was this window is suspected, not proven; the first export was not tagged.
 * **The other failures of the public CI of `v0.4.0a1` were in tests, not in the package.** The release-table tests used `v0.4.0a1` as their
   example of an unpinned release and went red the day it was pinned; a helper removed a deep tree with the recursive `os.walk` of Python 3.11;
   the mainline test depended on the runner's git setup (a detached checkout of a tag); the role-pane state test waited on a stand-in that the
@@ -188,9 +198,14 @@ a protocol and no result.
      second correction says.
   3. *A read race in `durable_io`.* `read_single_link` refuses a whole record that a writer is replacing or publishing at that instant (about 0.4 % of the reads in a
      stress reproduction); it fails closed, a refusal and never a wrong value, but it is a source of intermittent failures.
+* **A fourth defect, found on 2026-10-21 after the first export of `v0.4.0a2` and present in this package too: the create window of the single-name readers.**
+  `durable_create` publishes a file with `os.link` and drops its temporary name afterwards, so for about 60 to 66 microseconds the file has two names. At the tag,
+  `src/hoh/runlease.py` (the run-lease lock), `src/hoh/preflightgate.py` (the preflight report) and `src/hoh/routing.py` (the failover record) counted the names themselves
+  and refused the whole file in that window (a drive whose second opener met the lock halted). It fails closed: a refusal, never a wrong value. It is fixed in `v0.4.0a2`.
 * **`v0.4.0a1` was not uploaded to PyPI.** The sentences of this section that say it is published "to PyPI as a pre-release version", and that "until `v0.4.0a1` is
   uploaded PyPI holds `v0.1.0` only", state an intention that was not carried out: the operator decided on 2026-10-21 that PyPI starts with `v0.4.0a2`. PyPI held
   `v0.1.0` only on 2026-10-21. The package of this tag carries the three defects above; until `v0.4.0a2` is out, run it on Python 3.12 or 3.13.
+  The fourth item above names one more, so the package of this tag carries four defects in all.
 <!-- END GENERATED: tools/changelog_from_release_notes.py -->
 
 <!-- BEGIN GENERATED: tools/changelog_from_release_notes.py 0.3.0 -->

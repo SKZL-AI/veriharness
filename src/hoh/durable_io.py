@@ -195,11 +195,13 @@ SECOND_NAME_GRACE_S = 0.25
 _SECOND_NAME_POLL_S = 0.001
 
 
-def _settled_stat(fd: int) -> os.stat_result:
+def settled_stat(fd: int) -> os.stat_result:
     """`os.fstat(fd)`, re-taken for up to `SECOND_NAME_GRACE_S` while the file has exactly two names.
 
     Two names are what a record has while `durable_create` has linked it and not yet dropped its temp name; a
-    third, or a count that stays at two, is not that and is returned as it is."""
+    third, or a count that stays at two, is not that and is returned as it is. Every reader that judges the link
+    count of a file `durable_create` published asks here, on its own descriptor (`read_single_link`, the run-lease
+    lock, the preflight report, the failover record): a bare `os.fstat` would refuse the whole file for that instant."""
     st = os.fstat(fd)
     if st.st_nlink != 2 or not stat.S_ISREG(st.st_mode):
         return st
@@ -243,7 +245,7 @@ def read_single_link(path: Path | str) -> bytes | None:
                 raise UnsafeRecordFile(path, "is a symbolic link", errno.ELOOP) from exc
             raise
         try:
-            st = _settled_stat(fd)
+            st = settled_stat(fd)
             if not stat.S_ISREG(st.st_mode):
                 raise UnsafeRecordFile(path, "is not a regular file", errno.EINVAL)
             replaced = st.st_nlink == 0 and attempt + 1 < RECORD_REOPEN_ATTEMPTS

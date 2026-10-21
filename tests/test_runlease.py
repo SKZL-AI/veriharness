@@ -852,7 +852,7 @@ def test_the_module_removes_nothing_signals_nothing_runs_nothing_and_writes_only
     assert {attr for mod, attr in attrs if mod == "datetime"} <= {"strptime"}
     assert {attr for mod, attr in attrs if mod == "fcntl"} <= {"flock", "LOCK_EX", "LOCK_NB"}
     assert {attr for mod, attr in attrs if mod == "durable_io"} <= {
-        "durable_create", "durable_write", "read_single_link", "DiskFullError"}
+        "durable_create", "durable_write", "read_single_link", "settled_stat", "DiskFullError"}
     assert {attr for mod, attr in attrs if mod == "socket"} <= {"gethostname"}
     all_attrs = {n.attr for n in ast.walk(tree) if isinstance(n, ast.Attribute)}
     for forbidden in ("unlink", "remove", "rmdir", "rename", "replace_file", "kill", "killpg", "system",

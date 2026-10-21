@@ -2216,12 +2216,16 @@ Nothing above is edited. This update records what changed in the limits between 
   refused a whole record that a writer was replacing or publishing at that instant. Every limit that states "the budget is enforced" or "a digest
   covers the tree" is to be read with those three defects for the package of `v0.4.0a1`; the release notes of `v0.4.0a1` carry the dated corrections. They
   are fixed in `v0.4.0a2`; that is a statement about the code and its tests, not a claim that no other interpreter-dependent answer remains.
+* *A fourth defect of the package of `v0.4.0a1`, found after the first export of `v0.4.0a2`, is fixed.* The run-lease lock, the preflight report and the routing
+  failover record counted the names of a file themselves and refused the whole file for the instant `durable_create` had linked it and not yet dropped its
+  temporary name; the drive halted (fail-closed). They look again within a bound now, as the record read does; a file that keeps two names, has three, or is
+  not a regular file is still refused.
 * *The bounded executor of pre-authorised acts exists and executes nothing for real.* No production actor is registered; P3-32 reads
   PARTIAL in the register. The limit that the system does not itself release, publish or push stands: the executor refuses those classes.
 * *`v0.4.0a1` was not uploaded to PyPI.* PyPI held `v0.1.0` only on 2026-10-21; the first upload of the `v0.4` line is planned to be `v0.4.0a2`, in a separate step after its tag.
-* *The figures of the development line, taken again.* At the commit `82bdc60c` (committed on 2026-10-21 at 15:30 +0300; the figures quoted above for the
-  earlier commits stay as written) the history is 1,601 commits, 297 of them merges `[V48]`; the first and the latest commit of the
-  mainline are 44 days 15 hours apart `[V46]`, 33 of the 45 calendar days carry a commit `[V47]`, and the ledger runs to O271 with 243 numbered entries
+* *The figures of the development line, taken again.* At the commit `3439fb9f` (committed on 2026-10-21 at 21:23 +0300; the figures quoted above for the
+  earlier commits stay as written) the history is 1,612 commits, 299 of them merges `[V48]`; the first and the latest commit of the
+  mainline are 44 days 21 hours apart `[V46]`, 33 of the 45 calendar days carry a commit `[V47]`, and the ledger runs to O271 with 243 numbered entries
   `[V49]`; the register now holds 236 requirements, 88 PROVEN and 11 PARTIAL `[V10]`.
 * *The public CI is evidence only for the commit it ran on.* The CI of `v0.4.0a1` was red, with causes in tests and in the package (see the notes);
   a green run of `v0.4.0a2` would say that the suite passed on three interpreters on GitHub's runners on that day, nothing about other platforms.

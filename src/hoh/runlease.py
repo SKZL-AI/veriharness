@@ -396,7 +396,7 @@ class RunLeases:
                 raise
             raise RunLeaseError("unreadable", f"{lock}: {exc}") from exc
         try:
-            status = os.fstat(fd)
+            status = durable_io.settled_stat(fd)    # a creator of the lock may be between its link and its drop
             if not stat.S_ISREG(status.st_mode) or status.st_nlink != 1:
                 raise RunLeaseError("unreadable", f"{lock} is not a regular file with one name")
             deadline = time.monotonic() + self.lock_wait_seconds

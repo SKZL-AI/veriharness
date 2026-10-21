@@ -158187,6 +158187,31 @@
       "rule": "internal-working-document"
     },
     {
+      "path": "dogfood/pfix312a/DECISIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/pfix312a/NOTES.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/pfix312a/QUESTIONS.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/pfix312a/fix.diff",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
+      "path": "dogfood/pfix312a/spec.md",
+      "decision": "EXCLUDE",
+      "rule": "internal-working-document"
+    },
+    {
       "path": "dogfood/pfixroles/DECISIONS.md",
       "decision": "EXCLUDE",
       "rule": "internal-working-document"
@@ -194463,6 +194488,11 @@
     },
     {
       "path": "tests/test_controller.py",
+      "decision": "INCLUDE",
+      "rule": "tests"
+    },
+    {
+      "path": "tests/test_create_window.py",
       "decision": "INCLUDE",
       "rule": "tests"
     },

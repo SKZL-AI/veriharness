@@ -63,7 +63,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from .durable_io import DurableWriteNotSynced, durable_create
+from .durable_io import DurableWriteNotSynced, durable_create, settled_stat
 
 #: How `tools/preflight.py` writes `measured_at_utc` (`strftime` of a UTC time).
 REPORT_TIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
@@ -469,7 +469,7 @@ def _read_report(path: Path) -> bytes:
         raise PreflightRefused(
             f"the preflight report {_where(path)} cannot be opened: {exc.strerror}") from exc
     try:
-        st = os.fstat(fd)
+        st = settled_stat(fd)           # a creator may be between its link and its drop
         if not stat.S_ISREG(st.st_mode):
             raise PreflightRefused(
                 f"the preflight report {_where(path)} is not a regular file")
