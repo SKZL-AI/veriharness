@@ -64,8 +64,8 @@ RELEASES = {
     # refuses it.
     "v0.4.0a2": {
         "version": "0.4.0a2",
-        "commit": None,
-        "tag_object": None,
+        "commit": "096ab852a0bbc932415cd9ccd3b6c80f57489e5a",
+        "tag_object": "8637f374fad78897c35e07b4df46b3939becf6ea",
         "main_has_no_package_diff": True,
         "prerelease": True,
     },
