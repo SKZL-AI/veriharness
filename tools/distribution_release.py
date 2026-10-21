@@ -54,8 +54,8 @@ RELEASES = {
     # then every command refuses it.
     "v0.4.0a1": {
         "version": "0.4.0a1",
-        "commit": None,
-        "tag_object": None,
+        "commit": "332e1db10d970584dc8a1f672912f5c11c6b4db0",
+        "tag_object": "17e061153ef6d070dc39042549cb5d6e1a94fd45",
         "main_has_no_package_diff": True,
         "prerelease": True,
     },
